@@ -1,0 +1,48 @@
+#  -------------------------------------------------------------------------
+#  Copyright (C) 2020 BMW AG
+#  -------------------------------------------------------------------------
+#  This Source Code Form is subject to the terms of the Mozilla Public
+#  License, v. 2.0. If a copy of the MPL was not distributed with this
+#  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#  -------------------------------------------------------------------------
+
+include(FindPackageHandleStandardArgs)
+set(ramses-logic_VERSION @RLOGIC_VERSION@)
+
+@PACKAGE_INIT@
+
+find_package(PkgConfig QUIET)
+
+# find include dir
+find_path(ramses-logic_INCLUDE_DIR ramses-logic/LogicEngine.h
+    HINTS @PACKAGE_RLOGIC_INSTALL_HEADERS_PATH@
+)
+
+# Correct handling of shared lib versions on Linux, no version on other platforms (most notably Windows)
+if (CMAKE_SYSTEM_NAME MATCHES "Linux")
+    find_library(ramses-logic_LIBRARY
+        NAMES "libramses-logic.so.@RLOGIC_VERSION_MAJOR@.@RLOGIC_VERSION_MINOR@"
+        HINTS @PACKAGE_RLOGIC_INSTALL_LIBRARY_PATH@
+    )
+else ()
+    find_library(ramses-logic_LIBRARY
+        NAMES "ramses-logic"
+        HINTS @PACKAGE_RLOGIC_INSTALL_RUNTIME_PATH@
+    )
+endif()
+
+
+find_package_handle_standard_args(ramses-logic
+    FOUND_VAR ramses-logic_FOUND
+    REQUIRED_VARS ramses-logic_LIBRARY ramses-logic_INCLUDE_DIR
+    VERSION_VAR ramses-logic_VERSION)
+
+add_library(rlogic-ramses-logic SHARED IMPORTED GLOBAL)
+set_target_properties(rlogic-ramses-logic PROPERTIES IMPORTED_LOCATION ${ramses-logic_LIBRARY})
+if (MSVC)
+    set_target_properties(rlogic-ramses-logic PROPERTIES IMPORTED_IMPLIB ${ramses-logic_LIBRARY})
+endif()
+target_include_directories(rlogic-ramses-logic INTERFACE ${ramses-logic_INCLUDE_DIR})
+add_library(rlogic::ramses-logic ALIAS rlogic-ramses-logic)
+
+message(STATUS "Found rlogic::ramses-logic with lib ${ramses-logic_LIBRARY} and include dir: ${ramses-logic_INCLUDE_DIR}")

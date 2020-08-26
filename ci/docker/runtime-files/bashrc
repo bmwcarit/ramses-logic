@@ -1,0 +1,45 @@
+#!/bin/bash
+
+#  -------------------------------------------------------------------------
+#  Copyright (C) 2020 BMW AG
+#  -------------------------------------------------------------------------
+#  This Source Code Form is subject to the terms of the Mozilla Public
+#  License, v. 2.0. If a copy of the MPL was not distributed with this
+#  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#  -------------------------------------------------------------------------
+
+# persistent storage location
+export PERSISTENT_STORAGE="/home/rl-build/persistent-storage"
+
+# more bash aliases
+alias ..='cd ..'
+
+# add more stuff here
+# <---
+
+# build.sh bash completion
+_buildsh_complete()
+{
+    local cur
+    COMPREPLY=()
+    cur=${COMP_WORDS[COMP_CWORD]}
+    case "$COMP_CWORD" in
+        1)
+            COMPREPLY=( $(compgen -W "L64_GCC L64_GCCv7 L64_LLVM TEST_COVERAGE DOC_PACKAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE" -- $cur) )
+            ;;
+        2)
+            COMPREPLY=( $(compgen -W "Debug Release RelWithDebInfo" -- $cur) )
+            ;;
+        3|4|5)
+            COMPREPLY=( $(compgen -W "False True" -- $cur) )
+            ;;
+    esac
+    return 0
+}
+complete -F _buildsh_complete build.sh
+
+# config bash history
+HISTCONTROL=ignoreboth
+HISTSIZE=1000
+HISTFILESIZE=2000
+HISTFILE=${PERSISTENT_STORAGE}/.bash_history

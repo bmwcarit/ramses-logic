@@ -1,0 +1,110 @@
+//  -------------------------------------------------------------------------
+//  Copyright (C) 2020 BMW AG
+//  -------------------------------------------------------------------------
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//  -------------------------------------------------------------------------
+
+namespace rlogic.serialization;
+
+enum EPropertyType:uint8
+{
+    Unknown = 0,
+    Float = 1,
+    Vec2f = 2,
+    Vec3f = 3,
+    Vec4f = 4,
+    Int32 = 5,
+    Vec2i = 6,
+    Vec3i = 7,
+    Vec4i = 8,
+    Struct = 9,
+    String = 10,
+    Bool = 11
+}
+
+// Because unions can't hold primitives directly,
+// we need to define some dummy structs which only
+// hold a single primitive
+struct float_s
+{
+    v:float;
+}
+struct vec2f_s
+{
+    x:float;
+    y:float;
+}
+struct vec3f_s
+{
+    x:float;
+    y:float;
+    z:float;
+}
+struct vec4f_s
+{
+    x:float;
+    y:float;
+    z:float;
+    w:float;
+}
+struct int32_s
+{
+    v:int32;
+}
+struct vec2i_s
+{
+    x:int32;
+    y:int32;
+}
+struct vec3i_s
+{
+    x:int32;
+    y:int32;
+    z:int32;
+}
+struct vec4i_s
+{
+    x:int32;
+    y:int32;
+    z:int32;
+    w:int32;
+}
+struct bool_s
+{
+    v:bool;
+}
+// Strings can't be stored in structs
+// Therefore we need a table
+table string_s
+{
+    v:string;
+}
+
+// Now we can build our union from our
+// structs with primitives
+union PropertyValue
+{
+    float_s,
+    vec2f_s,
+    vec3f_s,
+    vec4f_s,
+    int32_s,
+    vec2i_s,
+    vec3i_s,
+    vec4i_s,
+    string_s,
+    bool_s
+}
+
+table Property
+{
+    name:string;
+    children:[Property];
+    value:PropertyValue;
+    // See TODO in code; we need this temporarily (or maybe permanently) in order to NOT set ramses node properties to our default values, when not expected
+    wasSet:bool;
+}
+
+root_type Property;

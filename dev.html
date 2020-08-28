@@ -1,0 +1,665 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Understand RAMSES Logic architecture and design &mdash; ramses_logic 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="prev" title="master" href="changelog_ref.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Quickstart</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme_ref.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_ref.html#build">Build</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_ref.html#examples">Examples</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Building</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Cloning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#build-requirements">Build requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#build-options">Build options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#building-on-windows">Building on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#building-in-docker-windows-or-linux">Building in Docker (Windows or Linux)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#building-on-linux-natively">Building on Linux natively</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#typical-build-errors-and-how-to-solve-them">Typical build errors and how to solve them</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#linking-script-outputs-to-ramses-scenes">Linking script outputs to <code class="docutils literal notranslate"><span class="pre">ramses</span></code> scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#error-handling">Error handling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#print-messages-from-within-lua">Print messages from within Lua</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#additional-lua-syntax-specifics">Additional Lua syntax specifics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#serialization-deserialization">Serialization/Deserialization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#logging">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#security-and-memory-safety">Security and memory safety</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#class-index">Class Index</a></li>
+</ul>
+<p class="caption"><span class="caption-text">ChangeLog</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog_ref.html">master</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog_ref.html#v0-1-0">v0.1.0</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Developers</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Understand RAMSES Logic architecture and design</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#current-architecture">Current Architecture</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#design-decision-log">Design decision log</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#contributing">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#pull-requests">Pull requests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#commit-guidelines">Commit guidelines</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#make-smaller-but-expressive-commits">Make smaller but expressive commits</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#bundle-commits-into-multiple-prs-when-it-makes-sense">Bundle commits into multiple PRs when it makes sense</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#review">Review</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#review-requirements">Review requirements</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#review-steps">Review steps</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#code-style">Code style</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#clang-tidy">Clang Tidy</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#custom-style-check">Custom style check</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#additional-conventions">Additional conventions</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#continuous-integration">Continuous integration</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#testing-linux-builds-with-docker">Testing Linux builds with Docker</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#testing-windows-builds-locally">Testing Windows builds locally</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="#branching">Branching</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ramses_logic</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Understand RAMSES Logic architecture and design</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/dev.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <p id="developer-docs">The following sections are aimed at <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">Logic</span></code> developers and contributors. If you simply
+want to use the library, stop reading here, unless you are interested in the internal workings
+of the code and are not afraid of technical details!</p>
+<div class="section" id="understand-ramses-logic-architecture-and-design">
+<h1>Understand RAMSES Logic architecture and design<a class="headerlink" href="#understand-ramses-logic-architecture-and-design" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="current-architecture">
+<h2>Current Architecture<a class="headerlink" href="#current-architecture" title="Permalink to this headline">¶</a></h2>
+<p>TODO (Violin/Sven)</p>
+</div>
+<div class="section" id="design-decision-log">
+<h2>Design decision log<a class="headerlink" href="#design-decision-log" title="Permalink to this headline">¶</a></h2>
+<p>The following list documents the design decisions behind the <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">Logic</span></code> project in
+inverse-chronological order (latest decisions come on top).</p>
+<ul>
+<li><dl class="simple">
+<dt>Do we support animations?</dt><dd><p>Yes, but they are not implemented yet.
+TODO (Violin/Sven) document this once we have fully decided</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>How to implement serialization?</dt><dd><p>Serialization is implemented using Flatbuffers - a library which allows binary optimizations
+when loading objects which are flat in memory.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Static vs. shared library</dt><dd><p>Both are supported, but shared lib is the preferred option. The public API is designed in a way
+that no memory allocation is exposed, so that DLLs on Windows will not have the problem of
+incompatible runtimes.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which version of <code class="docutils literal notranslate"><span class="pre">C++</span></code> to use?</dt><dd><p>As with CMake, <code class="docutils literal notranslate"><span class="pre">C++</span></code> version is a tradeoff between modern code and compatibility.
+We settled on <code class="docutils literal notranslate"><span class="pre">C++17</span></code> so that we can use some of the modern features like <code class="docutils literal notranslate"><span class="pre">string_view</span></code>,
+and <code class="docutils literal notranslate"><span class="pre">std::optional</span></code> and <code class="docutils literal notranslate"><span class="pre">std::variant</span></code>.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which version of``CMake`` to use?</dt><dd><p><code class="docutils literal notranslate"><span class="pre">CMake</span></code> is an obvious choice for any C/C++ project as it is de-facto industry standard
+for cross-platform development. There is a tradeoff between cleaniness and compatibility when
+choosing a minimal CMake version, and we settled on version 3.13, despite it being relatively
+new and not installed by default on the majority of Linux distributions. CMake made great improvements
+over the last few versions, and 3.13 specifically offers much better ways to install and package
+projects, as well as many QoL changes.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which tool to use for documentation</dt><dd><p>We use a combination of Doxygen, Sphinx and Breathe. Doxygen because it has great support
+for inline C++ documentation and lexer capabilities. Sphinx because it is industry standard
+and provides great flexibility in putting multiple different projects under the same umbrella.
+Breathe is a bridge between Doxygen and Sphinx which provides beautiful html output from
+raw Doxygen output.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Plain <code class="docutils literal notranslate"><span class="pre">Lua</span></code> vs. <code class="docutils literal notranslate"><span class="pre">Sol</span></code> wrapper</dt><dd><p>Since <code class="docutils literal notranslate"><span class="pre">Lua</span></code> has a low-level API in C which requires careful handling of the stack as well
+as working with raw pointers and casts, we decised to use <code class="docutils literal notranslate"><span class="pre">sol</span></code> - a great C++ wrapper for
+Lua which also provides easy switch between different <code class="docutils literal notranslate"><span class="pre">Lua</span></code> implementations with negligable
+performance overhead.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Should scripts interact between each other?</dt><dd><p>One of the difficulties of script environments is to define boundaries and state of scripts.
+It is often required that data is passed between scripts, but it is highly undesirable that
+scripts global variables influence each other and create unexpected side effects. To address
+this we put each script in its own <code class="docutils literal notranslate"><span class="pre">Lua</span></code> environment, but allow scripts to pass data to
+each other by explicitly linking one script’s output(s) to another script’s input. This can
+be done during asset design time or during runtime.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>What is the interface of scripts to the <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">Logic</span></code> runtime?</dt><dd><p>Based on the latter decision, we had to define how <code class="docutils literal notranslate"><span class="pre">Lua</span></code> scripts interact with the C++ side of
+the runtime. After lengthy discussions and considering various different options, we settled on
+a solution where each <code class="docutils literal notranslate"><span class="pre">Lua</span></code> script declares explicitly its interface via a special function with the
+same name. There is a differentiation between inputs and outputs which also defines when a script will be
+executed, namely when it’s inputs values changed. Script payload must be placed in another special function
+called <code class="docutils literal notranslate"><span class="pre">run</span></code> which can access inputs as declared, and also set outputs’ values.</p>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>How should scripts interact with the <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> scene(s)?</dt><dd><p><code class="docutils literal notranslate"><span class="pre">Lua</span></code> offers multiple ways to interact between scripts and C++. The two main options we considered:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>provide custom classes and overload them in C++ code (e.g. RamsesNode type in <code class="docutils literal notranslate"><span class="pre">Lua</span></code>)</p></li>
+<li><p>provide interface in <code class="docutils literal notranslate"><span class="pre">Lua</span></code> to set predefined types (e.g. int, float, vec3, etc.) and link them to C++ objects</p></li>
+</ul>
+</div></blockquote>
+<p>We chose the second option because it allows decoupling of the <code class="docutils literal notranslate"><span class="pre">Lua</span></code> scripts from the actual 3D scene, and also allows
+the <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">Composer</span></code> which uses the <code class="docutils literal notranslate"><span class="pre">Lua</span></code> runtime to generically link the scripts
+properties to <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> objects.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which tools to use for CI/testing?</dt><dd><p>All CI tools are based on Docker for two reasons: Docker is industry standard for reproducible
+build environments, and it nicely abstracts tool installation details from the user - such as Python
+environment, extensions, tool versions etc. Also, the Docker image recipe can be used as a baseline
+for a custom build environment or debug build issues arising from using special compilers. The concrete
+tools we use for quality checks are: Googletest, clang-tidy, valgrind, and a bunch of custom python scripts
+for license checking and code-style. We also use llvm tools for test coverage and statistics.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which approach to use for continuous integration?</dt><dd><p>There are multiple open platforms for CI available for open source projects, but all of them
+have limitations, mostly in the capacity. Therefore we chose to use an internal commercial CI system
+for the initial development of the project in order to not hit limitations. It is planned to switch to
+an open platform in future (i.e. Github actions, CircleCI or similar).</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Should we support JIT compilation of scripts?</dt><dd><p>Currently we use standard Lua, no JIT, but we maintain the possibility to switch to LuaJIT in the
+future.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which version of <code class="docutils literal notranslate"><span class="pre">Lua</span></code>?</dt><dd><p>We chose Lua 5.1 as it is still compatible with LuaJIT and enables potentially compiling scripts
+dynamically in a performance-friendly way.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Which scripting language to use?</dt><dd><p><code class="docutils literal notranslate"><span class="pre">Lua</span></code> was an easy choice, because it provides by far the best combination between extensibility
+and performance. The stack concept of Lua provides unprecendented flexibility for custom extensions
+in C++ code, and the metatable approach provides great way to provide object oriented features in a
+pure scripting language. The other option we considered was Python due to its power and popularity, but
+ultimately ruled out as an option due to the size of the interpreter itself and the complexity of it
+which is not required for real time graphics applications.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Should we make separate library or embed support in <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> directly?</dt><dd><p><code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> is designed to be minimalistic and closely aligned to OpenGL. Even though it would be more
+convenient to have a single library, we decided it’s better to create a separate lib/module so that
+users which don’t need the scripting support are not forced with it, and we can also be more flexible
+with the choice of technology.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Should scripts be executed remotely (renderer), or client-side only? Or both?</dt><dd><p><code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> provides distribution support for graphical content - in fact that’s the primary feature
+of <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> that distinguishes it from other engines. We had the choice to whether to make scripting
+execution also remote (i.e. executed on a renderer component rather than a client component). There are
+pros and cons for both approaches, but ultimately we decided to implement a client-side scripting runtime
+in favor of security and stability concerns. Sending scripts to a remote renderer poses a security risk
+mostly for embedded devices which must fulfill safety and quality criteria, and the benefits of executing
+scripts remotely is comparatively small.</p>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Should we add scripting support to <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code>?</dt><dd><p>As more and more users of <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> use the rendering engine, various applications had to
+find a solution to the lack of scripting capabilities. We tried several solutions - code generation,
+proprietary scripting formats, as well as implementing everything in C++ purely. Reality showed that
+these solutions do very similar things - abstract and control the structure of ramses scene(s) and
+they even shared the same code, for e.g. animation, grouping of nodes, offscreen rendering. Thus we
+decided that scripting support would provide a common ground for implementing such logic and abstraction.</p>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="contributing">
+<h1>Contributing<a class="headerlink" href="#contributing" title="Permalink to this headline">¶</a></h1>
+</div>
+<div class="section" id="pull-requests">
+<h1>Pull requests<a class="headerlink" href="#pull-requests" title="Permalink to this headline">¶</a></h1>
+<p>All contributions must be offered as GitHub pull requests. Please read Github documentation for
+more info how to fork projects and create pull requests.</p>
+<p>Please make sure the PR has a good description - what does it do? Which were the considerations
+while implementing it, if relevant? Did you consider other options, but decided against them
+for a good reason?</p>
+</div>
+<div class="section" id="commit-guidelines">
+<h1>Commit guidelines<a class="headerlink" href="#commit-guidelines" title="Permalink to this headline">¶</a></h1>
+<p>There are no strict rules how commits have to be arranged, but we offer some guidelines which
+make the review easier and ensures faster integration.</p>
+<div class="section" id="make-smaller-but-expressive-commits">
+<h2>Make smaller but expressive commits<a class="headerlink" href="#make-smaller-but-expressive-commits" title="Permalink to this headline">¶</a></h2>
+<p>Commits should be small, yet expressive. If you apply a renaming schema to all files in the
+repository, you should not split them in hundreds of commits - put them in one commit, as
+long as the reviewer can see a pattern. If you implement multiple classes/libraries which
+build on top of each other, could be reasonable to split them in multiple commits to “tell
+a story”. If you need to forward fix something - it’s ok to have a “FIX” commit, don’t have
+to rebase the whole branch. This works especially well after a first review round, when you
+want to only fix a reviewer’s comment without rewriting the code.</p>
+</div>
+<div class="section" id="bundle-commits-into-multiple-prs-when-it-makes-sense">
+<h2>Bundle commits into multiple PRs when it makes sense<a class="headerlink" href="#bundle-commits-into-multiple-prs-when-it-makes-sense" title="Permalink to this headline">¶</a></h2>
+<p>If you have a complex feature which can be split into multiple, smaller PRs, in a way that
+some of them can be integrated earlier than others, then do so. For example, if you need
+some refactoring before you add the actual feature, and the refactoring makes sense in
+general even without the new feature - then consider creating two PRs. This increases the
+chances that the refactoring is merged earlier, thus avoiding conflicts and rebases, while
+the feature is subject of further discussion and refinement.</p>
+<div class="admonition note">
+<p class="admonition-title">Note</p>
+<p>When submitting multiple PRs which depend on each other, please mark their
+dependency by adding a line like this: “Depends-On: &lt;change-url&gt;” where &lt;change-url&gt;
+is a link to another PR which needs to go in first.</p>
+</div>
+</div>
+</div>
+<div class="section" id="review">
+<h1>Review<a class="headerlink" href="#review" title="Permalink to this headline">¶</a></h1>
+<p>All code is subject to peer review. We try to be objective and focus more on technical
+question rather than cosmetic preferences, but all reviewers are human and inevitably
+have preferences. We try to acknowledge that everyone has their own style, but we also try
+to keep things consistent across a large codebase. We strive to maintain friendly and helpful
+language when reviewing, give concrete suggestions how things could be done instead, in
+favor of just disliking a piece of code.</p>
+<div class="section" id="review-requirements">
+<h2>Review requirements<a class="headerlink" href="#review-requirements" title="Permalink to this headline">¶</a></h2>
+<p>Before asking for review, please make sure <a class="reference external" href="https://genivi.github.io/ramses-logic/dev.html#continuous-integration">the code works</a>,
+there are unit tests (even for proof-of-concept code), and there are <a class="reference external" href="https://genivi.github.io/ramses-logic/dev.html#code-style">no code style or
+formatting violations</a>.
+The PR source branch has to be based on the latest
+released branch HEAD revision, unless the requested change is a hotfix for an existing
+release. Please don’t rebase branches after you asked for a review, unless the reviewer
+explicitly asked for it. You can merge the latest HEAD of the target branch into the PR
+source branch, if you need a change that was integrated after the first review round.</p>
+</div>
+<div class="section" id="review-steps">
+<h2>Review steps<a class="headerlink" href="#review-steps" title="Permalink to this headline">¶</a></h2>
+<p>As soon as a PR is created, it will be looked at by a reviewer. If you want to signal
+that it’s being worked on/changed, put a WIP in the name, or add a WIP label. After a
+review round, address the comments of the review, and wait for the reviewer to mark
+them as ‘resolved’. Once everything is resolved, the PR will enter the <a class="reference external" href="https://genivi.github.io/ramses-logic/dev.html#continuous-integration">integration process</a>.</p>
+</div>
+</div>
+<div class="section" id="code-style">
+<h1>Code style<a class="headerlink" href="#code-style" title="Permalink to this headline">¶</a></h1>
+<p>The code style is checked using LLVM tools (Clang-tidy) as well as a custom Python-based
+style script which performs additional checks. Both checks have to be successful before
+code can be meaningfully reviewed.</p>
+<div class="section" id="clang-tidy">
+<h2>Clang Tidy<a class="headerlink" href="#clang-tidy" title="Permalink to this headline">¶</a></h2>
+<p>Clang-tidy is performed as an automated build step within the <a class="reference external" href="https://genivi.github.io/ramses-logic/dev.html#continuous-integration">continuous integration pipeline</a>.
+Check its documentation for instructions how to execute it locally before submitting code.</p>
+</div>
+<div class="section" id="custom-style-check">
+<h2>Custom style check<a class="headerlink" href="#custom-style-check" title="Permalink to this headline">¶</a></h2>
+<p>Some things can’t be easily checked with off-the-shelve tools, so we have our own scripts
+to check them (we are generally trying to shift towards established tools when possible).
+For example license headers, header guards, or tab/space restrictions. You can execute
+those scripts on your local machine with Python like this:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> &lt;source_root&gt;
+python3 ci/scripts/code_style_checker/check_all_styles.py
+</pre></div>
+</div>
+</div>
+<div class="section" id="additional-conventions">
+<h2>Additional conventions<a class="headerlink" href="#additional-conventions" title="Permalink to this headline">¶</a></h2>
+<p>When it comes to code style, not everything can be checked automatically with tools. The following
+list describes additional conventions and style patterns used throughout the project:</p>
+<ul>
+<li><dl>
+<dt>Namespaces</dt><dd><p>All code must be in a namespace. Code in namespaces is indented. Nested namespaces
+must use the compact C++17 notation (namespace1::namespace2::namespaces3)</p>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Good</span>
+<span class="k">namespace</span> <span class="n">namespace1</span><span class="o">::</span><span class="n">namespace2</span>
+<span class="p">{</span>
+    <span class="k">class</span> <span class="nc">MyClass</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Bad</span>
+<span class="k">namespace</span> <span class="n">namespace1</span>
+<span class="p">{</span>
+    <span class="k">namespace</span> <span class="n">namespace2</span>
+    <span class="p">{</span>
+        <span class="k">class</span> <span class="nc">MyClass</span><span class="p">;</span>
+    <span class="p">}</span>
+<span class="p">}</span>
+
+<span class="c1">// Also bad</span>
+<span class="k">namespace</span> <span class="n">namespace1</span><span class="p">{</span>
+<span class="k">namespace</span> <span class="n">namespace2</span> <span class="p">{</span>
+
+<span class="k">class</span> <span class="nc">MyClass</span><span class="p">;</span>
+
+<span class="p">}</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+</dd>
+</dl>
+</li>
+<li><dl>
+<dt>Usage of <code class="docutils literal notranslate"><span class="pre">auto</span></code></dt><dd><p>The C++ community is divided when it comes to usage of the <code class="docutils literal notranslate"><span class="pre">auto</span></code> keyword. Therefore
+we don’t enforce strict rules, except for some concrete cases listed below</p>
+<ul class="simple">
+<li><p>When declaring primitive types (int, strings, bool etc.), don’t use auto:</p></li>
+</ul>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Good</span>
+<span class="n">std</span><span class="o">::</span><span class="n">string</span> <span class="n">myString</span> <span class="o">=</span> <span class="s">&quot;hello&quot;</span><span class="p">;</span>
+<span class="c1">// Bad</span>
+<span class="k">auto</span> <span class="n">myString</span> <span class="o">=</span> <span class="s">&quot;hello&quot;</span><span class="p">;</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>When using template functions which have the type as explicit template parameter, don’t repeat it but use auto instead</p></li>
+</ul>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Good</span>
+<span class="k">auto</span> <span class="n">myUniquePtr</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">MyType</span><span class="o">&gt;</span><span class="p">();</span>
+<span class="c1">// Bad</span>
+<span class="n">std</span><span class="o">::</span><span class="n">unique_ptr</span><span class="o">&lt;</span><span class="n">MyType</span><span class="o">&gt;</span> <span class="n">myUniquePtr</span> <span class="o">=</span> <span class="n">std</span><span class="o">::</span><span class="n">make_unique</span><span class="o">&lt;</span><span class="n">MyType</span><span class="o">&gt;</span><span class="p">();</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>When using loops and iterators, use auto, but don’t omit const and reference qualifiers if used</p></li>
+</ul>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Good</span>
+<span class="k">for</span><span class="p">(</span><span class="k">const</span> <span class="k">auto</span><span class="o">&amp;</span> <span class="nl">readIterator</span> <span class="p">:</span> <span class="n">myVector</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">readIterator</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Bad</span>
+<span class="k">for</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">MyType</span><span class="o">&gt;::</span><span class="n">iterator</span> <span class="nl">readIterator</span> <span class="p">:</span> <span class="n">myVector</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="o">*</span><span class="n">readIterator</span><span class="p">;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>When using loops and iterators, use auto, but don’t omit const and reference qualifiers if used</p></li>
+</ul>
+<div class="highlight-cpp notranslate"><div class="highlight"><pre><span></span><span class="c1">// Good</span>
+<span class="k">for</span><span class="p">(</span><span class="k">const</span> <span class="k">auto</span><span class="o">&amp;</span> <span class="nl">readIterator</span> <span class="p">:</span> <span class="n">myVector</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="n">readIterator</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Bad</span>
+<span class="k">for</span><span class="p">(</span><span class="k">const</span> <span class="n">std</span><span class="o">::</span><span class="n">vector</span><span class="o">&lt;</span><span class="n">MyType</span><span class="o">&gt;::</span><span class="n">iterator</span> <span class="nl">readIterator</span> <span class="p">:</span> <span class="n">myVector</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="n">std</span><span class="o">::</span><span class="n">cout</span> <span class="o">&lt;&lt;</span> <span class="o">*</span><span class="n">readIterator</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="c1">// Bad</span>
+<span class="k">for</span><span class="p">(</span><span class="k">auto</span> <span class="nl">readIterator</span> <span class="p">:</span> <span class="n">myVector</span><span class="p">)</span>
+<span class="p">{</span>
+    <span class="c1">// code which doesn&#39;t require non-const access to readIterator</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<ul class="simple">
+<li><p>For all other cases, apply common sense. If using <code class="docutils literal notranslate"><span class="pre">auto</span></code> makes it more difficult to understand/read the code,
+then don’t use it. If the type is obvious and auto makes the code more readable, use auto!</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+</div>
+<div class="section" id="continuous-integration">
+<h1>Continuous integration<a class="headerlink" href="#continuous-integration" title="Permalink to this headline">¶</a></h1>
+<p>There is no support for a public CI service yet, it will be added in the future. If you want to contribute
+to the project, you can ensure your code gets merged quickly by executing some or all of the tests yourself
+before submitting a PR.</p>
+<p>We suggest executing the following set of builds in order to maximize the chance that the PR will be merged
+without further changes:</p>
+<ul class="simple">
+<li><p>A GCC-based build in Release mode (Linux or Windows WSL)</p></li>
+<li><p>A LLVM-based build in Debug mode (Linux or Windows WSL)</p></li>
+<li><p>A Visual Studio 2017 CE Release build (Windows)</p></li>
+<li><p>A CLANG_TIDY run in Docker (Linux or Windows WSL)</p></li>
+<li><p>A TEST_COVERAGE run in Docker (Linux or Windows WSL)</p></li>
+</ul>
+<blockquote>
+<div><p>The following subchapters explain how to execute these builds.</p>
+</div></blockquote>
+<div class="section" id="testing-linux-builds-with-docker">
+<h2>Testing Linux builds with Docker<a class="headerlink" href="#testing-linux-builds-with-docker" title="Permalink to this headline">¶</a></h2>
+<p>You can build and start the docker container for building by following the
+<a class="reference external" href="https://genivi.github.io/ramses-logic/build.html#building-in-docker-windows-or-linux">build instructions for Docker</a>. The possible builds
+and options are listed when executing the build.sh script in the container
+without any parameters.</p>
+</div>
+<div class="section" id="testing-windows-builds-locally">
+<h2>Testing Windows builds locally<a class="headerlink" href="#testing-windows-builds-locally" title="Permalink to this headline">¶</a></h2>
+<p>You can follow the <a class="reference external" href="https://genivi.github.io/ramses-logic/build.html#building-on-windows">build instructions for Windows</a> and then execute the RUN_TESTS target of Visual Studio,
+or use the ctest command in the build folder.</p>
+</div>
+</div>
+<div class="section" id="branching">
+<h1>Branching<a class="headerlink" href="#branching" title="Permalink to this headline">¶</a></h1>
+<p>Currently, we don’t maintain multiple branches. We have a single mainline branch
+where releases are pushed and tagged. After we have reached a level of feature
+completeness where we feel comfortable to support older branches, we will
+do so.</p>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+      
+        <a href="changelog_ref.html" class="btn btn-neutral float-left" title="master" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, BMW AG
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

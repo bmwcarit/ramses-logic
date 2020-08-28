@@ -1,0 +1,471 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Cloning &mdash; ramses_logic 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Overview" href="api.html" />
+    <link rel="prev" title="Introduction" href="readme_ref.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Quickstart</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="readme_ref.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_ref.html#build">Build</a></li>
+<li class="toctree-l1"><a class="reference internal" href="readme_ref.html#examples">Examples</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Building</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Cloning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#build-requirements">Build requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#build-options">Build options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#building-on-windows">Building on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#building-in-docker-windows-or-linux">Building in Docker (Windows or Linux)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#building-on-linux-natively">Building on Linux natively</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#typical-build-errors-and-how-to-solve-them">Typical build errors and how to solve them</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#linking-script-outputs-to-ramses-scenes">Linking script outputs to <code class="docutils literal notranslate"><span class="pre">ramses</span></code> scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#error-handling">Error handling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#print-messages-from-within-lua">Print messages from within Lua</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#additional-lua-syntax-specifics">Additional Lua syntax specifics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#serialization-deserialization">Serialization/Deserialization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#logging">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#security-and-memory-safety">Security and memory safety</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#class-index">Class Index</a></li>
+</ul>
+<p class="caption"><span class="caption-text">ChangeLog</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog_ref.html">master</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog_ref.html#v0-1-0">v0.1.0</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dev.html">Understand RAMSES Logic architecture and design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#contributing">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#pull-requests">Pull requests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#commit-guidelines">Commit guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#review">Review</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#code-style">Code style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#continuous-integration">Continuous integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#branching">Branching</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ramses_logic</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Cloning</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/build.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <p id="build-instructions">The following sections describe different build scenarios with detailed
+options and explanations. If you are a versed C++ developer and are familiar
+with CMake, consider using the <a class="reference internal" href="readme_ref.html#quickstart"><span class="std std-ref">quickstart guide</span></a>.</p>
+<div class="section" id="cloning">
+<h1>Cloning<a class="headerlink" href="#cloning" title="Permalink to this headline">¶</a></h1>
+<p>The <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> project uses <a class="reference external" href="https://git-scm.com/book/en/v2/Git-Tools-Submodules">Git submodules</a>
+to bundle its dependencies, including <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> itself. Git doesn’t automatically
+clone these, the user has to clone them explicitly like this:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git submodule update --init --recursive
+</pre></div>
+</div>
+<p>The “recursive” option makes sure that sub-dependencies are cloned as well. Beware that using
+the <code class="docutils literal notranslate"><span class="pre">download</span> <span class="pre">as</span> <span class="pre">ZIP</span></code> option in <code class="docutils literal notranslate"><span class="pre">GitHub</span></code> also doesn’t package dependencies, so if you go for
+this option, make sure that you download the submodules yourself, otherwise the build will fail.</p>
+<p>Cloning all submodules recursively will also clone <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> and can take quite some time. If you want
+to avoid this, and you already have a <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> build you want to re-use, consider cloning the
+submodules one-by-one and not clone <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> in conjunktion with the <a class="reference internal" href="#build-options"><span class="std std-ref">Build options</span></a> to use an
+existing <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> target.</p>
+</div>
+<div class="section" id="build-requirements">
+<h1>Build requirements<a class="headerlink" href="#build-requirements" title="Permalink to this headline">¶</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">Logic</span></code> requires CMake 3.13 or newer and a C++17-compatible compiler:</p>
+<ul class="simple">
+<li><p>Clang6 or newer</p></li>
+<li><p>GCC7 or newer</p></li>
+<li><p>MSVC2017 (_MSC_VER &gt;= 1914)</p></li>
+</ul>
+<p>Since <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> is a dependency of <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> and is built alongside it, following
+additional build dependencies must be present in order to run some of the visual demos/examples:</p>
+<ul class="simple">
+<li><dl class="simple">
+<dt>Windows</dt><dd><ul>
+<li><p>A graphics card and drivers which supports OpenGL 4.2 or newer</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>Linux</dt><dd><ul>
+<li><p>X11 or Wayland (or both) developer libraries</p></li>
+<li><p>OpenGL + EGL developer libraries</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+<p>For example, for <code class="docutils literal notranslate"><span class="pre">Ubuntu</span> <span class="pre">18.04</span> <span class="pre">LTS</span></code> these can be installed like this:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>sudo apt-get install <span class="se">\</span>
+        libx11-dev <span class="se">\</span>
+        libwayland-dev <span class="se">\</span>
+        libgles2-mesa-dev
+</pre></div>
+</div>
+<p>Refer to the <a class="reference external" href="https://github.com/GENIVI/ramses#building-and-testing">RAMSES build instructions</a> for more details.</p>
+</div>
+<div class="section" id="build-options">
+<h1>Build options<a class="headerlink" href="#build-options" title="Permalink to this headline">¶</a></h1>
+<p>Following CMake settings can be optionally enabled/disabled when building:</p>
+<ul>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_RAMSES_TARGET</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ramses-shared-lib-client-only, ramses-shared-lib-&lt;platform&gt;, or a custom target name</p></li>
+<li><p>default: ramses-shared-lib-client-only (will be built from <code class="docutils literal notranslate"><span class="pre">Ramses</span></code> sources)</p></li>
+<li><p>enables setting a custom Ramses target instead of building and linking Ramses from source. If set,
+and if the target exists, will use it, otherwise fallback to building from source.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_ALLOW_RAMSES_BUILD</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: ON</p></li>
+<li><p>Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET (see option above) is
+not a valid ramses target. This will disable the automatic fallback to building Ramses from source if the specified
+custom target is not available at generation time for some reason.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_WARNINGS_AS_ERRORS</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: ON</p></li>
+<li><p>treats compiler warnings as errors and aborts the build. Use this option if your compiler generates warnings which are not fixed yet.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_FORCE_BUILD_TESTS</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: OFF</p></li>
+<li><p>by default, tests are built only when RAMSES Logic is built as a standalone projects. Use this to force building them.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_BUILD_EXAMPLES</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: ON</p></li>
+<li><p>set to OFF if you don’t need the examples and want to reduce building time</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_ENABLE_TEST_COVERAGE</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: OFF</p></li>
+<li><p>enables clang’s options to generate code coverage from test executables</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_BUILD_DOCS</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: OFF</p></li>
+<li><p>builds these documentation pages. Requires <a class="reference external" href="https://www.sphinx-doc.org/">sphinx</a>, <a class="reference external" href="https://breathe.readthedocs.io/">breathe</a> and the <a class="reference external" href="https://github.com/readthedocs/sphinx_rtd_theme">rtd documentation theme</a> by sphinx.</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="option-list">
+<dt><kbd><span class="option">-D<var>ramses-logic_BUILD_WITH_LTO</var></span></kbd></dt>
+<dd><ul class="simple">
+<li><p>options: ON/OFF</p></li>
+<li><p>default: OFF</p></li>
+<li><p>turns clang’s link-time optimizations on (details <a class="reference external" href="https://llvm.org/docs/LinkTimeOptimization.html">here</a>)</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>-DCMAKE_TOOLCHAIN_FILE=&lt;file&gt;</dt><dd><ul class="simple">
+<li><p>options: any of the files in <a class="reference external" href="https://github.com/GENIVI/ramses-logic/tree/master/cmake/toolchain">cmake/toolchain</a> or your custom cross-compilation toolchain file</p></li>
+<li><p>default: not set</p></li>
+<li><p>This is a standard CMake feature. We provide several toolchain files for popular compilers, use them or create your own</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+<div class="section" id="building-on-windows">
+<h1>Building on Windows<a class="headerlink" href="#building-on-windows" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><p>Start CMake GUI</p></li>
+<li><p>Select &lt;ramses-logic&gt; as source path, choose arbitrary &lt;build&gt; folder.</p></li>
+<li><p>Click ‘Configure’</p></li>
+<li><p>Optionally, set some of the options above</p></li>
+<li><p>Click ‘Generate’</p></li>
+<li><p>Open solution in Visual Studio</p></li>
+</ul>
+</div>
+<div class="section" id="building-in-docker-windows-or-linux">
+<h1>Building in Docker (Windows or Linux)<a class="headerlink" href="#building-in-docker-windows-or-linux" title="Permalink to this headline">¶</a></h1>
+<p>We prefer to build <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> in Docker because it abstracts the dependency installation
+and the <code class="docutils literal notranslate"><span class="pre">CMake</span></code> invocations away from the user. Docker itself is installed slightly differently
+on different distributions, check the docker manual for your distro. The instructions below
+are for Ubuntu 18.04 LTS:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>apt install docker.io
+groupadd docker             <span class="c1">#can fail if already exists</span>
+usermod –aG docker <span class="nv">$USER</span>
+newgrp docker               <span class="c1">#logs you into the new group in the current terminal session</span>
+
+docker run hello-world      <span class="c1">#check that docker works</span>
+
+<span class="nb">cd</span> &lt;ramses-sdk&gt;/ci/docker
+./build-image.sh            <span class="c1"># builds the docker image locally (will take a while)</span>
+
+./start-container.sh        <span class="c1"># Starts a docker container</span>
+
+<span class="c1"># We are inside the docker container now</span>
+
+./build.sh L64_LLVM Release <span class="c1"># Builds with Clang/llvm x64 in Release mode</span>
+
+./build.sh L64_GCC Debug    <span class="c1"># Builds with GCC x64 in Debug mode</span>
+
+<span class="nb">cd</span> build/L64_GCC-Debug
+ctest -C Debug -V           <span class="c1"># Runs unit tests with CTest</span>
+
+<span class="c1"># Build artifacts are stored in build/&lt;compiler&gt;-&lt;buildtype&gt;</span>
+<span class="c1"># This folder is persistent across docker executions! You can access it from your host after exiting the container</span>
+
+./build.sh DOC              <span class="c1"># Builds the documentation and puts it into $PACKAGE_DIR as archive</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="building-on-linux-natively">
+<h1>Building on Linux natively<a class="headerlink" href="#building-on-linux-natively" title="Permalink to this headline">¶</a></h1>
+<p>Assuming you have met the <a class="reference internal" href="#build-requirements"><span class="std std-ref">Build requirements</span></a>, you can build <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> like this:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span><span class="nb">cd</span> &lt;ramses-logic-src&gt;
+mkdir build <span class="o">&amp;&amp;</span> <span class="nb">cd</span> build
+<span class="nb">export</span> <span class="nv">OPTIONS</span><span class="o">=</span><span class="s2">&quot;-Dramses-logic_OPTION_1=ON ...&quot;</span> <span class="c1"># see above for a list of options</span>
+cmake <span class="nv">$OPTIONS</span> ../
+make
+</pre></div>
+</div>
+</div>
+<div class="section" id="typical-build-errors-and-how-to-solve-them">
+<h1>Typical build errors and how to solve them<a class="headerlink" href="#typical-build-errors-and-how-to-solve-them" title="Permalink to this headline">¶</a></h1>
+<ul class="simple">
+<li><dl class="simple">
+<dt>not able to find something in external/ folder</dt><dd><ul>
+<li><p>Check that you downloaded the submodules as shown in <a class="reference internal" href="#cloning"><span class="std std-ref">Cloning</span></a></p></li>
+</ul>
+</dd>
+</dl>
+</li>
+<li><dl class="simple">
+<dt>CMake can’t identify the compiler of <code class="docutils literal notranslate"><span class="pre">Visual</span> <span class="pre">Studio</span> <span class="pre">Community</span> <span class="pre">edition</span></code></dt><dd><ul>
+<li><p>You need to download a Windows SDK 8.1</p></li>
+</ul>
+</dd>
+</dl>
+</li>
+</ul>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="api.html" class="btn btn-neutral float-right" title="Overview" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="readme_ref.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, BMW AG
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

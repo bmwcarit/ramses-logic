@@ -1,0 +1,287 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Introduction &mdash; ramses_logic 0.0.1 documentation</title>
+  
+
+  
+  
+  
+  
+
+  
+  <script type="text/javascript" src="_static/js/modernizr.min.js"></script>
+  
+    
+      <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+        <script src="_static/language_data.js"></script>
+    
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+
+    
+
+  
+  <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="Cloning" href="build.html" />
+    <link rel="prev" title="Ramses Logic documentation" href="index.html" /> 
+</head>
+
+<body class="wy-body-for-nav">
+
+   
+  <div class="wy-grid-for-nav">
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+          
+
+          
+            <a href="index.html">
+          
+
+          
+            
+            <img src="_static/logo.png" class="logo" alt="Logo"/>
+          
+          </a>
+
+          
+            
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+              
+            
+            
+              <p class="caption"><span class="caption-text">Quickstart</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#build">Build</a></li>
+<li class="toctree-l1"><a class="reference internal" href="#examples">Examples</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Building</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="build.html">Cloning</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#build-requirements">Build requirements</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#build-options">Build options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#building-on-windows">Building on Windows</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#building-in-docker-windows-or-linux">Building in Docker (Windows or Linux)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#building-on-linux-natively">Building on Linux natively</a></li>
+<li class="toctree-l1"><a class="reference internal" href="build.html#typical-build-errors-and-how-to-solve-them">Typical build errors and how to solve them</a></li>
+</ul>
+<p class="caption"><span class="caption-text">API</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="api.html">Overview</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#linking-script-outputs-to-ramses-scenes">Linking script outputs to <code class="docutils literal notranslate"><span class="pre">ramses</span></code> scenes</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#error-handling">Error handling</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#print-messages-from-within-lua">Print messages from within Lua</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#additional-lua-syntax-specifics">Additional Lua syntax specifics</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#serialization-deserialization">Serialization/Deserialization</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#logging">Logging</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#security-and-memory-safety">Security and memory safety</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html#class-index">Class Index</a></li>
+</ul>
+<p class="caption"><span class="caption-text">ChangeLog</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="changelog_ref.html">master</a></li>
+<li class="toctree-l1"><a class="reference internal" href="changelog_ref.html#v0-1-0">v0.1.0</a></li>
+</ul>
+<p class="caption"><span class="caption-text">Developers</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="dev.html">Understand RAMSES Logic architecture and design</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#contributing">Contributing</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#pull-requests">Pull requests</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#commit-guidelines">Commit guidelines</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#review">Review</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#code-style">Code style</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#continuous-integration">Continuous integration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="dev.html#branching">Branching</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" aria-label="top navigation">
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">ramses_logic</a>
+        
+      </nav>
+
+
+      <div class="wy-nav-content">
+        
+        <div class="rst-content">
+        
+          
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+
+  <ul class="wy-breadcrumbs">
+    
+      <li><a href="index.html">Docs</a> &raquo;</li>
+        
+      <li>Introduction</li>
+    
+    
+      <li class="wy-breadcrumbs-aside">
+        
+            
+            <a href="_sources/readme_ref.rst.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+    
+  </ul>
+
+  
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p><code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> extends the <a class="reference external" href="https://github.com/GENIVI/ramses">RAMSES rendering ecosystem</a> with scripting support based on
+<a class="reference external" href="https://github.com/lua/lua">Lua</a>. <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> is designed to be minimalistic and closely aligned to OpenGL, which can be a
+limitation for more complex applications. <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> addresses this limitation by providing a runtime library which can
+load and run <code class="docutils literal notranslate"><span class="pre">Lua</span></code> scripts and provides a standard set of tools to let these scripts interact between each other and control
+a sophisticated <code class="docutils literal notranslate"><span class="pre">RAMSES</span></code> scene.</p>
+<p>You can find the full documentation of <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> <a class="reference external" href="https://genivi.github.io/ramses-logic">here</a>.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p>This is an alpha build yet. It is not fully feature complete yet, as there are still major features being worked on, including:</p>
+<ul class="simple">
+<li><p>Possibility to link inputs and outputs to form an execution network of scripts and bindings</p></li>
+<li><p>Full-fledged RAMSES support</p></li>
+<li><p>Appearance bindings</p></li>
+<li><p>Interfaces</p></li>
+<li><p>Animations</p></li>
+<li><p>Serialization</p></li>
+</ul>
+</div>
+</div>
+<div class="section" id="build">
+<span id="quickstart"></span><h1>Build<a class="headerlink" href="#build" title="Permalink to this headline">¶</a></h1>
+<p>Clone RAMSES logic along with its dependencies:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>git clone https://github.com/GENIVI/ramses-logic &lt;path&gt;
+<span class="nb">cd</span> &lt;path&gt;
+git submodule update --init --recursive
+</pre></div>
+</div>
+<p>Configure and build with CMake (CMake 3.13 or newer required):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>mkdir build <span class="o">&amp;&amp;</span> <span class="nb">cd</span> build
+cmake -G<span class="s2">&quot;Visual Studio 16 2019&quot;</span> ../   <span class="c1"># Or any other generator!</span>
+cmake --build .
+</pre></div>
+</div>
+<p>You can find the compiler version of the examples in <code class="docutils literal notranslate"><span class="pre">&lt;path&gt;/build/bin</span></code>.</p>
+<p>For more in-depth build instructions and customization options, have a look at
+the <a class="reference external" href="https://genivi.github.io/ramses-logic/build.html">detailed build documentation</a>.</p>
+</div>
+<div class="section" id="examples">
+<h1>Examples<a class="headerlink" href="#examples" title="Permalink to this headline">¶</a></h1>
+<p>Have a look at the sample code in the <a class="reference external" href="https://github.com/GENIVI/ramses-logic/tree/master/examples">examples directory</a>
+which demonstrates different aspects and features of the <code class="docutils literal notranslate"><span class="pre">RAMSES</span> <span class="pre">logic</span></code> library in a minimalistic fashion.</p>
+</div>
+
+
+           </div>
+           
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="build.html" class="btn btn-neutral float-right" title="Cloning" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="index.html" class="btn btn-neutral float-left" title="Ramses Logic documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2020, BMW AG
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/rtfd/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script>
+
+  
+  
+    
+   
+
+</body>
+</html>

@@ -73,9 +73,13 @@ target_include_directories(ramses-logic-obj
         include/public
         include
         flatbuffers
+        ${PROJECT_BINARY_DIR}/BuildConfig
 )
 
-target_compile_definitions(ramses-logic-obj PRIVATE RLOGIC_LINK_SHARED_EXPORT=1)
+if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
+    target_compile_definitions(ramses-logic-obj PRIVATE RLOGIC_LINK_SHARED_EXPORT=1)
+endif()
+
 
 ################## ramses-logic-static ##################
 add_library(ramses-logic-static STATIC)
@@ -95,26 +99,27 @@ set_target_properties(ramses-logic PROPERTIES
     PUBLIC_HEADER "${public_headers}"
     SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
 )
-target_compile_definitions(ramses-logic PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)
+if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
+    target_compile_definitions(ramses-logic PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)
+endif()
 
 FOLDERIZE_TARGETS(ramses-logic-obj ramses-logic-static ramses-logic)
 
-# TODO Violin/Sven/Tobias Discuss if we are happy with target naming before first release
-
-# TODO Violin/Sven/Tobias consider making optional or settable by user?
-install(
-    TARGETS ramses-logic
-    EXPORT ramses-logic-targets
-    RUNTIME DESTINATION         ${RLOGIC_INSTALL_RUNTIME_PATH}
-    LIBRARY DESTINATION         ${RLOGIC_INSTALL_LIBRARY_PATH}
-    ARCHIVE DESTINATION         ${RLOGIC_INSTALL_ARCHIVE_PATH}
-    PUBLIC_HEADER DESTINATION   ${RLOGIC_INSTALL_HEADERS_PATH}/ramses-logic
-)
-
-if (MSVC)
+if(ramses-logic_ENABLE_INSTALL)
     install(
-        FILES $<TARGET_PDB_FILE:ramses-logic>
-        DESTINATION ${RLOGIC_INSTALL_RUNTIME_PATH} CONFIGURATIONS Debug RelWithDebInfo)
+        TARGETS ramses-logic
+        EXPORT ramses-logic-targets
+        RUNTIME DESTINATION         ${RLOGIC_INSTALL_RUNTIME_PATH}
+        LIBRARY DESTINATION         ${RLOGIC_INSTALL_LIBRARY_PATH}
+        ARCHIVE DESTINATION         ${RLOGIC_INSTALL_ARCHIVE_PATH}
+        PUBLIC_HEADER DESTINATION   ${RLOGIC_INSTALL_HEADERS_PATH}/ramses-logic
+    )
+
+    if (MSVC)
+        install(
+            FILES $<TARGET_PDB_FILE:ramses-logic>
+            DESTINATION ${RLOGIC_INSTALL_RUNTIME_PATH} CONFIGURATIONS Debug RelWithDebInfo)
+    endif()
 endif()
 
 if(ramses-logic_BUILD_TESTS)
@@ -147,22 +152,6 @@ if(ramses-logic_BUILD_TESTS)
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     )
 
-    add_test(
-        NAME ramses-logic-test
-        COMMAND $<TARGET_FILE:ramses-logic-test>
-        WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-    )
-
-    set_target_properties(ramses-logic-test PROPERTIES
-        VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-    )
-
+    MakeTestFromTarget(ramses-logic-test)
     FOLDERIZE_TARGET(ramses-logic-test)
-
-    if (ramses-logic_ENABLE_TEST_COVERAGE)
-        # attach environment variable for clang coverage
-        set_tests_properties(ramses-logic-test PROPERTIES
-            ENVIRONMENT LLVM_PROFILE_FILE=ramses-logic-test_%p.profraw)
-    endif()
-
 endif()

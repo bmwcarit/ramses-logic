@@ -113,5 +113,12 @@ namespace rlogic
 
         LOG_INFO("Info message");
         EXPECT_TRUE(called);
+
+        // Can't "unset" a custom logger because of the lambda approach
+        // Set to an empty lambda, otherwise this test influences other tests which trigger logs
+        Logger::SetLogHandler([](ELogMessageType type, std::string_view message){
+            (void)type;
+            (void)message;
+        });
     }
 }

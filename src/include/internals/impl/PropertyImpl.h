@@ -20,7 +20,7 @@ namespace rlogic
 {
     class Property;
 }
-namespace rlogic::serialization
+namespace rlogic_serialization
 {
     struct Property;
 }
@@ -33,12 +33,19 @@ namespace flatbuffers
 
 namespace rlogic::internal
 {
+    class LogicNodeImpl;
+
+    enum class EInputOutputProperty : uint8_t
+    {
+        Input,
+        Output
+    };
 
     class PropertyImpl
     {
     public:
-        PropertyImpl(std::string_view name, EPropertyType type);
-        static std::unique_ptr<PropertyImpl> Create(const serialization::Property* prop);
+        PropertyImpl(std::string_view name, EPropertyType type, EInputOutputProperty inputOutput);
+        static std::unique_ptr<PropertyImpl> Create(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput);
 
         // Move-able (noexcept); Not copy-able
         ~PropertyImpl() noexcept = default;
@@ -55,24 +62,38 @@ namespace rlogic::internal
         const Property* getChild(size_t index) const;
         const Property* getChild(std::string_view name) const;
 
+        bool isInput() const;
+        bool isOutput() const;
+        EInputOutputProperty getInputOutputProperty() const;
+
         Property* getChild(size_t index);
         Property* getChild(std::string_view name);
 
         void addChild(std::unique_ptr<PropertyImpl> child);
+        void clearChildren();
 
         template <typename T> std::optional<T> get() const;
         template <typename T> bool set(T value);
+        void set(const PropertyImpl& other);
 
-        flatbuffers::Offset<rlogic::serialization::Property> serialize(flatbuffers::FlatBufferBuilder& builder);
+        flatbuffers::Offset<rlogic_serialization::Property> serialize(flatbuffers::FlatBufferBuilder& builder);
+
+        void setLogicNode(LogicNodeImpl& logicNode);
+        LogicNodeImpl& getLogicNode();
+        const LogicNodeImpl& getLogicNode() const;
 
     private:
         std::string                                     m_name;
         EPropertyType                                   m_type;
         std::vector<std::unique_ptr<Property>>          m_children;
         std::variant<int32_t, float, bool, std::string, vec2f, vec3f, vec4f, vec2i, vec3i, vec4i> m_value;
+
+        // TODO Violin/Sven consider solving this more elegantly
+        LogicNodeImpl*                                  m_logicNode = nullptr;
         // TODO Violin/Sven/Tobias re-consider if we want to track it this way after we have implemented dirty handling and more binding types
         bool m_wasSet = false;
+        EInputOutputProperty                            m_inputOutputProperty;
 
-        flatbuffers::Offset<rlogic::serialization::Property> serialize_recursive(flatbuffers::FlatBufferBuilder& builder);
+        flatbuffers::Offset<rlogic_serialization::Property> serialize_recursive(flatbuffers::FlatBufferBuilder& builder);
     };
 }

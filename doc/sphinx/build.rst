@@ -79,6 +79,12 @@ Following CMake settings can be optionally enabled/disabled when building:
     * default: ON
     * treats compiler warnings as errors and aborts the build. Use this option if your compiler generates warnings which are not fixed yet.
 
+* -Dramses-logic_ENABLE_INSTALL
+    * options: ON/OFF
+    * default: ON
+    * Set this to OFF to prevent Ramses Logic installing its targets, headers, and documentation. Use this if you link statically and don't
+      have to expose any Ramses Logic headers or ship the shared library with your installation. It has no effect on the installation of Ramses though!
+
 * -Dramses-logic_FORCE_BUILD_TESTS
     * options: ON/OFF
     * default: OFF

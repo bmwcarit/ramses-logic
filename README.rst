@@ -11,18 +11,6 @@ a sophisticated ``RAMSES`` scene.
 
 You can find the full documentation of ``RAMSES logic`` `here <https://genivi.github.io/ramses-logic>`_.
 
-.. warning::
-
-    This is an alpha build yet. It is not fully feature complete yet, as there are still major features being worked on, including:
-
-    * Possibility to link inputs and outputs to form an execution network of scripts and bindings
-    * Full-fledged RAMSES support
-    * Appearance bindings
-    * Interfaces
-    * Animations
-    * Serialization
-
-
 .. _quickstart:
 
 ========================
@@ -54,5 +42,4 @@ the `detailed build documentation <https://genivi.github.io/ramses-logic/build.h
 Examples
 ========================
 
-Have a look at the sample code in the `examples directory <https://github.com/GENIVI/ramses-logic/tree/master/examples>`_
-which demonstrates different aspects and features of the ``RAMSES logic`` library in a minimalistic fashion.
+Prefer to learn by example? Have a look at our `self-contained example snippets <https://genivi.github.io/ramses-logic/api.html#list-of-all-examples>`_.

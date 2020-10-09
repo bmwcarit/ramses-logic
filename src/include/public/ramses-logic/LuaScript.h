@@ -89,7 +89,7 @@ namespace rlogic
         /**
         * Destructor of LuaScript
         */
-        ~LuaScript() noexcept;
+        ~LuaScript() noexcept override;
 
         /**
         * Copy Constructor of LuaScript is deleted because scripts are not supposed to be copied

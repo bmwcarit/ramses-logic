@@ -9,6 +9,7 @@
 #include "LuaScriptTest_Base.h"
 
 #include "ramses-logic/Property.h"
+#include "internals/impl/PropertyImpl.h"
 
 
 namespace rlogic
@@ -16,10 +17,6 @@ namespace rlogic
     class ALuaScript_Interface : public ALuaScript
     {
     protected:
-        void TearDown() override
-        {
-            std::remove("script.lua");
-        }
     };
 
     // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
@@ -342,6 +339,28 @@ namespace rlogic
         EXPECT_EQ(0u, sub2->getChildCount());
     }
 
+    TEST_F(ALuaScript_Interface, MarksInputsAsInput)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto  inputs = script->getInputs();
+        const auto inputCount = inputs->getChildCount();
+        for (size_t i = 0; i < inputCount; ++i)
+        {
+            EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild(i)->m_impl->getInputOutputProperty());
+        }
+    }
+
+    TEST_F(ALuaScript_Interface, MarksOutputsAsOutput)
+    {
+        auto*      script     = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
+        auto       outputs     = script->getOutputs();
+        const auto outputCount = outputs->getChildCount();
+        for (size_t i = 0; i < outputCount; ++i)
+        {
+            EXPECT_EQ(internal::EInputOutputProperty::Output, outputs->getChild(i)->m_impl->getInputOutputProperty());
+        }
+    }
+
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToItsInputs)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
@@ -357,32 +376,17 @@ namespace rlogic
         auto vec_2i = inputs->getChild("vec2i");
         auto vec_3i = inputs->getChild("vec3i");
         auto vec_4i = inputs->getChild("vec4i");
-        EXPECT_TRUE(speedInt32->get<int32_t>().has_value());
-        EXPECT_EQ(0, speedInt32->get<int32_t>().value());
-        EXPECT_TRUE(tempFloat->get<float>().has_value());
-        EXPECT_EQ(0.0f, tempFloat->get<float>().value());
-        EXPECT_TRUE(nameString->get<std::string>().has_value());
-        EXPECT_EQ("", nameString->get<std::string>().value());
-        EXPECT_TRUE(enabledBool->get<bool>().has_value());
-        EXPECT_EQ(false, enabledBool->get<bool>().value());
-        EXPECT_TRUE(vec_2f->get<vec2f>());
-        EXPECT_TRUE(vec_3f->get<vec3f>());
-        EXPECT_TRUE(vec_4f->get<vec4f>());
-        EXPECT_TRUE(vec_2i->get<vec2i>());
-        EXPECT_TRUE(vec_3i->get<vec3i>());
-        EXPECT_TRUE(vec_4i->get<vec4i>());
-        vec2f zeroVec2f{ 0.0f, 0.0f };
-        vec3f zeroVec3f{ 0.0f, 0.0f, 0.0f };
-        vec4f zeroVec4f{ 0.0f, 0.0f, 0.0f, 0.0f };
-        vec2i zeroVec2i{ 0, 0 };
-        vec3i zeroVec3i{ 0, 0, 0 };
-        vec4i zeroVec4i{ 0, 0, 0, 0 };
-        EXPECT_EQ(zeroVec2f, *vec_2f->get<vec2f>());
-        EXPECT_EQ(zeroVec3f, *vec_3f->get<vec3f>());
-        EXPECT_EQ(zeroVec4f, *vec_4f->get<vec4f>());
-        EXPECT_EQ(zeroVec2i, *vec_2i->get<vec2i>());
-        EXPECT_EQ(zeroVec3i, *vec_3i->get<vec3i>());
-        EXPECT_EQ(zeroVec4i, *vec_4i->get<vec4i>());
+        EXPECT_EQ(0, *speedInt32->get<int32_t>());
+        EXPECT_FLOAT_EQ(0.0f, *tempFloat->get<float>());
+        EXPECT_EQ("", *nameString->get<std::string>());
+        EXPECT_TRUE(enabledBool->get<bool>());
+        EXPECT_FALSE(*enabledBool->get<bool>());
+        EXPECT_THAT(*vec_2f->get<vec2f>(), ::testing::ElementsAre(0.0f, 0.0f));
+        EXPECT_THAT(*vec_3f->get<vec3f>(), ::testing::ElementsAre(0.0f, 0.0f, 0.0f));
+        EXPECT_THAT(*vec_4f->get<vec4f>(), ::testing::ElementsAre(0.0f, 0.0f, 0.0f, 0.0f));
+        EXPECT_THAT(*vec_2i->get<vec2i>(), ::testing::ElementsAre(0, 0));
+        EXPECT_THAT(*vec_3i->get<vec3i>(), ::testing::ElementsAre(0, 0, 0));
+        EXPECT_THAT(*vec_4i->get<vec4i>(), ::testing::ElementsAre(0, 0, 0, 0));
     }
 
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToItsOutputs)

@@ -32,3 +32,21 @@ string(CONCAT VALGRIND_OPTIONS
 )
 set(MEMORYCHECK_COMMAND_OPTIONS ${VALGRIND_OPTIONS} CACHE INTERNAL "")
 
+function(MakeTestFromTarget TARGET)
+    add_test(
+        NAME ${TARGET}
+        COMMAND ${TARGET}
+        WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    )
+
+    set_target_properties(${TARGET} PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
+    )
+
+    if (ramses-logic_ENABLE_TEST_COVERAGE)
+        set(prof_filename ${TARGET}_%p.profraw)
+        # attach environment variable for clang coverage
+        set_tests_properties(${TARGET} PROPERTIES
+            ENVIRONMENT LLVM_PROFILE_FILE=${prof_filename})
+    endif()
+endfunction()

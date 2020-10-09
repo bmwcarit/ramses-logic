@@ -8,11 +8,12 @@
 
 include "logicnode.fbs";
 
-namespace rlogic.serialization;
+namespace rlogic_serialization;
 
 table RamsesNodeBinding
 {
     logicnode:LogicNode;
+    ramsesNode:uint64;
 }
 
 root_type RamsesNodeBinding;

@@ -16,7 +16,7 @@ namespace rlogic
     RamsesNodeBinding::RamsesNodeBinding(std::unique_ptr<internal::RamsesNodeBindingImpl> impl) noexcept
         // The impl pointer is owned by this class, but a reference to the data is passed to the base class
         // TODO MSVC2017 fix for std::reference_wrapper with base class
-        : LogicNode(std::ref(static_cast<internal::LogicNodeImpl&>(*impl)))
+        : RamsesBinding(std::ref(static_cast<internal::RamsesBindingImpl&>(*impl)))
         , m_nodeBinding(std::move(impl))
     {
     }

@@ -41,15 +41,14 @@ namespace rlogic::internal
             return std::make_optional(EPropertyType::Vec3i);
         case ramses::EEffectInputDataType::EEffectInputDataType_Vector4I:
             return EPropertyType::Vec4i;
-        default:
-        // TODO Violin/Sven re-enable after R26 has been released to Github
-        //case ramses::EEffectInputDataType::EEffectInputDataType_Matrix22F:
-        //case ramses::EEffectInputDataType::EEffectInputDataType_Matrix33F:
-        //case ramses::EEffectInputDataType::EEffectInputDataType_Matrix44F:
-        //case ramses::EEffectInputDataType::EEffectInputDataType_TextureSampler2D:
-        //case ramses::EEffectInputDataType::EEffectInputDataType_TextureSampler3D:
-        //case ramses::EEffectInputDataType::EEffectInputDataType_TextureSamplerCube:
+        case ramses::EEffectInputDataType::EEffectInputDataType_Matrix22F:
+        case ramses::EEffectInputDataType::EEffectInputDataType_Matrix33F:
+        case ramses::EEffectInputDataType::EEffectInputDataType_Matrix44F:
+        case ramses::EEffectInputDataType::EEffectInputDataType_TextureSampler2D:
+        case ramses::EEffectInputDataType::EEffectInputDataType_TextureSampler3D:
+        case ramses::EEffectInputDataType::EEffectInputDataType_TextureSamplerCube:
             return std::nullopt;
         }
+        return std::nullopt;
     }
 }

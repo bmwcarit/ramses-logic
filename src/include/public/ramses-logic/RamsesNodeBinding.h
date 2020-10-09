@@ -9,7 +9,7 @@
 #pragma once
 
 #include "ramses-logic/APIExport.h"
-#include "ramses-logic/LogicNode.h"
+#include "ramses-logic/RamsesBinding.h"
 
 #include <memory>
 
@@ -26,7 +26,8 @@ namespace rlogic::internal
 namespace rlogic
 {
     /**
-     * The RamsesNodeBinding is a specialization of LogicNode which allows manipulation of Ramses nodes.
+     * The RamsesNodeBinding is a specialization of #rlogic::LogicNode which allows manipulation of Ramses nodes.
+     * RamsesNodeBinding's can be created with #rlogic::LogicEngine::createRamsesNodeBinding.
      *
      * The RamsesNodeBinding has a fixed set of inputs which correspond to properties of ramses::Node.
      * They have a fixed type and name:
@@ -65,7 +66,7 @@ namespace rlogic
      * explicitly based on their scene update logic and frame lifecycle.
      *
      */
-    class RamsesNodeBinding : public LogicNode
+    class RamsesNodeBinding : public RamsesBinding
     {
     public:
         /**
@@ -96,7 +97,7 @@ namespace rlogic
         /**
          * Destructor of RamsesNodeBinding.
          */
-        ~RamsesNodeBinding() noexcept;
+        ~RamsesNodeBinding() noexcept override;
 
         /**
          * Copy Constructor of RamsesNodeBinding is deleted because RamsesNodeBindings are not supposed to be copied

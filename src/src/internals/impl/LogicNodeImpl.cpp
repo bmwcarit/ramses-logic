@@ -22,21 +22,20 @@ namespace rlogic::internal
     LogicNodeImpl::LogicNodeImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs)
         : m_name(name)
     {
-        setInputs(std::move(inputs));
-        setOutputs(std::move(outputs));
+        // TODO Violin have another look over the code below
+        if (inputs)
+        {
+            m_inputs = std::make_unique<Property>(std::move(inputs));
+            m_inputs->m_impl->setLogicNode(*this);
+        }
+        if (outputs)
+        {
+            m_outputs = std::make_unique<Property>(std::move(outputs));
+            m_outputs->m_impl->setLogicNode(*this);
+        }
     }
 
     LogicNodeImpl::~LogicNodeImpl() noexcept = default;
-
-    void LogicNodeImpl::setInputs(std::unique_ptr<PropertyImpl> inputs)
-    {
-        m_inputs = std::make_unique<Property>(std::move(inputs));
-    }
-
-    void LogicNodeImpl::setOutputs(std::unique_ptr<PropertyImpl> outputs)
-    {
-        m_outputs = std::make_unique<Property>(std::move(outputs));
-    }
 
     Property* LogicNodeImpl::getInputs()
     {
@@ -49,6 +48,11 @@ namespace rlogic::internal
     }
 
     const Property* LogicNodeImpl::getOutputs() const
+    {
+        return m_outputs.get();
+    }
+
+    Property* LogicNodeImpl::getOutputs()
     {
         return m_outputs.get();
     }
@@ -68,9 +72,9 @@ namespace rlogic::internal
         m_errors.clear();
     }
 
-    flatbuffers::Offset<serialization::LogicNode> LogicNodeImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
+    flatbuffers::Offset<rlogic_serialization::LogicNode> LogicNodeImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
     {
-        return serialization::CreateLogicNode(
+        return rlogic_serialization::CreateLogicNode(
             builder,
             builder.CreateString(m_name),
             nullptr != m_inputs ? m_inputs->m_impl->serialize(builder) : 0,

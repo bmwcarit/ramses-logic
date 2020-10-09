@@ -6,34 +6,34 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-function(add_example name)
-    add_executable(${name} ${name}/main.cpp)
+function(add_example)
+    cmake_parse_arguments(
+        EXAMPLE             # Prefix of parsed args
+        "MAKE_TEST"         # Options
+        "NAME"              # Single-value args
+        "FILES"             # Multi-value-args
+        ${ARGN}
+    )
 
-    target_link_libraries(${name}
+    add_executable(${EXAMPLE_NAME} ${EXAMPLE_FILES})
+
+    target_link_libraries(${EXAMPLE_NAME}
         PRIVATE
             rlogic::ramses-logic
     )
 
-    # TODO Violin reduce code duplication for creating tests
-    if(ramses-logic_BUILD_TESTS)
-        set(testname ${name})
-        add_test(
-            NAME ${testname}
-            COMMAND $<TARGET_FILE:${name}>
-            WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-        )
+    FOLDERIZE_TARGET(${EXAMPLE_NAME})
 
-        set_target_properties(${name} PROPERTIES
-            VS_DEBUGGER_WORKING_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}"
-        )
+    if(ramses-logic_BUILD_TESTS AND ${EXAMPLE_MAKE_TEST})
+        MakeTestFromTarget(${EXAMPLE_NAME})
     endif()
-
-    FOLDERIZE_TARGET(${name})
-
 endfunction()
 
-add_example(00_minimal)
-add_example(01_properties_simple)
-add_example(02_properties_complex)
-add_example(03_errors_compile_time)
-add_example(04_errors_runtime)
+add_example(NAME 00_minimal               FILES 00_minimal/main.cpp               MAKE_TEST)
+add_example(NAME 01_properties_simple     FILES 01_properties_simple/main.cpp     MAKE_TEST)
+add_example(NAME 02_properties_complex    FILES 02_properties_complex/main.cpp    MAKE_TEST)
+add_example(NAME 03_errors_compile_time   FILES 03_errors_compile_time/main.cpp   MAKE_TEST)
+add_example(NAME 04_errors_runtime        FILES 04_errors_runtime/main.cpp        MAKE_TEST)
+# Can't execute ramses examples as test - they have a loop which blocks test automation and wastes resources
+add_example(NAME 05_ramses_scene          FILES 05_ramses_scene/main.cpp)
+add_example(NAME 06_serialization         FILES 06_serialization/main.cpp)

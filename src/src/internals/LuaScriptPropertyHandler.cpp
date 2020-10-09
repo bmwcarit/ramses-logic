@@ -32,7 +32,7 @@ namespace rlogic::internal
         return data.getChildPropertyAsSolObject(index);
     }
 
-    rlogic::Property* LuaScriptPropertyHandler::getStructProperty(const sol::object& propertyIndex)
+    Property* LuaScriptPropertyHandler::getStructProperty(const sol::object& propertyIndex)
     {
         std::string_view childPropertyName = GetIndexAsString(propertyIndex);
         return getStructProperty(childPropertyName);
@@ -147,5 +147,4 @@ namespace rlogic::internal
     {
         return m_propertyDescription;
     }
-
 }

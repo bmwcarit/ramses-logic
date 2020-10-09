@@ -17,6 +17,8 @@ namespace rlogic
     {
     }
 
+    LogicNode::~LogicNode() noexcept = default;
+
     Property* LogicNode::getInputs()
     {
         return m_impl.get().getInputs();

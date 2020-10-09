@@ -20,6 +20,7 @@
 #include "generated/property_gen.h"
 
 #include <memory>
+#include "LogicNodeDummy.h"
 
 namespace rlogic::internal
 {
@@ -34,8 +35,8 @@ namespace rlogic::internal
 
         static std::unique_ptr < PropertyImpl> Deserialize(const void* buffer)
         {
-            const auto propertyFB = serialization::GetProperty(buffer);
-            return PropertyImpl::Create(propertyFB);
+            const auto propertyFB = rlogic_serialization::GetProperty(buffer);
+            return PropertyImpl::Create(propertyFB, EInputOutputProperty::Input);
         }
     };
 
@@ -47,19 +48,19 @@ namespace rlogic::internal
 
     TEST_F(AProperty, HasANameAfterCreation)
     {
-        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float));
+        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float, EInputOutputProperty::Input));
         EXPECT_EQ("PropertyName", desc.getName());
     }
 
     TEST_F(AProperty, HasATypeAfterCreation)
     {
-        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float));
+        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float, EInputOutputProperty::Input));
         EXPECT_EQ(EPropertyType::Float, desc.getType());
     }
 
     TEST_F(AProperty, HasUserValueOnlyAfterSetIsCalledSuccessfully)
     {
-        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float));
+        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float, EInputOutputProperty::Input));
         EXPECT_FALSE(desc.m_impl->wasSet());
         EXPECT_FALSE(desc.set<int32_t>(5));
         EXPECT_FALSE(desc.m_impl->wasSet());
@@ -69,37 +70,37 @@ namespace rlogic::internal
 
     TEST_F(AProperty, DoesntHaveChildrenAfterCreation)
     {
-        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float));
+        Property desc(std::make_unique<PropertyImpl>("PropertyName", EPropertyType::Float, EInputOutputProperty::Input));
         ASSERT_EQ(0u, desc.getChildCount());
     }
 
     TEST_F(AProperty, ReturnsDefaultValue_ForPrimitiveTypes)
     {
-        Property aFloat(std::make_unique<PropertyImpl>("", EPropertyType::Float));
+        Property aFloat(std::make_unique<PropertyImpl>("", EPropertyType::Float, EInputOutputProperty::Input));
         ASSERT_TRUE(aFloat.get<float>());
         EXPECT_FLOAT_EQ(0.0f, *aFloat.get<float>());
 
-        Property aInt(std::make_unique<PropertyImpl>("", EPropertyType::Int32));
+        Property aInt(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EInputOutputProperty::Input));
         ASSERT_TRUE(aInt.get<int32_t>());
         EXPECT_EQ(0, *aInt.get<int32_t>());
 
-        Property aBool(std::make_unique<PropertyImpl>("", EPropertyType::Bool));
+        Property aBool(std::make_unique<PropertyImpl>("", EPropertyType::Bool, EInputOutputProperty::Input));
         ASSERT_TRUE(aBool.get<bool>());
         EXPECT_EQ(false, *aBool.get<bool>());
 
-        Property aString(std::make_unique<PropertyImpl>("", EPropertyType::String));
+        Property aString(std::make_unique<PropertyImpl>("", EPropertyType::String, EInputOutputProperty::Input));
         ASSERT_TRUE(aString.get<std::string>());
         EXPECT_EQ("", *aString.get<std::string>());
     }
 
     TEST_F(AProperty, ReturnsDefaultValue_VectorTypes)
     {
-        Property aVec2f(std::make_unique<PropertyImpl>("", EPropertyType::Vec2f));
-        Property aVec3f(std::make_unique<PropertyImpl>("", EPropertyType::Vec3f));
-        Property aVec4f(std::make_unique<PropertyImpl>("", EPropertyType::Vec4f));
-        Property aVec2i(std::make_unique<PropertyImpl>("", EPropertyType::Vec2i));
-        Property aVec3i(std::make_unique<PropertyImpl>("", EPropertyType::Vec3i));
-        Property aVec4i(std::make_unique<PropertyImpl>("", EPropertyType::Vec4i));
+        Property aVec2f(std::make_unique<PropertyImpl>("", EPropertyType::Vec2f, EInputOutputProperty::Input));
+        Property aVec3f(std::make_unique<PropertyImpl>("", EPropertyType::Vec3f, EInputOutputProperty::Input));
+        Property aVec4f(std::make_unique<PropertyImpl>("", EPropertyType::Vec4f, EInputOutputProperty::Input));
+        Property aVec2i(std::make_unique<PropertyImpl>("", EPropertyType::Vec2i, EInputOutputProperty::Input));
+        Property aVec3i(std::make_unique<PropertyImpl>("", EPropertyType::Vec3i, EInputOutputProperty::Input));
+        Property aVec4i(std::make_unique<PropertyImpl>("", EPropertyType::Vec4i, EInputOutputProperty::Input));
 
         EXPECT_TRUE(aVec2f.get<vec2f>());
         EXPECT_TRUE(aVec3f.get<vec3f>());
@@ -149,10 +150,10 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsValueIfItIsSetBeforehand_PrimitiveTypes)
     {
-        Property aFloat(std::make_unique<PropertyImpl>("", EPropertyType::Float));
-        Property aInt32(std::make_unique<PropertyImpl>("", EPropertyType::Int32));
-        Property aBool(std::make_unique<PropertyImpl>("", EPropertyType::Bool));
-        Property aString(std::make_unique<PropertyImpl>("", EPropertyType::String));
+        Property aFloat(std::make_unique<PropertyImpl>("", EPropertyType::Float, EInputOutputProperty::Input));
+        Property aInt32(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EInputOutputProperty::Input));
+        Property aBool(std::make_unique<PropertyImpl>("", EPropertyType::Bool, EInputOutputProperty::Input));
+        Property aString(std::make_unique<PropertyImpl>("", EPropertyType::String, EInputOutputProperty::Input));
 
         EXPECT_TRUE(aFloat.set<float>(47.11f));
         EXPECT_TRUE(aInt32.set<int>(5));
@@ -176,9 +177,9 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsValueIfItIsSetBeforehand_VectorTypes_Float)
     {
-        Property avec2f(std::make_unique<PropertyImpl>("", EPropertyType::Vec2f));
-        Property avec3f(std::make_unique<PropertyImpl>("", EPropertyType::Vec3f));
-        Property avec4f(std::make_unique<PropertyImpl>("", EPropertyType::Vec4f));
+        Property avec2f(std::make_unique<PropertyImpl>("", EPropertyType::Vec2f, EInputOutputProperty::Input));
+        Property avec3f(std::make_unique<PropertyImpl>("", EPropertyType::Vec3f, EInputOutputProperty::Input));
+        Property avec4f(std::make_unique<PropertyImpl>("", EPropertyType::Vec4f, EInputOutputProperty::Input));
 
         EXPECT_TRUE(avec2f.set<vec2f>({ 0.1f, 0.2f }));
         EXPECT_TRUE(avec3f.set<vec3f>({ 0.1f, 0.2f, 0.3f }));
@@ -201,9 +202,9 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsValueIfItIsSetBeforehand_VectorTypes_Int)
     {
-        Property avec2i(std::make_unique<PropertyImpl>("", EPropertyType::Vec2i));
-        Property avec3i(std::make_unique<PropertyImpl>("", EPropertyType::Vec3i));
-        Property avec4i(std::make_unique<PropertyImpl>("", EPropertyType::Vec4i));
+        Property avec2i(std::make_unique<PropertyImpl>("", EPropertyType::Vec2i, EInputOutputProperty::Input));
+        Property avec3i(std::make_unique<PropertyImpl>("", EPropertyType::Vec3i, EInputOutputProperty::Input));
+        Property avec4i(std::make_unique<PropertyImpl>("", EPropertyType::Vec4i, EInputOutputProperty::Input));
 
         EXPECT_TRUE(avec2i.set<vec2i>({1, 2}));
         EXPECT_TRUE(avec3i.set<vec3i>({1, 2, 3}));
@@ -224,13 +225,26 @@ namespace rlogic::internal
         EXPECT_TRUE(expectedValueVec4i == *valueVec4i);
     }
 
+    TEST_F(AProperty, IsInitializedAsInputOrOutput)
+    {
+        Property inputProperty(std::make_unique<PropertyImpl>("Input", EPropertyType::Float, EInputOutputProperty::Input));
+        Property outputProperty(std::make_unique<PropertyImpl>("Output", EPropertyType::Int32, EInputOutputProperty::Output));
+
+        EXPECT_TRUE(inputProperty.m_impl->isInput());
+        EXPECT_FALSE(inputProperty.m_impl->isOutput());
+        EXPECT_EQ(internal::EInputOutputProperty::Input, inputProperty.m_impl->getInputOutputProperty());
+        EXPECT_TRUE(outputProperty.m_impl->isOutput());
+        EXPECT_FALSE(outputProperty.m_impl->isInput());
+        EXPECT_EQ(internal::EInputOutputProperty::Output, outputProperty.m_impl->getInputOutputProperty());
+    }
+
     TEST_F(AProperty, ReturnsNoValueWhenAccessingWithWrongType)
     {
-        Property floatProp(std::make_unique<PropertyImpl>("", EPropertyType::Float));
-        Property int32Prop(std::make_unique<PropertyImpl>("", EPropertyType::Int32));
-        Property boolProp(std::make_unique<PropertyImpl>("", EPropertyType::Bool));
-        Property stringProp(std::make_unique<PropertyImpl>("", EPropertyType::String));
-        Property structProp(std::make_unique<PropertyImpl>("", EPropertyType::Struct));
+        Property floatProp(std::make_unique<PropertyImpl>("", EPropertyType::Float, EInputOutputProperty::Input));
+        Property int32Prop(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EInputOutputProperty::Input));
+        Property boolProp(std::make_unique<PropertyImpl>("", EPropertyType::Bool, EInputOutputProperty::Input));
+        Property stringProp(std::make_unique<PropertyImpl>("", EPropertyType::String, EInputOutputProperty::Input));
+        Property structProp(std::make_unique<PropertyImpl>("", EPropertyType::Struct, EInputOutputProperty::Input));
 
         EXPECT_TRUE(floatProp.get<float>());
         EXPECT_FALSE(floatProp.get<int32_t>());
@@ -260,22 +274,22 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsNullptrForGetChildByIndexIfPropertyHasNoChildren)
     {
-        Property property_float(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float));
+        Property property_float(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float, EInputOutputProperty::Input));
 
         EXPECT_EQ(nullptr, property_float.getChild(0));
     }
 
     TEST_F(AProperty, ReturnsNullptrForGetChildByNameIfPropertyHasNoChildren)
     {
-        Property property_float(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float));
+        Property property_float(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float, EInputOutputProperty::Input));
 
         EXPECT_EQ(nullptr, property_float.getChild("child"));
     }
 
     TEST_F(AProperty, DoesNotAddChildIfTypeIsNotStruct)
     {
-        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float);
-        rootImpl->addChild(std::make_unique<PropertyImpl>("ChildProperty", EPropertyType::Float));
+        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float, EInputOutputProperty::Input);
+        rootImpl->addChild(std::make_unique<PropertyImpl>("ChildProperty", EPropertyType::Float, EInputOutputProperty::Input));
 
         Property root(std::move(rootImpl));
 
@@ -285,8 +299,8 @@ namespace rlogic::internal
 
     TEST_F(AProperty, AddsChildIfTypeIsStruct)
     {
-        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
-        rootImpl->addChild(std::make_unique<PropertyImpl>("ChildProperty", EPropertyType::Float));
+        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
+        rootImpl->addChild(std::make_unique<PropertyImpl>("ChildProperty", EPropertyType::Float, EInputOutputProperty::Input));
 
         Property root(std::move(rootImpl));
 
@@ -297,7 +311,7 @@ namespace rlogic::internal
 
     TEST_F(AProperty, CanBeEmptyAndConst)
     {
-        auto           rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
+        auto           rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
         const Property root(std::move(rootImpl));
 
         const auto child = root.getChild(0);
@@ -306,10 +320,10 @@ namespace rlogic::internal
 
     TEST_F(AProperty, CanHaveNestedProperties)
     {
-        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
+        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
 
-        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild1", EPropertyType::Int32));
-        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild2", EPropertyType::Float));
+        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild1", EPropertyType::Int32, EInputOutputProperty::Input));
+        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild2", EPropertyType::Float, EInputOutputProperty::Input));
 
         Property root(std::move(rootImpl));
 
@@ -331,10 +345,10 @@ namespace rlogic::internal
 
     TEST_F(AProperty, SetsValueIfTheTypeMatches)
     {
-        Property floatProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float));
-        Property int32Property(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Int32));
-        Property stringProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::String));
-        Property boolProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Bool));
+        Property floatProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float, EInputOutputProperty::Input));
+        Property int32Property(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Int32, EInputOutputProperty::Input));
+        Property stringProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::String, EInputOutputProperty::Input));
+        Property boolProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Bool, EInputOutputProperty::Input));
 
         EXPECT_TRUE(floatProperty.set<float>(47.11f));
         EXPECT_TRUE(int32Property.set<int32_t>(4711));
@@ -359,10 +373,10 @@ namespace rlogic::internal
 
     TEST_F(AProperty, DoesNotSetValueIfTheTypeDoesNotMatch)
     {
-        Property floatProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float));
-        Property int32Property(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Int32));
-        Property stringProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::String));
-        Property boolProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Bool));
+        Property floatProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Float, EInputOutputProperty::Input));
+        Property int32Property(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Int32, EInputOutputProperty::Input));
+        Property stringProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::String, EInputOutputProperty::Input));
+        Property boolProperty(std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Bool, EInputOutputProperty::Input));
 
         EXPECT_FALSE(floatProperty.set<int32_t>(4711));
         EXPECT_FALSE(int32Property.set<float>(47.11f));
@@ -387,10 +401,10 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsChildByName)
     {
-        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
+        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
 
-        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild1", EPropertyType::Int32));
-        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild2", EPropertyType::Float));
+        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild1", EPropertyType::Int32, EInputOutputProperty::Input));
+        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild2", EPropertyType::Float, EInputOutputProperty::Input));
 
         Property root(std::move(rootImpl));
 
@@ -406,10 +420,10 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsConstChildByName)
     {
-        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
+        auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
 
-        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild1", EPropertyType::Int32));
-        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild2", EPropertyType::Float));
+        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild1", EPropertyType::Int32, EInputOutputProperty::Input));
+        rootImpl->addChild(std::make_unique<PropertyImpl>("PropertyChild2", EPropertyType::Float, EInputOutputProperty::Input));
 
         const Property root(std::move(rootImpl));
 
@@ -427,7 +441,7 @@ namespace rlogic::internal
     {
         flatbuffers::FlatBufferBuilder builder;
         {
-            auto rootImpl   = std::make_unique<PropertyImpl>("EmptyProperty", EPropertyType::Struct);
+            auto rootImpl = std::make_unique<PropertyImpl>("EmptyProperty", EPropertyType::Struct, EInputOutputProperty::Input);
 
             rootImpl->serialize(builder);
         }
@@ -437,6 +451,7 @@ namespace rlogic::internal
             ASSERT_EQ(0u, root->getChildCount());
             EXPECT_EQ(EPropertyType::Struct, root->getType());
             EXPECT_EQ("EmptyProperty", root->getName());
+            EXPECT_EQ(EInputOutputProperty::Input, root->getInputOutputProperty());
         }
     }
 
@@ -444,18 +459,18 @@ namespace rlogic::internal
     {
         flatbuffers::FlatBufferBuilder builder;
         {
-            auto rootImpl = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
-            auto propInt32  = std::make_unique<PropertyImpl>("PropertyInt32", EPropertyType::Int32);
-            auto propFloat  = std::make_unique<PropertyImpl>("PropertyFloat", EPropertyType::Float);
-            auto propBool   = std::make_unique<PropertyImpl>("PropertyBool", EPropertyType::Bool);
-            auto propString = std::make_unique<PropertyImpl>("PropertyString", EPropertyType::String);
-            auto propVec2f  = std::make_unique<PropertyImpl>("PropertyVec2f", EPropertyType::Vec2f);
-            auto propVec3f  = std::make_unique<PropertyImpl>("PropertyVec3f", EPropertyType::Vec3f);
-            auto propVec4f  = std::make_unique<PropertyImpl>("PropertyVec4f", EPropertyType::Vec4f);
-            auto propVec2i  = std::make_unique<PropertyImpl>("PropertyVec2i", EPropertyType::Vec2i);
-            auto propVec3i  = std::make_unique<PropertyImpl>("PropertyVec3i", EPropertyType::Vec3i);
-            auto propVec4i = std::make_unique<PropertyImpl>("PropertyVec4i", EPropertyType::Vec4i);
-            auto propWasNotSet = std::make_unique<PropertyImpl>("PropertyDefaultValue", EPropertyType::Vec4i);
+            auto rootImpl      = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
+            auto propInt32     = std::make_unique<PropertyImpl>("PropertyInt32", EPropertyType::Int32, EInputOutputProperty::Input);
+            auto propFloat     = std::make_unique<PropertyImpl>("PropertyFloat", EPropertyType::Float, EInputOutputProperty::Input);
+            auto propBool      = std::make_unique<PropertyImpl>("PropertyBool", EPropertyType::Bool, EInputOutputProperty::Input);
+            auto propString    = std::make_unique<PropertyImpl>("PropertyString", EPropertyType::String, EInputOutputProperty::Input);
+            auto propVec2f     = std::make_unique<PropertyImpl>("PropertyVec2f", EPropertyType::Vec2f, EInputOutputProperty::Input);
+            auto propVec3f     = std::make_unique<PropertyImpl>("PropertyVec3f", EPropertyType::Vec3f, EInputOutputProperty::Input);
+            auto propVec4f     = std::make_unique<PropertyImpl>("PropertyVec4f", EPropertyType::Vec4f, EInputOutputProperty::Input);
+            auto propVec2i     = std::make_unique<PropertyImpl>("PropertyVec2i", EPropertyType::Vec2i, EInputOutputProperty::Input);
+            auto propVec3i     = std::make_unique<PropertyImpl>("PropertyVec3i", EPropertyType::Vec3i, EInputOutputProperty::Input);
+            auto propVec4i     = std::make_unique<PropertyImpl>("PropertyVec4i", EPropertyType::Vec4i, EInputOutputProperty::Input);
+            auto propWasNotSet = std::make_unique<PropertyImpl>("PropertyDefaultValue", EPropertyType::Vec4i, EInputOutputProperty::Input);
 
             propInt32->set(4711);
             propFloat->set(47.11f);
@@ -538,10 +553,10 @@ namespace rlogic::internal
     {
         flatbuffers::FlatBufferBuilder builder;
         {
-            auto propertyRoot = std::make_unique<PropertyImpl>("PropertyInt", EPropertyType::Struct);
-            auto c1 = std::make_unique<PropertyImpl>("PropertyFloat1", EPropertyType::Float);
-            auto c2 = std::make_unique<PropertyImpl>("PropertyFloat2", EPropertyType::Float);
-            auto c3 = std::make_unique<PropertyImpl>("PropertyFloat3", EPropertyType::Float);
+            auto propertyRoot = std::make_unique<PropertyImpl>("PropertyInt", EPropertyType::Struct, EInputOutputProperty::Input);
+            auto c1 = std::make_unique<PropertyImpl>("PropertyFloat1", EPropertyType::Float, EInputOutputProperty::Input);
+            auto c2 = std::make_unique<PropertyImpl>("PropertyFloat2", EPropertyType::Float, EInputOutputProperty::Input);
+            auto c3 = std::make_unique<PropertyImpl>("PropertyFloat3", EPropertyType::Float, EInputOutputProperty::Input);
 
             propertyRoot->addChild(std::move(c1));
             propertyRoot->addChild(std::move(c2));
@@ -569,11 +584,11 @@ namespace rlogic::internal
     {
         flatbuffers::FlatBufferBuilder builder;
         {
-            auto propertyRoot = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct);
-            auto propertyNested1 = std::make_unique<PropertyImpl>("PropertyNested", EPropertyType::Struct);
-            auto propertyFloat1  = std::make_unique<PropertyImpl>("PropertyFloat", EPropertyType::Float);
-            auto propertyNested2 = std::make_unique<PropertyImpl>("PropertyNested", EPropertyType::Struct);
-            auto propertyFloat2  = std::make_unique<PropertyImpl>("PropertyFloat", EPropertyType::Float);
+            auto propertyRoot    = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, EInputOutputProperty::Input);
+            auto propertyNested1 = std::make_unique<PropertyImpl>("PropertyNested", EPropertyType::Struct, EInputOutputProperty::Input);
+            auto propertyFloat1  = std::make_unique<PropertyImpl>("PropertyFloat", EPropertyType::Float, EInputOutputProperty::Input);
+            auto propertyNested2 = std::make_unique<PropertyImpl>("PropertyNested", EPropertyType::Struct, EInputOutputProperty::Input);
+            auto propertyFloat2  = std::make_unique<PropertyImpl>("PropertyFloat", EPropertyType::Float, EInputOutputProperty::Input);
 
             propertyNested1->addChild(std::move(propertyFloat1));
             propertyNested2->addChild(std::move(propertyFloat2));
@@ -608,5 +623,19 @@ namespace rlogic::internal
             EXPECT_EQ(EPropertyType::Float, propertyFloat2->getType());
             EXPECT_EQ("PropertyFloat", propertyFloat2->getName());
         }
+    }
+
+    TEST_F(AProperty, SetsLogicNodeRecursiveToAllChildren)
+    {
+        auto logicNode = LogicNodeDummy::Create("LogicNode");
+        auto propertyRoot = std::make_unique<PropertyImpl>("PropertyRoot", EPropertyType::Struct, internal::EInputOutputProperty::Input);
+        propertyRoot->addChild(std::make_unique<PropertyImpl>("PropertyFloat1", EPropertyType::Float, internal::EInputOutputProperty::Input));
+        propertyRoot->addChild(std::make_unique<PropertyImpl>("PropertyFloat2", EPropertyType::Float, internal::EInputOutputProperty::Input));
+
+        propertyRoot->setLogicNode(logicNode->m_impl.get());
+
+        EXPECT_EQ(&logicNode->m_impl.get(), &propertyRoot->getLogicNode());
+        EXPECT_EQ(&logicNode->m_impl.get(), &propertyRoot->getChild("PropertyFloat1")->m_impl->getLogicNode());
+        EXPECT_EQ(&logicNode->m_impl.get(), &propertyRoot->getChild("PropertyFloat2")->m_impl->getLogicNode());
     }
 }

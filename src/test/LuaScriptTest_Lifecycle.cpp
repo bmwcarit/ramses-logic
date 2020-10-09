@@ -12,7 +12,7 @@
 #include "ramses-logic/Property.h"
 
 #include "internals/impl/LuaScriptImpl.h"
-#include "internals/impl/LuaStateImpl.h"
+#include "internals/impl/LogicEngineImpl.h"
 #include "internals/impl/PropertyImpl.h"
 
 #include "generated/luascript_gen.h"
@@ -25,10 +25,6 @@ namespace rlogic
     class ALuaScript_Lifecycle : public ALuaScript
     {
     protected:
-        void TearDown() override
-        {
-            std::remove("script.lua");
-        }
     };
 
     TEST_F(ALuaScript_Lifecycle, HasEmptyFilenameWhenCreatedFromSource)
@@ -54,31 +50,27 @@ namespace rlogic
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NoOutputs)
     {
-        flatbuffers::FlatBufferBuilder builder;
         {
-            std::vector<std::string> errors;
-            internal::LuaStateImpl   luaState;
-            auto script = internal::LuaScriptImpl::Create(luaState,
+            LogicEngine tempLogicEngine;
+            auto script = tempLogicEngine.createLuaScriptFromSource(
                 R"(
                     function interface()
                         IN.param = INT
                     end
                     function run()
                     end
-                )", "MyScript", "MyScript.lua", errors);
+                )", "MyScript");
 
             ASSERT_NE(nullptr, script);
-            script->serialize(builder);
+            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
         }
         {
-            internal::LuaStateImpl          luaState;
-            std::vector<std::string>        errors;
-            const serialization::LuaScript* luaScript = serialization::GetLuaScript(builder.GetBufferPointer());
-            auto                            loadedScript = internal::LuaScriptImpl::Create(luaState, luaScript, errors);
+            EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
+            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
 
             ASSERT_NE(nullptr, loadedScript);
             EXPECT_EQ("MyScript", loadedScript->getName());
-            EXPECT_EQ("MyScript.lua", loadedScript->getFilename());
+            EXPECT_EQ("", loadedScript->getFilename());
 
             auto inputs = loadedScript->getInputs();
             auto outputs = loadedScript->getOutputs();
@@ -92,8 +84,42 @@ namespace rlogic
             EXPECT_EQ("param", inputs->getChild(0u)->getName());
             EXPECT_EQ(EPropertyType::Int32, inputs->getChild(0u)->getType());
 
-            EXPECT_TRUE(loadedScript->update());
+            EXPECT_TRUE(m_logicEngine.update());
         }
+        std::remove("script.lua");
+    }
+
+    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_FromEmptySourceFile)
+    {
+        std::ofstream ofs;
+        ofs.open("script.lua", std::ofstream::out);
+        ofs << R"(
+            function interface()
+            end
+            function run()
+            end
+        )";
+        ofs.close();
+
+        {
+            LogicEngine tempLogicEngine;
+            auto script = tempLogicEngine.createLuaScriptFromFile("script.lua", "MyScript");
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
+        }
+        {
+            EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
+            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
+
+            ASSERT_NE(nullptr, loadedScript);
+            EXPECT_EQ("MyScript", loadedScript->getName());
+            EXPECT_EQ("script.lua", loadedScript->getFilename());
+
+            EXPECT_TRUE(m_logicEngine.update());
+        }
+        std::remove("script.lua");
+        std::remove("script.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, ProducesErrorWhenLoadedFromFaultyFile)
@@ -109,19 +135,20 @@ namespace rlogic
         )";
         ofs.close();
 
-        auto script = m_logicEngine.createLuaScriptFromFile("script.lua");
+        const auto script = m_logicEngine.createLuaScriptFromFile("script.lua");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("\"script.lua\""));
+
+        std::remove("script.lua");
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NestedProperties)
     {
-        flatbuffers::FlatBufferBuilder builder;
         {
-            std::vector<std::string> errors;
-            internal::LuaStateImpl   luaState;
-            auto                     script = internal::LuaScriptImpl::Create(luaState, R"(
+            LogicEngine tempLogicEngine;
+            auto script = tempLogicEngine.createLuaScriptFromSource(
+                R"(
                 function interface()
                     IN.int_param = INT
                     IN.nested_param = {
@@ -135,21 +162,18 @@ namespace rlogic
                 function run()
                     OUT.float_param = 47.11
                 end
-            )",
-                "MyScript", "MyScript.lua", errors);
+            )", "MyScript");
 
             ASSERT_NE(nullptr, script);
-            script->serialize(builder);
+            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
         }
         {
-            internal::LuaStateImpl          luaState;
-            std::vector<std::string>        errors;
-            const serialization::LuaScript* luaScript = serialization::GetLuaScript(builder.GetBufferPointer());
-            auto                            loadedScript = internal::LuaScriptImpl::Create(luaState, luaScript, errors);
+            EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
+            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
 
             ASSERT_NE(nullptr, loadedScript);
             EXPECT_EQ("MyScript", loadedScript->getName());
-            EXPECT_EQ("MyScript.lua", loadedScript->getFilename());
+            EXPECT_EQ("", loadedScript->getFilename());
 
             auto inputs = loadedScript->getInputs();
             auto outputs = loadedScript->getOutputs();
@@ -184,59 +208,51 @@ namespace rlogic
             EXPECT_EQ("float_param", out_nested_child->getName());
             EXPECT_EQ(EPropertyType::Float, out_nested_child->getType());
 
-            EXPECT_TRUE(loadedScript->update());
+            EXPECT_TRUE(m_logicEngine.update());
             EXPECT_FLOAT_EQ(47.11f, *outputs->getChild(0u)->get<float>());
         }
+        std::remove("script.bin");
     }
 
-    TEST_F(ALuaScript_Lifecycle, ProducesNoErrorIfSerializedDeserializedMultipleTimes)
+    TEST_F(ALuaScript_Lifecycle, OverwritesCurrentData_WhenLoadedASecondTimeFromTheSameFile)
     {
-        flatbuffers::FlatBufferBuilder builder;
         {
-            std::vector<std::string> errors;
-            internal::LuaStateImpl   luaState;
-            auto                     script = internal::LuaScriptImpl::Create(luaState, R"(
+            LogicEngine tempLogicEngine;
+            auto script = tempLogicEngine.createLuaScriptFromSource(
+                R"(
+                my_var = 5
                 function interface()
                     IN.in_param = INT
                     OUT.out_param = INT
                 end
                 function run()
+                    OUT.out_param = OUT.out_param + my_var
                 end
-            )", "MyScript", "MyScript.lua", errors);
+            )", "MyScript");
 
             ASSERT_NE(nullptr, script);
-            script->serialize(builder);
+            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
         }
+        for(size_t i = 0; i < 2; ++i)
         {
-            internal::LuaStateImpl          luaState;
-            std::vector<std::string>        errors;
-            const serialization::LuaScript* luaScript = serialization::GetLuaScript(builder.GetBufferPointer());
-            auto                            loadedScript = internal::LuaScriptImpl::Create(luaState, luaScript, errors);
+            EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
+            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
 
             ASSERT_NE(nullptr, loadedScript);
-            loadedScript->serialize(builder);
+            EXPECT_TRUE(m_logicEngine.update());
+            EXPECT_EQ(5, *loadedScript->getOutputs()->getChild("out_param")->get<int32_t>());
+            EXPECT_TRUE(m_logicEngine.update());
+            EXPECT_EQ(10, *loadedScript->getOutputs()->getChild("out_param")->get<int32_t>());
         }
-        {
-            internal::LuaStateImpl          luaState;
-            std::vector<std::string>        errors;
-            const serialization::LuaScript* luaScript = serialization::GetLuaScript(builder.GetBufferPointer());
-            auto                            loadedScript = internal::LuaScriptImpl::Create(luaState, luaScript, errors);
-
-            ASSERT_NE(nullptr, loadedScript);
-            const auto inputs = loadedScript->getInputs();
-            ASSERT_EQ(1u, inputs->getChildCount());
-            const auto param = inputs->getChild(0);
-            EXPECT_EQ("in_param", param->getName());
-            EXPECT_EQ(EPropertyType::Int32, param->getType());
-        }
+        std::remove("script.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithoutInputs)
     {
         flatbuffers::FlatBufferBuilder builder;
         {
-            auto script = serialization::CreateLuaScript(
-                builder, serialization::CreateLogicNode(
+            auto script = rlogic_serialization::CreateLuaScript(
+                builder, rlogic_serialization::CreateLogicNode(
                     builder,
                     builder.CreateString("StcriptName")
                 ),
@@ -249,7 +265,7 @@ namespace rlogic
         {
             std::vector<std::string> errors;
             internal::LuaStateImpl   state;
-            auto                     script = internal::LuaScriptImpl::Create(state, serialization::GetLuaScript(builder.GetBufferPointer()), errors);
+            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, errors.size());
@@ -261,9 +277,9 @@ namespace rlogic
     {
         flatbuffers::FlatBufferBuilder builder;
         {
-            internal::PropertyImpl input("Input", EPropertyType::Int32);
-            auto script = serialization::CreateLuaScript(builder,
-                serialization::CreateLogicNode(
+            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EInputOutputProperty::Input);
+            auto script = rlogic_serialization::CreateLuaScript(builder,
+                rlogic_serialization::CreateLogicNode(
                     builder,
                     builder.CreateString("ScriptName"),
                     input.serialize(builder)
@@ -279,7 +295,7 @@ namespace rlogic
         {
             std::vector<std::string> errors;
             internal::LuaStateImpl   state;
-            auto                     script = internal::LuaScriptImpl::Create(state, serialization::GetLuaScript(builder.GetBufferPointer()), errors);
+            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, errors.size());
@@ -294,12 +310,12 @@ namespace rlogic
             auto                   source = R"(
                 this.goes.boom
             )";
-            internal::PropertyImpl input("Input", EPropertyType::Int32);
-            internal::PropertyImpl output("Output", EPropertyType::Int32);
+            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EInputOutputProperty::Input);
+            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EInputOutputProperty::Output);
 
-            auto script = serialization::CreateLuaScript(
+            auto script = rlogic_serialization::CreateLuaScript(
                 builder,
-                serialization::CreateLogicNode(
+                rlogic_serialization::CreateLogicNode(
                     builder,
                     builder.CreateString("ScriptName"),
                     input.serialize(builder),
@@ -315,7 +331,7 @@ namespace rlogic
         {
             std::vector<std::string> errors;
             internal::LuaStateImpl   state;
-            auto                     script = internal::LuaScriptImpl::Create(state, serialization::GetLuaScript(builder.GetBufferPointer()), errors);
+            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, errors.size());
@@ -323,7 +339,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithSCriptWithRuntimeError)
+    TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithScriptWithRuntimeError)
     {
         flatbuffers::FlatBufferBuilder builder;
         {
@@ -333,11 +349,11 @@ namespace rlogic
                 end
                 add(2)
             )";
-            internal::PropertyImpl input("Input", EPropertyType::Int32);
-            internal::PropertyImpl output("Output", EPropertyType::Int32);
+            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EInputOutputProperty::Input);
+            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EInputOutputProperty::Output);
 
-            auto script = serialization::CreateLuaScript(builder,
-                serialization::CreateLogicNode(
+            auto script = rlogic_serialization::CreateLuaScript(builder,
+                rlogic_serialization::CreateLogicNode(
                     builder,
                     builder.CreateString("ScriptName"),
                     input.serialize(builder),
@@ -352,7 +368,7 @@ namespace rlogic
         {
             std::vector<std::string> errors;
             internal::LuaStateImpl   state;
-            auto                     script = internal::LuaScriptImpl::Create(state, serialization::GetLuaScript(builder.GetBufferPointer()), errors);
+            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, errors.size());

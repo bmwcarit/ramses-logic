@@ -29,7 +29,7 @@ namespace rlogic::internal
         return sol::stack::top(L);
     }
 
-    LuaStateImpl::LuaStateImpl() noexcept
+    LuaStateImpl::LuaStateImpl()
         : m_sol(std::make_unique<sol::state>())
     {
         m_sol->open_libraries(sol::lib::base, sol::lib::string, sol::lib::io);

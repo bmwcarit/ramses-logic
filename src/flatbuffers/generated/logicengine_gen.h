@@ -6,38 +6,156 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "link_gen.h"
 #include "logicnode_gen.h"
 #include "luascript_gen.h"
 #include "property_gen.h"
+#include "ramsesappearancebinding_gen.h"
 #include "ramsesnodebinding_gen.h"
 
-namespace rlogic {
-namespace serialization {
+namespace rlogic_serialization {
+
+struct Version;
+struct VersionBuilder;
 
 struct LogicEngine;
 struct LogicEngineBuilder;
+
+struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef VersionBuilder Builder;
+  struct Traits;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_V_MAJOR = 4,
+    VT_V_MINOR = 6,
+    VT_V_PATCH = 8,
+    VT_V_STRING = 10
+  };
+  uint32_t v_major() const {
+    return GetField<uint32_t>(VT_V_MAJOR, 0);
+  }
+  uint32_t v_minor() const {
+    return GetField<uint32_t>(VT_V_MINOR, 0);
+  }
+  uint32_t v_patch() const {
+    return GetField<uint32_t>(VT_V_PATCH, 0);
+  }
+  const flatbuffers::String *v_string() const {
+    return GetPointer<const flatbuffers::String *>(VT_V_STRING);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyField<uint32_t>(verifier, VT_V_MAJOR) &&
+           VerifyField<uint32_t>(verifier, VT_V_MINOR) &&
+           VerifyField<uint32_t>(verifier, VT_V_PATCH) &&
+           VerifyOffset(verifier, VT_V_STRING) &&
+           verifier.VerifyString(v_string()) &&
+           verifier.EndTable();
+  }
+};
+
+struct VersionBuilder {
+  typedef Version Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_v_major(uint32_t v_major) {
+    fbb_.AddElement<uint32_t>(Version::VT_V_MAJOR, v_major, 0);
+  }
+  void add_v_minor(uint32_t v_minor) {
+    fbb_.AddElement<uint32_t>(Version::VT_V_MINOR, v_minor, 0);
+  }
+  void add_v_patch(uint32_t v_patch) {
+    fbb_.AddElement<uint32_t>(Version::VT_V_PATCH, v_patch, 0);
+  }
+  void add_v_string(flatbuffers::Offset<flatbuffers::String> v_string) {
+    fbb_.AddOffset(Version::VT_V_STRING, v_string);
+  }
+  explicit VersionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  VersionBuilder &operator=(const VersionBuilder &);
+  flatbuffers::Offset<Version> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<Version>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<Version> CreateVersion(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t v_major = 0,
+    uint32_t v_minor = 0,
+    uint32_t v_patch = 0,
+    flatbuffers::Offset<flatbuffers::String> v_string = 0) {
+  VersionBuilder builder_(_fbb);
+  builder_.add_v_string(v_string);
+  builder_.add_v_patch(v_patch);
+  builder_.add_v_minor(v_minor);
+  builder_.add_v_major(v_major);
+  return builder_.Finish();
+}
+
+struct Version::Traits {
+  using type = Version;
+  static auto constexpr Create = CreateVersion;
+};
+
+inline flatbuffers::Offset<Version> CreateVersionDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    uint32_t v_major = 0,
+    uint32_t v_minor = 0,
+    uint32_t v_patch = 0,
+    const char *v_string = nullptr) {
+  auto v_string__ = v_string ? _fbb.CreateString(v_string) : 0;
+  return rlogic_serialization::CreateVersion(
+      _fbb,
+      v_major,
+      v_minor,
+      v_patch,
+      v_string__);
+}
 
 struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LogicEngineBuilder Builder;
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_LUASCRIPTS = 4,
-    VT_RAMSESNODEBINDINGS = 6
+    VT_RLOGICVERSION = 4,
+    VT_LUASCRIPTS = 6,
+    VT_RAMSESNODEBINDINGS = 8,
+    VT_RAMSESAPPEARANCEBINDINGS = 10,
+    VT_LINKS = 12
   };
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::LuaScript>> *luascripts() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::LuaScript>> *>(VT_LUASCRIPTS);
+  const rlogic_serialization::Version *rlogicVersion() const {
+    return GetPointer<const rlogic_serialization::Version *>(VT_RLOGICVERSION);
   }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::RamsesNodeBinding>> *ramsesnodebindings() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::RamsesNodeBinding>> *>(VT_RAMSESNODEBINDINGS);
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luascripts() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *>(VT_LUASCRIPTS);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *ramsesnodebindings() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *>(VT_RAMSESNODEBINDINGS);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *ramsesappearancebindings() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *>(VT_RAMSESAPPEARANCEBINDINGS);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *links() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *>(VT_LINKS);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_RLOGICVERSION) &&
+           verifier.VerifyTable(rlogicVersion()) &&
            VerifyOffset(verifier, VT_LUASCRIPTS) &&
            verifier.VerifyVector(luascripts()) &&
            verifier.VerifyVectorOfTables(luascripts()) &&
            VerifyOffset(verifier, VT_RAMSESNODEBINDINGS) &&
            verifier.VerifyVector(ramsesnodebindings()) &&
            verifier.VerifyVectorOfTables(ramsesnodebindings()) &&
+           VerifyOffset(verifier, VT_RAMSESAPPEARANCEBINDINGS) &&
+           verifier.VerifyVector(ramsesappearancebindings()) &&
+           verifier.VerifyVectorOfTables(ramsesappearancebindings()) &&
+           VerifyOffset(verifier, VT_LINKS) &&
+           verifier.VerifyVector(links()) &&
+           verifier.VerifyVectorOfTables(links()) &&
            verifier.EndTable();
   }
 };
@@ -46,11 +164,20 @@ struct LogicEngineBuilder {
   typedef LogicEngine Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
-  void add_luascripts(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::LuaScript>>> luascripts) {
+  void add_rlogicVersion(flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion) {
+    fbb_.AddOffset(LogicEngine::VT_RLOGICVERSION, rlogicVersion);
+  }
+  void add_luascripts(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>> luascripts) {
     fbb_.AddOffset(LogicEngine::VT_LUASCRIPTS, luascripts);
   }
-  void add_ramsesnodebindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::RamsesNodeBinding>>> ramsesnodebindings) {
+  void add_ramsesnodebindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>> ramsesnodebindings) {
     fbb_.AddOffset(LogicEngine::VT_RAMSESNODEBINDINGS, ramsesnodebindings);
+  }
+  void add_ramsesappearancebindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>> ramsesappearancebindings) {
+    fbb_.AddOffset(LogicEngine::VT_RAMSESAPPEARANCEBINDINGS, ramsesappearancebindings);
+  }
+  void add_links(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links) {
+    fbb_.AddOffset(LogicEngine::VT_LINKS, links);
   }
   explicit LogicEngineBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -66,11 +193,17 @@ struct LogicEngineBuilder {
 
 inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::LuaScript>>> luascripts = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic::serialization::RamsesNodeBinding>>> ramsesnodebindings = 0) {
+    flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>> luascripts = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>> ramsesnodebindings = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>> ramsesappearancebindings = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links = 0) {
   LogicEngineBuilder builder_(_fbb);
+  builder_.add_links(links);
+  builder_.add_ramsesappearancebindings(ramsesappearancebindings);
   builder_.add_ramsesnodebindings(ramsesnodebindings);
   builder_.add_luascripts(luascripts);
+  builder_.add_rlogicVersion(rlogicVersion);
   return builder_.Finish();
 }
 
@@ -81,47 +214,54 @@ struct LogicEngine::Traits {
 
 inline flatbuffers::Offset<LogicEngine> CreateLogicEngineDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
-    const std::vector<flatbuffers::Offset<rlogic::serialization::LuaScript>> *luascripts = nullptr,
-    const std::vector<flatbuffers::Offset<rlogic::serialization::RamsesNodeBinding>> *ramsesnodebindings = nullptr) {
-  auto luascripts__ = luascripts ? _fbb.CreateVector<flatbuffers::Offset<rlogic::serialization::LuaScript>>(*luascripts) : 0;
-  auto ramsesnodebindings__ = ramsesnodebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic::serialization::RamsesNodeBinding>>(*ramsesnodebindings) : 0;
-  return rlogic::serialization::CreateLogicEngine(
+    flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luascripts = nullptr,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *ramsesnodebindings = nullptr,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *ramsesappearancebindings = nullptr,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::Link>> *links = nullptr) {
+  auto luascripts__ = luascripts ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaScript>>(*luascripts) : 0;
+  auto ramsesnodebindings__ = ramsesnodebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>(*ramsesnodebindings) : 0;
+  auto ramsesappearancebindings__ = ramsesappearancebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>(*ramsesappearancebindings) : 0;
+  auto links__ = links ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Link>>(*links) : 0;
+  return rlogic_serialization::CreateLogicEngine(
       _fbb,
+      rlogicVersion,
       luascripts__,
-      ramsesnodebindings__);
+      ramsesnodebindings__,
+      ramsesappearancebindings__,
+      links__);
 }
 
-inline const rlogic::serialization::LogicEngine *GetLogicEngine(const void *buf) {
-  return flatbuffers::GetRoot<rlogic::serialization::LogicEngine>(buf);
+inline const rlogic_serialization::LogicEngine *GetLogicEngine(const void *buf) {
+  return flatbuffers::GetRoot<rlogic_serialization::LogicEngine>(buf);
 }
 
-inline const rlogic::serialization::LogicEngine *GetSizePrefixedLogicEngine(const void *buf) {
-  return flatbuffers::GetSizePrefixedRoot<rlogic::serialization::LogicEngine>(buf);
+inline const rlogic_serialization::LogicEngine *GetSizePrefixedLogicEngine(const void *buf) {
+  return flatbuffers::GetSizePrefixedRoot<rlogic_serialization::LogicEngine>(buf);
 }
 
 inline bool VerifyLogicEngineBuffer(
     flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<rlogic::serialization::LogicEngine>(nullptr);
+  return verifier.VerifyBuffer<rlogic_serialization::LogicEngine>(nullptr);
 }
 
 inline bool VerifySizePrefixedLogicEngineBuffer(
     flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<rlogic::serialization::LogicEngine>(nullptr);
+  return verifier.VerifySizePrefixedBuffer<rlogic_serialization::LogicEngine>(nullptr);
 }
 
 inline void FinishLogicEngineBuffer(
     flatbuffers::FlatBufferBuilder &fbb,
-    flatbuffers::Offset<rlogic::serialization::LogicEngine> root) {
+    flatbuffers::Offset<rlogic_serialization::LogicEngine> root) {
   fbb.Finish(root);
 }
 
 inline void FinishSizePrefixedLogicEngineBuffer(
     flatbuffers::FlatBufferBuilder &fbb,
-    flatbuffers::Offset<rlogic::serialization::LogicEngine> root) {
+    flatbuffers::Offset<rlogic_serialization::LogicEngine> root) {
   fbb.FinishSizePrefixed(root);
 }
 
-}  // namespace serialization
-}  // namespace rlogic
+}  // namespace rlogic_serialization
 
 #endif  // FLATBUFFERS_GENERATED_LOGICENGINE_RLOGIC_SERIALIZATION_H_

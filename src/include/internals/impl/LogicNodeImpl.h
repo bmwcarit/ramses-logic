@@ -21,7 +21,7 @@ namespace flatbuffers
     class FlatBufferBuilder;
 }
 
-namespace rlogic::serialization
+namespace rlogic_serialization
 {
     struct LogicNode;
 }
@@ -48,6 +48,7 @@ namespace rlogic::internal
         Property*       getInputs();
         const Property* getInputs() const;
 
+        Property* getOutputs();
         const Property* getOutputs() const;
 
         virtual bool update() = 0;
@@ -61,12 +62,9 @@ namespace rlogic::internal
         explicit LogicNodeImpl(std::string_view name) noexcept;
         LogicNodeImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs);
 
-        void setInputs(std::unique_ptr<PropertyImpl> inputs);
-        void setOutputs(std::unique_ptr<PropertyImpl> outputs);
-
         void addError(std::string_view error);
 
-        flatbuffers::Offset<serialization::LogicNode> serialize(flatbuffers::FlatBufferBuilder& builder) const;
+        flatbuffers::Offset<rlogic_serialization::LogicNode> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
     private:
         std::string               m_name;

@@ -123,6 +123,34 @@ inverse-chronological order (latest decisions come on top).
     decided that scripting support would provide a common ground for implementing such logic and abstraction.
 
 ========================================
+Developer guidelines
+========================================
+
+Apart from the general project architecture and design decisions outlined above, we try to be as open to change as
+possible. Want to try out something new? Feel free to experiment with the codebase and propose a change
+(see :ref:`contributing <Contributing>`).
+
+Here are some additional things to consider when modifying the project:
+
+* Execute existing tests before submitting PRs and write new tests for new functionality
+* Have an idea or feature request? Feel free to create a Github issue
+* Treat documentation at least as good as the code itself
+
+    * Added a new feature? Mention it in the CHANGELOG!
+    * Modified the public API? Adapt the doxygen documentation!
+    * Changed the serialization format? Re-run the FlatbufGen target in CMake
+    * Made an API, ABI or any other incompatible change? Don't forget to bump the semantic version of the project
+      in the main CMakeLists.txt file
+
+.. note::
+
+    When changing the serialization schemes of Ramses Logic, the generated flatbuffers header files have to be
+    re-generated and committed as part of the change. This may seem counter-intuitive for code generation, but not
+    all build system support dynamically generated code. Hence, we keep the generated header files checked in with
+    the rest of the code, and re-generate them when needed. To re-create those files, execute the ``FlatbufGen`` target
+    on your build system.
+
+========================================
 Contributing
 ========================================
 

@@ -11,8 +11,6 @@ if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     return()
 endif()
 
-# TODO Violin move this to developer docs (once we have such)
-
 # This CMake file creates two targets (FlatbufGen and FlatbufCheck)
 # FlatbufGen: re-generates flatbuffers header files from schemas, puts results in source tree
 # FlatbufCheck: checks that generated headers are exactly the same as ones in source tree

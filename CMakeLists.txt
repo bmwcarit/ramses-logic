@@ -14,20 +14,23 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 1)
+set(RLOGIC_VERSION_MINOR 2)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 
 project(RamsesLogic
     VERSION ${RLOGIC_VERSION}
+    DESCRIPTION "A scripting and animation runtime for Ramses based on Lua"
     LANGUAGES CXX
+    HOMEPAGE_URL  "https://github.com/GENIVI/ramses-logic"
 )
 
 # Configurable options
 set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE
     STRING "Set this cache variable to a custom RAMSES target. If this is a valid target name, Ramses Logic will use it instead of building Ramses")
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
+option(ramses-logic_ENABLE_INSTALL "Enable/disable installation of Ramses Logic" ON)
 option(ramses-logic_BUILD_WITH_LTO "Build all targets with link time optimization enabled (not supported on all platforms)" OFF)
 option(ramses-logic_WARNINGS_AS_ERRORS "Treat warnings as errors when compiling" ON)
 option(ramses-logic_FORCE_BUILD_TESTS "Force build tests, even if built as a submodule" OFF)
@@ -92,52 +95,61 @@ include(cmake/addCheckerTargets.cmake)
 
 if(ramses-logic_BUILD_DOCS)
     add_subdirectory(doc)
+endif()
 
+if(ramses-logic_ENABLE_INSTALL)
     install(FILES       README.rst CHANGELOG.rst LICENSE.txt
             DESTINATION share/doc/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
             COMPONENT   ${PROJECT_NAME}-${PROJECT_VERSION}
         )
 endif()
 
-
 #==========================================================================
 # generate CMake config files
 #==========================================================================
 
-include(CMakePackageConfigHelpers)
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/templates/build-config.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/BuildConfig/ramses-logic-build-config.h"
+    @ONLY
+)
 
-# install paths for find/config script must differ on windows and linux because of different search
-# rules used by find_package. See https://cmake.org/cmake/help/git-master/command/find_package.html
-# for details
-set(ramses-logic-VERSION_DIR "ramses-logic-${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}")
-if (CMAKE_SYSTEM_NAME MATCHES "Windows")
-    set(ramses-logic_FIND_SCRIPT_INSTALL_DIR "lib/${ramses-logic-VERSION_DIR}/cmake")
-else()
-    set(ramses-logic_FIND_SCRIPT_INSTALL_DIR "lib/cmake/${ramses-logic-VERSION_DIR}")
+if(ramses-logic_ENABLE_INSTALL)
+    include(CMakePackageConfigHelpers)
+
+    # install paths for find/config script must differ on windows and linux because of different search
+    # rules used by find_package. See https://cmake.org/cmake/help/git-master/command/find_package.html
+    # for details
+    set(ramses-logic-VERSION_DIR "ramses-logic-${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}")
+    if (CMAKE_SYSTEM_NAME MATCHES "Windows")
+        set(ramses-logic_FIND_SCRIPT_INSTALL_DIR "lib/${ramses-logic-VERSION_DIR}/cmake")
+    else()
+        set(ramses-logic_FIND_SCRIPT_INSTALL_DIR "lib/cmake/${ramses-logic-VERSION_DIR}")
+    endif()
+
+    # generate CMake config file (use ramses-logicTemplate.cmake.in as base)
+    configure_package_config_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/cmake/templates/ramses-logic-Template.cmake.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfig.cmake"
+        INSTALL_DESTINATION "${ramses-logic_FIND_SCRIPT_INSTALL_DIR}"
+        PATH_VARS RLOGIC_INSTALL_HEADERS_PATH RLOGIC_INSTALL_LIBRARY_PATH RLOGIC_INSTALL_RUNTIME_PATH RLOGIC_INSTALL_ARCHIVE_PATH
+        NO_SET_AND_CHECK_MACRO
+        NO_CHECK_REQUIRED_COMPONENTS_MACRO
+    )
+    install(
+        FILES       ${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfig.cmake
+        DESTINATION ${ramses-logic_FIND_SCRIPT_INSTALL_DIR}
+    )
+
+    # generate CMake version file
+    write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfigVersion.cmake"
+        VERSION ${RLOGIC_VERSION}
+        COMPATIBILITY SameMajorVersion)
+    install(
+        FILES       ${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfigVersion.cmake
+        DESTINATION ${ramses-logic_FIND_SCRIPT_INSTALL_DIR}
+    )
 endif()
-
-# generate CMake config file (use ramses-logicTemplate.cmake.in as base)
-configure_package_config_file(
-    "${CMAKE_CURRENT_SOURCE_DIR}/cmake/templates/ramses-logic-Template.cmake.in"
-    "${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfig.cmake"
-    INSTALL_DESTINATION "${ramses-logic_FIND_SCRIPT_INSTALL_DIR}"
-    PATH_VARS RLOGIC_INSTALL_HEADERS_PATH RLOGIC_INSTALL_LIBRARY_PATH RLOGIC_INSTALL_RUNTIME_PATH RLOGIC_INSTALL_ARCHIVE_PATH
-    NO_SET_AND_CHECK_MACRO
-    NO_CHECK_REQUIRED_COMPONENTS_MACRO
-)
-install(
-    FILES       ${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfig.cmake
-    DESTINATION ${ramses-logic_FIND_SCRIPT_INSTALL_DIR}
-)
-
-# generate CMake version file
-write_basic_package_version_file("${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfigVersion.cmake"
-    VERSION ${RLOGIC_VERSION}
-    COMPATIBILITY SameMajorVersion)
-install(
-    FILES       ${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfigVersion.cmake
-    DESTINATION ${ramses-logic_FIND_SCRIPT_INSTALL_DIR}
-)
 
 
 #==========================================================================

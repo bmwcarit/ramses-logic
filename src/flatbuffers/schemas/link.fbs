@@ -1,0 +1,28 @@
+//  -------------------------------------------------------------------------
+//  Copyright (C) 2020 BMW AG
+//  -------------------------------------------------------------------------
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//  -------------------------------------------------------------------------
+
+namespace rlogic_serialization;
+
+enum ELogicNodeType:uint8
+{
+    Script = 0,
+    RamsesNodeBinding = 1,
+    RamsesAppearanceBinding = 2,
+}
+
+table Link
+{
+    sourceLogicNodeType:ELogicNodeType;
+    targetLogicNodeType:ELogicNodeType;
+    sourceLogicNodeId:uint32;
+    targetLogicNodeId:uint32;
+    sourcePropertyNestedIndex:[uint32];
+    targetPropertyNestedIndex:[uint32];
+}
+
+root_type Link;

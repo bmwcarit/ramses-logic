@@ -23,37 +23,42 @@ namespace rlogic::internal
         return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name));
     }
 
-    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Create(const serialization::RamsesNodeBinding& nodeBinding)
+    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Create(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode)
     {
-        // TODO Test with large scene how much overhead it is to store lots of bindings with empty names
+        // TODO Violin/Sven Test with large scene how much overhead it is to store lots of bindings with empty names
         assert(nullptr != nodeBinding.logicnode());
         assert(nullptr != nodeBinding.logicnode()->name());
         assert(nullptr != nodeBinding.logicnode()->inputs());
 
-        auto inputs = PropertyImpl::Create(nodeBinding.logicnode()->inputs());
+        auto inputs = PropertyImpl::Create(nodeBinding.logicnode()->inputs(), EInputOutputProperty::Input);
 
         assert (nullptr != inputs);
 
         const auto name = nodeBinding.logicnode()->name()->string_view();
 
-        return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name , std::move(inputs)));
+        return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name , std::move(inputs), ramsesNode));
     }
 
     RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name) noexcept
-        : LogicNodeImpl(name)
+        : RamsesBindingImpl(name, CreateNodeProperties(), nullptr)
     {
-        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct);
-        // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f));
-
-        setInputs(std::move(inputsImpl));
+        // TODO Violin this still needs some thought (the impl lifecycle with and without deserialization + base classes)
     }
 
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs) noexcept
-        : LogicNodeImpl(name, std::move(inputs), nullptr)
+    std::unique_ptr<PropertyImpl> RamsesNodeBindingImpl::CreateNodeProperties()
+    {
+        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EInputOutputProperty::Input);
+        // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool, EInputOutputProperty::Input));
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f, EInputOutputProperty::Input));
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f, EInputOutputProperty::Input));
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EInputOutputProperty::Input));
+        return inputsImpl;
+    }
+
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept
+        : RamsesBindingImpl(name, std::move(inputs), nullptr)
+        , m_ramsesNode(ramsesNode)
     {
     }
 
@@ -124,10 +129,17 @@ namespace rlogic::internal
         return true;
     }
 
-    flatbuffers::Offset<serialization::RamsesNodeBinding> RamsesNodeBindingImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
+    flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
     {
-        auto ramsesNodeBinding = serialization::CreateRamsesNodeBinding(builder,
-            LogicNodeImpl::serialize(builder)
+        ramses::sceneObjectId_t ramsesNodeId;
+        if (m_ramsesNode != nullptr)
+        {
+            ramsesNodeId = m_ramsesNode->getSceneObjectId();
+        }
+
+        auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
+            LogicNodeImpl::serialize(builder),
+            ramsesNodeId.getValue()
         );
         builder.Finish(ramsesNodeBinding);
 

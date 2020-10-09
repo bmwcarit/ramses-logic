@@ -63,8 +63,8 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        auto inputsImpl  = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct);
-        auto outputsImpl = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct);
+        auto inputsImpl  = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EInputOutputProperty::Input);
+        auto outputsImpl = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EInputOutputProperty::Output);
 
         (*env)["IN"]  = luaState.createUserObject(LuaScriptPropertyExtractor(luaState, *inputsImpl));
         (*env)["OUT"] = luaState.createUserObject(LuaScriptPropertyExtractor(luaState, *outputsImpl));
@@ -106,7 +106,7 @@ namespace rlogic::internal
         return chunkname;
     }
 
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(LuaStateImpl& luaState, const serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut)
+    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(LuaStateImpl& luaState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut)
     {
         assert(nullptr != luaScript);
         assert(nullptr != luaScript->filename());
@@ -127,14 +127,14 @@ namespace rlogic::internal
         load_source = luaScript->source()->string_view();
         string_source = load_source;
 
-        auto inputs = PropertyImpl::Create(luaScript->logicnode()->inputs());
+        auto inputs = PropertyImpl::Create(luaScript->logicnode()->inputs(), EInputOutputProperty::Input);
         if (nullptr == inputs)
         {
             errorsOut.emplace_back("Error during deserialization of inputs");
             return nullptr;
         }
 
-        auto outputs = PropertyImpl::Create(luaScript->logicnode()->outputs());
+        auto outputs = PropertyImpl::Create(luaScript->logicnode()->outputs(), EInputOutputProperty::Output);
         if (nullptr == outputs)
         {
             errorsOut.emplace_back("Error during deserialization of outputs");
@@ -211,12 +211,12 @@ namespace rlogic::internal
         return true;
     }
 
-    flatbuffers::Offset<serialization::LuaScript> LuaScriptImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
+    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
     {
         // TODO use this after update to SOL3
         //sol::bytecode scriptCode = m_solFunction.dump();
 
-        auto luascript = serialization::CreateLuaScript(
+        auto luascript = rlogic_serialization::CreateLuaScript(
             builder,
             LogicNodeImpl::serialize(builder),
             builder.CreateString(m_filename),

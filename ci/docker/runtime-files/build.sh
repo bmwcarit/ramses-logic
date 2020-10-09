@@ -297,7 +297,7 @@ else
     # Perform install checks
     # They are quick, so we execute them always
     echo "Checking installed headers"
-    python3 $RL_SRC/ci/scripts/installation-check/check-includes-valid.py $RL_SRC/ $INSTALL_DIR/
+    python3 $RL_SRC/ci/scripts/installation-check/check-installation.py --install-dir $INSTALL_DIR/ --src-dir $RL_SRC/
     echo "Building against shared library"
     bash $RL_SRC/ci/scripts/installation-check/check-build-with-install-shared-lib.sh $BUILD_DIR/install-check/ $INSTALL_DIR
     echo "Building against ramses logic as a source tree (submodule) and linking statically"

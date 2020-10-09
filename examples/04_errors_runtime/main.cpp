@@ -13,7 +13,6 @@
 /**
  * This example shows how to deal with runtime errors in Lua scripts.
  */
-
 int main()
 {
     rlogic::LogicEngine logicEngine;

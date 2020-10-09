@@ -8,16 +8,17 @@
 
 #pragma once
 
-#include "internals/impl/LogicNodeImpl.h"
+#include "internals/impl/RamsesBindingImpl.h"
 
 #include <memory>
 
 namespace ramses
 {
+    class Scene;
     class Node;
 }
 
-namespace rlogic::serialization
+namespace rlogic_serialization
 {
     struct RamsesNodeBinding;
 }
@@ -38,7 +39,7 @@ namespace rlogic::internal
         Scaling = 3,
     };
 
-    class RamsesNodeBindingImpl : public LogicNodeImpl
+    class RamsesNodeBindingImpl : public RamsesBindingImpl
     {
     public:
         // Move-able (noexcept); Not copy-able
@@ -48,19 +49,20 @@ namespace rlogic::internal
         RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other)                = delete;
         RamsesNodeBindingImpl& operator=(const RamsesNodeBindingImpl& other) = delete;
         static std::unique_ptr<RamsesNodeBindingImpl> Create(std::string_view name);
-        static std::unique_ptr<RamsesNodeBindingImpl> Create(const serialization::RamsesNodeBinding& nodeBinding);
+        static std::unique_ptr<RamsesNodeBindingImpl> Create(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode);
 
         bool setRamsesNode(ramses::Node* node);
         ramses::Node* getRamsesNode() const;
         bool update() override;
 
-        flatbuffers::Offset<serialization::RamsesNodeBinding> serialize(flatbuffers::FlatBufferBuilder& builder) const;
+        flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
     private:
 
         explicit RamsesNodeBindingImpl(std::string_view name) noexcept;
-        RamsesNodeBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs) noexcept;
-
+        RamsesNodeBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept;
         ramses::Node* m_ramsesNode = nullptr;
+
+        static std::unique_ptr<PropertyImpl> CreateNodeProperties();
     };
 }

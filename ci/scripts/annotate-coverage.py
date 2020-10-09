@@ -112,6 +112,8 @@ def create_annotated_patch_html(patch, cov):
 
     rows = []
     current_idx = 0
+    totalTestedLines = 0
+    totalUntestedLines = 0
     for line in patch:
         escaped_line = html.escape(line).replace(' ', '&nbsp;')
 
@@ -146,10 +148,12 @@ def create_annotated_patch_html(patch, cov):
             if cnt != '':
                 if cnt > 0:
                     cnt_cls += ' cntgood'
+                    totalTestedLines += 1
                 else:
                     cnt_cls += ' cntbad'
                     if need_cov:
                         cls += ' linebad'
+                        totalUntestedLines += 1
 
             rows.append(f'<tr><td class="lnum">{current_idx}</td><td class="{cnt_cls}">{cnt}</td><td class="line {cls}">{escaped_line}</td></tr>')
             current_idx += 1
@@ -157,7 +161,11 @@ def create_annotated_patch_html(patch, cov):
             rows.append(f'<tr><td class="lnum"></td><td class="cnt"></td><td class="line {cls}">{escaped_line}</td></tr>')
 
     doc = html_template.replace('%ROWS%', '\n'.join(rows))
-    return doc
+    return {
+        'html_report': doc,
+        'tested_lines': totalTestedLines,
+        'untested_lines': totalUntestedLines
+    }
 
 def get_api_token():
     """Read github API token from file"""
@@ -175,9 +183,9 @@ def get_github_pr(github_url, owner, repo, pr_num):
 def download_patch_from_pr(pr):
     return pr.diff().decode('utf-8')
 
-def post_issue_comment(link_base, html, pr):
+def post_issue_comment(link_base, html, pr, annotated_patch):
     html_file = Path(html).name
-    body = f'Check out [PR coverage]({link_base}/{html_file})'
+    body = f'Check out [PR coverage]({link_base}/{html_file})\n\nCoverage report summary [tested:{annotated_patch["tested_lines"]}] [untested:{annotated_patch["untested_lines"]}]'
     pr.create_comment(body)
 
 def main():
@@ -185,10 +193,10 @@ def main():
     parser.add_argument('--coverage', required=True, help='llvm-cov coverage json export')
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--diff-file', help='Path to diff file')
-    group.add_argument('--github-url', required=True, help='Github URL')
-    group.add_argument('--repo-owner', required=True, help='Project owner (org)')
-    group.add_argument('--repo-name', required=True, help='Project name (repo)')
     group.add_argument('--pr', type=int, help='Github PR#')
+    parser.add_argument('--github-url', required=True, help='Github URL')
+    parser.add_argument('--repo-owner', required=True, help='Project owner (org)')
+    parser.add_argument('--repo-name', required=True, help='Project name (repo)')
     parser.add_argument('--html-output', required=True, help='Location of html output file')
     parser.add_argument('--post-log-link-in-issue', required=False, default=None, help='Post link to <arg>/<html-output name> to PR given in --pr')
     args = parser.parse_args()
@@ -203,16 +211,11 @@ def main():
         pr = get_github_pr(github_url=args.github_url, owner=args.repo_owner, repo=args.repo_name, pr_num=args.pr)
         patch = download_patch_from_pr(pr)
 
-    doc = create_annotated_patch_html(patch.split('\n'), cov)
-    Path(args.html_output).write_text(doc)
+    annotated_patch = create_annotated_patch_html(patch.split('\n'), cov)
+    Path(args.html_output).write_text(annotated_patch['html_report'])
 
     if args.post_log_link_in_issue:
-        post_issue_comment(args.post_log_link_in_issue, args.html_output, pr)
+        post_issue_comment(args.post_log_link_in_issue, args.html_output, pr, annotated_patch)
 
 if __name__ == '__main__':
-    # TODO(tobias) for testing catch all errors and never return non-zero return code
-    try:
-        sys.exit(main())
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
+    sys.exit(main())

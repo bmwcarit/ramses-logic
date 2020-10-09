@@ -23,19 +23,27 @@ namespace rlogic
 {
     class Property;
 
+    /**
+     * A base class for multiple logic classes which provides a unified interface to their
+     * inputs and outputs. Some subclasses don't have inputs or outputs - in that case the
+     * #getInputs or #getOutputs methods respectively will return nullptr. Some subclasses,
+     * like the #rlogic::RamsesAppearanceBinding, will have their inputs depending on their
+     * current state (in this example the GLSL uniforms of the shader to which the bound ramses
+     * Appearance belongs). In those cases, #getInputs()/#getOutputs() will return a #rlogic::Property
+     * which represents an empty struct (type Struct, but no child properties).
+     */
     class LogicNode
     {
     public:
 
         /**
-         * Returns a tree like structure with the inputs of the LogicNode.
+         * Returns a property of type Struct which holds the inputs of the #LogicNode.
          *
-         * Returns the root Property of the LogicNode (type Struct) which contains potentially
+         * Returns the root Property of the LogicNode which contains potentially
          * nested list of properties. The properties are different for the classes which derive from
-         * LogicNode. Look at the documentation of each derived class for more information on the properties.             *
-         * @return a tree like structure with the inputs of the LogicNode
+         * #LogicNode. Look at the documentation of each derived class for more information on the properties.             *
+         * @return a tree like structure with the inputs of the #LogicNode
          */
-        // TODO this can not be null, actually. Should we make it a reference instead?
         RLOGIC_API Property* getInputs();
 
         /**
@@ -44,27 +52,26 @@ namespace rlogic
         RLOGIC_API const Property* getInputs() const;
 
         /**
-         * Returns a tree like structure with the outputs of the LogicNode
+         * Returns a property of type Struct which holds the outputs of the #LogicNode
          *
-         * Returns the root Property of the LogicNode (type Struct) which contains potentially
+         * Returns the root Property of the LogicNode which contains potentially
          * nested list of properties. The properties are different for the classes which derive from
-         * LogicNode. Look at the documentation of each derived class for more information on the properties.             *
+         * #LogicNode. Look at the documentation of each derived class for more information on the properties.             *
          * @return a tree like structure with the outputs of the LogicNode
          */
         RLOGIC_API const Property* getOutputs() const;
 
         /**
-         * Returns the name of this LogicNode. The name can be used to find the object after deserialization
-         * at the LogicEngine
+         * Returns the name of this #LogicNode.
+         *
          * @return the name of the LogicNode
          */
         RLOGIC_API std::string_view getName() const;
 
         /**
-        * Destructor of LogicNode
+        * Destructor of #LogicNode
         */
-        // TODO Clang-Tidy prefers to do the defaulting in this case in the header - Discuss with Tobias
-        ~LogicNode() noexcept = default;
+        virtual ~LogicNode() noexcept;
 
         /**
         * Copy Constructor of LogicNode is deleted because LogicNodes are not supposed to be copied

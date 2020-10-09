@@ -1,0 +1,35 @@
+//  -------------------------------------------------------------------------
+//  Copyright (C) 2020 BMW AG
+//  -------------------------------------------------------------------------
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//  -------------------------------------------------------------------------
+
+// Content here is configured by CMake
+
+#pragma once
+
+#include <string_view>
+#include <cstdint>
+
+namespace rlogic
+{
+    constexpr std::string_view  g_PROJECT_NAME                 = "@PROJECT_NAME@";
+    constexpr std::string_view  g_PROJECT_DESCRIPTION          = "@PROJECT_DESCRIPTION@";
+    constexpr std::string_view  g_PROJECT_HOMEPAGE_URL         = "@PROJECT_HOMEPAGE_URL@";
+    constexpr std::string_view  g_PROJECT_VERSION              = "@PROJECT_VERSION@";
+    constexpr uint32_t          g_PROJECT_VERSION_MAJOR        = @PROJECT_VERSION_MAJOR@u;
+    constexpr uint32_t          g_PROJECT_VERSION_MINOR        = @PROJECT_VERSION_MINOR@u;
+    constexpr uint32_t          g_PROJECT_VERSION_PATCH        = @PROJECT_VERSION_PATCH@u;
+    constexpr std::string_view  g_CMAKE_BUILD_TYPE             = "@CMAKE_BUILD_TYPE@";
+    constexpr std::string_view  g_CMAKE_CXX_COMPILER           = "@CMAKE_CXX_COMPILER@";
+    constexpr std::string_view  g_CMAKE_CXX_COMPILER_ID        = "@CMAKE_CXX_COMPILER_ID@";
+    constexpr std::string_view  g_CMAKE_CXX_FLAGS              = "@CMAKE_CXX_FLAGS@";
+    constexpr std::string_view  g_CMAKE_CXX_FLAGS_DEBUG        = "@CMAKE_CXX_FLAGS_DEBUG@";
+    constexpr std::string_view  g_CMAKE_CXX_FLAGS_RELEASE      = "@CMAKE_CXX_FLAGS_RELEASE@";
+    constexpr std::string_view  g_CMAKE_SYSTEM_NAME            = "@CMAKE_SYSTEM_NAME@";
+    constexpr std::string_view  g_CMAKE_SYSTEM_VERSION         = "@CMAKE_SYSTEM_VERSION@";
+    constexpr std::string_view  g_CMAKE_TOOLCHAIN_FILE         = "@CMAKE_TOOLCHAIN_FILE@";
+}
+

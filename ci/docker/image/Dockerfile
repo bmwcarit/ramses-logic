@@ -61,12 +61,10 @@ RUN if [ -n "${HTTP_PROXY}" ]; then \
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7 \
     && update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 900 --slave /usr/bin/g++ g++ /usr/bin/g++-9
 
-RUN pip3 install \
-        cmake==3.13.1 \
-        github3.py \
-        sphinx==3.0.4 \
-        breathe==4.18.1 \
-        sphinx-rtd-theme==0.4.3
+# install pip3 packages
+COPY requirements-py3.txt /tmp/
+RUN pip3 install -r /tmp/requirements-py3.txt \
+    && rm -f /tmp/requirements-py3.txt
 
 # add ramses user and groups
 RUN groupadd --gid 1000 rl-build \

@@ -10,8 +10,8 @@
 if (ramses-logic_ENABLE_CODE_STYLE AND CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     if (rlogic_PYTHON3)
         add_custom_target(RL_CHECK_CODE_STYLE
-            COMMAND ${rlogic_PYTHON3} ${CMAKE_CURRENT_SOURCE_DIR}/ci/scripts/code_style_checker/check_all_styles.py ${CMAKE_CURRENT_SOURCE_DIR}
-            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/ci/scripts/code_style_checker
+            COMMAND ${rlogic_PYTHON3} ${PROJECT_SOURCE_DIR}/ci/scripts/code_style_checker/check_all_styles.py
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
             )
         set_property(TARGET RL_CHECK_CODE_STYLE PROPERTY FOLDER "CMakePredefinedTargets")
         message(STATUS " + RL_CHECK_CODE_STYLE")

@@ -1,0 +1,48 @@
+#  -------------------------------------------------------------------------
+#  Copyright (C) 2020 BMW AG
+#  -------------------------------------------------------------------------
+#  This Source Code Form is subject to the terms of the Mozilla Public
+#  License, v. 2.0. If a copy of the MPL was not distributed with this
+#  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#  -------------------------------------------------------------------------
+
+
+alabaster==0.7.12
+Babel==2.8.0
+breathe==4.18.1
+certifi==2020.6.20
+cffi==1.14.2
+chardet==3.0.4
+cmake==3.13.1
+cryptography==3.0
+docutils==0.16
+gitdb2==2.0.3
+github3.py==1.3.0
+GitPython==2.1.8
+idna==2.10
+imagesize==1.2.0
+Jinja2==2.11.2
+jwcrypto==0.8
+MarkupSafe==1.1.1
+packaging==20.4
+pycparser==2.20
+Pygments==2.6.1
+pyparsing==2.4.7
+python-dateutil==2.8.1
+pytz==2020.1
+PyYAML==3.12
+requests==2.24.0
+six==1.15.0
+smmap2==2.0.3
+snowballstemmer==2.0.0
+Sphinx==3.0.4
+sphinx-rtd-theme==0.4.3
+sphinxcontrib-applehelp==1.0.2
+sphinxcontrib-devhelp==1.0.2
+sphinxcontrib-htmlhelp==1.0.3
+sphinxcontrib-jsmath==1.0.1
+sphinxcontrib-qthelp==1.0.3
+sphinxcontrib-serializinghtml==1.1.4
+uritemplate==3.0.1
+urllib3==1.25.10
+

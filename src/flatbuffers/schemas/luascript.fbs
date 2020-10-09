@@ -8,7 +8,7 @@
 
 include "logicnode.fbs";
 
-namespace rlogic.serialization;
+namespace rlogic_serialization;
 
 table LuaScript
 {

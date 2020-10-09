@@ -93,9 +93,10 @@ target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALW
 
 # TODO don't build flatbuffers if target already present
 
-set(FLATBUFFERS_BUILD_TESTS OFF)
-set(FLATBUFFERS_INSTALL OFF)
-set(FLATBUFFERS_BUILD_FLATHASH OFF)
+# Don't build flatbuf targets we don't need
+set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
 
 # Only add flatc target if flatbuffers header generation needed
 if(ramses-logic_ENABLE_FLATBUFFERS_GENERATION)
@@ -129,6 +130,7 @@ endif()
 
 if(ramses-logic_RAMSES_TARGET AND TARGET ${ramses-logic_RAMSES_TARGET})
     message(STATUS " + Using existing ramses target '${ramses-logic_RAMSES_TARGET}'")
+    # TODO Violin add version check here once ramses provides CMake variables for it
 else()
     if(ramses-logic_ALLOW_RAMSES_BUILD)
         message(STATUS " + Building ramses from source and using target '${ramses-logic_RAMSES_TARGET}'")

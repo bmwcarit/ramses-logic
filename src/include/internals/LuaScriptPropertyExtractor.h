@@ -27,7 +27,7 @@ namespace rlogic::internal
     private:
         PropertyImpl& m_propertyDescription;
 
-        void        addEntryToPropertyDescription(const sol::object& index, const sol::object& value, PropertyImpl& property);
+        void        addStructProperty(const sol::object& propertyName, const sol::object& propertyValue, PropertyImpl& parentStruct);
         sol::object getProperty(const sol::object& index);
     };
 }

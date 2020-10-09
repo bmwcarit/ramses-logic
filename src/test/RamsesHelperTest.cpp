@@ -28,8 +28,8 @@ namespace rlogic::internal
         EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_Matrix22F));
         EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_Matrix33F));
         EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_Matrix44F));
-        // TODO Violin/Sven re-enable after R26 has been released to Github
-        //EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSampler2D));
-        //EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSampler3D));
+        EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSampler2D));
+        EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSampler3D));
+        EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSamplerCube));
     }
 }

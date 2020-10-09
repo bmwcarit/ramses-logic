@@ -10,6 +10,17 @@
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
+#include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/RamsesNodeBinding.h"
+
+#include "ramses-framework-api/RamsesFramework.h"
+#include "ramses-client-api/RamsesClient.h"
+#include "ramses-client-api/Effect.h"
+#include "ramses-client-api/Appearance.h"
+#include "ramses-client-api/Scene.h"
+#include "ramses-client-api/EffectDescription.h"
+#include "ramses-client-api/UniformInput.h"
+#include "ramses-client-api/Node.h"
 
 namespace rlogic
 {
@@ -390,7 +401,7 @@ namespace rlogic
 
         input->set(5);
 
-        m_logicEngine.update();
+        EXPECT_TRUE(m_logicEngine.update());
 
         EXPECT_EQ(10, *field1->get<int32_t>());
         EXPECT_EQ(25, *field2->get<int32_t>());
@@ -422,7 +433,7 @@ namespace rlogic
 
         input->set(5);
 
-        m_logicEngine.update();
+        EXPECT_TRUE(m_logicEngine.update());
 
         EXPECT_EQ(10, *field1->get<int32_t>());
         EXPECT_EQ(25, *field2->get<int32_t>());
@@ -450,7 +461,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Not possible to partially assign structs!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 1"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -480,7 +491,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Not possible to partially assign structs!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 3"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -648,7 +659,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Tried to set unsupported type 'STRING' to output 'str' which is of type number !"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Assigning wrong type (number) to output 'str'!"));
     }
 
     TEST_F(ALuaScript_Runtime, SupportsMultipleLevelsOfNestedInputs_confidenceTest)
@@ -691,7 +702,6 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToAccessFieldsWithNonStringIndexAtRuntime)
     {
-        // TODO Violin/Sven would be nice to have verbose error messages here... Doesn't have to be these, but the currently returned ones are misleading
         const std::vector<LuaTestError> allCases = {
             {"local var = IN[0]",
             "Only strings supported as table key type!"},
@@ -727,7 +737,6 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToCreatePropertiesAtRuntime)
     {
-        // TODO Violin/Sven would be nice to have verbose error messages here... Doesn't have to be these, but the currently returned ones are misleading
         const std::vector<LuaTestError> allCases =
         {
             {"IN.cannot_create_inputs_here = 5",
@@ -1154,4 +1163,117 @@ namespace rlogic
         EXPECT_EQ(0, outputs->getChild(0)->get<int32_t>());
     }
 
+    TEST_F(ALuaScript_Runtime, HasNoInfluenceOnBindingsIfTheyAreNotLinked)
+    {
+        LogicEngine logicEngine;
+        auto        scriptSource = R"(
+            function interface()
+                IN.inFloat = FLOAT
+                IN.inVec3  = VEC3F
+                OUT.outFloat = FLOAT
+                OUT.outVec3  = VEC3F
+            end
+            function run()
+                OUT.outFloat = IN.inFloat
+                OUT.outVec3 = IN.inVec3
+            end
+        )";
+
+        const std::string_view vertexShaderSource = R"(
+            #version 300 es
+
+            uniform highp float floatUniform;
+
+            void main()
+            {
+                gl_Position = floatUniform * vec4(1.0);
+            })";
+
+        const std::string_view fragmentShaderSource = R"(
+            #version 300 es
+
+            out lowp vec4 color;
+            void main(void)
+            {
+                color = vec4(1.0, 0.0, 0.0, 1.0);
+            })";
+
+        auto script1 = logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
+        auto script2 = logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
+        auto script3 = logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
+
+        auto script1FloatInput  = script1->getInputs()->getChild("inFloat");
+        auto script1FloatOutput = script1->getOutputs()->getChild("outFloat");
+        auto script1Vec3Input   = script1->getInputs()->getChild("inVec3");
+        auto script1Vec3Output  = script1->getOutputs()->getChild("outVec3");
+        auto script2FloatInput  = script2->getInputs()->getChild("inFloat");
+        auto script2FloatOutput = script2->getOutputs()->getChild("outFloat");
+        auto script2Vec3Input   = script2->getInputs()->getChild("inVec3");
+        auto script2Vec3Output  = script2->getOutputs()->getChild("outVec3");
+        auto script3FloatInput  = script3->getInputs()->getChild("inFloat");
+        auto script3FloatOutput = script3->getOutputs()->getChild("outFloat");
+        auto script3Vec3Input   = script3->getInputs()->getChild("inVec3");
+        auto script3Vec3Output  = script3->getOutputs()->getChild("outVec3");
+
+        auto nodeBinding       = logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
+
+        ramses::RamsesFramework ramsesFramework;
+        auto                    ramsesClient = ramsesFramework.createClient("client");
+        auto                    ramsesScene  = ramsesClient->createScene(ramses::sceneId_t(1));
+
+        ramses::EffectDescription ramsesEffectDesc;
+        ramsesEffectDesc.setVertexShader(vertexShaderSource.data());
+        ramsesEffectDesc.setFragmentShader(fragmentShaderSource.data());
+        auto ramsesEffect     = ramsesScene->createEffect(ramsesEffectDesc);
+        auto ramsesAppearance = ramsesScene->createAppearance(*ramsesEffect);
+        appearanceBinding->setRamsesAppearance(ramsesAppearance);
+
+        logicEngine.update();
+
+        EXPECT_FALSE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+
+        logicEngine.link(*script1FloatOutput, *script2FloatInput);
+        logicEngine.link(*script2FloatOutput, *script3FloatInput);
+        logicEngine.link(*script1Vec3Output,  *script2Vec3Input);
+        logicEngine.link(*script2Vec3Output,  *script3Vec3Input);
+
+        logicEngine.update();
+
+        EXPECT_FALSE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+
+        logicEngine.link(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
+
+        script1Vec3Input->set(vec3f{1.f, 2.f, 3.f});
+
+        logicEngine.update();
+
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
+
+        logicEngine.link(*script3FloatOutput, *appearanceBinding->getInputs()->getChild("floatUniform"));
+
+        script1FloatInput->set(42.f);
+
+        logicEngine.update();
+
+        EXPECT_FLOAT_EQ(42.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+
+        logicEngine.unlink(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
+
+        script1FloatInput->set(23.f);
+        script1Vec3Input->set(vec3f{3.f, 2.f, 1.f});
+
+        logicEngine.update();
+
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
+        EXPECT_FLOAT_EQ(23.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+    }
 }

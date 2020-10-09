@@ -6,22 +6,13 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-namespace rlogic.serialization;
+namespace rlogic_serialization;
 
-enum EPropertyType:uint8
+// For primitives properties, the exact type is derived from the union type
+enum EPropertyRootType:uint8
 {
-    Unknown = 0,
-    Float = 1,
-    Vec2f = 2,
-    Vec3f = 3,
-    Vec4f = 4,
-    Int32 = 5,
-    Vec2i = 6,
-    Vec3i = 7,
-    Vec4i = 8,
-    Struct = 9,
-    String = 10,
-    Bool = 11
+    Primitive = 0,
+    Struct = 1
 }
 
 // Because unions can't hold primitives directly,
@@ -101,6 +92,7 @@ union PropertyValue
 table Property
 {
     name:string;
+    rootType:EPropertyRootType;
     children:[Property];
     value:PropertyValue;
     // See TODO in code; we need this temporarily (or maybe permanently) in order to NOT set ramses node properties to our default values, when not expected

@@ -23,7 +23,7 @@ namespace rlogic::internal
 
     void LuaScriptPropertyExtractor::NewIndex(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& rhs)
     {
-        data.addEntryToPropertyDescription(index, rhs, data.m_propertyDescription);
+        data.addStructProperty(index, rhs, data.m_propertyDescription);
     }
 
     sol::object LuaScriptPropertyExtractor::Index(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& /*rhs*/)
@@ -45,19 +45,19 @@ namespace rlogic::internal
         return sol::nil;
     }
 
-    void LuaScriptPropertyExtractor::addEntryToPropertyDescription(const sol::object& index, const sol::object& value, PropertyImpl& property)
+    void LuaScriptPropertyExtractor::addStructProperty(const sol::object& propertyName, const sol::object& propertyValue, PropertyImpl& parentStruct)
     {
-        const auto name = GetIndexAsString(index);
+        const std::string_view name = GetIndexAsString(propertyName);
 
-        if (nullptr != property.getChild(name))
+        if (nullptr != parentStruct.getChild(name))
         {
             sol_helper::throwSolException("Property '{}' already exists! Can't declare the same property twice!", name);
         }
 
-        const auto solType = value.get_type();
+        const auto solType = propertyValue.get_type();
         if (solType == sol::type::number)
         {
-            const auto type = value.as<EPropertyType>();
+            const auto type = propertyValue.as<EPropertyType>();
             if (type == EPropertyType::Float ||
                 type == EPropertyType::Vec2f ||
                 type == EPropertyType::Vec3f ||
@@ -69,7 +69,7 @@ namespace rlogic::internal
                 type == EPropertyType::String ||
                 type == EPropertyType::Bool)
             {
-                property.addChild(std::make_unique<PropertyImpl>(name, type));
+                parentStruct.addChild(std::make_unique<PropertyImpl>(name, type, parentStruct.getInputOutputProperty()));
             }
             else
             {
@@ -78,15 +78,15 @@ namespace rlogic::internal
         }
         else if (solType == sol::type::table)
         {
-            const auto table          = value.as<sol::table>();
-            auto propertyStruct = std::make_unique<PropertyImpl>(name, EPropertyType::Struct);
+            const auto table          = propertyValue.as<sol::table>();
+            auto propertyStruct = std::make_unique<PropertyImpl>(name, EPropertyType::Struct, parentStruct.getInputOutputProperty());
 
             for (auto& tableEntry : table)
             {
-                addEntryToPropertyDescription(tableEntry.first, tableEntry.second, *propertyStruct);
+                addStructProperty(tableEntry.first, tableEntry.second, *propertyStruct);
             }
 
-            property.addChild(std::move(propertyStruct));
+            parentStruct.addChild(std::move(propertyStruct));
         }
         else
         {

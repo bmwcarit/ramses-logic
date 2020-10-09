@@ -3,6 +3,55 @@ master
 ======
 
 ======
+v0.2.0
+======
+
+------------------
+Bugfixes
+------------------
+
+* Fixed a bug with recent sol and Visual Studio 16.7.4
+
+    * Only a workaround, until properly fixed in sol + MSVS
+    * Results in minor mismatch in reported errors when using VECx types
+    * Errors are still readable and have a stack trace, just the message is different
+
+------------------
+Features
+------------------
+
+* Improved class hierarchy:
+
+    * All binding-classes inherit from RamsesBinding
+    * Scripts and RamsesBinding inherit from LogicNode
+    * Can call destroy(LogicNode&) for all object types now
+
+* RamsesAppearanceBinding class for manipulation of RAMSES appearances.
+* Linking of outputs of LogicNodes to inputs of other LogicNodes, with some limitations:
+
+    * No checks for cycles yet
+    * Must link struct properties one-by-one
+    * Some error checks missing (see API docs of link())
+    * LogicNode has "isLinked" function for checking if a LogicNode is linked
+
+* Iterators and collections to iterate over objects of LogicEngine class
+* Saving and loading of LogicEngine to and from files
+* Upgrade to Ramses v.26.0.4 (from v25.0.6)
+* Added API to obtain version of ramses logic
+* Added CMake option to disable installation of Ramses Logic
+
+    * Does not affect ramses installation (Ramses has no such option yet)
+    * Sol doesn't support disabling of installation - Sol headers are still installed
+
+* Improved documentation
+
+------------------
+Fixes
+------------------
+
+* Remove flatbuffers targets from build
+
+======
 v0.1.0
 ======
 

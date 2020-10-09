@@ -19,10 +19,21 @@
 #pragma GCC diagnostic ignored "-Wcast-align"
 #pragma GCC diagnostic ignored "-Wempty-body"
 #pragma GCC diagnostic ignored "-Wimplicit-fallthrough"
+#pragma GCC diagnostic ignored "-Wunused-parameter"
+#pragma GCC diagnostic ignored "-Wshadow"
+#endif
+
+#if defined(_MSC_VER)
+__pragma(warning(push))
+__pragma(warning(disable: 4100))
 #endif
 
 #include "sol/sol.hpp"
 
 #ifndef _MSC_VER
 #pragma GCC diagnostic pop
+#endif
+
+#if defined(_MSC_VER)
+__pragma(warning(pop))
 #endif

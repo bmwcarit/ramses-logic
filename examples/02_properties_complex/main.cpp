@@ -12,7 +12,6 @@
 #include <iostream>
 #include <cassert>
 
-
 /**
  * This example demonstrates more complex data structures and possible
  * ways to interact with them: structs, nested structs, vector properties

@@ -134,7 +134,7 @@ namespace rlogic
             end
 
             function run()
-                print("Value of " .. IN.propertyName .. "[" .. tostring(IN.index) .. "]" .. " is " .. IN[IN.propertyName][IN.index])
+                local message = "Value of " .. IN.propertyName .. "[" .. tostring(IN.index) .. "]" .. " is " .. IN[IN.propertyName][IN.index]
             end
         )");
         auto  inputs  = script->getInputs();
@@ -237,7 +237,12 @@ namespace rlogic
             errorType->set<std::string>(error);
             EXPECT_FALSE(m_logicEngine.update());
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
+
+            // TODO Violin this is a workaround for a compiler issue with VS 2019 version 16.7 and latest sol
+            // Investigate further if not fixed by VS or sol or both
+            // Issue summary: function overloads handled differently on MSVC and clang/gcc -> results in different behavior in this test
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::AnyOf(::testing::HasSubstr("Only non-negative integers supported as array index type!"),
+                                                                       ::testing::HasSubstr("not a numeric type")));
         }
     }
 

@@ -8,13 +8,27 @@
 
 include "luascript.fbs";
 include "ramsesnodebinding.fbs";
+include "ramsesappearancebinding.fbs";
+include "link.fbs";
 
-namespace rlogic.serialization;
+namespace rlogic_serialization;
+
+// Use v_ prefix because major/minor are defined in some system headers
+table Version
+{
+    v_major:uint32;
+    v_minor:uint32;
+    v_patch:uint32;
+    v_string:string;
+}
 
 table LogicEngine
 {
+    rlogicVersion:Version;
     luascripts:[LuaScript];
     ramsesnodebindings:[RamsesNodeBinding];
+    ramsesappearancebindings:[RamsesAppearanceBinding];
+    links:[Link];
 }
 
 root_type LogicEngine;

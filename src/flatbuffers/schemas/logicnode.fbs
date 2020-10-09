@@ -8,7 +8,7 @@
 
 include "property.fbs";
 
-namespace rlogic.serialization;
+namespace rlogic_serialization;
 
 table LogicNode
 {

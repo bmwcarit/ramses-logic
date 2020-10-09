@@ -108,7 +108,7 @@ namespace rlogic::internal
             break;
         default:
                 sol_helper::throwSolException(
-                    "Tried to set unsupported type '{}' to output '{}' which is of type number !", GetLuaPrimitiveTypeName(property.getType()), property.getName());
+                    "Assigning wrong type ({}) to output '{}'!", sol_helper::GetSolTypeName(number.get_type()), property.getName());
         }
     }
 
@@ -124,7 +124,8 @@ namespace rlogic::internal
         {
             if (tableFieldCount != property.getChildCount())
             {
-                sol_helper::throwSolException("Not possible to partially assign structs!");
+                sol_helper::throwSolException("Element size mismatch when assigning struct property '{}'! Expected: {} Received: {}",
+                    property.getName(), property.getChildCount(), tableFieldCount);
                 return;
             }
 

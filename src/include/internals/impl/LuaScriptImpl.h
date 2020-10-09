@@ -24,7 +24,7 @@ namespace flatbuffers
     class FlatBufferBuilder;
 }
 
-namespace rlogic::serialization
+namespace rlogic_serialization
 {
     struct LuaScript;
 }
@@ -38,7 +38,7 @@ namespace rlogic::internal
     {
     public:
         static std::unique_ptr<LuaScriptImpl> Create(LuaStateImpl& luaState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut);
-        static std::unique_ptr<LuaScriptImpl> Create(LuaStateImpl& luaState, const serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut);
+        static std::unique_ptr<LuaScriptImpl> Create(LuaStateImpl& luaState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut);
 
         // Move-able (noexcept); Not copy-able
         ~LuaScriptImpl() noexcept override = default;
@@ -51,7 +51,7 @@ namespace rlogic::internal
 
         bool update() override;
 
-        flatbuffers::Offset<serialization::LuaScript> serialize(flatbuffers::FlatBufferBuilder& builder) const;
+        flatbuffers::Offset<rlogic_serialization::LuaScript> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
         void luaPrint(sol::variadic_args args);
         void overrideLuaPrint(LuaPrintFunction luaPrintFunction);

@@ -20,7 +20,7 @@ namespace rlogic::internal
     class LuaStateImpl
     {
     public:
-        LuaStateImpl() noexcept;
+        LuaStateImpl();
 
         // Move-able (noexcept); Not copy-able
         ~LuaStateImpl() noexcept = default;

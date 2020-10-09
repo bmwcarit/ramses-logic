@@ -17,3 +17,7 @@ SET(FLAGS_COMMON  "-m64 -fno-omit-frame-pointer -fsanitize=undefined -fno-saniti
 
 SET(CMAKE_C_FLAGS     "${FLAGS_COMMON}" CACHE STRING "")
 SET(CMAKE_CXX_FLAGS   "${FLAGS_COMMON}" CACHE STRING "")
+
+# ubsan needs rtti information (typeinfo) for all symbols. that does not work with hidden typeinfo from public API
+# because only methods, not whole class is exported. Disable symbol visibility for this build to solve
+SET(ramses-logic_DISABLE_SYMBOL_VISIBILITY TRUE)

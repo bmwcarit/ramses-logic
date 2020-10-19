@@ -19,10 +19,11 @@ jobs:
 
     - name: Fetch submodules
       # Recursively checkout submodules
+      # TODO Violin use ssh and shallow clone to save resources
       run: |
         auth_header="$(git config --local --get http.https://github.com/.extraheader)"
         git submodule sync --recursive
-        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
+        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive
 
     - name: Create Build Environment
       # Some projects don't allow in-source building, so create a separate build directory

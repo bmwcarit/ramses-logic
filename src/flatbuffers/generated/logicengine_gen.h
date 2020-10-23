@@ -119,12 +119,16 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LogicEngineBuilder Builder;
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_RLOGICVERSION = 4,
-    VT_LUASCRIPTS = 6,
-    VT_RAMSESNODEBINDINGS = 8,
-    VT_RAMSESAPPEARANCEBINDINGS = 10,
-    VT_LINKS = 12
+    VT_RAMSESVERSION = 4,
+    VT_RLOGICVERSION = 6,
+    VT_LUASCRIPTS = 8,
+    VT_RAMSESNODEBINDINGS = 10,
+    VT_RAMSESAPPEARANCEBINDINGS = 12,
+    VT_LINKS = 14
   };
+  const rlogic_serialization::Version *ramsesVersion() const {
+    return GetPointer<const rlogic_serialization::Version *>(VT_RAMSESVERSION);
+  }
   const rlogic_serialization::Version *rlogicVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RLOGICVERSION);
   }
@@ -142,6 +146,8 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_RAMSESVERSION) &&
+           verifier.VerifyTable(ramsesVersion()) &&
            VerifyOffset(verifier, VT_RLOGICVERSION) &&
            verifier.VerifyTable(rlogicVersion()) &&
            VerifyOffset(verifier, VT_LUASCRIPTS) &&
@@ -164,6 +170,9 @@ struct LogicEngineBuilder {
   typedef LogicEngine Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
+  void add_ramsesVersion(flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion) {
+    fbb_.AddOffset(LogicEngine::VT_RAMSESVERSION, ramsesVersion);
+  }
   void add_rlogicVersion(flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion) {
     fbb_.AddOffset(LogicEngine::VT_RLOGICVERSION, rlogicVersion);
   }
@@ -193,6 +202,7 @@ struct LogicEngineBuilder {
 
 inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
     flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>> luascripts = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>> ramsesnodebindings = 0,
@@ -204,6 +214,7 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
   builder_.add_ramsesnodebindings(ramsesnodebindings);
   builder_.add_luascripts(luascripts);
   builder_.add_rlogicVersion(rlogicVersion);
+  builder_.add_ramsesVersion(ramsesVersion);
   return builder_.Finish();
 }
 
@@ -214,6 +225,7 @@ struct LogicEngine::Traits {
 
 inline flatbuffers::Offset<LogicEngine> CreateLogicEngineDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
     flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
     const std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luascripts = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *ramsesnodebindings = nullptr,
@@ -225,6 +237,7 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngineDirect(
   auto links__ = links ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Link>>(*links) : 0;
   return rlogic_serialization::CreateLogicEngine(
       _fbb,
+      ramsesVersion,
       rlogicVersion,
       luascripts__,
       ramsesnodebindings__,

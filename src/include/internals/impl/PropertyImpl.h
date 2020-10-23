@@ -45,6 +45,7 @@ namespace rlogic::internal
     {
     public:
         PropertyImpl(std::string_view name, EPropertyType type, EInputOutputProperty inputOutput);
+        PropertyImpl(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput);
         static std::unique_ptr<PropertyImpl> Create(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput);
 
         // Move-able (noexcept); Not copy-able

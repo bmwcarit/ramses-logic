@@ -14,10 +14,11 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 2)
+set(RLOGIC_VERSION_MINOR 3)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
+set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
 
 project(RamsesLogic
     VERSION ${RLOGIC_VERSION}
@@ -30,6 +31,8 @@ project(RamsesLogic
 set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE
     STRING "Set this cache variable to a custom RAMSES target. If this is a valid target name, Ramses Logic will use it instead of building Ramses")
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
+option(ramses-logic_BUILD_SHARED_LIB "Enable/disable build of Ramses Logic shared lib target" ON)
+option(ramses-logic_BUILD_STATIC_LIB "Enable/disable build of Ramses Logic static lib target" OFF)
 option(ramses-logic_ENABLE_INSTALL "Enable/disable installation of Ramses Logic" ON)
 option(ramses-logic_BUILD_WITH_LTO "Build all targets with link time optimization enabled (not supported on all platforms)" OFF)
 option(ramses-logic_WARNINGS_AS_ERRORS "Treat warnings as errors when compiling" ON)
@@ -40,6 +43,10 @@ option(ramses-logic_ENABLE_FLATBUFFERS_GENERATION "Create target to generate fla
 option(ramses-logic_ENABLE_TEST_COVERAGE "Enable test coverage - works on clang only (ON/OFF)" OFF)
 option(ramses-logic_ENABLE_CODE_STYLE "Enable code style checker target (requires python3.6+)" ON)
 option(ramses-logic_USE_CCACHE "Enable ccache for build" OFF)
+
+if(NOT ramses-logic_BUILD_STATIC_LIB AND NOT ramses-logic_BUILD_SHARED_LIB)
+    message(FATAL_ERROR "One of the ramses-logic_BUILD_SHARED_LIB/ramses-logic_BUILD_STATIC_LIB options must be enabled!")
+endif()
 
 # Standard installation paths
 # TODO Violin/Sven/Tobias consider making configurable from outside?

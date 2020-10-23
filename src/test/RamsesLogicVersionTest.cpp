@@ -9,15 +9,17 @@
 #include "gtest/gtest.h"
 
 #include "ramses-logic/RamsesLogicVersion.h"
+#include "ramses-logic-build-config.h"
+#include "fmt/format.h"
 
 namespace rlogic
 {
     TEST(GetRamsesLogicVersion, ReturnsCorrectVersion)
     {
         auto version = GetRamsesLogicVersion();
-        EXPECT_EQ("0.2.0", version.string);
-        EXPECT_EQ(version.major, 0u);
-        EXPECT_EQ(version.minor, 2u);
-        EXPECT_EQ(version.patch, 0u);
+        EXPECT_EQ(fmt::format("{}.{}.{}", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR, g_PROJECT_VERSION_PATCH), version.string);
+        EXPECT_EQ(version.major, g_PROJECT_VERSION_MAJOR);
+        EXPECT_EQ(version.minor, g_PROJECT_VERSION_MINOR);
+        EXPECT_EQ(version.patch, g_PROJECT_VERSION_PATCH);
     }
 }

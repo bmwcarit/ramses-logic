@@ -86,4 +86,14 @@ namespace rlogic::internal
     {
         return m_name;
     }
+
+    void LogicNodeImpl::setDirty(bool dirty)
+    {
+        m_dirty = dirty;
+    }
+
+    bool LogicNodeImpl::isDirty() const
+    {
+        return m_dirty;
+    }
 }

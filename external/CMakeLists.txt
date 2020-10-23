@@ -166,3 +166,16 @@ else()
         message(FATAL_ERROR "Must either provide a valid ramses target (current value: '${ramses-logic_RAMSES_TARGET}') or set ramses-logic_ALLOW_RAMSES_BUILD=ON")
     endif()
 endif()
+
+# TODO Violin fix this once ramses exports its version correctly when installed
+if(ramses-sdk_VERSION)
+    # Requires >= 26.0.4 because no version info available before that
+    # Version less than 27 because not tested with 27 yet
+    set(RAMSES_VERSION_GE 26.0.4)
+    set(RAMSES_VERSION_LT 27)
+    if(${ramses-sdk_VERSION} VERSION_GREATER_EQUAL ${RAMSES_VERSION_GE} AND ${ramses-sdk_VERSION} VERSION_LESS ${RAMSES_VERSION_LT})
+        message(STATUS "Using ramses target '${ramses-logic_RAMSES_TARGET}' in version '${ramses-sdk_VERSION}' (for ramses logic)")
+    else()
+        message(FATAL_ERROR "Using incompatible ramses version '${ramses-sdk_VERSION}'. Expected >= ${RAMSES_VERSION_GE} and < ${RAMSES_VERSION_LT}")
+    endif()
+endif()

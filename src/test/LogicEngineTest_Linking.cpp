@@ -22,6 +22,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 
+#include "internals/impl/LogicEngineImpl.h"
 #include "internals/impl/RamsesNodeBindingImpl.h"
 #include "internals/impl/LogicNodeImpl.h"
 
@@ -32,11 +33,49 @@ namespace rlogic
 {
     class ALogicEngine_Linking : public ALogicEngine
     {
+    protected:
+        ALogicEngine_Linking()
+            : m_sourceScript(*m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript, "SourceScript"))
+            , m_targetScript(*m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript, "TargetScript"))
+            , m_sourceProperty(*m_sourceScript.getOutputs()->getChild("source"))
+            , m_targetProperty(*m_targetScript.getInputs()->getChild("target"))
+        {
+        }
+
+        const std::string_view m_minimalLinkScript = R"(
+            function interface()
+                IN.target = BOOL
+                OUT.source = BOOL
+            end
+            function run()
+            end
+        )";
+
+        const std::string_view m_linkScriptMultipleTypes = R"(
+            function interface()
+                IN.target_INT = INT
+                OUT.source_INT = INT
+                IN.target_VEC3F = VEC3F
+                OUT.source_VEC3F = VEC3F
+            end
+            function run()
+                OUT.source_INT = IN.target_INT
+                OUT.source_VEC3F = IN.target_VEC3F
+            end
+        )";
+
+        LuaScript& m_sourceScript;
+        LuaScript& m_targetScript;
+
+        const Property& m_sourceProperty;
+        Property& m_targetProperty;
+
+
     };
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertiesWithMismatchedTypesAreLinked)
     {
-        const auto errorString = "Types of source property 'outParam:{}' does not match target property 'inParam:{}'";
+        const char* errorString = "Types of source property 'outParam:{}' does not match target property 'inParam:{}'";
 
         std::array<std::tuple<std::string, std::string, std::string>, 5> errorCases = {
             std::make_tuple("FLOAT", "INT",   fmt::format(errorString, "FLOAT", "INT")),
@@ -50,9 +89,8 @@ namespace rlogic
             })", fmt::format(errorString, "INT", "STRUCT"))
         };
 
-        for (auto& errorCase : errorCases)
+        for (const auto& errorCase : errorCases)
         {
-            LogicEngine logicEngine;
             const auto  luaScriptSource = fmt::format(R"(
                 function interface()
                     IN.inParam = {}
@@ -62,250 +100,126 @@ namespace rlogic
                 end
             )", std::get<1>(errorCase), std::get<0>(errorCase));
 
-            auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-            auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
+            auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+            auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
 
             const auto sourceProperty = sourceScript->getOutputs()->getChild("outParam");
             const auto targetProperty = targetScript->getInputs()->getChild("inParam");
 
-            EXPECT_FALSE(logicEngine.link(
+            EXPECT_FALSE(m_logicEngine.link(
                 *sourceProperty,
                 *targetProperty
             ));
 
-            const auto& errors = logicEngine.getErrors();
+            const auto& errors = m_logicEngine.getErrors();
             ASSERT_EQ(1u, errors.size());
             EXPECT_EQ(errors[0], std::get<2>(errorCase));
-
         }
-
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfLogicNodeIsLinkedToItself)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intParam = INT
-                OUT.intParam = INT
-            end
-            function run()
-            end
-        )";
-        auto script    = logicEngine.createLuaScriptFromSource(luaScriptSource);
+        const auto targetPropertyFromTheSameScript = m_sourceScript.getInputs()->getChild("target");
 
-        const auto sourceProperty = script->getOutputs()->getChild("intParam");
-        const auto targetProperty = script->getInputs()->getChild("intParam");
+        EXPECT_FALSE(m_logicEngine.link(m_sourceProperty, *targetPropertyFromTheSameScript));
 
-        EXPECT_FALSE(logicEngine.link(*sourceProperty, *targetProperty));
-
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
+        // TODO Violin error message is not giving enough info where the error came from - improve
         EXPECT_EQ(errors[0], "SourceNode and TargetNode are equal");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfInputIsLinkedToOutput)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intParam = INT
-                OUT.intParam = INT
-            end
-            function run()
-            end
-        )";
+        const auto sourceProperty = m_sourceScript.getOutputs()->getChild("source");
+        const auto targetProperty = m_targetScript.getInputs()->getChild("target");
 
-        auto       sourceScript   = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto       targetScript   = logicEngine.createLuaScriptFromSource(luaScriptSource);
-
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intParam");
-        const auto targetProperty = targetScript->getInputs()->getChild("intParam");
-
-        EXPECT_FALSE(logicEngine.link(*targetProperty, *sourceProperty));
-        const auto errors = logicEngine.getErrors();
+        EXPECT_FALSE(m_logicEngine.link(*targetProperty, *sourceProperty));
+        const auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Failed to link input property 'intParam' to output property 'intParam'. Only outputs can be linked to inputs", errors[0]);
+        EXPECT_EQ("Failed to link input property 'target' to output property 'source'. Only outputs can be linked to inputs", errors[0]);
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfInputIsLinkedToInput)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intParam = INT
-                OUT.intParam = INT
-            end
-            function run()
-            end
-        )";
+        const auto sourceInput = m_sourceScript.getInputs()->getChild("target");
+        const auto targetInput = m_targetScript.getInputs()->getChild("target");
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-
-        const auto sourceInput = sourceScript->getInputs()->getChild("intParam");
-        const auto targetInput = targetScript->getInputs()->getChild("intParam");
-
-        EXPECT_FALSE(logicEngine.link(*sourceInput, *targetInput));
-        const auto errors = logicEngine.getErrors();
+        EXPECT_FALSE(m_logicEngine.link(*sourceInput, *targetInput));
+        const auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Failed to link input property 'intParam' to input property 'intParam'. Only outputs can be linked to inputs", errors[0]);
+        EXPECT_EQ("Failed to link input property 'target' to input property 'target'. Only outputs can be linked to inputs", errors[0]);
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfOutputIsLinkedToOutput)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intParam = INT
-                OUT.intParam = INT
-            end
-            function run()
-            end
-        )";
+        auto       sourceScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes);
+        auto       targetScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes);
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
+        const auto sourceOuput  = sourceScript->getOutputs()->getChild("source_INT");
+        const auto targetOutput = targetScript->getOutputs()->getChild("source_INT");
 
-        const auto sourceOuput  = sourceScript->getOutputs()->getChild("intParam");
-        const auto targetOutput = targetScript->getOutputs()->getChild("intParam");
+        EXPECT_FALSE(m_logicEngine.link(*sourceOuput, *targetOutput));
 
-        EXPECT_FALSE(logicEngine.link(*sourceOuput, *targetOutput));
-
-        const auto errors = logicEngine.getErrors();
+        const auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Failed to link output property 'intParam' to output property 'intParam'. Only outputs can be linked to inputs", errors[0]);
+        EXPECT_EQ("Failed to link output property 'source_INT' to output property 'source_INT'. Only outputs can be linked to inputs", errors[0]);
     }
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorIfMatchingPropertiesAreLinked)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
-            end
-            function run()
-            end
-        )";
-
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = targetScript->getInputs()->getChild("intTarget");
-
-        EXPECT_TRUE(logicEngine.link(*sourceProperty, *targetProperty));
+        EXPECT_TRUE(m_logicEngine.link(m_sourceProperty, m_targetProperty));
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwiceToSameProperty_LuaScript)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
-            end
-            function run()
-            end
-        )";
+        EXPECT_TRUE(m_logicEngine.link(m_sourceProperty, m_targetProperty));
+        EXPECT_FALSE(m_logicEngine.link(m_sourceProperty, m_targetProperty));
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
-
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = targetScript->getInputs()->getChild("intTarget");
-
-        EXPECT_TRUE(logicEngine.link(*sourceProperty, *targetProperty));
-        EXPECT_FALSE(logicEngine.link(*sourceProperty, *targetProperty));
-
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0], "The property 'intSource' of LogicNode 'SourceScript' is already linked to the property 'intTarget' of LogicNode 'TargetScript'");
+        EXPECT_EQ(errors[0], "The property 'source' of LogicNode 'SourceScript' is already linked to the property 'target' of LogicNode 'TargetScript'");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwice_RamsesBinding)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = BOOL
-                OUT.intSource = BOOL
-            end
-            function run()
-            end
-        )";
+        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding("RamsesBinding");
 
-        auto sourceScript  = logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto ramsesBinding = logicEngine.createRamsesNodeBinding("RamsesBinding");
+        const auto visibilityProperty = ramsesBinding->getInputs()->getChild("visibility");
 
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = ramsesBinding->getInputs()->getChild("visibility");
+        EXPECT_TRUE(m_logicEngine.link(m_sourceProperty, *visibilityProperty));
+        EXPECT_FALSE(m_logicEngine.link(m_sourceProperty, *visibilityProperty));
 
-        EXPECT_TRUE(logicEngine.link(*sourceProperty, *targetProperty));
-        EXPECT_FALSE(logicEngine.link(*sourceProperty, *targetProperty));
-
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0], "The property 'intSource' of LogicNode 'SourceScript' is already linked to the property 'visibility' of LogicNode 'RamsesBinding'");
+        EXPECT_EQ(errors[0], "The property 'source' of LogicNode 'SourceScript' is already linked to the property 'visibility' of LogicNode 'RamsesBinding'");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_LuaScript)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
-            end
-            function run()
-            end
-        )";
+        EXPECT_FALSE(m_logicEngine.unlink(m_sourceProperty, m_targetProperty));
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = targetScript->getInputs()->getChild("intTarget");
-
-        EXPECT_FALSE(logicEngine.unlink(
-            *sourceProperty,
-            *targetProperty
-        ));
-
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0], "No link available from source property 'intSource' to target property 'intTarget'");
+        // TODO Violin error message is not giving enough info where the error came from
+        EXPECT_EQ(errors[0], "No link available from source property 'source' to target property 'target'");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesNodeBinding)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = BOOL
-                OUT.intSource = BOOL
-            end
-            function run()
-            end
-        )";
+        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding("RamsesBinding");
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto ramsesBinding = logicEngine.createRamsesNodeBinding("RamsesBinding");
+        const auto visibilityProperty = ramsesBinding->getInputs()->getChild("visibility");
 
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = ramsesBinding->getInputs()->getChild("visibility");
+        EXPECT_FALSE(m_logicEngine.unlink(m_sourceProperty, *visibilityProperty));
 
-        EXPECT_FALSE(logicEngine.unlink(*sourceProperty, *targetProperty));
-
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0], "No link available from source property 'intSource' to target property 'visibility'");
+        EXPECT_EQ(errors[0], "No link available from source property 'source' to target property 'visibility'");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorIfLinkedToMatchingType)
     {
-        LogicEngine logicEngine;
         const auto  luaScriptSource = R"(
             function interface()
                 IN.boolTarget  = BOOL
@@ -323,34 +237,33 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
 
-        const auto output  = sourceScript->getOutputs();
-        const auto input   = targetScript->getInputs();
+        const auto outputs  = sourceScript->getOutputs();
+        const auto inputs   = targetScript->getInputs();
 
-        auto boolTarget  = input->getChild("boolTarget");
-        auto intTarget   = input->getChild("intTarget");
-        auto floatTarget = input->getChild("floatTarget");
-        auto vec2Target  = input->getChild("vec2Target");
-        auto vec3Target  = input->getChild("vec3Target");
+        auto boolTarget = inputs->getChild("boolTarget");
+        auto intTarget = inputs->getChild("intTarget");
+        auto floatTarget = inputs->getChild("floatTarget");
+        auto vec2Target = inputs->getChild("vec2Target");
+        auto vec3Target = inputs->getChild("vec3Target");
 
-        auto boolSource  = output->getChild("boolSource");
-        auto intSource   = output->getChild("intSource");
-        auto floatSource = output->getChild("floatSource");
-        auto vec2Source  = output->getChild("vec2Source");
-        auto vec3Source  = output->getChild("vec3Source");
+        auto boolSource = outputs->getChild("boolSource");
+        auto intSource = outputs->getChild("intSource");
+        auto floatSource = outputs->getChild("floatSource");
+        auto vec2Source = outputs->getChild("vec2Source");
+        auto vec3Source = outputs->getChild("vec3Source");
 
-        EXPECT_TRUE(logicEngine.link(*boolSource,  *boolTarget));
-        EXPECT_TRUE(logicEngine.link(*intSource,   *intTarget));
-        EXPECT_TRUE(logicEngine.link(*floatSource, *floatTarget));
-        EXPECT_TRUE(logicEngine.link(*vec2Source,  *vec2Target));
-        EXPECT_TRUE(logicEngine.link(*vec3Source,  *vec3Target));
+        EXPECT_TRUE(m_logicEngine.link(*boolSource, *boolTarget));
+        EXPECT_TRUE(m_logicEngine.link(*intSource, *intTarget));
+        EXPECT_TRUE(m_logicEngine.link(*floatSource, *floatTarget));
+        EXPECT_TRUE(m_logicEngine.link(*vec2Source, *vec2Target));
+        EXPECT_TRUE(m_logicEngine.link(*vec3Source, *vec3Target));
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingStructs)
     {
-        LogicEngine logicEngine;
         const auto  luaScriptSource = R"(
             function interface()
                 IN.intTarget = INT
@@ -368,8 +281,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
 
         const auto output = sourceScript->getOutputs();
         const auto input  = targetScript->getInputs();
@@ -377,20 +290,19 @@ namespace rlogic
         auto structTarget = input->getChild("structTarget");
         auto structSource = output->getChild("structSource");
 
-        EXPECT_FALSE(logicEngine.link(*structSource, *structTarget));
-        auto errors = logicEngine.getErrors();
+        EXPECT_FALSE(m_logicEngine.link(*structSource, *structTarget));
+        auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
         EXPECT_EQ("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked", errors[0]);
 
-        EXPECT_FALSE(logicEngine.link(*output, *input));
-        errors = logicEngine.getErrors();
+        EXPECT_FALSE(m_logicEngine.link(*output, *input));
+        errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
         EXPECT_EQ("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked", errors[0]);
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_WhenAnotherLinkFromTheSameScriptExists)
     {
-        LogicEngine logicEngine;
         const auto  luaScriptSource = R"(
             function interface()
                 IN.intTarget1 = INT
@@ -401,165 +313,102 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
 
         const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
         const auto targetProperty1 = targetScript->getInputs()->getChild("intTarget1");
         const auto targetProperty2 = targetScript->getInputs()->getChild("intTarget2");
 
-        logicEngine.link(
-            *sourceProperty,
-            *targetProperty1
-        );
+        EXPECT_TRUE(m_logicEngine.link(*sourceProperty, *targetProperty1));
 
-        EXPECT_FALSE(
-            logicEngine.unlink(
-                *sourceProperty,
-                *targetProperty2
-        ));
+        EXPECT_FALSE(m_logicEngine.unlink(*sourceProperty, *targetProperty2));
 
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
+        // TODO Violin error message is not giving enough info where the error came from
         EXPECT_EQ(errors[0], "No link available from source property 'intSource' to target property 'intTarget2'");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesBinding)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = BOOL
-                OUT.intSource = BOOL
-            end
-            function run()
-            end
-        )";
-
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetBinding = logicEngine.createRamsesNodeBinding(luaScriptSource);
-
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = targetBinding->getInputs()->getChild("visibility");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        const auto visibilityProperty = targetBinding->getInputs()->getChild("visibility");
         const auto unlinkedTargetProperty = targetBinding->getInputs()->getChild("translation");
 
-        logicEngine.link(*sourceProperty, *targetProperty);
+        EXPECT_TRUE(m_logicEngine.link(m_sourceProperty, *visibilityProperty));
 
-        EXPECT_FALSE(logicEngine.unlink(*sourceProperty, *unlinkedTargetProperty));
+        EXPECT_FALSE(m_logicEngine.unlink(m_sourceProperty, *unlinkedTargetProperty));
 
-        const auto& errors = logicEngine.getErrors();
+        const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0], "No link available from source property 'intSource' to target property 'translation'");
+        // TODO Violin error message is not giving enough info where the error came from
+        EXPECT_EQ(errors[0], "No link available from source property 'source' to target property 'translation'");
     }
 
     TEST_F(ALogicEngine_Linking, UnlinksPropertiesWhichAreLinked)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
-            end
-            function run()
-            end
-        )";
-
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty = targetScript->getInputs()->getChild("intTarget");
-
-        logicEngine.link(
-            *sourceProperty,
-            *targetProperty
-        );
-
-        EXPECT_TRUE(logicEngine.unlink(
-            *sourceProperty,
-            *targetProperty
+        ASSERT_TRUE(m_logicEngine.link(
+            m_sourceProperty,
+            m_targetProperty
         ));
+
+        EXPECT_TRUE(m_logicEngine.unlink(
+            m_sourceProperty,
+            m_targetProperty
+        ));
+        // TODO Violin This is already tested below, isn't it? (and the other test also checks what happens with the values - this one only checks return value of unlink())
     }
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorsIfMultipleLinksFromSameSourceAreUnlinked)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
-            end
-            function run()
-                OUT.intSource = IN.intTarget
-            end
-        )";
+        auto targetScript2 = m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript);
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript1 = logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript2 = logicEngine.createLuaScriptFromSource(luaScriptSource);
+        const auto targetProperty2 = targetScript2->getInputs()->getChild("target");
 
-        const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
-        const auto targetProperty1 = targetScript1->getInputs()->getChild("intTarget");
-        const auto targetProperty2 = targetScript2->getInputs()->getChild("intTarget");
-
-        logicEngine.link(
-            *sourceProperty,
-            *targetProperty1
+        m_logicEngine.link(
+            m_sourceProperty,
+            m_targetProperty
         );
 
-        logicEngine.link(
-            *sourceProperty,
+        m_logicEngine.link(
+            m_sourceProperty,
             *targetProperty2
         );
 
-        EXPECT_TRUE(logicEngine.unlink(
-            *sourceProperty,
-            *targetProperty1
+        EXPECT_TRUE(m_logicEngine.unlink(
+            m_sourceProperty,
+            m_targetProperty
         ));
 
-        EXPECT_TRUE(logicEngine.unlink(
-            *sourceProperty,
+        EXPECT_TRUE(m_logicEngine.unlink(
+            m_sourceProperty,
             *targetProperty2
         ));
 
-        sourceScript->getInputs()->getChild("intTarget")->set(42);
-
-        logicEngine.update();
-
-        EXPECT_EQ(0, targetScript2->getOutputs()->getChild("intSource")->get<int32_t>());
+        // TODO Violin What happens after they are unlinked? Probably should test that the link has no effect, i.e. doesn't propagate values any more
     }
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
-            end
-            function run()
-                OUT.intSource = IN.intTarget
-            end
-        )";
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes, "TargetScript");
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
+        auto output = sourceScript->getOutputs()->getChild("source_INT");
+        auto input  = targetScript->getInputs()->getChild("target_INT");
 
-        auto output = sourceScript->getOutputs()->getChild("intSource");
-        auto input  = targetScript->getInputs()->getChild("intTarget");
+        EXPECT_TRUE(m_logicEngine.link(*output, *input));
 
-        EXPECT_TRUE(logicEngine.link(*output, *input));
+        sourceScript->getInputs()->getChild("target_INT")->set(42);
 
-        sourceScript->getInputs()->getChild("intTarget")->set(42);
+        m_logicEngine.update();
 
-        logicEngine.update();
-
-        EXPECT_EQ(42, targetScript->getOutputs()->getChild("intSource")->get<int32_t>());
+        EXPECT_EQ(42, *targetScript->getOutputs()->getChild("source_INT")->get<int32_t>());
     }
 
+    // TODO Violin test more corner cases - especially with the value of the unlinked input and different ordering of link/unlink/update calls
     TEST_F(ALogicEngine_Linking, DoesNotPropagateOutputsToInputsAfterUnlink)
     {
-        LogicEngine logicEngine;
         const auto  luaScriptSource = R"(
             function interface()
                 IN.intTarget = INT
@@ -570,64 +419,71 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
 
         auto output = sourceScript->getOutputs()->getChild("intSource");
         auto input  = targetScript->getInputs()->getChild("intTarget");
 
-        EXPECT_TRUE(logicEngine.link(*output, *input));
+        EXPECT_TRUE(m_logicEngine.link(*output, *input));
         sourceScript->getInputs()->getChild("intTarget")->set(42);
 
-        EXPECT_TRUE(logicEngine.unlink(
+        EXPECT_TRUE(m_logicEngine.unlink(
             *output,
             *input
         ));
 
-        logicEngine.update();
+        m_logicEngine.update();
 
-        EXPECT_EQ(0, targetScript->getOutputs()->getChild("intSource")->get<int32_t>());
+        EXPECT_EQ(0, *targetScript->getOutputs()->getChild("intSource")->get<int32_t>());
     }
 
+    // TODO Violin add test with 2 scripts , one input in each
     TEST_F(ALogicEngine_Linking, PropagatesOneOutputToMultipleInputs)
     {
-        LogicEngine logicEngine;
-        const auto  luaScriptSource = R"(
+        const auto  luaScriptSource1 = R"(
             function interface()
-                IN.intTarget1 = INT
-                IN.intTarget2 = INT
                 OUT.intSource = INT
             end
             function run()
-                OUT.intSource = IN.intTarget1
+                OUT.intSource = 5
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
+        const auto  luaScriptSource2 = R"(
+            function interface()
+                IN.intTarget1 = INT
+                IN.intTarget2 = INT
+            end
+            function run()
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource1, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource2, "TargetScript");
 
         auto output = sourceScript->getOutputs()->getChild("intSource");
         auto input1 = targetScript->getInputs()->getChild("intTarget1");
         auto input2 = targetScript->getInputs()->getChild("intTarget2");
 
-        EXPECT_TRUE(logicEngine.link(*output, *input1));
-        EXPECT_TRUE(logicEngine.link(*output, *input2));
-        sourceScript->getInputs()->getChild("intTarget1")->set(42);
+        EXPECT_TRUE(m_logicEngine.link(*output, *input1));
+        EXPECT_TRUE(m_logicEngine.link(*output, *input2));
 
-        logicEngine.update();
+        m_logicEngine.update();
 
-        EXPECT_EQ(42, targetScript->getInputs()->getChild("intTarget1")->get<int32_t>());
-        EXPECT_EQ(42, targetScript->getInputs()->getChild("intTarget2")->get<int32_t>());
+        EXPECT_EQ(5, *targetScript->getInputs()->getChild("intTarget1")->get<int32_t>());
+        EXPECT_EQ(5, *targetScript->getInputs()->getChild("intTarget2")->get<int32_t>());
 
-        EXPECT_TRUE(logicEngine.unlink(*output, *input1));
-        sourceScript->getInputs()->getChild("intTarget1")->set(24);
+        EXPECT_TRUE(m_logicEngine.unlink(*output, *input1));
+        input1->set(6);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
-        EXPECT_EQ(42, targetScript->getInputs()->getChild("intTarget1")->get<int32_t>());
-        EXPECT_EQ(24, targetScript->getInputs()->getChild("intTarget2")->get<int32_t>());
+        EXPECT_EQ(6, *input1->get<int32_t>());
+        EXPECT_EQ(5, *input2->get<int32_t>());
     }
 
+    // TODO Violin need more tests - what is with default values after unlinking?
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesAppearanceBindings)
     {
         RamsesTestSetup testSetup;
@@ -646,17 +502,15 @@ namespace rlogic
         #version 100
 
         uniform highp float floatUniform;
-        attribute vec3 a_position;
 
         void main()
         {
-            gl_Position = floatUniform * vec4(a_position, 1.0);
+            gl_Position = floatUniform * vec4(1.0);
         })");
 
         const ramses::Effect* effect     = scene->createEffect(effectDesc, ramses::ResourceCacheFlag_DoNotCache, "glsl shader");
         ramses::Appearance*   appearance = scene->createAppearance(*effect, "triangle appearance");
 
-        LogicEngine logicEngine;
         const auto  luaScriptSource = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -667,18 +521,18 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript  = logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetBinding = logicEngine.createRamsesAppearanceBinding("TargetBinding");
+        auto sourceScript  = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
+        auto targetBinding = m_logicEngine.createRamsesAppearanceBinding("TargetBinding");
         targetBinding->setRamsesAppearance(appearance);
 
         auto sourceInput  = sourceScript->getInputs()->getChild("floatInput");
         auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
         auto targetInput  = targetBinding->getInputs()->getChild("floatUniform");
 
-        logicEngine.link(*sourceOutput, *targetInput);
+        m_logicEngine.link(*sourceOutput, *targetInput);
 
         sourceInput->set(47.11f);
-        logicEngine.update();
+        m_logicEngine.update();
 
         ramses::UniformInput floatUniform;
         effect->findUniformInput("floatUniform", floatUniform);
@@ -687,78 +541,89 @@ namespace rlogic
         EXPECT_FLOAT_EQ(47.11f, result);
     }
 
+    // TODO Violin test should actually test that the links propagates the value *even if the output is NOT set any more in the source script!*
     TEST_F(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndOutputValueIsSetBeforehand)
     {
-        const auto  luaScriptSource = R"(
+        const auto  luaScriptSource1 = R"(
             function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+                OUT.output = INT
             end
             function run()
-                OUT.floatOutput = IN.floatInput
+                OUT.output = 5
             end
         )";
 
-        LogicEngine logicEngine;
-        auto sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "source");
-        auto targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "target");
+        const auto  luaScriptSource2 = R"(
+            function interface()
+                IN.input = INT
+            end
+            function run()
+            end
+        )";
 
-        auto sourceInput  = sourceScript->getInputs()->getChild("floatInput");
-        auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
-        auto targetInput  = targetScript->getInputs()->getChild("floatInput");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource1, "source");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource2, "target");
 
-        //propagate source input to source output
-        sourceInput->set(42.42f);
-        logicEngine.update();
-        EXPECT_FLOAT_EQ(42.42f, *sourceOutput->get<float>());
-        EXPECT_FLOAT_EQ(0.0f, *targetInput->get<float>());
+        auto sourceOutput = sourceScript->getOutputs()->getChild("output");
+        auto targetInput  = targetScript->getInputs()->getChild("input");
 
-        logicEngine.link(*sourceOutput, *targetInput);
-        logicEngine.update();
+        //propagates source input to source output
+        ASSERT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(5, *sourceOutput->get<int32_t>());
+        EXPECT_EQ(0, *targetInput->get<int32_t>());
 
-        EXPECT_FLOAT_EQ(42.42f, *targetInput->get<float>());
+        ASSERT_TRUE(m_logicEngine.link(*sourceOutput, *targetInput));
+        m_logicEngine.update();
+
+        EXPECT_EQ(5, *targetInput->get<int32_t>());
     }
 
     TEST_F(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndInputValueIsSetBeforehand)
     {
-        const auto luaScriptSource = R"(
+        const auto  luaScriptSource1 = R"(
             function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+                OUT.output = INT
             end
             function run()
-                OUT.floatOutput = IN.floatInput
+                OUT.output = 5
             end
         )";
 
-        LogicEngine logicEngine;
-        auto        sourceScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "source");
-        auto        targetScript = logicEngine.createLuaScriptFromSource(luaScriptSource, "target");
+        const auto  luaScriptSource2 = R"(
+            function interface()
+                IN.input = INT
+            end
+            function run()
+            end
+        )";
 
-        auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
-        auto targetInput  = targetScript->getInputs()->getChild("floatInput");
+        auto        sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource1, "source");
+        auto        targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource2, "target");
 
-        // propagate source input to source output
-        targetInput->set(42.42f);
-        logicEngine.update();
-        EXPECT_FLOAT_EQ(42.42f, *targetInput->get<float>());
-        EXPECT_FLOAT_EQ(0.0f, *sourceOutput->get<float>());
+        auto sourceOutput = sourceScript->getOutputs()->getChild("output");
+        auto targetInput = targetScript->getInputs()->getChild("input");
 
-        logicEngine.link(*sourceOutput, *targetInput);
-        logicEngine.update();
+        targetInput->set<int32_t>(100);
+        ASSERT_TRUE(m_logicEngine.update());
 
-        EXPECT_FLOAT_EQ(0.0f, *targetInput->get<float>());
+        ASSERT_EQ(5, *sourceOutput->get<int32_t>());
+        ASSERT_EQ(100, *targetInput->get<int32_t>());
 
-        logicEngine.unlink(*sourceOutput, *targetInput);
-        logicEngine.update();
+        m_logicEngine.link(*sourceOutput, *targetInput);
+        m_logicEngine.update();
 
-        EXPECT_FLOAT_EQ(0.0f, *targetInput->get<float>());
+        EXPECT_EQ(5, *targetInput->get<int32_t>());
+
+        m_logicEngine.unlink(*sourceOutput, *targetInput);
+        m_logicEngine.update();
+
+        // Value was overwritten after link + update
+        EXPECT_EQ(5, *targetInput->get<int32_t>());
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfLinkIsCreatedBetweenDifferentLogicEngines)
     {
-        LogicEngine engine1;
-        LogicEngine engine2;
+        LogicEngine otherLogicEngine;
         const auto  luaScriptSource = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -769,22 +634,22 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = engine1.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = engine2.createLuaScriptFromSource(luaScriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
+        auto targetScript = otherLogicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
 
         const auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
         const auto targetInput  = targetScript->getInputs()->getChild("floatInput");
 
-        EXPECT_FALSE(engine1.link(*sourceOutput, *targetInput));
+        EXPECT_FALSE(m_logicEngine.link(*sourceOutput, *targetInput));
         {
-            auto errors = engine1.getErrors();
+            auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(1u, errors.size());
             EXPECT_EQ("LogicNode 'TargetScript' is not an instance of this LogicEngine", errors[0]);
         }
 
-        EXPECT_FALSE(engine2.link(*sourceOutput, *targetInput));
+        EXPECT_FALSE(otherLogicEngine.link(*sourceOutput, *targetInput));
         {
-            auto errors = engine2.getErrors();
+            auto errors = otherLogicEngine.getErrors();
             ASSERT_EQ(1u, errors.size());
             EXPECT_EQ("LogicNode 'SourceScript' is not an instance of this LogicEngine", errors[0]);
         }
@@ -792,7 +657,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, PropagatesValuesFromMultipleOutputScriptsToOneInputScript)
     {
-        LogicEngine logicEngine;
         const auto  sourceScript = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -815,9 +679,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
-        auto scriptB = logicEngine.createLuaScriptFromSource(sourceScript, "ScriptB");
-        auto scriptC = logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
+        auto scriptB = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptB");
+        auto scriptC = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -829,13 +693,13 @@ namespace rlogic
         auto outputC1 = scriptC->getOutputs()->getChild("floatOutput1");
         auto outputC2 = scriptC->getOutputs()->getChild("floatOutput2");
 
-        logicEngine.link(*outputA, *inputC1);
-        logicEngine.link(*outputB, *inputC2);
+        m_logicEngine.link(*outputA, *inputC1);
+        m_logicEngine.link(*outputB, *inputC2);
 
         inputA->set(42.f);
         inputB->set(24.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *outputC1->get<float>());
         EXPECT_FLOAT_EQ(24.f, *outputC2->get<float>());
@@ -843,7 +707,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, PropagatesValuesFromOutputScriptToMultipleInputScripts)
     {
-        LogicEngine logicEngine;
         const auto  scriptSource = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -854,9 +717,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = logicEngine.createLuaScriptFromSource(scriptSource, "ScriptA");
-        auto scriptB = logicEngine.createLuaScriptFromSource(scriptSource, "ScriptB");
-        auto scriptC = logicEngine.createLuaScriptFromSource(scriptSource, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptA");
+        auto scriptB = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptB");
+        auto scriptC = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptC");
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -865,12 +728,12 @@ namespace rlogic
         auto inputC  = scriptC->getInputs()->getChild("floatInput");
         auto outputC = scriptC->getOutputs()->getChild("floatOutput");
 
-        logicEngine.link(*outputA, *inputB);
-        logicEngine.link(*outputA, *inputC);
+        m_logicEngine.link(*outputA, *inputB);
+        m_logicEngine.link(*outputA, *inputC);
 
-        inputA->set(42.f);
+        inputA->set<float>(42.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *outputB->get<float>());
         EXPECT_FLOAT_EQ(42.f, *outputC->get<float>());
@@ -878,7 +741,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputToMultipleScriptsWithMultipleInputs)
     {
-        LogicEngine logicEngine;
         const auto  sourceScript = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -901,9 +763,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
-        auto scriptB = logicEngine.createLuaScriptFromSource(targetScript, "ScriptB");
-        auto scriptC = logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
+        auto scriptB = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptB");
+        auto scriptC = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -917,14 +779,14 @@ namespace rlogic
         auto outputC1 = scriptC->getOutputs()->getChild("floatOutput1");
         auto outputC2 = scriptC->getOutputs()->getChild("floatOutput2");
 
-        logicEngine.link(*outputA, *inputB1);
-        logicEngine.link(*outputA, *inputB2);
-        logicEngine.link(*outputA, *inputC1);
-        logicEngine.link(*outputA, *inputC2);
+        m_logicEngine.link(*outputA, *inputB1);
+        m_logicEngine.link(*outputA, *inputB2);
+        m_logicEngine.link(*outputA, *inputC1);
+        m_logicEngine.link(*outputA, *inputC2);
 
         inputA->set(42.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *outputB1->get<float>());
         EXPECT_FLOAT_EQ(42.f, *outputB2->get<float>());
@@ -934,7 +796,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, DoesNotPropagateValuesIfScriptIsDestroyed)
     {
-        LogicEngine logicEngine;
         const auto  scriptSource = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -945,9 +806,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = logicEngine.createLuaScriptFromSource(scriptSource, "ScriptA");
-        auto scriptB = logicEngine.createLuaScriptFromSource(scriptSource, "ScriptB");
-        auto scriptC = logicEngine.createLuaScriptFromSource(scriptSource, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptA");
+        auto scriptB = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptB");
+        auto scriptC = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptC");
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -956,14 +817,14 @@ namespace rlogic
         auto inputC  = scriptC->getInputs()->getChild("floatInput");
         auto outputC = scriptC->getOutputs()->getChild("floatOutput");
 
-        logicEngine.link(*outputA, *inputB);
-        logicEngine.link(*outputB, *inputC);
+        m_logicEngine.link(*outputA, *inputB);
+        m_logicEngine.link(*outputB, *inputC);
 
-        logicEngine.destroy(*scriptB);
+        m_logicEngine.destroy(*scriptB);
 
         inputA->set(42.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *outputA->get<float>());
         EXPECT_FLOAT_EQ(0.f,  *inputC->get<float>());
@@ -1189,6 +1050,10 @@ namespace rlogic
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("links.bin"));
 
+            // Internal check that deserialization did not result in more link copies
+            const auto& links = m_logicEngine.m_impl->getLogicNodeConnector().getLinks();
+            EXPECT_EQ(links.size(), 3u);
+
             // Load all scripts and their properties
             auto scriptC = findLuaScriptByName("ScriptC");
             auto scriptB = findLuaScriptByName("ScriptB");
@@ -1233,8 +1098,6 @@ namespace rlogic
         // TODO Violin discuss moving removal of files to test fixtures dtor
         std::remove("links.bin");
     }
-
-    //TODO Violin add test which checks internal state of links, to avoid that we create more than needed
 
     TEST_F(ALogicEngine_Linking, PreservesNestedLinksBetweenScriptsAfterSavingAndLoadingFromFile)
     {
@@ -1295,6 +1158,10 @@ namespace rlogic
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("nested_links.bin"));
+
+            // Internal check that deserialization did not result in more link copies
+            const auto& links = m_logicEngine.m_impl->getLogicNodeConnector().getLinks();
+            EXPECT_EQ(links.size(), 3u);
 
             // Load all scripts and their properties
             auto scriptA = findLuaScriptByName("ScriptA");
@@ -1665,5 +1532,96 @@ namespace rlogic
         EXPECT_FALSE(logicEngine.isLinked(*targetBinding));
     }
 
-}
+    TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinking)
+    {
+        LogicEngine logicEngine;
+        auto        scriptSource = R"(
+            function interface()
+                IN.input = BOOL
+                OUT.output = BOOL
+            end
+            function run()
+            end
+        )";
 
+        auto sourceScript  = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetBinding = logicEngine.createRamsesNodeBinding("RamsesBinding");
+
+        logicEngine.update();
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
+
+        auto output = sourceScript->getOutputs()->getChild("output");
+        auto input  = targetBinding->getInputs()->getChild("visibility");
+
+        logicEngine.link(*output, *input);
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_TRUE(targetBinding->m_impl.get().isDirty());
+    }
+
+    TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinkingWithStructs)
+    {
+        LogicEngine logicEngine;
+        auto scriptSource = R"(
+            function interface()
+                IN.struct = {
+                    inBool = BOOL
+                }
+                OUT.struct = {
+                    outBool = BOOL
+                }
+            end
+            function run()
+            end
+        )";
+
+        auto sourceScript  = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetScript = logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+
+        logicEngine.update();
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
+
+        auto output = sourceScript->getOutputs()->getChild("struct")->getChild("outBool");
+        auto input = targetScript->getInputs()->getChild("struct")->getChild("inBool");
+
+        logicEngine.link(*output, *input);
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+    }
+
+    TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterUnlink)
+    {
+        LogicEngine logicEngine;
+        auto        scriptSource = R"(
+            function interface()
+                IN.input = BOOL
+                OUT.output = BOOL
+            end
+            function run()
+            end
+        )";
+
+        auto sourceScript = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetBinding = logicEngine.createRamsesNodeBinding("RamsesBinding");
+
+        auto output = sourceScript->getOutputs()->getChild("output");
+        auto input  = targetBinding->getInputs()->getChild("visibility");
+
+        logicEngine.link(*output, *input);
+
+        logicEngine.update();
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
+
+        logicEngine.unlink(*output, *input);
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_TRUE(targetBinding->m_impl.get().isDirty());
+    }
+}

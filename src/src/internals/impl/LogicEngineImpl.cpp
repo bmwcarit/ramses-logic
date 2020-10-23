@@ -23,6 +23,7 @@
 #include "generated/logicengine_gen.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
+#include "ramses-framework-api/RamsesVersion.h"
 #include "ramses-client-api/SceneObject.h"
 #include "ramses-client-api/Scene.h"
 #include "ramses-utils.h"
@@ -293,40 +294,50 @@ namespace rlogic::internal
         }
     }
 
-    bool LogicEngineImpl::update()
+    bool LogicEngineImpl::update(bool disableDirtyTracking)
     {
         m_errors.clear();
 
         for (auto unlinkedNode : m_disconnectedNodes)
         {
-            if (!unlinkedNode->update())
+            if (disableDirtyTracking || unlinkedNode->isDirty())
             {
-                const auto& errors = unlinkedNode->getErrors();
-                m_errors.insert(m_errors.end(), errors.begin(), errors.end());
-                return false;
+                if (!unlinkedNode->update())
+                {
+                    const auto& errors = unlinkedNode->getErrors();
+                    m_errors.insert(m_errors.end(), errors.begin(), errors.end());
+                    return false;
+                }
             }
+            unlinkedNode->setDirty(false);
         }
 
-        // TODO Sort the scripts before execution to get a valid order
         for (auto logicNode : m_logicNodeGraph)
         {
             updateLinksRecursive(*logicNode->getInputs());
 
-            if (!logicNode->update())
+            if (disableDirtyTracking || logicNode->isDirty())
             {
-                const auto& errors = logicNode->getErrors();
-                m_errors.insert(m_errors.end(), errors.begin(), errors.end());
-                return false;
+                if (!logicNode->update())
+                {
+                    const auto& errors = logicNode->getErrors();
+                    m_errors.insert(m_errors.end(), errors.begin(), errors.end());
+                    return false;
+                }
             }
+            logicNode->setDirty(false);
         }
 
         for (auto& ramsesBinding : m_ramsesBindings)
         {
             updateLinksRecursive(*ramsesBinding->getInputs());
-
-            bool success = ramsesBinding->m_impl.get().update();
-            assert(success && "Bindings update can never fail!");
-            (void)success;
+            if (disableDirtyTracking || ramsesBinding->m_impl.get().isDirty())
+            {
+                bool success = ramsesBinding->m_impl.get().update();
+                assert(success && "Bindings update can never fail!");
+                (void)success;
+            }
+            ramsesBinding->m_impl.get().setDirty(false);
         }
         return true;
     }
@@ -336,7 +347,7 @@ namespace rlogic::internal
         return m_errors;
     }
 
-    bool LogicEngineImpl::CheckVersionFromFile(const rlogic_serialization::Version& version)
+    bool LogicEngineImpl::CheckLogicVersionFromFile(const rlogic_serialization::Version& version)
     {
         // TODO Violin/Tobias/Sven should discuss to what do we couple the serialization
         // compatibility check and when do we mandate version bump
@@ -344,6 +355,12 @@ namespace rlogic::internal
         return
             version.v_major() == g_PROJECT_VERSION_MAJOR &&
             version.v_minor() == g_PROJECT_VERSION_MINOR;
+    }
+
+    bool LogicEngineImpl::CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion)
+    {
+        // Only major version changes result in file incompatibilities
+        return static_cast<int>(ramsesVersion.v_major()) == ramses::GetRamsesVersion().major;
     }
 
     // TODO Violin/Sven consider handling errors gracefully, e.g. don't change state when error occurs
@@ -368,20 +385,26 @@ namespace rlogic::internal
 
         const auto logicEngine = rlogic_serialization::GetLogicEngine(buf.data());
 
-        if (nullptr == logicEngine || nullptr == logicEngine->rlogicVersion())
+        if (nullptr == logicEngine || nullptr == logicEngine->ramsesVersion() || nullptr == logicEngine->rlogicVersion())
         {
-            m_errors.emplace_back(fmt::format("File '{}' doesn't contain logic engine data with a readable version"));
+            m_errors.emplace_back(fmt::format("File '{}' doesn't contain logic engine data with readable version specifiers", sFilename));
+            return false;
+        }
+
+        const auto& ramsesVersion = *logicEngine->ramsesVersion();
+        if (!CheckRamsesVersionFromFile(ramsesVersion))
+        {
+            m_errors.emplace_back(fmt::format("Version mismatch while loading file '{}'! Expected Ramses version {}.x.x but found {} in file",
+                sFilename, ramses::GetRamsesVersion().major,
+                ramsesVersion.v_string()->string_view()));
             return false;
         }
 
         const auto& rlogicVersion = *logicEngine->rlogicVersion();
-        if (!CheckVersionFromFile(rlogicVersion))
+        if (!CheckLogicVersionFromFile(rlogicVersion))
         {
-            m_errors.emplace_back(fmt::format("Version mismatch while loading file '{}'! Expected version {}.{}.x but found {}.{}.{} (full string: {})",
+            m_errors.emplace_back(fmt::format("Version mismatch while loading file '{}'! Expected version {}.{}.x but found {} in file",
                 sFilename, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
-                rlogicVersion.v_major(),
-                rlogicVersion.v_minor(),
-                rlogicVersion.v_patch(),
                 rlogicVersion.v_string()->string_view()));
             return false;
         }
@@ -743,13 +766,24 @@ namespace rlogic::internal
             links.emplace_back(offset);
         }
 
+        ramses::RamsesVersion ramsesVersion = ramses::GetRamsesVersion();
+
+        auto ramsesVersionOffset = rlogic_serialization::CreateVersion(builder,
+            ramsesVersion.major,
+            ramsesVersion.minor,
+            ramsesVersion.patch,
+            builder.CreateString(ramsesVersion.string));
+
+        auto ramsesLogicVersionOffset = rlogic_serialization::CreateVersion(builder,
+            g_PROJECT_VERSION_MAJOR,
+            g_PROJECT_VERSION_MINOR,
+            g_PROJECT_VERSION_PATCH,
+            builder.CreateString(g_PROJECT_VERSION));
+
         auto logicEngine = rlogic_serialization::CreateLogicEngine(
             builder,
-            rlogic_serialization::CreateVersion(builder,
-                g_PROJECT_VERSION_MAJOR,
-                g_PROJECT_VERSION_MINOR,
-                g_PROJECT_VERSION_PATCH,
-                builder.CreateString(g_PROJECT_VERSION)),
+            ramsesVersionOffset,
+            ramsesLogicVersionOffset,
             builder.CreateVector(luascripts),
             builder.CreateVector(ramsesnodebindings),
             builder.CreateVector(ramsesappearancebindings),
@@ -846,6 +880,7 @@ namespace rlogic::internal
         m_disconnectedNodes.erase(&sourceNode);
         m_disconnectedNodes.erase(&targetNode);
         m_logicNodeGraph.addLink(sourceNode, targetNode);
+        targetNode.setDirty(true);
 
         return true;
     }
@@ -866,6 +901,8 @@ namespace rlogic::internal
         auto& sourceNode = sourceProperty.m_impl->getLogicNode();
         auto& targetNode = targetProperty.m_impl->getLogicNode();
 
+        targetNode.setDirty(true);
+
         if (!m_logicNodeConnector.isLinked(sourceNode))
         {
             m_disconnectedNodes.insert(&sourceNode);
@@ -876,5 +913,10 @@ namespace rlogic::internal
         }
 
         return true;
+    }
+
+    const LogicNodeConnector& LogicEngineImpl::getLogicNodeConnector() const
+    {
+        return m_logicNodeConnector;
     }
 }

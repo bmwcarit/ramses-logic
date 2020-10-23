@@ -17,10 +17,18 @@ function(add_example)
 
     add_executable(${EXAMPLE_NAME} ${EXAMPLE_FILES})
 
-    target_link_libraries(${EXAMPLE_NAME}
-        PRIVATE
-            rlogic::ramses-logic
-    )
+    # Prefer shared library for linking examples
+    if(TARGET rlogic::ramses-logic)
+        target_link_libraries(${EXAMPLE_NAME}
+            PRIVATE
+                rlogic::ramses-logic
+        )
+    else()
+        target_link_libraries(${EXAMPLE_NAME}
+            PRIVATE
+                rlogic::ramses-logic-static
+        )
+    endif()
 
     FOLDERIZE_TARGET(${EXAMPLE_NAME})
 
@@ -34,6 +42,6 @@ add_example(NAME 01_properties_simple     FILES 01_properties_simple/main.cpp   
 add_example(NAME 02_properties_complex    FILES 02_properties_complex/main.cpp    MAKE_TEST)
 add_example(NAME 03_errors_compile_time   FILES 03_errors_compile_time/main.cpp   MAKE_TEST)
 add_example(NAME 04_errors_runtime        FILES 04_errors_runtime/main.cpp        MAKE_TEST)
-# Can't execute ramses examples as test - they have a loop which blocks test automation and wastes resources
+# Can't execute ramses runtime example as test - it has a loop which blocks test automation and wastes resources
 add_example(NAME 05_ramses_scene          FILES 05_ramses_scene/main.cpp)
-add_example(NAME 06_serialization         FILES 06_serialization/main.cpp)
+add_example(NAME 06_serialization         FILES 06_serialization/main.cpp         MAKE_TEST)

@@ -41,12 +41,33 @@ namespace rlogic::internal
         {
             // This is equivalent to SetTable, but is needed when the right side is a custom type, not a Lua table
             // For example when assigning OUT.someStruct = IN.someStruct
-            assert (value.is<LuaScriptPropertyHandler>() && "Unexpected userdata type!");
+
+            if (!value.is<LuaScriptPropertyHandler>())
+            {
+                // TODO Violin this error message can be made more concrete if we refactor how we deal with userdata (See TODO at the top of the file)
+                sol_helper::throwSolException("Unexpected object type assigned to property '{}'!", property.getName());
+            }
+
             LuaScriptPropertyHandler& structPropertyHandler = value.as<LuaScriptPropertyHandler>();
-            // TODO (Violin/Sven) this can be probably simplified a lot by overloading the PropertyImpl assignment operator and using it, instead of
+            // TODO (Violin/Sven) this error check and switch can be probably simplified a lot by overloading the PropertyImpl assignment operator and using it, instead of
             // going over Lua/Sol here - in the end, we are juggling C++ objects, might as well treat them as such
+
+            const EPropertyType expectedType = property.getType();
+            const EPropertyType receivedType = structPropertyHandler.getPropertyImpl().getType();
+            if (expectedType != receivedType)
+            {
+                sol_helper::throwSolException("Type mismatch while assigning property '{}'! Expected {} but received {}",
+                    property.getName(),
+                    GetLuaPrimitiveTypeName(expectedType),
+                    GetLuaPrimitiveTypeName(receivedType)
+                    );
+            }
+
             switch (property.getType())
             {
+            case EPropertyType::Array:
+                SetArray(property, structPropertyHandler);
+                break;
             case EPropertyType::Struct:
                 SetStruct(property, structPropertyHandler);
                 break;
@@ -72,8 +93,8 @@ namespace rlogic::internal
             case EPropertyType::Bool:
             case EPropertyType::Float:
             case EPropertyType::Int32:
-                assert(false && "Should not have reached this code!");
-                break;
+                // TODO Violin this should be tested more! (Or we refactor the code that this switch doesn't exist in the first place)
+                sol_helper::throwSolException("Assigning non-primitive value to property '{}'!", property.getName());
             }
             break;
         }
@@ -120,7 +141,8 @@ namespace rlogic::internal
         size_t tableFieldCount = 0u;
         table.for_each([&](const std::pair<sol::object, sol::object>& /*key_value*/) { ++tableFieldCount; });
 
-        if (property.getType() == EPropertyType::Struct)
+        const EPropertyType propType = property.getType();
+        if (propType == EPropertyType::Struct)
         {
             if (tableFieldCount != property.getChildCount())
             {
@@ -135,10 +157,32 @@ namespace rlogic::internal
                 Set(*child, key_value.second);
             }
         }
+        else if (propType == EPropertyType::Array)
+        {
+            // TODO Violin refactor this with struct case - lots of similarities, only index type is different
+            if (tableFieldCount != property.getChildCount())
+            {
+                sol_helper::throwSolException("Element size mismatch when assigning array property '{}'! Expected: {} Received: {}",
+                    property.getName(), property.getChildCount(), tableFieldCount);
+                return;
+            }
+
+            for (size_t i = 0; i < tableFieldCount; ++i)
+            {
+                const size_t luaIndex = i+1;
+                const sol::object& solObject = table[luaIndex];
+                if (solObject == sol::nil)
+                {
+                    sol_helper::throwSolException("Error during assignment of array property '{}'! Expected a value at index {}",
+                        property.getName(), luaIndex);
+                }
+                Set(*property.getChild(i), solObject);
+            }
+        }
         else
         {
             // TODO Violin is there a better way for this?
-            switch (property.getType())
+            switch (propType)
             {
             case EPropertyType::Vec2f:
                 property.set<vec2f>(ExtractArray<float, 2>(table));
@@ -162,11 +206,16 @@ namespace rlogic::internal
                 // with the fact that we handle 3 different things in the same base class - "Property"
                 // Discuss whether we want this pattern, or maybe there are some other ideas how to deal
                 // with type abstraction and polymorphy where we would not have this problem
-            case EPropertyType::Struct:
             case EPropertyType::Float:
             case EPropertyType::Int32:
             case EPropertyType::String:
             case EPropertyType::Bool:
+                // TODO Violin refactor this code, this should have failed earlier
+                // TODO Violin test the other types too
+                sol_helper::throwSolException("Assigning a table to property '{}' of type '{}'!", property.getName(), GetLuaPrimitiveTypeName(propType));
+                break;
+            case EPropertyType::Array:
+            case EPropertyType::Struct:
                 assert(false && "Should not have reached this code!");
             }
         }
@@ -204,6 +253,79 @@ namespace rlogic::internal
             Property* child = property.getChild(i);
             const sol::object rhs   = structPropertyHandler.getChildPropertyAsSolObject(child->getName());
             Set(*child, rhs);
+        }
+    }
+
+    void LuaScriptPropertySetter::SetArray(Property& property, LuaScriptPropertyHandler& structPropertyHandler)
+    {
+        const PropertyImpl& rhsProperty = structPropertyHandler.getPropertyImpl();
+        assert (rhsProperty.getType() == EPropertyType::Array);
+        const size_t childCount = property.getChildCount();
+        const size_t rhsChildCount = rhsProperty.getChildCount();
+
+        if (rhsChildCount != childCount)
+        {
+            sol_helper::throwSolException("Element size mismatch when assigning array property '{}'! Expected: {} Received: {}",
+                property.getName(),
+                childCount,
+                rhsChildCount);
+        }
+
+        for (size_t i = 0u; i < childCount; ++i)
+        {
+            Property* child = property.getChild(i);
+            const Property* rhsChild = rhsProperty.getChild(i);
+            const EPropertyType expectedElementType = child->getType();
+            const EPropertyType rhsElementType = rhsChild->getType();
+
+            if(rhsElementType != expectedElementType)
+            {
+                sol_helper::throwSolException("Array element type mismatch (expected {} but received {})!",
+                    GetLuaPrimitiveTypeName(expectedElementType),
+                    GetLuaPrimitiveTypeName(rhsElementType));
+            }
+
+            // TODO violin we have too many switches like this one - needs some refactoring
+            // Start at LuaScriptPropertySetter::Set(), follow all submethods, and unify these switch-cases (also check the other sol wrapper classes for similar code)
+            // Idea: instead of checking the right hand side type, check the left-hand side and abort on mismatch
+            // This way we should not have to delay type resolving further down the line
+            switch (expectedElementType)
+            {
+            case EPropertyType::Bool:
+                child->set(*rhsChild->get<bool>());
+                break;
+            case EPropertyType::Float:
+                child->set(*rhsChild->get<float>());
+                break;
+            case EPropertyType::Int32:
+                child->set(*rhsChild->get<int32_t>());
+                break;
+            case EPropertyType::String:
+                child->set(*rhsChild->get<std::string>());
+                break;
+            case EPropertyType::Vec2f:
+                child->set<vec2f>(*rhsChild->get<vec2f>());
+                break;
+            case EPropertyType::Vec3f:
+                child->set<vec3f>(*rhsChild->get<vec3f>());
+                break;
+            case EPropertyType::Vec4f:
+                child->set<vec4f>(*rhsChild->get<vec4f>());
+                break;
+            case EPropertyType::Vec2i:
+                child->set<vec2i>(*rhsChild->get<vec2i>());
+                break;
+            case EPropertyType::Vec3i:
+                child->set<vec3i>(*rhsChild->get<vec3i>());
+                break;
+            case EPropertyType::Vec4i:
+                child->set<vec4i>(*rhsChild->get<vec4i>());
+                break;
+            case EPropertyType::Array:
+            case EPropertyType::Struct:
+                assert(false && "These types are not supported for arrays (yet)");
+                break;
+            }
         }
     }
 }

@@ -9,6 +9,7 @@
 #include "ramses-logic/Property.h"
 
 #include "internals/impl/PropertyImpl.h"
+#include "internals/impl/LogicNodeImpl.h"
 
 #include "internals/SerializationHelper.h"
 
@@ -56,8 +57,77 @@ namespace rlogic::internal
         case EPropertyType::Bool:
             m_value = false;
             break;
+        case EPropertyType::Array:
         case EPropertyType::Struct:
             break;
+        }
+    }
+
+    PropertyImpl::PropertyImpl(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput)
+        : m_name(prop->name()->string_view())
+        , m_type(ConvertSerializationTypeToEPropertyType(prop->rootType(), prop->value_type()))
+        // TODO Violin/Sven we can probably save some time by having default values not being deserialized
+        // If we do this, we could also not serialize the m_hasDefaultValue maybe
+        , m_wasSet(prop->wasSet())
+        , m_inputOutputProperty(inputOutput)
+    {
+        // If primitive: set value; otherwise load children
+        if (prop->rootType() == rlogic_serialization::EPropertyRootType::Primitive)
+        {
+            switch (prop->value_type())
+            {
+            case rlogic_serialization::PropertyValue::float_s:
+                m_value = prop->value_as_float_s()->v();
+                break;
+            case rlogic_serialization::PropertyValue::vec2f_s: {
+                auto vec2fValue = prop->value_as_vec2f_s();
+                m_value         = vec2f{vec2fValue->x(), vec2fValue->y()};
+                break;
+            }
+            case rlogic_serialization::PropertyValue::vec3f_s: {
+                auto vec3fValue = prop->value_as_vec3f_s();
+                m_value         = vec3f{vec3fValue->x(), vec3fValue->y(), vec3fValue->z()};
+                break;
+            }
+            case rlogic_serialization::PropertyValue::vec4f_s: {
+                auto vec4fValue = prop->value_as_vec4f_s();
+                m_value         = vec4f{vec4fValue->x(), vec4fValue->y(), vec4fValue->z(), vec4fValue->w()};
+                break;
+            }
+            case rlogic_serialization::PropertyValue::int32_s:
+                m_value = prop->value_as_int32_s()->v();
+                break;
+            case rlogic_serialization::PropertyValue::vec2i_s: {
+                auto vec2iValue = prop->value_as_vec2i_s();
+                m_value         = vec2i{vec2iValue->x(), vec2iValue->y()};
+                break;
+            }
+            case rlogic_serialization::PropertyValue::vec3i_s: {
+                auto vec3iValue = prop->value_as_vec3i_s();
+                m_value         = vec3i{vec3iValue->x(), vec3iValue->y(), vec3iValue->z()};
+                break;
+            }
+            case rlogic_serialization::PropertyValue::vec4i_s: {
+                auto vec4iValue = prop->value_as_vec4i_s();
+                m_value         = vec4i{vec4iValue->x(), vec4iValue->y(), vec4iValue->z(), vec4iValue->w()};
+                break;
+            }
+            case rlogic_serialization::PropertyValue::string_s:
+                m_value = prop->value_as_string_s()->v()->str();
+                break;
+            case rlogic_serialization::PropertyValue::bool_s:
+                m_value = prop->value_as_bool_s()->v();
+                break;
+            case rlogic_serialization::PropertyValue::NONE:
+                break;
+            }
+        }
+        else
+        {
+            for (auto child : *prop->children())
+            {
+                addChild(Create(child, inputOutput));
+            }
         }
     }
 
@@ -123,7 +193,7 @@ namespace rlogic::internal
     {
         assert(nullptr != child);
         assert(m_inputOutputProperty == child->m_inputOutputProperty);
-        if (m_type == EPropertyType::Struct)
+        if (m_type == EPropertyType::Struct || m_type == EPropertyType::Array)
         {
             child->setLogicNode(*m_logicNode);
             m_children.push_back(std::make_unique<Property>(std::move(child)));
@@ -228,6 +298,9 @@ namespace rlogic::internal
                 valueType = rlogic_serialization::PropertyValueTraits<rlogic_serialization::string_s>::enum_value;
             }
             break;
+        case EPropertyType::Array:
+            propertyRootType = rlogic_serialization::EPropertyRootType::Array;
+            break;
         case EPropertyType::Struct:
             propertyRootType = rlogic_serialization::EPropertyRootType::Struct;
             break;
@@ -252,67 +325,7 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        const auto type = ConvertSerializationTypeToEPropertyType(prop->rootType(), prop->value_type());
-        auto property = std::make_unique<PropertyImpl>(prop->name()->string_view(), type, inputOutput);
-
-        switch (prop->value_type())
-        {
-        case rlogic_serialization::PropertyValue::bool_s:
-            property->set(prop->value_as_bool_s()->v());
-            break;
-        case rlogic_serialization::PropertyValue::float_s:
-            property->set(prop->value_as_float_s()->v());
-            break;
-        case rlogic_serialization::PropertyValue::vec2f_s:
-        {
-            auto vec2fValue = prop->value_as_vec2f_s();
-            property->set<vec2f>({vec2fValue->x(), vec2fValue->y()});
-            break;
-        }
-        case rlogic_serialization::PropertyValue::vec3f_s: {
-            auto vec3fValue = prop->value_as_vec3f_s();
-            property->set<vec3f>({vec3fValue->x(), vec3fValue->y(), vec3fValue->z()});
-            break;
-        }
-        case rlogic_serialization::PropertyValue::vec4f_s: {
-            auto vec4fValue = prop->value_as_vec4f_s();
-            property->set<vec4f>({vec4fValue->x(), vec4fValue->y(), vec4fValue->z(), vec4fValue->w()});
-            break;
-        }
-        case rlogic_serialization::PropertyValue::int32_s:
-            property->set(prop->value_as_int32_s()->v());
-            break;
-        case rlogic_serialization::PropertyValue::vec2i_s: {
-            auto vec2iValue = prop->value_as_vec2i_s();
-            property->set<vec2i>({vec2iValue->x(), vec2iValue->y()});
-            break;
-        }
-        case rlogic_serialization::PropertyValue::vec3i_s: {
-            auto vec3iValue = prop->value_as_vec3i_s();
-            property->set<vec3i>({vec3iValue->x(), vec3iValue->y(), vec3iValue->z()});
-            break;
-        }
-        case rlogic_serialization::PropertyValue::vec4i_s: {
-            auto vec4iValue = prop->value_as_vec4i_s();
-            property->set<vec4i>({vec4iValue->x(), vec4iValue->y(), vec4iValue->z(), vec4iValue->w()});
-            break;
-        }
-        case rlogic_serialization::PropertyValue::string_s:
-            property->set(prop->value_as_string_s()->v()->str());
-            break;
-        case rlogic_serialization::PropertyValue::NONE:
-            break;
-        }
-        // TODO Violin/Sven we can probably save some time by having default values not being deserialized
-        // If we do this, we could also not serialize the m_hasDefaultValue maybe
-        property->m_wasSet = prop->wasSet();
-
-        for (auto child : *prop->children())
-        {
-            property->addChild(Create(child, inputOutput));
-        }
-
-        return property;
+        return std::make_unique<PropertyImpl>(prop, inputOutput);
     }
 
     template <typename T> std::optional<T> PropertyImpl::get() const
@@ -342,7 +355,11 @@ namespace rlogic::internal
     {
         if (PropertyTypeToEnum<T>::TYPE == m_type)
         {
-            m_value = value;
+            if (std::get<T>(m_value) != value)
+            {
+                m_value = value;
+                m_logicNode->setDirty(true);
+            }
             m_wasSet  = true;
             return true;
         }
@@ -370,8 +387,13 @@ namespace rlogic::internal
         assert(m_type == other.m_type);
         // TODO Violin this doesn't scale well. Need some basic type utils, this is not the only place where we need it
         assert(m_type != EPropertyType::Struct);
-        m_value = other.m_value;
         m_wasSet = true;
+        if (m_value != other.m_value)
+        {
+            m_value = other.m_value;
+            m_logicNode->setDirty(true);
+            return;
+        }
     }
 
     void PropertyImpl::clearChildren()

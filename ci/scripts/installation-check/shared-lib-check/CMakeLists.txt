@@ -31,3 +31,13 @@ add_custom_target(run-ramses-logic-shared-check
     COMMENT "Run executable ramses-logic-shared-check")
 
 add_dependencies(run-all run-ramses-logic-shared-check)
+
+# Do some extra checks on publicly exported targets/variables
+
+if(NOT DEFINED ramses-logic_VERSION)
+    message(FATAL_ERROR "ramses-logic_VERSION is not exported correctly!")
+endif()
+
+if(TARGET rlogic::ramses-logic-static)
+    message(FATAL_ERROR "Static lib target is built without explicitly being enabled!")
+endif()

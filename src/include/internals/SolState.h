@@ -17,17 +17,17 @@
 
 namespace rlogic::internal
 {
-    class LuaStateImpl
+    class SolState
     {
     public:
-        LuaStateImpl();
+        SolState();
 
         // Move-able (noexcept); Not copy-able
-        ~LuaStateImpl() noexcept = default;
-        LuaStateImpl(LuaStateImpl&& other) noexcept = default;
-        LuaStateImpl& operator=(LuaStateImpl&& other) noexcept = default;
-        LuaStateImpl(const LuaStateImpl& other) = delete;
-        LuaStateImpl& operator=(const LuaStateImpl& other) = delete;
+        ~SolState() noexcept = default;
+        SolState(SolState&& other) noexcept = default;
+        SolState& operator=(SolState&& other) noexcept = default;
+        SolState(const SolState& other) = delete;
+        SolState& operator=(const SolState& other) = delete;
 
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
         std::optional<sol::environment> createEnvironment(const sol::protected_function& rootScript);
@@ -39,7 +39,7 @@ namespace rlogic::internal
 
     };
 
-    template <typename T> inline sol::object LuaStateImpl::createUserObject(const T& instance)
+    template <typename T> inline sol::object SolState::createUserObject(const T& instance)
     {
         return sol::object(*m_sol, sol::in_place_type<T>, instance);
     }

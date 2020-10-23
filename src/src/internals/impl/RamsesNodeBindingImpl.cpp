@@ -126,6 +126,7 @@ namespace rlogic::internal
                 }
             }
         }
+
         return true;
     }
 

@@ -18,9 +18,15 @@
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/Effect.h"
 #include "ramses-client-api/Scene.h"
+#include "ramses-framework-api/RamsesVersion.h"
+
+#include "internals/impl/LogicNodeImpl.h"
 
 #include "generated/logicengine_gen.h"
+#include "ramses-logic-build-config.h"
 #include "flatbuffers/util.h"
+#include "fmt/format.h"
+
 #include <fstream>
 
 namespace rlogic
@@ -38,19 +44,68 @@ namespace rlogic
         EXPECT_EQ("Failed to load file 'invalid'", errors[0]);
     }
 
-    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongVersion)
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithoutVersionInfo)
     {
         {
-            // This is a bit hacky, but an easy way to fake a file with wrong version without
-            // doing magic with Git or modifying the serialization code itself
+            flatbuffers::FlatBufferBuilder builder;
+            auto logicEngine = rlogic_serialization::CreateLogicEngine(
+                builder
+            );
+
+            builder.Finish(logicEngine);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) No way around this reinterpret-cast
+            ASSERT_TRUE(flatbuffers::SaveFile("no_version.bin", reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize(), true));
+        }
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("no_version.bin"));
+        const auto& errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_EQ("File 'no_version.bin' doesn't contain logic engine data with readable version specifiers", errors[0]);
+
+        std::remove("no_version.bin");
+    }
+
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongRamsesVersion)
+    {
+        {
             flatbuffers::FlatBufferBuilder builder;
             auto logicEngine = rlogic_serialization::CreateLogicEngine(
                 builder,
                 rlogic_serialization::CreateVersion(builder,
-                    100, 200, 9000, builder.CreateString("100.200.9000-suffix")),
-                0,
-                0,
-                0
+                    10, 20, 900, builder.CreateString("10.20.900-suffix")),
+                rlogic_serialization::CreateVersion(builder,
+                    100, 200, 9000, builder.CreateString("100.200.9000-suffix"))
+            );
+
+            builder.Finish(logicEngine);
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) No way around this reinterpret-cast
+            ASSERT_TRUE(flatbuffers::SaveFile("wrong_ramses_version.bin", reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize(), true));
+        }
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_ramses_version.bin"));
+        const std::string expectedErrorMessage(fmt::format("Version mismatch while loading file 'wrong_ramses_version.bin'! Expected Ramses version {}.x.x but found 10.20.900-suffix in file", ramses::GetRamsesVersion().major));
+        const auto& errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_EQ(expectedErrorMessage, errors[0]);
+
+        std::remove("wrong_ramses_version.bin");
+    }
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongVersion)
+    {
+        {
+            ramses::RamsesVersion ramsesVersion = ramses::GetRamsesVersion();
+            flatbuffers::FlatBufferBuilder builder;
+            auto logicEngine = rlogic_serialization::CreateLogicEngine(
+                builder,
+                rlogic_serialization::CreateVersion(builder,
+                    ramsesVersion.major,
+                    ramsesVersion.minor,
+                    ramsesVersion.patch,
+                    builder.CreateString(ramsesVersion.string)),
+                rlogic_serialization::CreateVersion(builder,
+                    100, 200, 9000, builder.CreateString("100.200.9000-suffix"))
             );
 
             builder.Finish(logicEngine);
@@ -59,9 +114,10 @@ namespace rlogic
         }
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_version.bin"));
+        const std::string expectedErrorMessage(fmt::format("Version mismatch while loading file 'wrong_version.bin'! Expected version {}.{}.x but found 100.200.9000-suffix in file", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR));
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Version mismatch while loading file 'wrong_version.bin'! Expected version 0.2.x but found 100.200.9000 (full string: 100.200.9000-suffix)", errors[0]);
+        EXPECT_EQ(expectedErrorMessage, errors[0]);
 
         std::remove("wrong_version.bin");
     }
@@ -184,7 +240,7 @@ namespace rlogic
                 const auto inputs = script->getInputs();
                 ASSERT_NE(nullptr, inputs);
                 EXPECT_EQ(1u, inputs->getChildCount());
-
+                EXPECT_TRUE(script->m_impl.get().isDirty());
             }
             {
                 auto rNodeBinding = findRamsesNodeBindingByName("nodebinding");
@@ -192,6 +248,7 @@ namespace rlogic
                 const auto inputs = rNodeBinding->getInputs();
                 ASSERT_NE(nullptr, inputs);
                 EXPECT_EQ(4u, inputs->getChildCount());
+                EXPECT_TRUE(rNodeBinding->m_impl.get().isDirty());
             }
             {
                 auto rAppearanceBinding = findRamsesAppearanceBindingByName("appearancebinding");
@@ -204,6 +261,7 @@ namespace rlogic
                 ASSERT_NE(nullptr, floatUniform);
                 EXPECT_EQ("floatUniform", floatUniform->getName());
                 EXPECT_EQ(EPropertyType::Float, floatUniform->getType());
+                EXPECT_TRUE(rAppearanceBinding->m_impl.get().isDirty());
             }
         }
         std::remove("LogicEngine.bin");

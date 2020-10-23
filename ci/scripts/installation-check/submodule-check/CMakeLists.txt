@@ -35,6 +35,13 @@ set(ramses-logic_RAMSES_TARGET "my::custom-ramses" CACHE STRING "" FORCE)
 set(ramses-logic_ALLOW_RAMSES_BUILD OFF CACHE BOOL "" FORCE)
 
 #######################################################################
+### Enable static build, disable shared build (exactly the opposite than the defaults)
+#######################################################################
+
+set(ramses-logic_BUILD_STATIC_LIB ON CACHE BOOL "" FORCE)
+set(ramses-logic_BUILD_SHARED_LIB OFF CACHE BOOL "" FORCE)
+
+#######################################################################
 ### Add ramses logic as a subdirectory and build using existing ramses target
 #######################################################################
 
@@ -54,3 +61,13 @@ add_custom_target(run-submodule-check
 
 add_custom_target(run-all ALL)
 add_dependencies(run-all run-submodule-check)
+
+# Do some extra checks on publicly exported targets/variables
+
+if(NOT DEFINED ramses-logic_VERSION)
+    message(FATAL_ERROR "ramses-logic_VERSION is not exported correctly!")
+endif()
+
+if(TARGET rlogic::ramses-logic)
+    message(FATAL_ERROR "ramses-logic shared lib target is wrongly exported (should export only static lib)")
+endif()

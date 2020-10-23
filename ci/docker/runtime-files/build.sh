@@ -97,7 +97,17 @@ mkdir -p $BUILD_DIR/install &> /dev/null
 
 pushd $BUILD_DIR
 
-CMAKE_WARNINGS="-Wdev -Werror=dev -Wdeprecated -Werror=deprecated"
+# TODO Violin refactor argument passing to build script and make this an argument
+if [ -z "$BUILD_OSS" ]; then
+    echo "Running CMake with pedantic warning config"
+    CMAKE_WARNINGS="-Wdev -Werror=dev -Wdeprecated -Werror=deprecated"
+    IGNORE_INSTALL_FILES=""
+else
+    echo "Allow CMake warnings"
+    CMAKE_WARNINGS=""
+    # TODO Violin offer upstream sol change to disable installation
+    IGNORE_INSTALL_FILES=" --ignore ^include/sol --ignore ^share/pkgconfig/sol2 --ignore ^lib/cmake/sol2"
+fi
 
 # TODO Violin/Tobias this needs more cleanup!
 
@@ -297,7 +307,7 @@ else
     # Perform install checks
     # They are quick, so we execute them always
     echo "Checking installed headers"
-    python3 $RL_SRC/ci/scripts/installation-check/check-installation.py --install-dir $INSTALL_DIR/ --src-dir $RL_SRC/
+    python3 $RL_SRC/ci/scripts/installation-check/check-installation.py --install-dir $INSTALL_DIR/ $IGNORE_INSTALL_FILES --src-dir $RL_SRC/
     echo "Building against shared library"
     bash $RL_SRC/ci/scripts/installation-check/check-build-with-install-shared-lib.sh $BUILD_DIR/install-check/ $INSTALL_DIR
     echo "Building against ramses logic as a source tree (submodule) and linking statically"

@@ -8,7 +8,7 @@
 
 #include "internals/impl/LuaScriptImpl.h"
 
-#include "internals/impl/LuaStateImpl.h"
+#include "internals/SolState.h"
 #include "internals/impl/PropertyImpl.h"
 
 #include "internals/LuaScriptPropertyExtractor.h"
@@ -21,10 +21,10 @@
 
 namespace rlogic::internal
 {
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(LuaStateImpl& luaState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut)
+    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut)
     {
         std::string chunkname = BuildChunkName(scriptName, filename);
-        sol::load_result load_result = luaState.loadScript(source, chunkname);
+        sol::load_result load_result = solState.loadScript(source, chunkname);
 
         if (!load_result.valid())
         {
@@ -34,7 +34,7 @@ namespace rlogic::internal
         }
 
         sol::protected_function mainFunction = load_result;
-        std::optional<sol::environment> env = luaState.createEnvironment(mainFunction);
+        std::optional<sol::environment> env = solState.createEnvironment(mainFunction);
 
         // This should never fail
         assert(env);
@@ -66,8 +66,8 @@ namespace rlogic::internal
         auto inputsImpl  = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EInputOutputProperty::Input);
         auto outputsImpl = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EInputOutputProperty::Output);
 
-        (*env)["IN"]  = luaState.createUserObject(LuaScriptPropertyExtractor(luaState, *inputsImpl));
-        (*env)["OUT"] = luaState.createUserObject(LuaScriptPropertyExtractor(luaState, *outputsImpl));
+        (*env)["IN"]  = solState.createUserObject(LuaScriptPropertyExtractor(solState, *inputsImpl));
+        (*env)["OUT"] = solState.createUserObject(LuaScriptPropertyExtractor(solState, *outputsImpl));
 
         sol::protected_function_result intfResult = intf();
 
@@ -80,7 +80,7 @@ namespace rlogic::internal
 
         // Can't use make_unique because of private constructor
         // TODO Discuss Tobias/Sven/Violin whether we want to have this creation pattern
-        return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl (luaState, sol::protected_function(std::move(load_result)), scriptName, filename, source, std::move(inputsImpl), std::move(outputsImpl)));
+        return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl (solState, sol::protected_function(std::move(load_result)), scriptName, filename, source, std::move(inputsImpl), std::move(outputsImpl)));
     }
 
     std::string LuaScriptImpl::BuildChunkName(std::string_view scriptName, std::string_view fileName)
@@ -106,7 +106,7 @@ namespace rlogic::internal
         return chunkname;
     }
 
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(LuaStateImpl& luaState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut)
+    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut)
     {
         assert(nullptr != luaScript);
         assert(nullptr != luaScript->filename());
@@ -141,7 +141,7 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        sol::load_result load_result = luaState.loadScript(load_source, name);
+        sol::load_result load_result = solState.loadScript(load_source, name);
         if (!load_result.valid())
         {
             sol::error error = load_result;
@@ -150,18 +150,18 @@ namespace rlogic::internal
         }
 
         sol::protected_function mainFunction = load_result;
-        auto env = luaState.createEnvironment(mainFunction);
+        auto env = solState.createEnvironment(mainFunction);
         sol::protected_function_result main_result = mainFunction();
         if (main_result.valid())
         {
-            return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl(luaState, sol::protected_function(std::move(load_result)), name, filename, string_source, std::move(inputs), std::move(outputs)));
+            return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl(solState, sol::protected_function(std::move(load_result)), name, filename, string_source, std::move(inputs), std::move(outputs)));
         }
 
         errorsOut.emplace_back("Error during execution of main function of deserialized script");
         return nullptr;
     }
 
-    LuaScriptImpl::LuaScriptImpl(LuaStateImpl&  luaState,
+    LuaScriptImpl::LuaScriptImpl(SolState&  solState,
                   sol::protected_function       solFunction,
                   std::string_view              scriptName,
                   std::string_view              filename,
@@ -171,7 +171,7 @@ namespace rlogic::internal
         : LogicNodeImpl(scriptName, std::move(inputs), std::move(outputs))
         , m_filename(filename)
         , m_source(source)
-        , m_state(luaState)
+        , m_state(solState)
         , m_solFunction(std::move(solFunction))
         , m_luaPrintFunction(&LuaScriptImpl::DefaultLuaPrintFunction)
     {

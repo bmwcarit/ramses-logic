@@ -31,5 +31,6 @@ namespace rlogic::internal
         static void SetString(Property& property, std::string_view string);
         static void SetBool(Property& property, bool boolean);
         static void SetStruct(Property& property, LuaScriptPropertyHandler& structPropertyHandler);
+        static void SetArray(Property& property, LuaScriptPropertyHandler& structPropertyHandler);
     };
 }

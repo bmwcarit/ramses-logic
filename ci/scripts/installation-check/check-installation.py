@@ -21,6 +21,7 @@ def main():
     parser = argparse.ArgumentParser(description='Script to verify that installation of the project has no unexpected or missing files, and that all installed includes compile stand-alone')
     parser.add_argument('--src-dir', required=True, help='Ramses logic source dir')
     parser.add_argument('--install-dir', required=True, help='Directory where ramses logic was installed')
+    parser.add_argument('--ignore', required=False, action='append', nargs='*', help='Ignore file patterns from the installation folder')
     args = parser.parse_args()
 
     install_dir = Path(args.install_dir)
@@ -74,6 +75,14 @@ def main():
 
     print("Checking install non-header files")
 
+    if args.ignore:
+        # This is required because we use the more compatible 'append' option of argparse in favor of 'extend'
+        patterns = ignore = [i[0] for i in args.ignore]
+        print(f"Ignoring file patterns: {', '.join(patterns)}")
+        unexpectedFiles         = [f for f in unexpectedFiles       if not any([re.search(p, f) for p in patterns])]
+        expectNonheaderFiles    = [f for f in expectNonheaderFiles  if not any([re.search(p, f) for p in patterns])]
+
+
     # If all "expected" files were found, the list should be empty now - if not, report error
     if expectNonheaderFiles:
         print("Couldn't find some files in the install folder:\n  " + "\n  ".join(expectNonheaderFiles))
@@ -87,7 +96,7 @@ def main():
     srcIncludeDir = Path(args.src_dir) / 'src' / 'include' / 'public'
     srcApiHeaders = [str(f.relative_to(srcIncludeDir)) for f in srcIncludeDir.rglob("*") if f.suffix == '.h']
 
-    # check wich headers are unexpected and which are missing
+    # check which headers are unexpected and which are missing
     unexpectedHeaders = list(set(installedHeaders) - set(srcApiHeaders))
     missingHeaders = list(set(srcApiHeaders) - set(installedHeaders))
 

@@ -35,29 +35,32 @@ struct PropertyBuilder;
 enum class EPropertyRootType : uint8_t {
   Primitive = 0,
   Struct = 1,
+  Array = 2,
   MIN = Primitive,
-  MAX = Struct
+  MAX = Array
 };
 
-inline const EPropertyRootType (&EnumValuesEPropertyRootType())[2] {
+inline const EPropertyRootType (&EnumValuesEPropertyRootType())[3] {
   static const EPropertyRootType values[] = {
     EPropertyRootType::Primitive,
-    EPropertyRootType::Struct
+    EPropertyRootType::Struct,
+    EPropertyRootType::Array
   };
   return values;
 }
 
 inline const char * const *EnumNamesEPropertyRootType() {
-  static const char * const names[3] = {
+  static const char * const names[4] = {
     "Primitive",
     "Struct",
+    "Array",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameEPropertyRootType(EPropertyRootType e) {
-  if (flatbuffers::IsOutRange(e, EPropertyRootType::Primitive, EPropertyRootType::Struct)) return "";
+  if (flatbuffers::IsOutRange(e, EPropertyRootType::Primitive, EPropertyRootType::Array)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesEPropertyRootType()[index];
 }

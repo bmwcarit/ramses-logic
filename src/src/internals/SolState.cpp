@@ -6,7 +6,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "internals/impl/LuaStateImpl.h"
+#include "internals/SolState.h"
 
 #include "internals/SolWrapper.h"
 
@@ -15,6 +15,8 @@
 #include "internals/LuaScriptPropertyExtractor.h"
 #include "internals/LuaScriptPropertyHandler.h"
 #include "internals/SolHelper.h"
+#include "internals/ArrayTypeInfo.h"
+
 
 #include <iostream>
 
@@ -29,12 +31,13 @@ namespace rlogic::internal
         return sol::stack::top(L);
     }
 
-    LuaStateImpl::LuaStateImpl()
+    SolState::SolState()
         : m_sol(std::make_unique<sol::state>())
     {
-        m_sol->open_libraries(sol::lib::base, sol::lib::string, sol::lib::io);
+        m_sol->open_libraries();
         m_sol->set_exception_handler(&solExceptionHandler);
 
+        m_sol->new_usertype<ArrayTypeInfo>("ArrayTypeInfo");
         m_sol->new_usertype<LuaScriptPropertyExtractor>(
             "LuaScriptPropertyExtractor", sol::meta_method::new_index, &LuaScriptPropertyExtractor::NewIndex, sol::meta_method::index, &LuaScriptPropertyExtractor::Index);
         m_sol->new_usertype<LuaScriptPropertyHandler>(
@@ -51,14 +54,15 @@ namespace rlogic::internal
         (*m_sol)[GetLuaPrimitiveTypeName(EPropertyType::String)] = static_cast<int>(EPropertyType::String);
         (*m_sol)[GetLuaPrimitiveTypeName(EPropertyType::Bool)]   = static_cast<int>(EPropertyType::Bool);
         (*m_sol)[GetLuaPrimitiveTypeName(EPropertyType::Struct)] = static_cast<int>(EPropertyType::Struct);
+        m_sol->set_function(GetLuaPrimitiveTypeName(EPropertyType::Array), &LuaScriptPropertyExtractor::CreateArray);
     }
 
-    sol::load_result LuaStateImpl::loadScript(std::string_view source, std::string_view scriptName)
+    sol::load_result SolState::loadScript(std::string_view source, std::string_view scriptName)
     {
         return m_sol->load(source, std::string(scriptName));
     }
 
-    std::optional<sol::environment> LuaStateImpl::createEnvironment(const sol::protected_function& rootScript)
+    std::optional<sol::environment> SolState::createEnvironment(const sol::protected_function& rootScript)
     {
         if (!rootScript.valid())
         {

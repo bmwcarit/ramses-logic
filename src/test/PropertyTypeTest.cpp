@@ -79,5 +79,6 @@ namespace rlogic
         EXPECT_STREQ("BOOL", GetLuaPrimitiveTypeName(EPropertyType::Bool));
         EXPECT_STREQ("STRING", GetLuaPrimitiveTypeName(EPropertyType::String));
         EXPECT_STREQ("STRUCT", GetLuaPrimitiveTypeName(EPropertyType::Struct));
+        EXPECT_STREQ("ARRAY", GetLuaPrimitiveTypeName(EPropertyType::Array));
     }
 }

@@ -16,7 +16,7 @@
 
 namespace rlogic::internal
 {
-    LuaScriptPropertyHandler::LuaScriptPropertyHandler(LuaStateImpl& state, PropertyImpl& propertyDescription)
+    LuaScriptPropertyHandler::LuaScriptPropertyHandler(SolState& state, PropertyImpl& propertyDescription)
         : LuaScriptHandler(state)
         , m_propertyDescription(propertyDescription)
     {
@@ -38,7 +38,33 @@ namespace rlogic::internal
         return getStructProperty(childPropertyName);
     }
 
-    rlogic::Property* LuaScriptPropertyHandler::getStructProperty(std::string_view propertyName)
+    Property* LuaScriptPropertyHandler::getArrayProperty(const sol::object& propertyIndex)
+    {
+        const std::optional<size_t> maybeUInt = ExtractSpecificType<size_t>(propertyIndex);
+        if (!maybeUInt)
+        {
+            std::string indexInfo;
+            if (propertyIndex.get_type() == sol::type::number)
+            {
+                indexInfo = std::to_string(propertyIndex.as<int>());
+            }
+            else
+            {
+                indexInfo = sol_helper::GetSolTypeName(propertyIndex.get_type());
+            }
+
+            sol_helper::throwSolException("Only non-negative integers supported as array index type! Received {}", indexInfo);
+        }
+        const size_t childCount = m_propertyDescription.getChildCount();
+        const size_t indexAsUInt = *maybeUInt;
+        if (indexAsUInt == 0 || indexAsUInt > childCount)
+        {
+            sol_helper::throwSolException("Index out of range! Expected 0 < index <= {} but received index == {}", childCount, indexAsUInt);
+        }
+        return m_propertyDescription.getChild(indexAsUInt - 1);
+    }
+
+    Property* LuaScriptPropertyHandler::getStructProperty(std::string_view propertyName)
     {
         Property* structProperty = m_propertyDescription.getChild(propertyName);
         if (nullptr == structProperty)
@@ -50,8 +76,18 @@ namespace rlogic::internal
 
     void LuaScriptPropertyHandler::setChildProperty(const sol::object& propertyIndex, const sol::object& rhs)
     {
-        Property* structProperty = getStructProperty(propertyIndex);
-        LuaScriptPropertySetter::Set(*structProperty, rhs);
+        Property* childProperty = nullptr;
+
+        if (m_propertyDescription.getType() == EPropertyType::Struct)
+        {
+            childProperty = getStructProperty(propertyIndex);
+        }
+        else
+        {
+            childProperty = getArrayProperty(propertyIndex);
+        }
+
+        LuaScriptPropertySetter::Set(*childProperty, rhs);
     }
 
     sol::object LuaScriptPropertyHandler::getChildPropertyAsSolObject(const sol::object& propertyIndex)
@@ -63,6 +99,11 @@ namespace rlogic::internal
             return convertPropertyToSolObject(*structProperty->m_impl);
         }
 
+        if (propertyType == EPropertyType::Array)
+        {
+            const Property* arrayProperty = getArrayProperty(propertyIndex);
+            return convertPropertyToSolObject(*arrayProperty->m_impl);
+        }
         // Not a struct -> assume it's an array-like type
         const size_t maxIndex   = GetMaxIndexForVectorType(propertyType);
         std::optional<size_t> maybeUInt = ExtractSpecificType<size_t>(propertyIndex);
@@ -99,6 +140,7 @@ namespace rlogic::internal
         // Discuss whether we want this pattern, or maybe there are some other ideas how to deal
         // with type abstraction and polymorphy where we would not have this problem
         case EPropertyType::Struct:
+        case EPropertyType::Array:
         case EPropertyType::Float:
         case EPropertyType::Int32:
         case EPropertyType::String:
@@ -133,6 +175,7 @@ namespace rlogic::internal
         case EPropertyType::Vec2i:
         case EPropertyType::Vec3i:
         case EPropertyType::Vec4i:
+        case EPropertyType::Array:
         case EPropertyType::Struct:
             // TODO Violin/Sven this is probably a performance hit, we create a new lua table every
             // time a property is resolved

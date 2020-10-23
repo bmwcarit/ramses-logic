@@ -11,7 +11,7 @@
 #include "internals/SolWrapper.h"
 
 #include "internals/impl/PropertyImpl.h"
-#include "internals/impl/LuaStateImpl.h"
+#include "internals/SolState.h"
 #include "internals/LuaScriptHandler.h"
 
 namespace rlogic
@@ -25,7 +25,7 @@ namespace rlogic::internal
     class LuaScriptPropertyHandler : public LuaScriptHandler
     {
     public:
-        LuaScriptPropertyHandler(LuaStateImpl& state, PropertyImpl& propertyDescription);
+        LuaScriptPropertyHandler(SolState& state, PropertyImpl& propertyDescription);
         ~LuaScriptPropertyHandler() = default;
 
         static void        NewIndex(LuaScriptPropertyHandler& data, const sol::object& index, const sol::object& rhs);
@@ -45,6 +45,7 @@ namespace rlogic::internal
 
         Property* getStructProperty(const sol::object& propertyIndex);
         Property* getStructProperty(std::string_view propertyName);
+        Property* getArrayProperty(const sol::object& propertyIndex);
 
         template <typename T> sol::object convertPropertyToSolObject(PropertyImpl& property)
         {

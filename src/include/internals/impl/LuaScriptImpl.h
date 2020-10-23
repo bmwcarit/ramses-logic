@@ -31,14 +31,14 @@ namespace rlogic_serialization
 
 namespace rlogic::internal
 {
-    class LuaStateImpl;
+    class SolState;
     class PropertyImpl;
 
     class LuaScriptImpl : public LogicNodeImpl
     {
     public:
-        static std::unique_ptr<LuaScriptImpl> Create(LuaStateImpl& luaState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut);
-        static std::unique_ptr<LuaScriptImpl> Create(LuaStateImpl& luaState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut);
+        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut);
+        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut);
 
         // Move-able (noexcept); Not copy-able
         ~LuaScriptImpl() noexcept override = default;
@@ -57,7 +57,7 @@ namespace rlogic::internal
         void overrideLuaPrint(LuaPrintFunction luaPrintFunction);
 
     private:
-        LuaScriptImpl(LuaStateImpl&                 luaState,
+        LuaScriptImpl(SolState&                     solState,
                       sol::protected_function       solFunction,
                       std::string_view              scriptName,
                       std::string_view              filename,
@@ -67,7 +67,7 @@ namespace rlogic::internal
 
         std::string                             m_filename;
         std::string                             m_source;
-        std::reference_wrapper<LuaStateImpl>    m_state;
+        std::reference_wrapper<SolState>        m_state;
         sol::protected_function                 m_solFunction;
         LuaPrintFunction                        m_luaPrintFunction;
 

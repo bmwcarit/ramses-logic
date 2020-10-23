@@ -159,14 +159,19 @@ namespace rlogic
             "Only strings supported as table key type!"},
             {"OUT.no_nested_type = { correct_key = 'but wrong type' }",
             "Field 'correct_key' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            // TODO re-enable with arrays
-            //{"IN.array1 = ARRAY()"                                                          , "error message"},
-            //{"IN.array2 = ARRAY('not a type')"                                              , "error message"},
-            //{"IN.array3 = ARRAY(INT, 'not a number')"                                       , "error message"},
-            //{"IN.array4 = ARRAY(INT, -5)"                                                   , "error message"},
-            //{"IN.array5 = ARRAY({}, 5)"                                                     , "error message"},
-            //{"IN.array6 = ARRAY({x = INT, forbidden_nested = {nested = INT}}, 5)"           , "error message"},
-            //{"IN.array7 = ARRAY(ARRAY(INT, 52), 5)"                                         , "error message"},
+            {"IN.very_wrong = IN"                                                              , "Field 'very_wrong' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
+            {"IN.very_wrong = OUT"                                                             , "Field 'very_wrong' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
+            {"IN.array = ARRAY()"                                                              , "ARRAY() invoked with invalid size parameter (must be the first parameter)!"},
+            {"IN.array = ARRAY('not a number')"                                                , "ARRAY() invoked with invalid size parameter (must be the first parameter)!"},
+            {"IN.array = ARRAY(5)"                                                             , "ARRAY() invoked with invalid type parameter (must be the second parameter)!"},
+            {"IN.array = ARRAY(5, 9000)"                                                       , "Unsupported type id '9000' for array property 'array'!"},
+            {"IN.array = ARRAY(0, INT)"                                                        , "ARRAY() invoked with invalid size parameter (must be in the range [1, 255])!"},
+            {"IN.array = ARRAY(256, INT)"                                                      , "ARRAY() invoked with invalid size parameter (must be in the range [1, 255])!"},
+            {"IN.array = ARRAY(-5, INT)"                                                       , "ARRAY() invoked with invalid size parameter (must be in the range [1, 255])!"},
+            {"IN.array = ARRAY(5, {})"                                                         , "Unsupported type 'table' for array property 'array'!"},
+            {"IN.array = ARRAY(5, {x = INT, forbidden_nested = {nested = INT}})"               , "Unsupported type 'table' for array property 'array'!"},
+            {"IN.array = ARRAY(5, IN)"                                                         , "Unsupported type 'userdata' for array property 'array'!"},
+            {"IN.array = ARRAY(5, OUT)"                                                        , "Unsupported type 'userdata' for array property 'array'!"},
         };
 
         for (const auto& singleCase : allCases)
@@ -432,6 +437,42 @@ namespace rlogic
         EXPECT_EQ(zeroVec2i, *vec_2i->get<vec2i>());
         EXPECT_EQ(zeroVec3i, *vec_3i->get<vec3i>());
         EXPECT_EQ(zeroVec4i, *vec_4i->get<vec4i>());
+    }
+
+    TEST_F(ALuaScript_Interface, AssignsDefaultValuesToArrays)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.array_int = ARRAY(3, INT)
+                IN.array_float = ARRAY(3, FLOAT)
+                IN.array_vec2f = ARRAY(3, VEC2F)
+                OUT.array_int = ARRAY(3, INT)
+                OUT.array_float = ARRAY(3, FLOAT)
+                OUT.array_vec2f = ARRAY(3, VEC2F)
+            end
+
+            function run()
+            end
+        )");
+
+        std::initializer_list<const Property*> rootProperties = { script->getInputs(), script->getOutputs() };
+
+        for (auto rootProp : rootProperties)
+        {
+            auto array_int = rootProp->getChild("array_int");
+            auto array_float = rootProp->getChild("array_float");
+            auto array_vec2f = rootProp->getChild("array_vec2f");
+
+            for (size_t i = 0; i < 3; ++i)
+            {
+                EXPECT_TRUE(array_int->getChild(i)->get<int32_t>());
+                EXPECT_EQ(0, *array_int->getChild(i)->get<int32_t>());
+                EXPECT_TRUE(array_float->getChild(i)->get<float>());
+                EXPECT_FLOAT_EQ(0.0f, *array_float->getChild(i)->get<float>());
+                EXPECT_TRUE(array_vec2f->getChild(i)->get<vec2f>());
+                EXPECT_THAT(*array_vec2f->getChild(i)->get<vec2f>(), testing::ElementsAre(0.0f, 0.0f));
+            }
+        }
     }
 
 }

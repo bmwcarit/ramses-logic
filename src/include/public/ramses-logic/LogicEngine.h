@@ -35,6 +35,7 @@ namespace rlogic
     /**
     * Central object which creates and manages the lifecycle and execution
     * of scripts, bindings, and all other objects supported by the Ramses Logic library.
+    * All objects created by this class' methods must be destroyed with #destroy!
     *
     * - Use the create[Type] methods to create various objects, use #destroy() to delete them.
     * - Use #link and #unlink to connect data properties between these objects
@@ -84,8 +85,8 @@ namespace rlogic
          * @param scriptName name to assign to the script once it's created
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The script can be destroyed by calling the #destroy method
          */
-        // TODO Violin discuss if we mandate name, or accept empty too
         RLOGIC_API LuaScript* createLuaScriptFromFile(std::string_view filename, std::string_view scriptName = "");
 
         /**
@@ -98,6 +99,7 @@ namespace rlogic
          * @param scriptName name to assign to the script once it's created
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The script can be destroyed by calling the #destroy method
          */
         RLOGIC_API LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName = "");
 
@@ -121,6 +123,7 @@ namespace rlogic
          * @param name a name for the new #rlogic::RamsesNodeBinding.
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
          */
         RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(std::string_view name);
 
@@ -132,6 +135,7 @@ namespace rlogic
          * @param name a name for the the new #rlogic::RamsesAppearanceBinding.
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
          */
         RLOGIC_API RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name);
 
@@ -141,6 +145,8 @@ namespace rlogic
          * between them (see #link and #unlink). #rlogic::LogicNode's which don't have any links
          * between then are executed in arbitrary order, but the order is always the same between two
          * invocations of #update without any calls to #link or #unlink between them.
+         * As an optimization #rlogic::LogicNode's are only updated, if at least one input of a #rlogic::LogicNode
+         * has changed since the last call to #update.
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *

@@ -10,6 +10,7 @@
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
+#include "fmt/format.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 
@@ -22,10 +23,16 @@
 #include "ramses-client-api/UniformInput.h"
 #include "ramses-client-api/Node.h"
 
+#include <fstream>
+
 namespace rlogic
 {
     class ALuaScript_Runtime : public ALuaScript
     {
+    protected:
+        void TearDown() override {
+            std::remove("test_file.txt");
+        }
     };
 
     // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
@@ -565,6 +572,444 @@ namespace rlogic
         EXPECT_EQ(0, *nestedfield->get<int32_t>());
     }
 
+    TEST_F(ALuaScript_Runtime, AssignsValuesToArrays)
+    {
+        std::string_view scriptWithArrays = R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                IN.array_float = ARRAY(3, FLOAT)
+                OUT.array_int = ARRAY(2, INT)
+                OUT.array_float = ARRAY(3, FLOAT)
+            end
+
+            function run()
+                OUT.array_int = IN.array_int
+                OUT.array_int[2] = 5
+                OUT.array_float = IN.array_float
+                OUT.array_float[1] = 1.5
+            end
+        )";
+
+        auto* script = m_logicEngine.createLuaScriptFromSource(scriptWithArrays);
+
+        auto inputs = script->getInputs();
+        auto in_array_int = inputs->getChild("array_int");
+        auto in_array_float = inputs->getChild("array_float");
+        in_array_int->getChild(0)->set<int32_t>(1);
+        in_array_int->getChild(1)->set<int32_t>(2);
+        in_array_float->getChild(0)->set<float>(0.1f);
+        in_array_float->getChild(1)->set<float>(0.2f);
+        in_array_float->getChild(2)->set<float>(0.3f);
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        auto outputs = script->getOutputs();
+        auto out_array_int = outputs->getChild("array_int");
+        auto out_array_float = outputs->getChild("array_float");
+
+        EXPECT_EQ(1, *out_array_int->getChild(0)->get<int32_t>());
+        EXPECT_EQ(5, *out_array_int->getChild(1)->get<int32_t>());
+
+        EXPECT_FLOAT_EQ(1.5f, *out_array_float->getChild(0)->get<float>());
+        EXPECT_FLOAT_EQ(0.2f, *out_array_float->getChild(1)->get<float>());
+        EXPECT_FLOAT_EQ(0.3f, *out_array_float->getChild(2)->get<float>());
+    }
+
+    // TODO Violin refactor other tests which test 'unexpected type' to also list all invalid types like this one
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAccessingArrayWithNonIntegerIndex)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                IN.array = ARRAY(2, INT)
+                OUT.array = ARRAY(2, INT)
+            end
+            function run()
+                {}
+            end
+        )");
+
+        const std::vector<std::string> invalidStatements
+        {
+            "IN.array.name = 5",
+            "OUT.array.name = 5",
+            "IN.array[true] = 5",
+            "OUT.array[true] = 5",
+            "IN.array[{x=5}] = 5",
+            "OUT.array[{x=5}] = 5",
+            "IN.array[nil] = 5",
+            "OUT.array[nil] = 5",
+            "IN.array[IN] = 5",
+            "OUT.array[IN] = 5",
+        };
+
+        for (const auto& invalidStatement : invalidStatements)
+        {
+            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, invalidStatement));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
+            m_logicEngine.destroy(*script);
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAccessingArrayOutOfRange)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                IN.array = ARRAY(2, INT)
+                OUT.array = ARRAY(2, INT)
+            end
+            function run()
+                {}
+            end
+        )");
+
+        std::vector<LuaTestError> allErrorCases;
+        for (auto idx : std::initializer_list<int>{ -1, 0, 3})
+        {
+            std::string errorTemplate =
+                (idx < 0) ?
+                "Only non-negative integers supported as array index type! Received {}" :
+                "Index out of range! Expected 0 < index <= 2 but received index == {}";
+
+            for (const auto& prop : std::vector<std::string>{ "IN", "OUT" })
+            {
+                allErrorCases.emplace_back(LuaTestError{
+                    fmt::format("{}.array[{}] = 5", prop, idx),
+                    fmt::format(errorTemplate, idx)
+                    });
+            }
+        }
+
+        for (const auto& singleCase : allErrorCases)
+        {
+            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, singleCase.errorCode));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            m_logicEngine.destroy(*script);
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, AssignArrayValuesFromLuaTable)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.int_array = ARRAY(2, INT)
+                OUT.float_array = ARRAY(2, FLOAT)
+                OUT.vec2i_array = ARRAY(2, VEC2I)
+                OUT.vec3f_array = ARRAY(2, VEC3F)
+            end
+            function run()
+                OUT.int_array = {1, 2}
+                OUT.float_array = {0.1, 0.2}
+                OUT.vec2i_array = {{11, 12}, {21, 22}}
+                OUT.vec3f_array = {{0.11, 0.12, 0.13}, {0.21, 0.22, 0.23}}
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        auto int_array = script->getOutputs()->getChild("int_array");
+        auto float_array = script->getOutputs()->getChild("float_array");
+        auto vec2i_array = script->getOutputs()->getChild("vec2i_array");
+        auto vec3f_array = script->getOutputs()->getChild("vec3f_array");
+
+        EXPECT_EQ(1, *int_array->getChild(0)->get<int32_t>());
+        EXPECT_EQ(2, *int_array->getChild(1)->get<int32_t>());
+        EXPECT_FLOAT_EQ(0.1f, *float_array->getChild(0)->get<float>());
+        EXPECT_FLOAT_EQ(0.2f, *float_array->getChild(1)->get<float>());
+        EXPECT_THAT(*vec2i_array->getChild(0)->get<vec2i>(), ::testing::ElementsAre(11, 12));
+        EXPECT_THAT(*vec2i_array->getChild(1)->get<vec2i>(), ::testing::ElementsAre(21, 22));
+        EXPECT_THAT(*vec3f_array->getChild(0)->get<vec3f>(), ::testing::ElementsAre(0.11f, 0.12f, 0.13f));
+        EXPECT_THAT(*vec3f_array->getChild(1)->get<vec3f>(), ::testing::ElementsAre(0.21f, 0.22f, 0.23f));
+    }
+
+    TEST_F(ALuaScript_Runtime, AssignArrayValuesFromLuaTable_WithExplicitKeys)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.int_array = ARRAY(3, INT)
+            end
+            function run()
+                OUT.int_array = {[1] = 11, [2] = 12, [3] = 13}
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        auto int_array = script->getOutputs()->getChild("int_array");
+
+        EXPECT_EQ(11, *int_array->getChild(0)->get<int32_t>());
+        EXPECT_EQ(12, *int_array->getChild(1)->get<int32_t>());
+        EXPECT_EQ(13, *int_array->getChild(2)->get<int32_t>());
+    }
+
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayWithFewerElementsThanRequired_UsingExplicitIndices)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.int_array = ARRAY(3, INT)
+            end
+            function run()
+                OUT.int_array = {[1] = 11, [2] = 12}
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Element size mismatch when assigning array property 'int_array'! Expected: 3 Received: 2"));
+    }
+
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayFromLuaTableWithCorrectSizeButWrongIndices)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.int_array = ARRAY(3, INT)
+            end
+            function run()
+                -- 3 values, but use [1, 3, 4] instead of [1, 2, 3]
+                OUT.int_array = {[1] = 11, [3] = 13, [4] = 14}
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Error during assignment of array property 'int_array'! Expected a value at index 2"));
+    }
+
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArraysWrongValues)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                OUT.array_int = ARRAY(2, INT)
+                OUT.array_string = ARRAY(2, STRING)
+                OUT.array_vec2f = ARRAY(2, VEC2F)
+            end
+            function run()
+                {}
+            end
+        )");
+
+        // This is a subset of all possible permutations, but should cover most types and cases
+        const std::vector<LuaTestError> allErrorCases = {
+            {"OUT.array_int = {}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 0"},
+            {"OUT.array_int = {1}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 1"},
+            {"OUT.array_int = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 3"},
+            {"OUT.array_int = {1, 2.2}", "Implicit rounding during assignment of integer output"},
+            {"OUT.array_int = {1, true}", "Assigning boolean to 'INT' output"},
+            {"OUT.array_int = {nil, 1, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 1"},
+            {"OUT.array_int = {1, nil, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 2"},
+            // TODO Violin the messages below are a bit misleading now ... They could contain info which array field failed to be assigned. Need to refactor the code and fix them
+            {"OUT.array_string = {'somestring', 2}", "Assigning wrong type (number) to output ''"},
+            {"OUT.array_string = {'somestring', {}}", "Assigning a table to property '' of type 'STRING'"},
+            {"OUT.array_string = {'somestring', OUT.array_int}", "Type mismatch while assigning property ''! Expected STRING but received ARRAY"},
+            {"OUT.array_vec2f = {1, 2}", "Assigning wrong type (number) to output ''"},
+            {"OUT.array_vec2f = {{1, 2}, {5}}", "Expected 2 array components in table but got 1 instead"},
+            {"OUT.array_vec2f = {{1, 2}, {}}", "Expected 2 array components in table but got 0 instead"},
+            {"OUT.array_int = OUT", "Type mismatch while assigning property 'array_int'! Expected ARRAY but received STRUCT"},
+            {"OUT.array_int = IN", "Type mismatch while assigning property 'array_int'! Expected ARRAY but received STRUCT"},
+            // TODO Violin can we make this error more concrete? Maybe have our own type-name conversion util for errors?
+            {"OUT.array_int = ARRAY(2, INT)", "Unexpected object type assigned to property 'array_int'"},
+        };
+
+        for (const auto& singleCase : allErrorCases)
+        {
+            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, singleCase.errorCode));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            m_logicEngine.destroy(*script);
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, AssignsValuesArraysInVariousLuaSyntaxStyles)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.array = ARRAY(3, VEC2I)
+                OUT.array = ARRAY(3, VEC2I)
+            end
+            function run()
+                -- assign from "everything" towards "just one value" to cover as many cases as possible
+                OUT.array = IN.array
+                OUT.array[2] = IN.array[2]
+                OUT.array[3] = {5, 6}
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(script->getInputs()->getChild("array")->getChild(0)->set<vec2i>({ 1, 2 }));
+        EXPECT_TRUE(script->getInputs()->getChild("array")->getChild(1)->set<vec2i>({ 3, 4 }));
+        EXPECT_TRUE(script->getInputs()->getChild("array")->getChild(2)->set<vec2i>({ 5, 6 }));
+        ASSERT_TRUE(m_logicEngine.update());
+        EXPECT_THAT(*script->getOutputs()->getChild("array")->getChild(0)->get<vec2i>(), ::testing::ElementsAre(1, 2));
+        EXPECT_THAT(*script->getOutputs()->getChild("array")->getChild(1)->get<vec2i>(), ::testing::ElementsAre(3, 4));
+        EXPECT_THAT(*script->getOutputs()->getChild("array")->getChild(2)->get<vec2i>(), ::testing::ElementsAre(5, 6));
+    }
+
+    TEST_F(ALuaScript_Runtime, AssignsValuesArraysInVariousLuaSyntaxStyles_InNestedStruct)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.struct = {
+                    array1  = ARRAY(1, VEC2F),
+                    array2  = ARRAY(2, VEC3F)
+                }
+                OUT.struct = {
+                    array1  = ARRAY(1, VEC2F),
+                    array2  = ARRAY(2, VEC3F)
+                }
+            end
+            function run()
+                -- assign from "everything" towards "just one value" to cover as many cases as possible
+                OUT.struct = IN.struct
+                OUT.struct.array1    = IN.struct.array1
+                OUT.struct.array2[1]    = {1.1, 1.2, 1.3}
+                OUT.struct.array2[2]    = IN.struct.array2[2]
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(script->getInputs()->getChild("struct")->getChild("array1")->getChild(0)->set<vec2f>({ 0.1f, 0.2f }));
+        EXPECT_TRUE(script->getInputs()->getChild("struct")->getChild("array2")->getChild(0)->set<vec3f>({ 1.1f, 1.2f, 1.3f }));
+        EXPECT_TRUE(script->getInputs()->getChild("struct")->getChild("array2")->getChild(1)->set<vec3f>({ 2.1f, 2.2f, 2.3f }));
+        ASSERT_TRUE(m_logicEngine.update());
+        EXPECT_THAT(*script->getOutputs()->getChild("struct")->getChild("array1")->getChild(0)->get<vec2f>(), ::testing::ElementsAre(0.1f, 0.2f));
+        EXPECT_THAT(*script->getOutputs()->getChild("struct")->getChild("array2")->getChild(0)->get<vec3f>(), ::testing::ElementsAre(1.1f, 1.2f, 1.3f));
+        EXPECT_THAT(*script->getOutputs()->getChild("struct")->getChild("array2")->getChild(1)->get<vec3f>(), ::testing::ElementsAre(2.1f, 2.2f, 2.3f));
+    }
+
+    TEST_F(ALuaScript_Runtime, AllowsAssigningArraysFromTableWithNilAtTheEnd)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                OUT.array_2ints = ARRAY(2, INT)
+                OUT.array_3ints = ARRAY(3, INT)
+                OUT.array_4ints = ARRAY(4, INT)
+                OUT.array_vec2i = ARRAY(1, VEC2I)
+            end
+
+            function run()
+                {}
+            end
+        )");
+
+        // Lua+sol seem to not iterate over nil entries when creating a table
+        // Still, we test the behavior explicitly
+        const std::vector<std::string> allCases =
+        {
+            "OUT.array_2ints = {1, 2, nil} -- single nil",
+            "OUT.array_2ints = {1, 2, nil, nil} -- two nils",
+            "OUT.array_3ints = {1, 2, 3, nil}",
+            "OUT.array_4ints = {1, 2, 3, 4, nil}",
+            "OUT.array_vec2i = {{1, 2}, nil}",
+        };
+
+        for (const auto& aCase : allCases)
+        {
+            auto* script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, aCase));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_TRUE(m_logicEngine.update());
+
+            EXPECT_TRUE(m_logicEngine.getErrors().empty());
+            EXPECT_TRUE(m_logicEngine.destroy(*script));
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningArraysWithMismatchedSizes)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                IN.array_float2 = ARRAY(2, FLOAT)
+                IN.array_float4 = ARRAY(4, FLOAT)
+                IN.array_vec3f = ARRAY(1, VEC3F)
+                OUT.array_float3 = ARRAY(3, FLOAT)
+            end
+
+            function run()
+                {}
+            end
+        )");
+
+        const std::vector<LuaTestError> allCases =
+        {
+            {"OUT.array_float3 = IN.array_float2", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 2"},
+            {"OUT.array_float3 = IN.array_float4", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 4"},
+            {"OUT.array_float3 = IN.array_vec3f", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 1"},
+            {"OUT.array_float3 = {0.1, 0.2}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 2"},
+            {"OUT.array_float3 = {0.1, 0.2, 0.3, 0.4}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 4"},
+            {"OUT.array_float3 = {}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 0"},
+        };
+
+        for (const auto& aCase : allCases)
+        {
+            auto* script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, aCase.errorCode));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(aCase.expectedErrorMessage));
+            EXPECT_TRUE(m_logicEngine.destroy(*script));
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningUserdataArraysWithMismatchedTypes)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                IN.array_float = ARRAY(2, FLOAT)
+                IN.array_vec2f = ARRAY(2, VEC2F)
+                IN.array_vec2i = ARRAY(2, VEC2I)
+                OUT.array_int = ARRAY(2, INT)
+            end
+
+            function run()
+                {}
+            end
+        )");
+
+        const std::vector<LuaTestError> allCases =
+        {
+            {"OUT.array_int = IN.array_float", "Array element type mismatch (expected INT but received FLOAT)!"},
+            {"OUT.array_int = IN.array_vec2f", "Array element type mismatch (expected INT but received VEC2F)!"},
+            {"OUT.array_int = IN.array_vec2i", "Array element type mismatch (expected INT but received VEC2I)!"},
+        };
+
+        for (const auto& aCase : allCases)
+        {
+            auto* script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, aCase.errorCode));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(aCase.expectedErrorMessage));
+            EXPECT_TRUE(m_logicEngine.destroy(*script));
+        }
+    }
+
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenImplicitlyRoundingNumbers)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(R"(
@@ -834,7 +1279,8 @@ namespace rlogic
                         vec4f  = VEC4F,
                         vec2i  = VEC2I,
                         vec3i  = VEC3I,
-                        vec4i  = VEC4I
+                        vec4i  = VEC4I,
+                        array  = ARRAY(2, VEC2I)
                     }
                 }
 
@@ -853,7 +1299,8 @@ namespace rlogic
                         vec4f  = VEC4F,
                         vec2i  = VEC2I,
                         vec3i  = VEC3I,
-                        vec4i  = VEC4I
+                        vec4i  = VEC4I,
+                        array  = ARRAY(2, VEC2I)
                     }
                 }
             end
@@ -873,6 +1320,7 @@ namespace rlogic
                     OUT.struct.struct.vec2i    = {0, 0}
                     OUT.struct.struct.vec3i    = {0, 0, 0}
                     OUT.struct.struct.vec4i    = {0, 0, 0, 0}
+                    OUT.struct.struct.array    = {{0, 0}, {0, 0}}
                 elseif IN.assignmentType == "mirror_individually" then
                     OUT.float = IN.float
                     OUT.int   = IN.int
@@ -888,6 +1336,8 @@ namespace rlogic
                     OUT.struct.struct.vec2i     = IN.struct.struct.vec2i
                     OUT.struct.struct.vec3i     = IN.struct.struct.vec3i
                     OUT.struct.struct.vec4i     = IN.struct.struct.vec4i
+                    OUT.struct.struct.array[1]  = IN.struct.struct.array[1]
+                    OUT.struct.struct.array[2]  = IN.struct.struct.array[2]
                 elseif IN.assignmentType == "assign_constants" then
                     OUT.float = 0.1
                     OUT.int   = 1
@@ -897,12 +1347,13 @@ namespace rlogic
                     OUT.struct.struct.int       = 3
                     OUT.struct.struct.bool      = true
                     OUT.struct.struct.string    = "somestring"
-                    OUT.struct.struct.vec2f    = { 0.1, 0.2 }
-                    OUT.struct.struct.vec3f    = { 1.1, 1.2, 1.3 }
-                    OUT.struct.struct.vec4f    = { 2.1, 2.2, 2.3, 2.4 }
-                    OUT.struct.struct.vec2i    = { 1, 2 }
-                    OUT.struct.struct.vec3i    = { 3, 4, 5 }
-                    OUT.struct.struct.vec4i    = { 6, 7, 8, 9 }
+                    OUT.struct.struct.vec2f     = { 0.1, 0.2 }
+                    OUT.struct.struct.vec3f     = { 1.1, 1.2, 1.3 }
+                    OUT.struct.struct.vec4f     = { 2.1, 2.2, 2.3, 2.4 }
+                    OUT.struct.struct.vec2i     = { 1, 2 }
+                    OUT.struct.struct.vec3i     = { 3, 4, 5 }
+                    OUT.struct.struct.vec4i     = { 6, 7, 8, 9 }
+                    OUT.struct.struct.array     = { {11, 12}, {13, 14} }
                 elseif IN.assignmentType == "assign_struct" then
                     OUT.float = IN.float
                     OUT.int   = IN.int
@@ -929,6 +1380,8 @@ namespace rlogic
         script->getInputs()->getChild("struct")->getChild("struct")->getChild("vec2i")->set<vec2i>({ 1, 2 });
         script->getInputs()->getChild("struct")->getChild("struct")->getChild("vec3i")->set<vec3i>({ 3, 4, 5 });
         script->getInputs()->getChild("struct")->getChild("struct")->getChild("vec4i")->set<vec4i>({ 6, 7, 8, 9 });
+        script->getInputs()->getChild("struct")->getChild("struct")->getChild("array")->getChild(0)->set<vec2i>({ 11, 12 });
+        script->getInputs()->getChild("struct")->getChild("struct")->getChild("array")->getChild(1)->set<vec2i>({ 13, 14 });
 
         std::array<std::string, 3> assignmentTypes =
         {
@@ -967,6 +1420,8 @@ namespace rlogic
             EXPECT_THAT(*struct_lvl2->getChild("vec2i")->get<vec2i>(), ::testing::ElementsAre(1, 2));
             EXPECT_THAT(*struct_lvl2->getChild("vec3i")->get<vec3i>(), ::testing::ElementsAre(3, 4, 5));
             EXPECT_THAT(*struct_lvl2->getChild("vec4i")->get<vec4i>(), ::testing::ElementsAre(6, 7, 8, 9));
+            EXPECT_THAT(*struct_lvl2->getChild("array")->getChild(0)->get<vec2i>(), ::testing::ElementsAre(11, 12));
+            EXPECT_THAT(*struct_lvl2->getChild("array")->getChild(1)->get<vec2i>(), ::testing::ElementsAre(13, 14));
         }
     }
 
@@ -1276,4 +1731,59 @@ namespace rlogic
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
         EXPECT_FLOAT_EQ(23.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
     }
+
+
+    TEST_F(ALuaScript_Runtime, IncludesStandardLibraries)
+    {
+        std::ofstream ofs;
+        ofs.open("test_file.txt", std::ofstream::out);
+        ofs << "This text is from the file";
+        ofs.close();
+
+        const std::string_view scriptSrc = R"(
+            function debug_func(arg)
+                print(arg)
+            end
+
+            function interface()
+                OUT.floored_float = INT
+                OUT.file_contents = STRING
+                OUT.file_contents_gsub = STRING
+                OUT.table_maxn = INT
+                OUT.language_of_debug_func = STRING
+            end
+            function run()
+                -- test math lib
+                OUT.floored_float = math.floor(42.7)
+                -- test io and os libs
+                file = io.open("test_file.txt", "r")
+                io.input(file)
+                OUT.file_contents = io.read()
+                io.close(file)
+                -- test os lib
+                os.remove("test_file.txt")
+                -- test string lib
+                OUT.file_contents_gsub = string.gsub(OUT.file_contents, "text", "modified text")
+                -- test table lib
+                OUT.table_maxn = table.maxn ({11, 12, 13})
+                -- test debug lib
+                local debuginfo = debug.getinfo (debug_func)
+                OUT.language_of_debug_func = debuginfo.what
+            end
+        )";
+        auto script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        ASSERT_NE(nullptr, script);
+
+        m_logicEngine.update();
+
+        EXPECT_EQ(42, *script->getOutputs()->getChild("floored_float")->get<int32_t>());
+        EXPECT_EQ("This modified text is from the file", *script->getOutputs()->getChild("file_contents_gsub")->get<std::string>());
+        EXPECT_EQ(3, *script->getOutputs()->getChild("table_maxn")->get<int32_t>());
+        EXPECT_EQ("Lua", *script->getOutputs()->getChild("language_of_debug_func")->get<std::string>());
+
+        // File was deleted by script
+        std::ifstream f("test_file.txt");
+        EXPECT_FALSE(f.good());
+    }
+
 }

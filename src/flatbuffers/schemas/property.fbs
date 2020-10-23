@@ -12,7 +12,8 @@ namespace rlogic_serialization;
 enum EPropertyRootType:uint8
 {
     Primitive = 0,
-    Struct = 1
+    Struct = 1,
+    Array = 2
 }
 
 // Because unions can't hold primitives directly,

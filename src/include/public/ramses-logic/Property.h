@@ -24,27 +24,16 @@ namespace rlogic::internal
 namespace rlogic
 {
     /**
-    * Represents a generic property slot of the LogicEngine. This can be a script input
-    * or output, or a RamsesNodeBinding input slot.
-    * TODO discuss class structure we want to achieve with this - do we want inheritance?
-    * If yes, how do we handle type information and casting?
+    * Represents a generic property slot of the #rlogic::LogicNode and its derived classes.
+    * Properties can have primitive types (string, integer, etc.) or complex types (structs, arrays).
+    * Complex types can have "children", i.e. nested properties: named fields (structs), or indexed
+    * fields (arrays).
     */
     class Property
     {
     public:
         /**
-        * Returns the amount of available child (nested) properties. In the case that
-        * the Property is a EPropertyType::STRUCT, the returned number will correspond
-        * to the number of properties of that struct. getChildCount() returns always
-        * zero for primitive properties like EPropertyType::INT or EPropertyType::FLOAT.
-        *
-        * @return the amount of available children.
-        */
-        RLOGIC_API size_t getChildCount() const;
-
-        /**
         * Returns the type of this Property
-        * TODO extend this doc once we have not only script properties but also others
         *
         * @return the type of this Property
         */
@@ -52,21 +41,39 @@ namespace rlogic
 
         /**
         * Returns the name of this Property. Note that not all properties have a name -
-        * for example an array element does not have a name.
-        * TODO extend this doc once we have not only script properties but also others
+        * for example an array element does not have a name. In that case the result
+        * will be an empty string view. Struct fields always have a non-empty name.
         *
         * @return the name of this Property
         */
-        // TODO discuss: could be wise to use string view here maybe
         RLOGIC_API std::string_view getName() const;
 
         /**
-        * Returns the child with the given index.
+        * Returns the amount of available child (nested) properties. If the Property
+        * is of type #rlogic::EPropertyType::Struct, the returned number will correspond
+        * to the number of named properties of the struct. If the Property is of type
+        * #rlogic::EPropertyType::Array, the method will return the array size. For all
+        * other property types #getChildCount returns zero.
         *
-        * @return the child with the given index. Only structured properties
-        * can return a child. In case of a primitive property nullptr will be returned.
-        * If the child index is larger than the value of getChildCount(),
-        * nullptr will be returned
+        * @return the number of nested properties.
+        */
+        RLOGIC_API size_t getChildCount() const;
+
+        /**
+        * Returns the child property with the given \p index. \p index must be < #getChildCount().
+        *
+        * This method can be used to get nested properties of structs and arrays. For primitive types this will
+        * always return nullptr.
+        *
+        * Note that array indexing in #getChild follows C++ conventions and **not** Lua conventions! Inside the Lua scripts, you can
+        * and must use Lua conventions when indexing arrays (start at 1, end at N) while in C++ you must use [0, N-1].
+        *
+        * Struct properties can also be retrieved by index. The ordering is **not** guaranteed to match the order of
+        * declaration inside Lua scripts (Lua explicitly warns to not rely on ordering of named table entries!).
+        * However, once a script is created, the index will not change, i.e. it is permitted that user code caches
+        * the property index for faster future access.
+        *
+        * @return the child with the given index, or nullptr if the property is primitive or the index is out of range
         */
         RLOGIC_API const Property* getChild(size_t index) const;
 
@@ -76,11 +83,12 @@ namespace rlogic
         RLOGIC_API Property* getChild(size_t index);
 
         /**
-        * Returns the child with the given name. Only structured properties can return a child.
-        * In case of a primitive property nullptr will be returned.
-        * @return the child with the given name. If the child is not available nullptr will be returned
-        * This does only work, if the Property is a struct. If it isn't a struct nullptr will be returned
-        * TODO adjust the docs if arrays are supported
+        * Searches for a child with the given name. Only properties of type #rlogic::EPropertyType::Struct can return a child by name.
+        * In case of a primitive property or array this method will return nullptr.
+        *
+        * Note that this method may be slower than #getChild(size_t index) as it must do a string-based search.
+        *
+        * @return the child with the given name, or nullptr if property is not of type #rlogic::EPropertyType::Struct
         */
         RLOGIC_API Property* getChild(std::string_view name);
 
@@ -90,20 +98,26 @@ namespace rlogic
         RLOGIC_API const Property* getChild(std::string_view name) const;
 
         /**
-        * Returns the value of this Property. The supported template types defined by
-        * IsPrimitiveProperty<T>::value == true. Using any other type will result in linker
-        * errors since those are not implemented.
+        * Returns the value of this property. The supported template types are defined by
+        * #rlogic::IsPrimitiveProperty where IsPrimitiveProperty<T>::value == true for a type T.
+        *
+        * Attention! We recommend always specifying the template argument T explicitly, and don't rely on the compiler's
+        * type deduction! If T is not one of the supported types, a linker error will be issued!
+        *
         * If the template type and the internal type do not match, std::nullopt will be returned.
-        * @return the value of this Property as std::optional.
+        *
+        * @return the value of this Property as std::optional or std::nullopt if T does not match.
         */
-        // TODO document which types are implemented/supported
         template <typename T> RLOGIC_API std::optional<T> get() const;
 
         /**
-        * Sets the value of this Property
-        * @param value to set for this Property
+        * Sets the value of this Property. Same rules apply to template parameter T as in #get()
         *
-        * @return true if setting the value was successful, false otherwise.
+        * Attention! We recommend always specifying the template argument T explicitly, and don't rely on the compiler's
+        * type deduction! If T is not one of the supported types, a linker error will be issued!
+        *
+        * @param value the value to set for this Property
+        * @return true if setting the \p value was successful, false otherwise.
         */
         template <typename T> RLOGIC_API bool set(T value);
 

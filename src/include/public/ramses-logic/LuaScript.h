@@ -27,13 +27,9 @@ namespace rlogic
     /**
     * The LuaScript class is the cornerstone of RAMSES Logic as it encapsulates
     * a Lua script and the associated with it Lua environment. LuaScript instances are created
-    * by the LogicEngine class.
+    * by the #rlogic::LogicEngine class.
     *
     * A LuaScript can be created from Lua source code which must fulfill following requirements:
-    *
-    * \rst
-    * .. note:: TODO discuss whether we want to introduce further checks - e.g. must have at least one input and one output
-    * \endrst
     *
     * - valid Lua 5.1 syntax
     * - contains two global functions - interface() and run() with no parameters and no return values
@@ -46,18 +42,19 @@ namespace rlogic
     *           OUT.output_name = TYPE
     *       end
     *   \endcode
-    * - TYPE is one of [INT|FLOAT|BOOL|STRING|VEC2F|VEC3F|VEC4F|VEC2I|VEC3I|VEC4I]
+    * - TYPE is one of [INT|FLOAT|BOOL|STRING|VEC2F|VEC3F|VEC4F|VEC2I|VEC3I|VEC4I], or...
+    * - TYPE can be also a Lua table with nested properties, obeying the same rules as above, or...
+    * - TYPE can be an array declaration of the form ARRAY(n, T) where n is a positive integer, and T obeys the same rules as TYPE
     * - Each property must have a name (string) - other types like number, bool etc. are not supported as keys
-    * - TYPE can be also a Lua table with nested properties, obeying the same rules as above
     * - the run() function only accesses the IN and OUT global symbols and the properties defined by it
     *
-    * Violating any of these requirements will result in errors, which can be obtained either by calling
-    * LogicEngine::getErrors() (for compile-time errors) or LuaScript::getErrors() for runtime errors).
+    * Violating any of these requirements will result in errors, which can be obtained by calling
+    * #rlogic::LogicEngine::getErrors().
     * The LuaScript object encapsulates a Lua environment (see official Lua docs) which strips all
     * global table entries after the script is loaded to the Lua state, and leaves only the run()
     * function.
     *
-    * See also the full documentation at https://genivi.github.io/ramses-logic for more details on Lua and
+    * See also the full documentation at https://genivi.github.io/ramses-logic/api.html for more details on Lua and
     * its interaction with C++.
     */
     class LuaScript : public LogicNode

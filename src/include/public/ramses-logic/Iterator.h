@@ -40,6 +40,8 @@ namespace rlogic
     template <typename T, typename internal_container, bool isConst>
     class Iterator
     {
+        friend class Iterator<T, internal_container, true>;
+        friend class Iterator<T, internal_container, false>;
     private:
         /**
          * Internal type trait (const iterator type)
@@ -130,7 +132,8 @@ namespace rlogic
          * @param other the other iterator to compare to
          * @return true if the iterators point to the same object internally
         */
-        bool operator==(const Iterator& other) const noexcept
+        template <bool otherIsConst>
+        bool operator==(const Iterator<T, internal_container, otherIsConst>& other) const noexcept
         {
             return m_iterator == other.m_iterator;
         }
@@ -140,7 +143,8 @@ namespace rlogic
          * @param other the other iterator to compare to
          * @return true if the iterators point to different objects internally
          */
-        bool operator!=(const Iterator& other) const noexcept
+        template <bool otherIsConst>
+        bool operator!=(const Iterator<T, internal_container, otherIsConst>& other) const noexcept
         {
             return !(*this == other);
         }
@@ -154,8 +158,8 @@ namespace rlogic
          * Constructor which allows const-iterator to be constructed from a non-const iterator, but not the other way around
          * @param other iterator to construct from
          */
-        template<typename other_T, typename other_internal_container, bool wasConst, class = std::enable_if_t<isConst && !wasConst>>
-        explicit Iterator(const Iterator<other_T, other_internal_container, wasConst> & other) noexcept
+        template<bool otherIsConst, typename = std::enable_if_t<isConst && !otherIsConst>>
+        Iterator(const Iterator<T, internal_container, otherIsConst> & other) noexcept  // NOLINT(google-explicit-constructor) needs conversion to work
             : m_iterator(other.m_iterator)
         {
         }
@@ -164,8 +168,8 @@ namespace rlogic
          * Assignment operator which allows const-iterator to be assigned from a non-const iterator, but not the other way around
          * @param other iterator to be assign from
          */
-        template<typename other_T, typename other_internal_container, bool wasConst, class = std::enable_if_t<isConst && !wasConst>>
-        Iterator& operator=(const Iterator<other_T, other_internal_container, wasConst> & other) noexcept
+        template<bool otherIsConst, class = std::enable_if_t<isConst && !otherIsConst>>
+        Iterator& operator=(const Iterator<T, internal_container, otherIsConst> & other) noexcept
         {
             m_iterator = other.m_iterator;
             return *this;

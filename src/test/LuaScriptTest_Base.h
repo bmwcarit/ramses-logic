@@ -8,18 +8,13 @@
 
 #pragma once
 
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
-
-#include "ramses-logic/LogicEngine.h"
+#include "LogicEngineTest_Base.h"
 
 namespace rlogic
 {
-    class ALuaScript : public ::testing::Test
+    class ALuaScript : public ALogicEngine
     {
     protected:
-        LogicEngine m_logicEngine;
-
         std::string_view m_minimalScript = R"(
             function interface()
             end

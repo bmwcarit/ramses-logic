@@ -58,6 +58,9 @@ namespace rlogic::internal
 
         std::string_view getName() const;
 
+        void setDirty(bool dirty);
+        bool isDirty() const;
+
     protected:
         explicit LogicNodeImpl(std::string_view name) noexcept;
         LogicNodeImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs);
@@ -71,6 +74,7 @@ namespace rlogic::internal
         std::unique_ptr<Property> m_inputs;
         std::unique_ptr<Property> m_outputs;
         std::vector<std::string>  m_errors;
+        bool                      m_dirty = true;
 
     };
 }

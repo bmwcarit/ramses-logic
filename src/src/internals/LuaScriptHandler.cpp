@@ -7,14 +7,14 @@
 //  -------------------------------------------------------------------------
 
 #include "internals/LuaScriptHandler.h"
-#include "internals/impl/LuaStateImpl.h"
+#include "internals/SolState.h"
 #include "internals/SolHelper.h"
 
 #include <cmath>
 
 namespace rlogic::internal
 {
-    LuaScriptHandler::LuaScriptHandler(LuaStateImpl& state)
+    LuaScriptHandler::LuaScriptHandler(SolState& state)
         : m_state(state)
     {
     }
@@ -46,6 +46,7 @@ namespace rlogic::internal
         // Discuss whether we want this pattern, or maybe there are some other ideas how to deal
         // with type abstraction and polymorphy where we would not have this problem
         case EPropertyType::Struct:
+        case EPropertyType::Array:
         case EPropertyType::Float:
         case EPropertyType::Int32:
         case EPropertyType::String:

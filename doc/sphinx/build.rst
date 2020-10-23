@@ -59,7 +59,8 @@ Refer to the `RAMSES build instructions <https://github.com/GENIVI/ramses#buildi
 Build options
 ========================================
 
-Following CMake settings can be optionally enabled/disabled when building:
+A standard CMake build will create the shared library version of ``Ramses Logic`` by default. A static build alongside other
+things can be enabled using following CMake options:
 
 * -Dramses-logic_RAMSES_TARGET
     * options: ramses-shared-lib-client-only, ramses-shared-lib-<platform>, or a custom target name
@@ -78,6 +79,16 @@ Following CMake settings can be optionally enabled/disabled when building:
     * options: ON/OFF
     * default: ON
     * treats compiler warnings as errors and aborts the build. Use this option if your compiler generates warnings which are not fixed yet.
+
+* -Dramses-logic_BUILD_SHARED_LIB
+    * options: ON/OFF
+    * default: ON
+    * Enables building of the shared (dynamic) library version of logic engine (we recommend this over the static build)
+
+* -Dramses-logic_BUILD_STATIC_LIB
+    * options: ON/OFF
+    * default: OFF
+    * Enables building of the static library version of logic engine
 
 * -Dramses-logic_ENABLE_INSTALL
     * options: ON/OFF
@@ -115,6 +126,14 @@ Following CMake settings can be optionally enabled/disabled when building:
     * default: not set
     * This is a standard CMake feature. We provide several toolchain files for popular compilers, use them or create your own
 
+
+=======================================
+Project version
+=======================================
+
+You can check the project version at build time and at runtime. At build time it is available
+as a CMake cache variable named ``ramses-logic_VERSION``. At runtime, you can use the
+:func:`rlogic::GetRamsesLogicVersion` function to get the version as integer or as string.
 
 ========================================
 Building on Windows

@@ -168,6 +168,7 @@ namespace rlogic::internal
             break;
         }
         case EPropertyType::String:
+        case EPropertyType::Array:
         case EPropertyType::Struct:
         case EPropertyType::Bool:
             assert(false && "This should never happen");

@@ -20,6 +20,8 @@ namespace rlogic::internal
         {
         case rlogic_serialization::EPropertyRootType::Struct:
             return EPropertyType::Struct;
+        case rlogic_serialization::EPropertyRootType::Array:
+            return EPropertyType::Array;
         case rlogic_serialization::EPropertyRootType::Primitive:
             switch (valueType)
             {

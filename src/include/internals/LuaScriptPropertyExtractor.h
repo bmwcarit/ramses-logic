@@ -14,15 +14,16 @@
 namespace rlogic::internal
 {
     class PropertyImpl;
-    class LuaStateImpl;
+    class SolState;
 
     class LuaScriptPropertyExtractor : public LuaScriptHandler
     {
     public:
-        LuaScriptPropertyExtractor(LuaStateImpl& state, PropertyImpl& propertyDescription);
+        LuaScriptPropertyExtractor(SolState& state, PropertyImpl& propertyDescription);
 
         static sol::object Index(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& rhs);
         static void        NewIndex(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& rhs);
+        static sol::object CreateArray(sol::this_state state, std::optional<size_t> size, std::optional<sol::object> arrayType);
 
     private:
         PropertyImpl& m_propertyDescription;

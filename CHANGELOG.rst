@@ -3,12 +3,35 @@ master
 ======
 
 ======
+v0.3.0
+======
+
+**New features**
+
+* Optimization to only execute LogicNodes with changed inputs
+* Support arrays of primitives
+
+**Bugfixes**
+
+* Const-iterators can be initialized from non-const iterators
+
+**Improvements**
+
+* Check Ramses version during build time to ensure compatibility
+* loadFromFile() checks ramses version for compability
+* Lua Scripts have all standard Lua modules by default (see docs for details)
+* Currently supports ramses >= 26.0.4 and < 27
+
+**Build system**
+
+* Provides version info as CMake Cache variable
+* Fails build if ramses version is not compatible
+
+======
 v0.2.0
 ======
 
-------------------
-Bugfixes
-------------------
+**Bugfixes**
 
 * Fixed a bug with recent sol and Visual Studio 16.7.4
 
@@ -16,9 +39,7 @@ Bugfixes
     * Results in minor mismatch in reported errors when using VECx types
     * Errors are still readable and have a stack trace, just the message is different
 
-------------------
-Features
-------------------
+**Features**
 
 * Improved class hierarchy:
 
@@ -45,9 +66,7 @@ Features
 
 * Improved documentation
 
-------------------
-Fixes
-------------------
+**Fixes**
 
 * Remove flatbuffers targets from build
 
@@ -57,9 +76,7 @@ v0.1.0
 
 First version published on Github
 
-------------------
-Initial features
-------------------
+**Initial features**
 
 * Script loading and execution
 * Script input/output access from C++

@@ -10,12 +10,15 @@
 #include "internals/LuaScriptPropertyExtractor.h"
 #include "internals/SolHelper.h"
 #include "internals/impl/PropertyImpl.h"
-#include "internals/impl/LuaStateImpl.h"
+#include "internals/SolState.h"
+#include "internals/ArrayTypeInfo.h"
+
+#include "fmt/format.h"
 #include <algorithm>
 
 namespace rlogic::internal
 {
-    LuaScriptPropertyExtractor::LuaScriptPropertyExtractor(LuaStateImpl& state, PropertyImpl& propertyDescription)
+    LuaScriptPropertyExtractor::LuaScriptPropertyExtractor(SolState& state, PropertyImpl& propertyDescription)
         : LuaScriptHandler(state)
         , m_propertyDescription(propertyDescription)
     {
@@ -29,6 +32,26 @@ namespace rlogic::internal
     sol::object LuaScriptPropertyExtractor::Index(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& /*rhs*/)
     {
         return data.getProperty(index);
+    }
+
+    sol::object LuaScriptPropertyExtractor::CreateArray(sol::this_state state, std::optional<size_t> size, std::optional<sol::object> arrayType)
+    {
+        if (!size)
+        {
+            sol_helper::throwSolException("ARRAY() invoked with invalid size parameter (must be the first parameter)!");
+        }
+        // TODO Violin/Sven/Tobias discuss max array size
+        // Putting a "sane" number here, but maybe worth discussing again
+        constexpr size_t MaxArraySize = 255;
+        if (*size == 0u || *size > MaxArraySize)
+        {
+            sol_helper::throwSolException("ARRAY() invoked with invalid size parameter (must be in the range [1, {}])!", MaxArraySize);
+        }
+        if (!arrayType)
+        {
+            sol_helper::throwSolException("ARRAY() invoked with invalid type parameter (must be the second parameter)!");
+        }
+        return sol::object(state, sol::in_place_type<ArrayTypeInfo>, ArrayTypeInfo{*size, *arrayType});
     }
 
     sol::object LuaScriptPropertyExtractor::getProperty(const sol::object& index)
@@ -87,6 +110,51 @@ namespace rlogic::internal
             }
 
             parentStruct.addChild(std::move(propertyStruct));
+        }
+        else if (solType == sol::type::userdata)
+        {
+            if (propertyValue.is<ArrayTypeInfo>())
+            {
+                auto& arrayTypeInfo = propertyValue.as<ArrayTypeInfo>();
+                const sol::object& arrayType = arrayTypeInfo.arrayType;
+
+                const sol::type solArrayType = arrayType.get_type();
+                if (solArrayType == sol::type::number)
+                {
+                    const auto type = arrayType.as<EPropertyType>();
+                    if (type == EPropertyType::Float ||
+                        type == EPropertyType::Vec2f ||
+                        type == EPropertyType::Vec3f ||
+                        type == EPropertyType::Vec4f ||
+                        type == EPropertyType::Int32 ||
+                        type == EPropertyType::Vec2i ||
+                        type == EPropertyType::Vec3i ||
+                        type == EPropertyType::Vec4i ||
+                        type == EPropertyType::String ||
+                        type == EPropertyType::Bool)
+                    {
+                        auto arrayProperty = std::make_unique<PropertyImpl>(name, EPropertyType::Array, parentStruct.getInputOutputProperty());
+                        for (size_t i = 0; i < arrayTypeInfo.arraySize; ++i)
+                        {
+                            arrayProperty->addChild(std::make_unique<PropertyImpl>("", type, parentStruct.getInputOutputProperty()));
+                        }
+                        parentStruct.addChild(std::move(arrayProperty));
+                    }
+                    else
+                    {
+                        sol_helper::throwSolException("Unsupported type id '{}' for array property '{}'!", static_cast<uint32_t>(type), name);
+                    }
+                }
+                // TODO Violin/Sven here is the place where we should implement arrays of structs
+                else
+                {
+                    sol_helper::throwSolException("Unsupported type '{}' for array property '{}'!", sol_helper::GetSolTypeName(solArrayType), name);
+                }
+            }
+            else
+            {
+                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", name);
+            }
         }
         else
         {

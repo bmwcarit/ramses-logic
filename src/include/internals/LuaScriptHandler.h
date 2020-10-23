@@ -16,15 +16,15 @@
 
 namespace rlogic::internal
 {
-    class LuaStateImpl;
+    class SolState;
 
     class LuaScriptHandler
     {
     public:
-        explicit LuaScriptHandler(LuaStateImpl& state);
+        explicit LuaScriptHandler(SolState& state);
 
     protected:
-        LuaStateImpl& m_state;
+        SolState& m_state;
 
         static std::string_view GetIndexAsString (const sol::object& index);
 

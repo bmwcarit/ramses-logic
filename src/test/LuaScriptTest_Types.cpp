@@ -45,6 +45,24 @@ namespace rlogic
         EXPECT_FALSE(vec_4i->set<int32_t>(4711));
     }
 
+    TEST_F(ALuaScript_Types, FailsToSetArrayDirectly)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+            end
+
+            function run()
+            end
+        )");
+        auto  array_int = script->getInputs()->getChild("array_int");
+
+        EXPECT_FALSE(array_int->set<float>(4711.f));
+        EXPECT_FALSE(array_int->set<int32_t>(4711));
+        EXPECT_FALSE(array_int->set<bool>(true));
+        EXPECT_FALSE(array_int->set<std::string>("some string"));
+    }
+
     TEST_F(ALuaScript_Types, ProvidesIndexBasedAndNameBasedAccessToInputProperties)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
@@ -121,4 +139,55 @@ namespace rlogic
         EXPECT_EQ(EPropertyType::Vec4i, inputs->getChild(9)->getType());
     }
 
+    TEST_F(ALuaScript_Types, ProvidesFullTypeInformationOnArrayProperties)
+    {
+        std::string_view scriptWithArrays = R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                IN.array_float = ARRAY(3, FLOAT)
+                OUT.array_int = ARRAY(2, INT)
+                OUT.array_float = ARRAY(3, FLOAT)
+            end
+
+            function run()
+            end
+        )";
+
+        auto* script = m_logicEngine.createLuaScriptFromSource(scriptWithArrays);
+
+        std::initializer_list<const Property*> rootProperties = {script->getInputs(), script->getOutputs()};
+
+        for (auto rootProp : rootProperties)
+        {
+            ASSERT_EQ(2u, rootProp->getChildCount());
+            auto in_array_int = rootProp->getChild(0);
+
+            EXPECT_EQ("array_int", in_array_int->getName());
+            EXPECT_EQ(EPropertyType::Array, in_array_int->getType());
+            EXPECT_EQ(2, in_array_int->getChildCount());
+            EXPECT_EQ(EPropertyType::Int32, in_array_int->getChild(0)->getType());
+            EXPECT_EQ(EPropertyType::Int32, in_array_int->getChild(1)->getType());
+            EXPECT_EQ("", in_array_int->getChild(0)->getName());
+            EXPECT_EQ("", in_array_int->getChild(1)->getName());
+            EXPECT_EQ(0, in_array_int->getChild(0)->getChildCount());
+            EXPECT_EQ(0, in_array_int->getChild(1)->getChildCount());
+
+            auto in_array_float = rootProp->getChild(1);
+            EXPECT_EQ("array_float", in_array_float->getName());
+            EXPECT_EQ(EPropertyType::Array, in_array_float->getType());
+            EXPECT_EQ(3, in_array_float->getChildCount());
+            auto in_array_float_0 = in_array_float->getChild(0);
+            auto in_array_float_1 = in_array_float->getChild(1);
+            auto in_array_float_2 = in_array_float->getChild(2);
+            EXPECT_EQ(EPropertyType::Float, in_array_float_0->getType());
+            EXPECT_EQ(EPropertyType::Float, in_array_float_1->getType());
+            EXPECT_EQ(EPropertyType::Float, in_array_float_2->getType());
+            EXPECT_EQ("", in_array_float_0->getName());
+            EXPECT_EQ("", in_array_float_1->getName());
+            EXPECT_EQ("", in_array_float_2->getName());
+            EXPECT_EQ(0, in_array_float_0->getChildCount());
+            EXPECT_EQ(0, in_array_float_1->getChildCount());
+            EXPECT_EQ(0, in_array_float_2->getChildCount());
+        }
+    }
 }

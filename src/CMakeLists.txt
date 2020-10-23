@@ -76,49 +76,56 @@ target_include_directories(ramses-logic-obj
         ${PROJECT_BINARY_DIR}/BuildConfig
 )
 
+FOLDERIZE_TARGETS(ramses-logic-obj)
+
 if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
     target_compile_definitions(ramses-logic-obj PRIVATE RLOGIC_LINK_SHARED_EXPORT=1)
 endif()
 
-
-################## ramses-logic-static ##################
-add_library(ramses-logic-static STATIC)
-add_library(rlogic::ramses-logic-static ALIAS ramses-logic-static)
-target_link_libraries(ramses-logic-static PRIVATE ramses-logic-obj)
-target_link_libraries(ramses-logic-static PUBLIC ${ramses-logic_RAMSES_TARGET})
-target_include_directories(ramses-logic-static PUBLIC include/public)
-set_target_properties(ramses-logic-static PROPERTIES PUBLIC_HEADER "${public_headers}")
-
-################## ramses-logic (shared library) ##################
-add_library(ramses-logic SHARED)
-add_library(rlogic::ramses-logic ALIAS ramses-logic)
-target_link_libraries(ramses-logic PRIVATE ramses-logic-obj)
-target_link_libraries(ramses-logic PUBLIC ${ramses-logic_RAMSES_TARGET})
-target_include_directories(ramses-logic PUBLIC include/public)
-set_target_properties(ramses-logic PROPERTIES
-    PUBLIC_HEADER "${public_headers}"
-    SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-)
-if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
-    target_compile_definitions(ramses-logic PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)
+# Build static lib when top-level project or if explicitly requested by user, or if unit tests are enabled
+if(ramses-logic_BUILD_STATIC_LIB OR ramses-logic_BUILD_TESTS OR CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    ################## ramses-logic-static ##################
+    add_library(ramses-logic-static STATIC)
+    add_library(rlogic::ramses-logic-static ALIAS ramses-logic-static)
+    target_link_libraries(ramses-logic-static PRIVATE ramses-logic-obj)
+    target_link_libraries(ramses-logic-static PUBLIC ${ramses-logic_RAMSES_TARGET})
+    target_include_directories(ramses-logic-static PUBLIC include/public)
+    set_target_properties(ramses-logic-static PROPERTIES PUBLIC_HEADER "${public_headers}")
+    FOLDERIZE_TARGETS(ramses-logic-static)
 endif()
 
-FOLDERIZE_TARGETS(ramses-logic-obj ramses-logic-static ramses-logic)
-
-if(ramses-logic_ENABLE_INSTALL)
-    install(
-        TARGETS ramses-logic
-        EXPORT ramses-logic-targets
-        RUNTIME DESTINATION         ${RLOGIC_INSTALL_RUNTIME_PATH}
-        LIBRARY DESTINATION         ${RLOGIC_INSTALL_LIBRARY_PATH}
-        ARCHIVE DESTINATION         ${RLOGIC_INSTALL_ARCHIVE_PATH}
-        PUBLIC_HEADER DESTINATION   ${RLOGIC_INSTALL_HEADERS_PATH}/ramses-logic
+################## ramses-logic (shared library) ##################
+if(ramses-logic_BUILD_SHARED_LIB)
+    add_library(ramses-logic SHARED)
+    add_library(rlogic::ramses-logic ALIAS ramses-logic)
+    target_link_libraries(ramses-logic PRIVATE ramses-logic-obj)
+    target_link_libraries(ramses-logic PUBLIC ${ramses-logic_RAMSES_TARGET})
+    target_include_directories(ramses-logic PUBLIC include/public)
+    set_target_properties(ramses-logic PROPERTIES
+        PUBLIC_HEADER "${public_headers}"
+        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     )
+    if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
+        target_compile_definitions(ramses-logic PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)
+    endif()
 
-    if (MSVC)
+    FOLDERIZE_TARGETS(ramses-logic)
+
+    if(ramses-logic_ENABLE_INSTALL)
         install(
-            FILES $<TARGET_PDB_FILE:ramses-logic>
-            DESTINATION ${RLOGIC_INSTALL_RUNTIME_PATH} CONFIGURATIONS Debug RelWithDebInfo)
+            TARGETS ramses-logic
+            EXPORT ramses-logic-targets
+            RUNTIME DESTINATION         ${RLOGIC_INSTALL_RUNTIME_PATH}
+            LIBRARY DESTINATION         ${RLOGIC_INSTALL_LIBRARY_PATH}
+            ARCHIVE DESTINATION         ${RLOGIC_INSTALL_ARCHIVE_PATH}
+            PUBLIC_HEADER DESTINATION   ${RLOGIC_INSTALL_HEADERS_PATH}/ramses-logic
+        )
+
+        if (MSVC)
+            install(
+                FILES $<TARGET_PDB_FILE:ramses-logic>
+                DESTINATION ${RLOGIC_INSTALL_RUNTIME_PATH} CONFIGURATIONS Debug RelWithDebInfo)
+        endif()
     endif()
 endif()
 
@@ -150,6 +157,7 @@ if(ramses-logic_BUILD_TESTS)
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/test>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/flatbuffers>
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+            $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/BuildConfig>
     )
 
     MakeTestFromTarget(ramses-logic-test)

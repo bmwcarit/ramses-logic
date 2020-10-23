@@ -15,9 +15,8 @@
 namespace rlogic
 {
     /**
-    * EPropertyType lists the types of properties created and managed by the LogicEngine
-    * class. Currently represent the types supported by LuaScript input/output variables.
-    * TODO Violin extend docs once we have more properties
+    * #EPropertyType lists the types of properties created and managed by the #rlogic::LogicNode
+    * class and its derivates.
     */
     enum class EPropertyType : int
     {
@@ -31,7 +30,8 @@ namespace rlogic
         Vec4i,
         Struct,
         String,
-        Bool
+        Bool,
+        Array
     };
 
     using vec2f = std::array<float, 2>;
@@ -42,7 +42,7 @@ namespace rlogic
     using vec4i = std::array<int, 4>;
 
     /**
-    * Type trait which converts C++ types to EPropertyType enum for primitive types.
+    * Type trait which converts C++ types to #rlogic::EPropertyType enum for primitive types.
     */
     template <typename T> struct PropertyTypeToEnum;
 
@@ -97,9 +97,11 @@ namespace rlogic
     };
 
     /**
-    * Type trait which can be used to check if a property is primitive or not.
-    * Primitive properties can be set or queried for a value, whereas non-primitive
-    * properties can't. See also Property::set() and Property::get()
+    * Type trait which can be used to check if a type is primitive or not.
+    * "primitive" in this context means the type can be used as a template for
+    * #rlogic::Property::set() and #rlogic::Property::get(), i.e. it has a
+    * value which can be directly set/obtained, as opposed to non-primitive types
+    * like structs or arrays which don't have a singular settable value.
     */
     template <typename T> struct IsPrimitiveProperty
     {
@@ -187,6 +189,8 @@ namespace rlogic
             return "STRING";
         case EPropertyType::Bool:
             return "BOOL";
+        case EPropertyType::Array:
+            return "ARRAY";
         }
         return "STRUCT";
     }

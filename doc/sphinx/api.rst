@@ -8,6 +8,7 @@ Overview
 .. note::
 
     Prefer learning by example? Jump straight to the :ref:`examples <List of all examples>`!
+    Looking for a specific class or method? Check the :ref:`class index <Class Index>`
 
 The entry point to ``RAMSES logic`` is a factory-style class :class:`rlogic::LogicEngine` which can
 create instances of all other types of objects supported by ``RAMSES Logic``:
@@ -68,12 +69,87 @@ changed them explicitly, or when any of the inputs is linked to another script's
 
 For more information about ``Lua`` scripts, refer to the :class:`rlogic::LuaScript` class documentation.
 
+The ``interface()`` method enforces static types on the script's interface, while Lua is a dynamically typed
+language. This is meant to make it easier and less error-prone to integrate Lua scripts with C++/Java code,
+which are otherwise statically typed languages. Note that in the example above, the C++ code used get<T> and
+set<T> to interact with the scripts. The underlying :class:`rlogic::Property` class also has a :func:`rlogic::Property::getType`
+method which provides the type of the property as an enum value.
+
 You can :ref:`link scripts <Creating links between scripts>` to form a more sophisticated logic execution graph.
 
 You can :ref:`bind to Ramses objects <Linking scripts to Ramses scenes>` to control a 3D ``Ramses`` scene.
 
 Finally, the :class:`rlogic::LogicEngine` class and all its content can be also saved/loaded from a file. Refer to
 :ref:`the section on saving/loading from files for more details <Saving/Loading from file>`.
+
+==================================================
+Object lifecycle
+==================================================
+
+All objects besides the :class:`rlogic::LogicEngine` instance follow a strict factory pattern.
+An object ``X`` is created by a method of the shape ``X* LogicEngine::createX(...)``. The pointer
+returned shall not be freed or deleted, instead objects must be destroyed by calling :func:`rlogic::LogicEngine::destroy`.
+
+.. note::
+
+    This may seem strange for a library which is based on ``C++17``, but there are good reasons
+    for this design choice. Smart pointers don't work well together with Windows DLL's, specifically
+    when combining different CRTs. In order to provide a stable API on Windows
+    we chose to use raw pointers and hide object creation/deletion behind a pimpl/factory pattern.
+
+The :class:`rlogic::LogicEngine` doesn't create or destroy objects on its own - all data is
+explicitly created by calling ``create`` and ``destroy`` methods. There are two special cases worth mentioning:
+
+* if :class:`rlogic::LogicEngine` is destroyed, all objects are destroyed as well and theirs pointers invalidated
+* :func:`rlogic::LogicEngine::loadFromFile` destroys all objects previously created before the new content is loaded from the file
+
+.. note::
+
+    Loading data from files will invalidate all previous pointers to objects in
+    the:class:`rlogic::LogicEngine`. To avoid that, we recommend generally avoiding using
+    a logicengine instance which already has content to load from files, and instead always
+    create a fresh instance.
+
+==================================================
+Indexing inside and outside Lua
+==================================================
+
+``Lua`` has traditionally used indexing starting at 1, countrary to other popular script or
+programming languages. Thus, the syntax and type checks of the ``Ramses Logic`` runtime honours
+standard indexing used in Lua (starting by 1). This allows for example to use ``Lua`` tables as initializer
+lists for arrays, without having to provide indices. Take a look at the following code sample:
+
+.. code-block:: lua
+    :linenos:
+    :emphasize-lines: 7,9-12,14-17
+
+    function interface()
+        OUT.array = ARRAY(2, INT)
+    end
+
+    function run()
+        -- This will work
+        OUT.array = {11, 12}
+        -- This will also work
+        OUT.array = {
+            [1] = 11,
+            [2] = 12
+        }
+        -- This will not work and will result in error
+        OUT.array = {
+            [0] = 11,
+            [1] = 12
+        }
+    end
+
+The first two snippets are equivalent and will work. The first syntax (line 7) is obviously most convenient - just
+provide all array elements in the Lua table. Note that **Lua will implicitly index elements starting from 1 with this syntax**.
+The second syntax (line 9-12) is equivalent to the first one, but explicitly sets table indices. The third syntax (line 14-17)
+is the one which feels intuitive for ``C/C++`` developers, but will result in errors inside Lua scripts.
+
+In order to achieve memory efficiency, but also to be consistent with ``C/C++`` rules, the ``C++`` API of ``Ramses Logic``
+provides index access starting from 0 (for example :func:`rlogic::Property::getChild`). The index mapping is taken over by
+the ``Ramses Logic`` library.
 
 ==================================================
 Creating links between scripts
@@ -173,29 +249,46 @@ The reason for that is two-fold:
 If you destroy a still linked LogicNode with :func:`rlogic::LogicEngine::destroy`, all links from and to this :class:`rlogic::LogicNode` will
 be removed aswell.
 
+==================================================
+Performance and caching
+==================================================
+
+From performance point of view, it is not necessary to execute each :class:`rlogic::LogicNode` in an update step. LogicNodes with not changed inputs
+since the last update step, can be omitted. This is because the outputs of this :class:`rlogic::LogicNode` should not change if another update will be executed.
+There is one exception to this rule. If a :class:`rlogic::LogicNode` has not been updated before, it will always be updated, no matter whether inputs
+are changed or not.
+As a user you usally don't have to care about this mechanism, you just should know that LogicNode are only executed if at least one input is changed.
+
 =========================
 Error handling
 =========================
 
 Some of the ``RAMSES Logic`` classes' methods can issue errors when used incorrectly or when
-a ``Lua`` script encounters a compile-time or run-time error. Dealing with such errors gracefully
-can be done like this:
+a ``Lua`` script encounters a compile-time or run-time error. Those errors are globally collected
+by the :class:`rlogic::LogicEngine` class and can be obtained by calling :func:`rlogic::LogicEngine::getErrors()`.
+Beware that any of the mutable methods of :class:`rlogic::LogicEngine` clear the previously generated errors
+in the list, so that the list only ever contains the errors since the last method call.
 
-.. code-block::
-    :linenos:
+For code samples which demonstrate how compile-time and runtime errors can be gracefully handled,
+have a look at the :ref:`examples <List of all examples>`.
 
-    #include <iostream>
+==================================================
+Using Lua modules
+==================================================
 
-    ARamsesLogicClass object;
-    bool success = object.doSomething();
-    if(!success)
-    {
-        for(auto& error: object.getErrors())
-        {
-            // Or do something else with the error
-            std::cout << "Encountered error: " << error << std::endl;
-        }
-    }
+The ``Logic Engine`` restricts which Lua modules can be used to the standard modules
+of ``Lua 5.1``:
+
+* Base library
+* String
+* I/O
+* Table
+* Math
+* OS
+* Debug
+
+For more information on the standard modules, refer to the official
+`Lua documentation <https://www.lua.org/manual/5.1/manual.html#5>`_ of the standard modules.
 
 ===============================
 Print messages from within Lua
@@ -557,5 +650,34 @@ List of all examples
 =========================
 Class Index
 =========================
+
+Top-level API classes:
+
+* :class:`rlogic::LogicEngine`
+* :class:`rlogic::LuaScript`
+* :class:`rlogic::RamsesNodeBinding`
+* :class:`rlogic::RamsesAppearanceBinding`
+* :class:`rlogic::Property`
+
+Base classes:
+
+* :class:`rlogic::LogicNode` (base for almost everything)
+* :class:`rlogic::RamsesBinding` (base for all bindings)
+
+Iterators:
+
+* :class:`rlogic::Iterator`
+* :class:`rlogic::Collection`
+
+Free functions:
+
+* :func:`rlogic::GetRamsesLogicVersion`
+* :func:`rlogic::Logger::SetLogHandler`
+* :func:`rlogic::Logger::SetDefaultLogging`
+
+Type traits:
+
+* :struct:`rlogic::PropertyTypeToEnum`
+* :struct:`rlogic::IsPrimitiveProperty`
 
 .. doxygenindex::

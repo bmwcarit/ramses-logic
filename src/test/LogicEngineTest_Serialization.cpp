@@ -34,6 +34,12 @@ namespace rlogic
     class ALogicEngine_Serialization : public ALogicEngine
     {
     protected:
+        void TearDown() override {
+            std::remove("no_version.bin");
+            std::remove("wrong_ramses_version.bin");
+            std::remove("wrong_version.bin");
+            std::remove("LogicEngine.bin");
+        }
     };
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromInvalidFile)

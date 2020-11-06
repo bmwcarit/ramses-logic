@@ -34,6 +34,7 @@
 
 #include "flatbuffers/util.h"
 #include "fmt/format.h"
+#include "internals/impl/LoggerImpl.h"
 
 namespace rlogic::internal
 {
@@ -47,7 +48,7 @@ namespace rlogic::internal
         if (iStream.fail())
         {
             // TODO Violin need to report error here too! Error mechanism needs rethinking
-            m_errors.emplace_back("Failed opening file " + std::string(filename) + "!");
+            m_errors.add("Failed opening file " + std::string(filename) + "!");
             return nullptr;
         }
 
@@ -73,6 +74,32 @@ namespace rlogic::internal
         }
 
         return nullptr;
+    }
+
+    RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(std::string_view name)
+    {
+        m_errors.clear();
+        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(RamsesNodeBindingImpl::Create(name)));
+        auto ramsesBinding = m_ramsesNodeBindings.back().get();
+        m_ramsesBindings.emplace_back(ramsesBinding);
+        setupLogicNodeInternal(*ramsesBinding);
+        return ramsesBinding;
+    }
+
+    RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(std::string_view name)
+    {
+        m_errors.clear();
+        m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(RamsesAppearanceBindingImpl::Create(name)));
+        auto ramsesBinding = m_ramsesAppearanceBindings.back().get();
+        m_ramsesBindings.emplace_back(ramsesBinding);
+        setupLogicNodeInternal(*ramsesBinding);
+        return ramsesBinding;
+    }
+
+    void LogicEngineImpl::setupLogicNodeInternal(LogicNode& logicNode)
+    {
+        m_disconnectedNodes.insert(&logicNode.m_impl.get());
+        m_logicNodes.insert(&logicNode.m_impl.get());
     }
 
     bool LogicEngineImpl::destroy(LogicNode& logicNode)
@@ -107,8 +134,61 @@ namespace rlogic::internal
             }
         }
 
-        m_errors.push_back(fmt::format("Tried to destroy object '{}' with unknown type", logicNode.getName()));
+        m_errors.add(fmt::format("Tried to destroy object '{}' with unknown type", logicNode.getName()));
         return false;
+    }
+
+    bool LogicEngineImpl::destroyInternal(LuaScript& luaScript)
+    {
+        auto scriptIter = find_if(m_scripts.begin(), m_scripts.end(), [&](const std::unique_ptr<LuaScript>& script) {
+            return script.get() == &luaScript;
+        });
+        if (scriptIter == m_scripts.end())
+        {
+            m_errors.add("Can't find script in logic engine!");
+            return false;
+        }
+
+        m_logicNodeGraph.removeLinksForNode((*scriptIter)->m_impl);
+        m_scripts.erase(scriptIter);
+        return true;
+    }
+
+    bool LogicEngineImpl::destroyInternal(RamsesNodeBinding& ramsesNodeBinding)
+    {
+        auto nodeIter = find_if(m_ramsesNodeBindings.begin(), m_ramsesNodeBindings.end(), [&](const std::unique_ptr<RamsesNodeBinding>& nodeBinding)
+            {
+                return nodeBinding.get() == &ramsesNodeBinding;
+            });
+
+        if (nodeIter == m_ramsesNodeBindings.end())
+        {
+            m_errors.add("Can't find RamsesNodeBinding in logic engine!");
+            return false;
+        }
+
+        m_ramsesBindings.erase(std::find(m_ramsesBindings.begin(), m_ramsesBindings.end(), nodeIter->get()));
+        m_ramsesNodeBindings.erase(nodeIter);
+
+        return true;
+    }
+
+    bool LogicEngineImpl::destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding)
+    {
+        auto appearanceIter = find_if(m_ramsesAppearanceBindings.begin(), m_ramsesAppearanceBindings.end(), [&](const std::unique_ptr<RamsesAppearanceBinding>& appearanceBinding) {
+            return appearanceBinding.get() == &ramsesAppearanceBinding;
+            });
+
+        if (appearanceIter == m_ramsesAppearanceBindings.end())
+        {
+            m_errors.add("Can't find RamsesAppearanceBinding in logic engine!");
+            return false;
+        }
+
+        m_ramsesBindings.erase(std::find(m_ramsesBindings.begin(), m_ramsesBindings.end(), appearanceIter->get()));
+        m_ramsesAppearanceBindings.erase(appearanceIter);
+
+        return true;
     }
 
     void LogicEngineImpl::unlinkAll(LogicNode& logicNode)
@@ -144,12 +224,6 @@ namespace rlogic::internal
     }
 
 
-    void LogicEngineImpl::setupLogicNodeInternal(LogicNode& logicNode)
-    {
-        m_disconnectedNodes.insert(&logicNode.m_impl.get());
-        m_logicNodes.insert(&logicNode.m_impl.get());
-    }
-
     std::unordered_set<const LogicNodeImpl*> LogicEngineImpl::getAllLinkedLogicNodesOfInput(PropertyImpl& property)
     {
         std::unordered_set<const LogicNodeImpl*> linkedLogicNodes;
@@ -158,7 +232,7 @@ namespace rlogic::internal
 
             for (size_t i = 0; i < inputCount; ++i)
             {
-                const auto childProperty        = property.getChild(i);
+                const auto childProperty = property.getChild(i);
                 const auto linkedProperty = m_logicNodeConnector.getLinkedOutput(*childProperty->m_impl);
                 if (nullptr != linkedProperty)
                 {
@@ -179,7 +253,7 @@ namespace rlogic::internal
 
             for (size_t i = 0; i < outputCount; ++i)
             {
-                const auto childProperty  = property.getChild(i);
+                const auto childProperty = property.getChild(i);
                 const auto linkedProperty = m_logicNodeConnector.getLinkedInput(*childProperty->m_impl);
                 if (nullptr != linkedProperty)
                 {
@@ -192,82 +266,9 @@ namespace rlogic::internal
         return linkedLogicNodes;
     }
 
-    bool LogicEngineImpl::destroyInternal(LuaScript& luaScript)
-    {
-        auto scriptIter = find_if(m_scripts.begin(), m_scripts.end(), [&](const std::unique_ptr<LuaScript>& script) {
-            return script.get() == &luaScript;
-        });
-        if (scriptIter == m_scripts.end())
-        {
-            m_errors.emplace_back("Can't find script in logic engine!");
-            return false;
-        }
-
-        m_logicNodeGraph.removeLinksForNode((*scriptIter)->m_impl);
-        m_scripts.erase(scriptIter);
-        return true;
-    }
-
-    RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(std::string_view name)
-    {
-        m_errors.clear();
-        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(RamsesNodeBindingImpl::Create(name)));
-        auto ramsesBinding = m_ramsesNodeBindings.back().get();
-        m_ramsesBindings.emplace_back(ramsesBinding);
-        setupLogicNodeInternal(*ramsesBinding);
-        return ramsesBinding;
-    }
-
     bool LogicEngineImpl::isLinked(const LogicNode& logicNode) const
     {
         return m_disconnectedNodes.find(&logicNode.m_impl.get()) == m_disconnectedNodes.end();
-    }
-
-    bool LogicEngineImpl::destroyInternal(RamsesNodeBinding& ramsesNodeBinding)
-    {
-        auto nodeIter = find_if(m_ramsesNodeBindings.begin(), m_ramsesNodeBindings.end(), [&](const std::unique_ptr<RamsesNodeBinding>& nodeBinding)
-        {
-            return nodeBinding.get() == &ramsesNodeBinding;
-        });
-
-        if (nodeIter == m_ramsesNodeBindings.end())
-        {
-            m_errors.emplace_back("Can't find RamsesNodeBinding in logic engine!");
-            return false;
-        }
-
-        m_ramsesBindings.erase(std::find(m_ramsesBindings.begin(), m_ramsesBindings.end(), nodeIter->get()));
-        m_ramsesNodeBindings.erase(nodeIter);
-
-        return true;
-    }
-
-    RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(std::string_view name)
-    {
-        m_errors.clear();
-        m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(RamsesAppearanceBindingImpl::Create(name)));
-        auto ramsesBinding =  m_ramsesAppearanceBindings.back().get();
-        m_ramsesBindings.emplace_back(ramsesBinding);
-        setupLogicNodeInternal(*ramsesBinding);
-        return ramsesBinding;
-    }
-
-    bool LogicEngineImpl::destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding)
-    {
-        auto appearanceIter = find_if(m_ramsesAppearanceBindings.begin(), m_ramsesAppearanceBindings.end(), [&](const std::unique_ptr<RamsesAppearanceBinding>& appearanceBinding) {
-            return appearanceBinding.get() == &ramsesAppearanceBinding;
-        });
-
-        if (appearanceIter == m_ramsesAppearanceBindings.end())
-        {
-            m_errors.emplace_back("Can't find RamsesAppearanceBinding in logic engine!");
-            return false;
-        }
-
-        m_ramsesBindings.erase(std::find(m_ramsesBindings.begin(), m_ramsesBindings.end(), appearanceIter->get()));
-        m_ramsesAppearanceBindings.erase(appearanceIter);
-
-        return true;
     }
 
     void LogicEngineImpl::updateLinksRecursive(Property& inputProperty)
@@ -297,17 +298,26 @@ namespace rlogic::internal
     bool LogicEngineImpl::update(bool disableDirtyTracking)
     {
         m_errors.clear();
+        LOG_DEBUG("Begin update");
 
         for (auto unlinkedNode : m_disconnectedNodes)
         {
             if (disableDirtyTracking || unlinkedNode->isDirty())
             {
+                LOG_DEBUG("Updating LogicNode '{}'", unlinkedNode->getName());
                 if (!unlinkedNode->update())
                 {
                     const auto& errors = unlinkedNode->getErrors();
-                    m_errors.insert(m_errors.end(), errors.begin(), errors.end());
+                    for (const auto& error : errors)
+                    {
+                        m_errors.add(error);
+                    }
                     return false;
                 }
+            }
+            else
+            {
+                LOG_DEBUG("Skip update of LogicNode '{}' because no input has changed since the last update", unlinkedNode->getName());
             }
             unlinkedNode->setDirty(false);
         }
@@ -318,12 +328,20 @@ namespace rlogic::internal
 
             if (disableDirtyTracking || logicNode->isDirty())
             {
+                LOG_DEBUG("Updating LogicNode '{}'", logicNode->getName());
                 if (!logicNode->update())
                 {
                     const auto& errors = logicNode->getErrors();
-                    m_errors.insert(m_errors.end(), errors.begin(), errors.end());
+                    for (const auto& error : errors)
+                    {
+                        m_errors.add(error);
+                    }
                     return false;
                 }
+            }
+            else
+            {
+                LOG_DEBUG("Skip update of LogicNode '{}' because no input has changed since the last update", logicNode->getName());
             }
             logicNode->setDirty(false);
         }
@@ -333,9 +351,14 @@ namespace rlogic::internal
             updateLinksRecursive(*ramsesBinding->getInputs());
             if (disableDirtyTracking || ramsesBinding->m_impl.get().isDirty())
             {
+                LOG_DEBUG("Updating RamsesBinding '{}'", ramsesBinding->getName());
                 bool success = ramsesBinding->m_impl.get().update();
                 assert(success && "Bindings update can never fail!");
                 (void)success;
+            }
+            else
+            {
+                LOG_DEBUG("Skip update of RamsesBinding '{}' because no input has changed since the last update", ramsesBinding->getName());
             }
             ramsesBinding->m_impl.get().setDirty(false);
         }
@@ -344,7 +367,7 @@ namespace rlogic::internal
 
     const std::vector<std::string>& LogicEngineImpl::getErrors() const
     {
-        return m_errors;
+        return m_errors.getErrors();
     }
 
     bool LogicEngineImpl::CheckLogicVersionFromFile(const rlogic_serialization::Version& version)
@@ -379,7 +402,7 @@ namespace rlogic::internal
         std::string buf;
         if (!flatbuffers::LoadFile(sFilename.c_str(), true, &buf))
         {
-            m_errors.emplace_back(fmt::format("Failed to load file '{}'", sFilename));
+            m_errors.add(fmt::format("Failed to load file '{}'", sFilename));
             return false;
         }
 
@@ -387,14 +410,14 @@ namespace rlogic::internal
 
         if (nullptr == logicEngine || nullptr == logicEngine->ramsesVersion() || nullptr == logicEngine->rlogicVersion())
         {
-            m_errors.emplace_back(fmt::format("File '{}' doesn't contain logic engine data with readable version specifiers", sFilename));
+            m_errors.add(fmt::format("File '{}' doesn't contain logic engine data with readable version specifiers", sFilename));
             return false;
         }
 
         const auto& ramsesVersion = *logicEngine->ramsesVersion();
         if (!CheckRamsesVersionFromFile(ramsesVersion))
         {
-            m_errors.emplace_back(fmt::format("Version mismatch while loading file '{}'! Expected Ramses version {}.x.x but found {} in file",
+            m_errors.add(fmt::format("Version mismatch while loading file '{}'! Expected Ramses version {}.x.x but found {} in file",
                 sFilename, ramses::GetRamsesVersion().major,
                 ramsesVersion.v_string()->string_view()));
             return false;
@@ -403,7 +426,7 @@ namespace rlogic::internal
         const auto& rlogicVersion = *logicEngine->rlogicVersion();
         if (!CheckLogicVersionFromFile(rlogicVersion))
         {
-            m_errors.emplace_back(fmt::format("Version mismatch while loading file '{}'! Expected version {}.{}.x but found {} in file",
+            m_errors.add(fmt::format("Version mismatch while loading file '{}'! Expected version {}.{}.x but found {} in file",
                 sFilename, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
                 rlogicVersion.v_string()->string_view()));
             return false;
@@ -563,7 +586,7 @@ namespace rlogic::internal
             const bool success = link(*sourceProperty, *targetProperty);
             if (!success)
             {
-                m_errors.emplace_back(
+                m_errors.add(
                     fmt::format("Fatal error during loading from file! Could not link property '{}' (from LogicNode {}) to property '{}' (from LogicNode {})!",
                         sourceProperty->getName(),
                         srcLogicNode->getName(),
@@ -581,7 +604,7 @@ namespace rlogic::internal
     {
         if (nullptr == scene)
         {
-            m_errors.emplace_back(
+            m_errors.add(
                 fmt::format("Fatal error during loading from file! Serialized ramses logic object '{}' points to a Ramses object (id: {}) , but no Ramses scene was provided to resolve the Ramses object!",
                             logicNode->name()->string_view().data(),
                             objectId.getValue()
@@ -593,7 +616,7 @@ namespace rlogic::internal
 
         if (nullptr == sceneObject)
         {
-            m_errors.emplace_back(
+            m_errors.add(
                 fmt::format("Fatal error during loading from file! Serialized ramses logic object {} points to a Ramses object (id: {}) which couldn't be found in the provided scene!",
                             logicNode->name()->string_view().data(),
                             objectId.getValue()));
@@ -620,7 +643,7 @@ namespace rlogic::internal
         {
             // Can't be unit tested directly unfortunately because there is no way to force ramses to recreate an object with the same ID
             // But in order to be safe, we have to check that the cast to Node worked here
-            m_errors.emplace_back("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!");
+            m_errors.add("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!");
         }
 
         return std::make_optional(ramsesNode);
@@ -643,7 +666,7 @@ namespace rlogic::internal
         {
             // Can't be unit tested directly unfortunately because there is no way to force ramses to recreate an object with the same ID
             // But in order to be safe, we have to check that the cast to Node worked here
-            m_errors.emplace_back("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!");
+            m_errors.add("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!");
         }
 
         return std::make_optional(ramsesAppearance);
@@ -817,19 +840,19 @@ namespace rlogic::internal
 
         if (m_logicNodes.find(&sourceProperty.m_impl->getLogicNode()) == m_logicNodes.end())
         {
-            m_errors.emplace_back(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", sourceProperty.m_impl->getLogicNode().getName()));
+            m_errors.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", sourceProperty.m_impl->getLogicNode().getName()));
             return false;
         }
 
         if (m_logicNodes.find(&targetProperty.m_impl->getLogicNode()) == m_logicNodes.end())
         {
-            m_errors.emplace_back(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", targetProperty.m_impl->getLogicNode().getName()));
+            m_errors.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", targetProperty.m_impl->getLogicNode().getName()));
             return false;
         }
 
         if (&sourceProperty.m_impl->getLogicNode() == &targetProperty.m_impl->getLogicNode())
         {
-            m_errors.emplace_back("SourceNode and TargetNode are equal");
+            m_errors.add("SourceNode and TargetNode are equal");
             return false;
         }
 
@@ -838,13 +861,13 @@ namespace rlogic::internal
         {
             std::string_view lhsType = sourceProperty.m_impl->isOutput() ? "output" : "input";
             std::string_view rhsType = targetProperty.m_impl->isOutput() ? "output" : "input";
-            m_errors.emplace_back(fmt::format("Failed to link {} property '{}' to {} property '{}'. Only outputs can be linked to inputs", lhsType, sourceProperty.getName(), rhsType, targetProperty.getName()));
+            m_errors.add(fmt::format("Failed to link {} property '{}' to {} property '{}'. Only outputs can be linked to inputs", lhsType, sourceProperty.getName(), rhsType, targetProperty.getName()));
             return false;
         }
 
         if (sourceProperty.getType() != targetProperty.getType())
         {
-            m_errors.emplace_back(fmt::format("Types of source property '{}:{}' does not match target property '{}:{}'",
+            m_errors.add(fmt::format("Types of source property '{}:{}' does not match target property '{}:{}'",
                                               sourceProperty.getName(),
                                               GetLuaPrimitiveTypeName(sourceProperty.getType()),
                                               targetProperty.getName(),
@@ -855,7 +878,7 @@ namespace rlogic::internal
         // TODO Violin solve this in a more generic way, it will break as soon as we add other complex types
         if (sourceProperty.getType() == EPropertyType::Struct && targetProperty.getType() == EPropertyType::Struct)
         {
-            m_errors.emplace_back(fmt::format("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked"));
+            m_errors.add(fmt::format("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked"));
             return false;
         }
 
@@ -868,7 +891,7 @@ namespace rlogic::internal
 
         if(!m_logicNodeConnector.link(*_sourceProperty.m_impl, *_targetProperty.m_impl))
         {
-            m_errors.emplace_back(fmt::format("The property '{}' of LogicNode '{}' is already linked to the property '{}' of LogicNode '{}'",
+            m_errors.add(fmt::format("The property '{}' of LogicNode '{}' is already linked to the property '{}' of LogicNode '{}'",
                                               sourceProperty.getName(),
                                               sourceNode.getName(),
                                               targetProperty.getName(),
@@ -894,7 +917,7 @@ namespace rlogic::internal
 
         if(!m_logicNodeConnector.unlink(*_targetProperty.m_impl))
         {
-            m_errors.emplace_back(fmt::format("No link available from source property '{}' to target property '{}'", sourceProperty.getName(), targetProperty.getName()));
+            m_errors.add(fmt::format("No link available from source property '{}' to target property '{}'", sourceProperty.getName(), targetProperty.getName()));
             return false;
         }
 
@@ -912,11 +935,18 @@ namespace rlogic::internal
             m_disconnectedNodes.insert(&targetNode);
         }
 
+        m_logicNodeGraph.removeLink(sourceNode, targetNode);
+
         return true;
     }
 
     const LogicNodeConnector& LogicEngineImpl::getLogicNodeConnector() const
     {
         return m_logicNodeConnector;
+    }
+
+    const LogicNodeGraph& LogicEngineImpl::getLogicNodeGraph() const
+    {
+        return m_logicNodeGraph;
     }
 }

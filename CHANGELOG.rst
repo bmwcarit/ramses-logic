@@ -3,6 +3,25 @@ master
 ======
 
 ======
+v0.3.1
+======
+
+**Bugfixes**
+
+* Fixed a bug which caused a crash when unlinking and destroying nodes
+* Upgrade ramses from 26.0.4 -> 26.0.6 (fixes important resource creation bug)
+
+**Improvements**
+
+* Property::set<T> and Property::get<T>  trigger a  static assert when used with the wrong type T
+* Add a few debug logs, mainly aimed at debugging if/when logic nodes are updated based on their input changes (only published on custom logger)
+* Errors are now also logged in the order of their appearance, both in console logger and in custom logger
+
+**Dependencies**
+
+* Updated googletest to a newer version (fixes some clang-tidy issues)
+
+======
 v0.3.0
 ======
 

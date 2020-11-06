@@ -18,8 +18,12 @@
 namespace rlogic
 {
     class ALogicEngine_Factory : public ALogicEngine
-
     {
+    protected:
+        void TearDown() override {
+            std::remove("empty.lua");
+            std::remove("valid.lua");
+        }
     };
 
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenCreatingEmptyScript)

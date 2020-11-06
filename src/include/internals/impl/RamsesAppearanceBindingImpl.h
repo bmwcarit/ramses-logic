@@ -35,12 +35,13 @@ namespace flatbuffers
 namespace rlogic::internal
 {
     class PropertyImpl;
+    class ErrorReporting;
 
     class RamsesAppearanceBindingImpl : public RamsesBindingImpl
     {
     public:
         static std::unique_ptr<RamsesAppearanceBindingImpl> Create(std::string_view name);
-        static std::unique_ptr<RamsesAppearanceBindingImpl> Create(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, std::vector<std::string>& errorsOut);
+        static std::unique_ptr<RamsesAppearanceBindingImpl> Create(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, ErrorReporting& errorReporting);
 
         void setRamsesAppearance(ramses::Appearance* appearance);
         ramses::Appearance* getRamsesAppearance() const;
@@ -58,7 +59,7 @@ namespace rlogic::internal
         std::unordered_map<PropertyImpl*, std::unique_ptr<ramses::UniformInput>> m_propertyToUniformInput;
 
         void setInputValueToUniform(PropertyImpl* property);
-        static bool AppearanceCompatibleWithDeserializedInputs(PropertyImpl& deserializedInputs, ramses::Appearance& appearance, std::vector<std::string>& errorsOut);
+        static bool AppearanceCompatibleWithDeserializedInputs(PropertyImpl& deserializedInputs, ramses::Appearance& appearance, ErrorReporting& errorReporting);
         void populatePropertyMappingCache(ramses::Appearance& appearance);
         void createInputProperties(ramses::Appearance& appearance);
     };

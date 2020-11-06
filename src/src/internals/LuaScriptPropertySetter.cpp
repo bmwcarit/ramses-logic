@@ -42,13 +42,14 @@ namespace rlogic::internal
             // This is equivalent to SetTable, but is needed when the right side is a custom type, not a Lua table
             // For example when assigning OUT.someStruct = IN.someStruct
 
-            if (!value.is<LuaScriptPropertyHandler>())
+            sol::optional<LuaScriptPropertyHandler> maybeStructPropertyHandler = value.as<sol::optional<LuaScriptPropertyHandler>>();
+            if (!maybeStructPropertyHandler)
             {
                 // TODO Violin this error message can be made more concrete if we refactor how we deal with userdata (See TODO at the top of the file)
                 sol_helper::throwSolException("Unexpected object type assigned to property '{}'!", property.getName());
             }
 
-            LuaScriptPropertyHandler& structPropertyHandler = value.as<LuaScriptPropertyHandler>();
+            LuaScriptPropertyHandler& structPropertyHandler = *maybeStructPropertyHandler;
             // TODO (Violin/Sven) this error check and switch can be probably simplified a lot by overloading the PropertyImpl assignment operator and using it, instead of
             // going over Lua/Sol here - in the end, we are juggling C++ objects, might as well treat them as such
 

@@ -13,6 +13,7 @@
 #include "ramses-client-api/UniformInput.h"
 
 #include "internals/RamsesHelper.h"
+#include "internals/ErrorReporting.h"
 
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/Property.h"
@@ -42,7 +43,7 @@ namespace rlogic::internal
         return std::unique_ptr<RamsesAppearanceBindingImpl>(new RamsesAppearanceBindingImpl(name));
     }
 
-    bool RamsesAppearanceBindingImpl::AppearanceCompatibleWithDeserializedInputs(PropertyImpl& deserializedInputs, ramses::Appearance& appearance, std::vector<std::string>& errorsOut)
+    bool RamsesAppearanceBindingImpl::AppearanceCompatibleWithDeserializedInputs(PropertyImpl& deserializedInputs, ramses::Appearance& appearance, ErrorReporting& errorReporting)
     {
         const ramses::Effect& effect = appearance.getEffect();
 
@@ -52,7 +53,7 @@ namespace rlogic::internal
             ramses::UniformInput uniformInput;
             if (ramses::StatusOK != effect.findUniformInput(input->getName().data(), uniformInput))
             {
-                errorsOut.emplace_back(fmt::format("Fatal error while loading from file: ramses appearance binding input (Name: {}) was not found in appearance '{}'!)",
+                errorReporting.add(fmt::format("Fatal error while loading from file: ramses appearance binding input (Name: {}) was not found in appearance '{}'!)",
                     input->getName(), appearance.getName()));
                 return false;
             }
@@ -60,7 +61,7 @@ namespace rlogic::internal
             if (!maybeSupportedUniformType || input->getType() != *maybeSupportedUniformType)
             {
                 const std::string typeMismatchLog = maybeSupportedUniformType ? GetLuaPrimitiveTypeName(*maybeSupportedUniformType) : "unsupported type";
-                errorsOut.emplace_back(fmt::format("Fatal error while loading from file: ramses appearance binding input (Name: {}) is expected to be of type {}, but instead it is {}!)",
+                errorReporting.add(fmt::format("Fatal error while loading from file: ramses appearance binding input (Name: {}) is expected to be of type {}, but instead it is {}!)",
                     input->getName(), GetLuaPrimitiveTypeName(input->getType()), typeMismatchLog));
                 return false;
             }
@@ -69,7 +70,7 @@ namespace rlogic::internal
         return true;
     }
 
-    std::unique_ptr<RamsesAppearanceBindingImpl> RamsesAppearanceBindingImpl::Create(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, std::vector<std::string>& errorsOut)
+    std::unique_ptr<RamsesAppearanceBindingImpl> RamsesAppearanceBindingImpl::Create(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, ErrorReporting& errorReporting)
     {
         // TODO Test with large scene how much overhead it is to store lots of bindings with empty names
         assert(nullptr != appearanceBinding.logicnode());
@@ -79,7 +80,7 @@ namespace rlogic::internal
         std::unique_ptr<PropertyImpl> inputsImpl = PropertyImpl::Create(appearanceBinding.logicnode()->inputs(), EInputOutputProperty::Input);
         if (nullptr != appearance)
         {
-            if (!AppearanceCompatibleWithDeserializedInputs(*inputsImpl, *appearance, errorsOut))
+            if (!AppearanceCompatibleWithDeserializedInputs(*inputsImpl, *appearance, errorReporting))
             {
                 return nullptr;
             }
@@ -91,7 +92,7 @@ namespace rlogic::internal
 
         if (inputsImpl->getChildCount() != 0u)
         {
-            errorsOut.emplace_back(fmt::format("Fatal error while loading from file: appearance binding (name: {}) has stored inputs, but a ramses appearance (id: {}) could not be resolved",
+            errorReporting.add(fmt::format("Fatal error while loading from file: appearance binding (name: {}) has stored inputs, but a ramses appearance (id: {}) could not be resolved",
                 appearanceBinding.logicnode()->name()->string_view(),
                 appearanceBinding.ramsesAppearance()));
             return nullptr;

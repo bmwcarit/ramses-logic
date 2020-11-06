@@ -11,6 +11,7 @@ extends: default
 
 ignore: |
     /external/
+    /.github/workflows/
 
 rules:
     line-length: disable

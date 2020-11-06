@@ -12,6 +12,7 @@
 
 #include "internals/LogicNodeGraph.h"
 #include "internals/LogicNodeConnector.h"
+#include "internals/ErrorReporting.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 
@@ -93,11 +94,12 @@ namespace rlogic::internal
         bool isLinked(const LogicNode& logicNode) const;
 
         // For testing only
+        const LogicNodeGraph& getLogicNodeGraph() const;
         const LogicNodeConnector& getLogicNodeConnector() const;
 
     private:
         SolState                            m_luaState;
-        std::vector<std::string>            m_errors;
+        ErrorReporting                      m_errors;
         // TODO Sven move the containers to store instances to seperate resource manager
         ScriptsContainer                    m_scripts;
         NodeBindingsContainer               m_ramsesNodeBindings;

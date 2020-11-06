@@ -102,24 +102,24 @@ namespace rlogic
         * #rlogic::IsPrimitiveProperty where IsPrimitiveProperty<T>::value == true for a type T.
         *
         * Attention! We recommend always specifying the template argument T explicitly, and don't rely on the compiler's
-        * type deduction! If T is not one of the supported types, a linker error will be issued!
+        * type deduction! If T is not one of the supported types, a static_assert will be triggered!
         *
-        * If the template type and the internal type do not match, std::nullopt will be returned.
+        * Returns nullopt if the template type T does not match the internal type of the property.
         *
         * @return the value of this Property as std::optional or std::nullopt if T does not match.
         */
-        template <typename T> RLOGIC_API std::optional<T> get() const;
+        template <typename T> std::optional<T> get() const;
 
         /**
         * Sets the value of this Property. Same rules apply to template parameter T as in #get()
         *
         * Attention! We recommend always specifying the template argument T explicitly, and don't rely on the compiler's
-        * type deduction! If T is not one of the supported types, a linker error will be issued!
+        * type deduction! If T is not one of the supported types, a static_assert will be triggered!
         *
         * @param value the value to set for this Property
         * @return true if setting the \p value was successful, false otherwise.
         */
-        template <typename T> RLOGIC_API bool set(T value);
+        template <typename T> bool set(T value);
 
         /**
         * Constructor of Property. User is not supposed to call this - properties are created by other factory classes
@@ -162,5 +162,26 @@ namespace rlogic
         */
         std::unique_ptr<internal::PropertyImpl> m_impl;
 
+    private:
+        /**
+         * Internal implementation of #get
+         */
+        template <typename T> RLOGIC_API std::optional<T> getInternal() const;
+        /**
+         * Internal implementation of #set
+         */
+        template <typename T> RLOGIC_API bool setInternal(T value);
     };
+
+    template <typename T> std::optional<T> Property::get() const
+    {
+        static_assert(IsPrimitiveProperty<T>::value, "Call get<T> only with types which have a value! Read the docs of the method!");
+        return getInternal<T>();
+    }
+
+    template <typename T> bool Property::set(T value)
+    {
+        static_assert(IsPrimitiveProperty<T>::value, "Call set<T> only with types which have a value! Read the docs of the method!");
+        return setInternal<T>(value);
+    }
 }

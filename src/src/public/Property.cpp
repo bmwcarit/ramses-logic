@@ -53,13 +53,13 @@ namespace rlogic
         return m_impl->getChild(name);
     }
 
-    template <typename T> std::optional<T> Property::get() const
+    template <typename T> std::optional<T> Property::getInternal() const
     {
         return m_impl->get<T>();
     }
 
     template<typename T>
-    bool Property::set(T value)
+    bool Property::setInternal(T value)
     {
         return m_impl->set<T>(value);
     }
@@ -68,25 +68,25 @@ namespace rlogic
     // we assert the two types are equivalent on the platform/compiler
     static_assert(std::is_same<int32_t, int>::value, "int32_t must be the same type as int");
 
-    template RLOGIC_API std::optional<float>       Property::get<float>() const;
-    template RLOGIC_API std::optional<vec2f>       Property::get<vec2f>() const;
-    template RLOGIC_API std::optional<vec3f>       Property::get<vec3f>() const;
-    template RLOGIC_API std::optional<vec4f>       Property::get<vec4f>() const;
-    template RLOGIC_API std::optional<int32_t>     Property::get<int32_t>() const;
-    template RLOGIC_API std::optional<vec2i>       Property::get<vec2i>() const;
-    template RLOGIC_API std::optional<vec3i>       Property::get<vec3i>() const;
-    template RLOGIC_API std::optional<vec4i>       Property::get<vec4i>() const;
-    template RLOGIC_API std::optional<std::string> Property::get<std::string>() const;
-    template RLOGIC_API std::optional<bool>        Property::get<bool>() const;
+    template RLOGIC_API std::optional<float>       Property::getInternal<float>() const;
+    template RLOGIC_API std::optional<vec2f>       Property::getInternal<vec2f>() const;
+    template RLOGIC_API std::optional<vec3f>       Property::getInternal<vec3f>() const;
+    template RLOGIC_API std::optional<vec4f>       Property::getInternal<vec4f>() const;
+    template RLOGIC_API std::optional<int32_t>     Property::getInternal<int32_t>() const;
+    template RLOGIC_API std::optional<vec2i>       Property::getInternal<vec2i>() const;
+    template RLOGIC_API std::optional<vec3i>       Property::getInternal<vec3i>() const;
+    template RLOGIC_API std::optional<vec4i>       Property::getInternal<vec4i>() const;
+    template RLOGIC_API std::optional<std::string> Property::getInternal<std::string>() const;
+    template RLOGIC_API std::optional<bool>        Property::getInternal<bool>() const;
 
-    template RLOGIC_API bool Property::set<float>(float /*value*/);
-    template RLOGIC_API bool Property::set<vec2f>(vec2f /*value*/);
-    template RLOGIC_API bool Property::set<vec3f>(vec3f /*value*/);
-    template RLOGIC_API bool Property::set<vec4f>(vec4f /*value*/);
-    template RLOGIC_API bool Property::set<int32_t>(int32_t /*value*/);
-    template RLOGIC_API bool Property::set<vec2i>(vec2i /*value*/);
-    template RLOGIC_API bool Property::set<vec3i>(vec3i /*value*/);
-    template RLOGIC_API bool Property::set<vec4i>(vec4i /*value*/);
-    template RLOGIC_API bool Property::set<std::string>(std::string /*value*/);
-    template RLOGIC_API bool Property::set<bool>(bool /*value*/);
+    template RLOGIC_API bool Property::setInternal<float>(float /*value*/);
+    template RLOGIC_API bool Property::setInternal<vec2f>(vec2f /*value*/);
+    template RLOGIC_API bool Property::setInternal<vec3f>(vec3f /*value*/);
+    template RLOGIC_API bool Property::setInternal<vec4f>(vec4f /*value*/);
+    template RLOGIC_API bool Property::setInternal<int32_t>(int32_t /*value*/);
+    template RLOGIC_API bool Property::setInternal<vec2i>(vec2i /*value*/);
+    template RLOGIC_API bool Property::setInternal<vec3i>(vec3i /*value*/);
+    template RLOGIC_API bool Property::setInternal<vec4i>(vec4i /*value*/);
+    template RLOGIC_API bool Property::setInternal<std::string>(std::string /*value*/);
+    template RLOGIC_API bool Property::setInternal<bool>(bool /*value*/);
 }

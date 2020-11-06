@@ -16,15 +16,16 @@
 
 /**
  * Interface to interact with the internal logger. If you want to handle log messages by yourself, you can
- * register an own log handler function with rlogic::Logger::SetLogHandler, which is called each time
+ * register your own log handler function with #rlogic::Logger::SetLogHandler, which is called each time
  * a log message is logged. In addition you can silence the standard output of the log messages
  */
 namespace rlogic::Logger
 {
     /**
-    * The LogHandlerFunc can be used to implement an own log handler. The
-    * function is called each time a log message occurs. After the call to the function
-    * the message is invalid. If you want to keep the message, you can store it in a std::string.
+    * The #LogHandlerFunc can be used to implement a custom log handler. The
+    * function is called for each log message separately. After the call to the function
+    * the string data behind std::string_view is deleted. If you want to keep it, you must
+    * copy it e.g. to a std::string.
     * E.g.
     * \code{.cpp}
     *   rlogic::Logger::SetLogHandler([](ElogMessageType msgType, std::string_view message){
@@ -36,15 +37,17 @@ namespace rlogic::Logger
 
     /**
     * Sets a custom log handler function, which is called each time a log message occurs.
+    * Note: setting a custom logger incurs a slight performance cost because log messages
+    * will be assembled and reported, even if default logging is disabled (#SetDefaultLogging).
     *
-    * @ param logHandlerFunc which is called for each log message
+    * @ param logHandlerFunc function which is called for each log message
     */
     RLOGIC_API void SetLogHandler(const LogHandlerFunc& logHandlerFunc);
 
     /**
-    * Sets the default logging to std::out to enabled or disabled
+    * Sets the default logging to std::out to enabled or disabled. Enabled by default.
     *
-    * @param loggingEnabled state for logging to std::out.
+    * @param loggingEnabled true if you want to enable logging to std::out, false otherwise
     */
     RLOGIC_API void SetDefaultLogging(bool loggingEnabled);
 }

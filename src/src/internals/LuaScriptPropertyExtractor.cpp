@@ -113,9 +113,10 @@ namespace rlogic::internal
         }
         else if (solType == sol::type::userdata)
         {
-            if (propertyValue.is<ArrayTypeInfo>())
+            const sol::optional<ArrayTypeInfo> maybeArrayTypeInfo = propertyValue.as<sol::optional<ArrayTypeInfo>>();
+            if (maybeArrayTypeInfo)
             {
-                auto& arrayTypeInfo = propertyValue.as<ArrayTypeInfo>();
+                const ArrayTypeInfo& arrayTypeInfo = *maybeArrayTypeInfo;
                 const sol::object& arrayType = arrayTypeInfo.arrayType;
 
                 const sol::type solArrayType = arrayType.get_type();

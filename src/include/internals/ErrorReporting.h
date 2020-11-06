@@ -8,19 +8,21 @@
 
 #pragma once
 
-#include <cassert>
+#include <vector>
+#include <string>
 
-namespace rlogic
+namespace rlogic::internal
 {
-    /**
-     * ELogMessageType lists the types of available log messages. The integer represents the
-     * priority of the log messages (lower means more important and higher priority).
-     */
-    enum class ELogMessageType : int
+    class ErrorReporting
     {
-        ERROR = 2,
-        WARNING = 3,
-        INFO = 4,
-        DEBUG = 5,
+    public:
+
+        void clear();
+        void add(std::string errorMessage);
+
+        const std::vector<std::string>& getErrors() const;
+
+    private:
+        std::vector<std::string> m_errors;
     };
 }

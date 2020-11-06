@@ -14,6 +14,7 @@
 #include "internals/LuaScriptPropertyExtractor.h"
 #include "internals/LuaScriptPropertyHandler.h"
 #include "internals/SolHelper.h"
+#include "internals/ErrorReporting.h"
 
 #include "generated/luascript_gen.h"
 
@@ -21,7 +22,7 @@
 
 namespace rlogic::internal
 {
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut)
+    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting)
     {
         std::string chunkname = BuildChunkName(scriptName, filename);
         sol::load_result load_result = solState.loadScript(source, chunkname);
@@ -29,7 +30,7 @@ namespace rlogic::internal
         if (!load_result.valid())
         {
             sol::error error = load_result;
-            errorsOut.emplace_back(error.what());
+            errorReporting.add(error.what());
             return nullptr;
         }
 
@@ -43,7 +44,7 @@ namespace rlogic::internal
         if (!main_result.valid())
         {
             sol::error error = main_result;
-            errorsOut.emplace_back(error.what());
+            errorReporting.add(error.what());
             return nullptr;
         }
 
@@ -51,7 +52,7 @@ namespace rlogic::internal
 
         if (!intf.valid())
         {
-            errorsOut.emplace_back("No 'interface' method defined in the script");
+            errorReporting.add("No 'interface' method defined in the script");
             return nullptr;
         }
 
@@ -59,7 +60,7 @@ namespace rlogic::internal
 
         if (!run.valid())
         {
-            errorsOut.emplace_back("No 'run' method defined in the script");
+            errorReporting.add("No 'run' method defined in the script");
             return nullptr;
         }
 
@@ -74,7 +75,7 @@ namespace rlogic::internal
         if (!intfResult.valid())
         {
             sol::error error = intfResult;
-            errorsOut.emplace_back(error.what());
+            errorReporting.add(error.what());
             return nullptr;
         }
 
@@ -106,7 +107,7 @@ namespace rlogic::internal
         return chunkname;
     }
 
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut)
+    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, ErrorReporting& errorReporting)
     {
         assert(nullptr != luaScript);
         assert(nullptr != luaScript->filename());
@@ -130,14 +131,14 @@ namespace rlogic::internal
         auto inputs = PropertyImpl::Create(luaScript->logicnode()->inputs(), EInputOutputProperty::Input);
         if (nullptr == inputs)
         {
-            errorsOut.emplace_back("Error during deserialization of inputs");
+            errorReporting.add("Error during deserialization of inputs");
             return nullptr;
         }
 
         auto outputs = PropertyImpl::Create(luaScript->logicnode()->outputs(), EInputOutputProperty::Output);
         if (nullptr == outputs)
         {
-            errorsOut.emplace_back("Error during deserialization of outputs");
+            errorReporting.add("Error during deserialization of outputs");
             return nullptr;
         }
 
@@ -145,7 +146,7 @@ namespace rlogic::internal
         if (!load_result.valid())
         {
             sol::error error = load_result;
-            errorsOut.emplace_back(error.what());
+            errorReporting.add(error.what());
             return nullptr;
         }
 
@@ -157,7 +158,7 @@ namespace rlogic::internal
             return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl(solState, sol::protected_function(std::move(load_result)), name, filename, string_source, std::move(inputs), std::move(outputs)));
         }
 
-        errorsOut.emplace_back("Error during execution of main function of deserialized script");
+        errorReporting.add("Error during execution of main function of deserialized script");
         return nullptr;
     }
 

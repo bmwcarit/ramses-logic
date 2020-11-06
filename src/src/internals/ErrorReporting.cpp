@@ -6,21 +6,26 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#pragma once
+#include "internals/ErrorReporting.h"
+#include "internals/impl/LoggerImpl.h"
 
-#include <cassert>
-
-namespace rlogic
+namespace rlogic::internal
 {
-    /**
-     * ELogMessageType lists the types of available log messages. The integer represents the
-     * priority of the log messages (lower means more important and higher priority).
-     */
-    enum class ELogMessageType : int
+
+    void ErrorReporting::add(std::string errorMessage)
     {
-        ERROR = 2,
-        WARNING = 3,
-        INFO = 4,
-        DEBUG = 5,
-    };
+        LOG_ERROR(errorMessage);
+        m_errors.emplace_back(std::move(errorMessage));
+    }
+
+    void ErrorReporting::clear()
+    {
+        m_errors.clear();
+    }
+
+    const std::vector<std::string>& ErrorReporting::getErrors() const
+    {
+        return m_errors;
+    }
+
 }

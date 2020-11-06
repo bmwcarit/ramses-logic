@@ -64,17 +64,31 @@ namespace rlogic::internal
         static LoggerImpl& GetInstance();
 
     private:
+        LoggerImpl() noexcept;
+
+        bool logMessageExceedsAllowedLogLevel(ELogMessageType messageType) const
+        {
+            return (messageType > m_allowedLogLevel);
+        }
+
         Logger::LogHandlerFunc m_logHandler;
         bool                   m_defaultLogging = true;
 
-        LoggerImpl() noexcept;
+        // TODO Violin add API to set this
+        const ELogMessageType m_allowedLogLevel = ELogMessageType::INFO;
+
     };
 
     template <typename... ARGS>
     inline void LoggerImpl::log(ELogMessageType messageType, const ARGS&... args)
     {
+        if (!m_defaultLogging && !m_logHandler)
+        {
+            return;
+        }
+
         const auto formattedMessage = fmt::format(args...);
-        if (m_defaultLogging)
+        if (m_defaultLogging && !logMessageExceedsAllowedLogLevel(messageType))
         {
             std::cout << "[ " << GetLogMessageTypeString(messageType) << " ] " << formattedMessage << std::endl;
         }

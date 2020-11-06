@@ -14,6 +14,7 @@
 #include "internals/impl/LuaScriptImpl.h"
 #include "internals/impl/LogicEngineImpl.h"
 #include "internals/impl/PropertyImpl.h"
+#include "internals/ErrorReporting.h"
 
 #include "generated/luascript_gen.h"
 #include "generated/logicnode_gen.h"
@@ -21,11 +22,17 @@
 #include "fmt/format.h"
 #include <fstream>
 
-namespace rlogic
+namespace rlogic::internal
 {
     class ALuaScript_Lifecycle : public ALuaScript
     {
     protected:
+        void TearDown() override {
+            std::remove("script.bin");
+            std::remove("script.lua");
+            std::remove("arrays.bin");
+            std::remove("nested_array.bin");
+        }
     };
 
     TEST_F(ALuaScript_Lifecycle, HasEmptyFilenameWhenCreatedFromSource)
@@ -422,6 +429,8 @@ namespace rlogic
         std::remove("script.bin");
     }
 
+    // TODO Violin this test does not make sense - this code path can't be triggered by user. Rework!
+    // What we can test (and should) is that a real script without inputs/outputs can be deserialized properly
     TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithoutInputs)
     {
         flatbuffers::FlatBufferBuilder builder;
@@ -438,13 +447,13 @@ namespace rlogic
             builder.Finish(script);
         }
         {
-            std::vector<std::string> errors;
+            ErrorReporting errors;
             internal::SolState   state;
             auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.size());
-            EXPECT_EQ("Error during deserialization of inputs", errors[0]);
+            ASSERT_EQ(1u, errors.getErrors().size());
+            EXPECT_EQ("Error during deserialization of inputs", errors.getErrors()[0]);
         }
     }
 
@@ -468,16 +477,17 @@ namespace rlogic
             builder.Finish(script);
         }
         {
-            std::vector<std::string> errors;
+            ErrorReporting errors;
             internal::SolState       state;
             auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.size());
-            EXPECT_EQ("Error during deserialization of outputs", errors[0]);
+            ASSERT_EQ(1u, errors.getErrors().size());
+            EXPECT_EQ("Error during deserialization of outputs", errors.getErrors()[0]);
         }
     }
 
+    // TODO Violin this test does not make sense - should be deleted, and check if there is related code which can be improved
     TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithScriptWithCompileTimeError)
     {
         flatbuffers::FlatBufferBuilder builder;
@@ -504,16 +514,17 @@ namespace rlogic
             builder.Finish(script);
         }
         {
-            std::vector<std::string> errors;
+            ErrorReporting errors;
             internal::SolState       state;
             auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.size());
-            EXPECT_THAT(errors[0], ::testing::HasSubstr("'=' expected near '<eof>'"));
+            ASSERT_EQ(1u, errors.getErrors().size());
+            EXPECT_THAT(errors.getErrors()[0], ::testing::HasSubstr("'=' expected near '<eof>'"));
         }
     }
 
+    // TODO Violin this test does not make sense - should be deleted, and check if there is related code which can be improved
     TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithScriptWithRuntimeError)
     {
         flatbuffers::FlatBufferBuilder builder;
@@ -541,13 +552,13 @@ namespace rlogic
             builder.Finish(script);
         }
         {
-            std::vector<std::string> errors;
+            ErrorReporting errors;
             internal::SolState       state;
             auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
 
             EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.size());
-            EXPECT_EQ("Error during execution of main function of deserialized script", errors[0]);
+            ASSERT_EQ(1u, errors.getErrors().size());
+            EXPECT_EQ("Error during execution of main function of deserialized script", errors.getErrors()[0]);
         }
     }
 

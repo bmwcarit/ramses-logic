@@ -11,6 +11,7 @@
 #include "internals/impl/PropertyImpl.h"
 #include "internals/impl/LuaScriptImpl.h"
 #include "internals/SolState.h"
+#include "internals/ErrorReporting.h"
 
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LogicEngine.h"
@@ -29,7 +30,7 @@ namespace rlogic::internal
     public:
         AProperty();
 
-        std::vector<std::string>       m_unusedScriptErrorVector;
+        ErrorReporting       m_unusedErrorReporting;
         SolState                       state;
         std::unique_ptr<LuaScriptImpl> script;
 
@@ -64,7 +65,7 @@ namespace rlogic::internal
     };
 
     AProperty::AProperty()
-        : script(LuaScriptImpl::Create(state, "", "", "", m_unusedScriptErrorVector))
+        : script(LuaScriptImpl::Create(state, "", "", "", m_unusedErrorReporting))
     {
     }
 

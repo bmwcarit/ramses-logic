@@ -988,6 +988,86 @@ namespace rlogic
         EXPECT_FLOAT_EQ(23.f, *scriptCOutput2->get<float>());
     }
 
+    TEST_F(ALogicEngine_Linking, canDestroyBindingAfterUnlinkingFromScript)
+    {
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("");
+
+        auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.out_vec3f = VEC3F
+            end
+
+            function run()
+                OUT.out_vec3f = { 0.0, 0.0, 0.0 }
+            end
+            )");
+
+        const Property* nodeTranslation = nodeBinding.getInputs()->getChild("translation");
+        const Property* scriptOutVec3f = outScript->getOutputs()->getChild("out_vec3f");
+
+        EXPECT_TRUE(m_logicEngine.link(*scriptOutVec3f, *nodeTranslation));
+        EXPECT_TRUE(m_logicEngine.unlink(*scriptOutVec3f, *nodeTranslation));
+
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->isLinked(*outScript));
+        EXPECT_FALSE(m_logicEngine.m_impl->isLinked(nodeBinding));
+
+        EXPECT_TRUE(m_logicEngine.destroy(nodeBinding));
+
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALogicEngine_Linking, WHEN_ScriptWasUnlinkedFromBindingAndMultipleLinksDestroyed_THEN_UpdateDoesNotOverwriteBindingInputsByDanglingLinks)
+    {
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("");
+
+        auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.translation = VEC3F
+                OUT.visibility = BOOL
+            end
+
+            function run()
+            end
+            )");
+
+        rlogic::Property* nodeTranslation = nodeBinding.getInputs()->getChild("translation");
+        rlogic::Property* nodeVisibility = nodeBinding.getInputs()->getChild("visibility");
+
+        const rlogic::Property* scriptTranslation = outScript->getOutputs()->getChild("translation");
+        const rlogic::Property* scriptVisiblity = outScript->getOutputs()->getChild("visibility");
+
+        EXPECT_TRUE(m_logicEngine.link(*scriptVisiblity, *nodeVisibility));
+        EXPECT_TRUE(m_logicEngine.link(*scriptTranslation, *nodeTranslation));
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        EXPECT_TRUE(m_logicEngine.unlink(*scriptVisiblity, *nodeVisibility));
+        EXPECT_TRUE(m_logicEngine.unlink(*scriptTranslation, *nodeTranslation));
+
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->isLinked(*outScript));
+        EXPECT_FALSE(m_logicEngine.m_impl->isLinked(nodeBinding));
+
+        EXPECT_TRUE(m_logicEngine.destroy(*outScript));
+
+        // Set some custom values after unlink
+        const vec3f translationValues{ 11.f, 12.0f, 13.0f };
+        nodeTranslation->set<vec3f>(translationValues);
+        nodeVisibility->set<bool>(false);
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        // Check that custom values are kept
+        EXPECT_EQ(*nodeTranslation->get<vec3f>(), translationValues);
+        EXPECT_FALSE(*nodeVisibility->get<bool>());
+    }
 
     TEST_F(ALogicEngine_Linking, PreservesLinksBetweenScriptsAfterSavingAndLoadingFromFile)
     {

@@ -33,12 +33,13 @@ namespace rlogic::internal
 {
     class SolState;
     class PropertyImpl;
+    class ErrorReporting;
 
     class LuaScriptImpl : public LogicNodeImpl
     {
     public:
-        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, std::vector<std::string>& errorsOut);
-        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, std::vector<std::string>& errorsOut);
+        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting);
+        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, ErrorReporting& errorReporting);
 
         // Move-able (noexcept); Not copy-able
         ~LuaScriptImpl() noexcept override = default;

@@ -33,8 +33,8 @@ endif()
 # make FlatbufGen   # Fails - no such targets because disabled
 # make FlatbufCheck # Fails - no such targets because disabled
 
-file(GLOB flatbuffers_schemas "${PROJECT_SOURCE_DIR}/src/flatbuffers/schemas/*.fbs")
-set(flatbuffers_output_dir "${PROJECT_SOURCE_DIR}/src/flatbuffers/generated")
+file(GLOB flatbuffers_schemas "${PROJECT_SOURCE_DIR}/lib/flatbuffers/schemas/*.fbs")
+set(flatbuffers_output_dir "${PROJECT_SOURCE_DIR}/lib/flatbuffers/generated")
 
 # create list of *_generated.h out of *.fbs file list
 foreach(schema ${flatbuffers_schemas})

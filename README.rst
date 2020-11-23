@@ -2,6 +2,7 @@
 Introduction
 ========================
 
+|build-status|
 
 ``RAMSES logic`` extends the `RAMSES rendering ecosystem <https://github.com/GENIVI/ramses>`_ with scripting support based on
 `Lua <https://github.com/lua/lua>`_. ``RAMSES`` is designed to be minimalistic and closely aligned to OpenGL, which can be a
@@ -43,3 +44,25 @@ Examples
 ========================
 
 Prefer to learn by example? Have a look at our `self-contained example snippets <https://genivi.github.io/ramses-logic/api.html#list-of-all-examples>`_.
+
+
+========================
+License
+========================
+
+The Ramses Logic Engine is licensed under the Mozilla Public License 2.0 (MPL-2.0),
+same as Ramses itself. Have a look at the Ramses README file for more information
+regarding Ramses and its dependencies.
+
+In addition to Ramses, the Ramses Logic Engine has following dependencies,
+listed alongside their licenses here:
+* Lua (MIT)
+* Sol (MIT)
+* Flatbuffers (Apache-2.0)
+* Fmtlib (MIT)
+* Googletest (BSD-3-Clause)
+
+
+.. |build-status| image:: https://github.com/GENIVI/ramses-logic/workflows/CMake/badge.svg?branch=master
+    :alt: build status
+    :target: https://github.com/GENIVI/ramses-logic/actions?query=branch%3Amaster

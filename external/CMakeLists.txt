@@ -29,7 +29,10 @@ if(ramses-logic_BUILD_TESTS AND NOT TARGET gmock)
     target_compile_options(gtest PRIVATE $<$<CXX_COMPILER_ID:Clang>:-Wno-missing-field-initializers>)
     target_compile_options(gmock PRIVATE $<$<CXX_COMPILER_ID:Clang>:-Wno-missing-field-initializers>)
 
-    FOLDERIZE_TARGETS(gmock gtest gmock_main gtest_main)
+    folderize_target(gmock "external")
+    folderize_target(gtest "external")
+    folderize_target(gmock_main "external")
+    folderize_target(gtest_main "external")
 endif()
 
 # Decouple internally used googletest from possible mismatch with externally provided one
@@ -74,7 +77,7 @@ target_include_directories(lua
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lua>
 )
 
-FOLDERIZE_TARGET(lua)
+folderize_target(lua "external")
 
 ################################################
 ################     Sol      ##################
@@ -106,12 +109,12 @@ else()
 endif()
 
 add_subdirectory(flatbuffers)
-FOLDERIZE_TARGET(flatbuffers)
+folderize_target(flatbuffers "external")
 
 add_library(rlogic::flatbuffers ALIAS flatbuffers)
 
 if(ramses-logic_ENABLE_FLATBUFFERS_GENERATION)
-    FOLDERIZE_TARGET(flatc)
+    folderize_target(flatc "external")
 endif()
 
 ################################################
@@ -120,7 +123,7 @@ endif()
 
 if (NOT TARGET fmt)
     add_subdirectory(fmt)
-    FOLDERIZE_TARGET(fmt)
+    folderize_target(fmt "external")
 endif()
 
 ################################################
@@ -167,15 +170,12 @@ else()
     endif()
 endif()
 
-# TODO Violin fix this once ramses exports its version correctly when installed
-if(ramses-sdk_VERSION)
-    # Requires >= 26.0.4 because no version info available before that
-    # Version less than 27 because not tested with 27 yet
-    set(RAMSES_VERSION_GE 26.0.4)
-    set(RAMSES_VERSION_LT 27)
-    if(${ramses-sdk_VERSION} VERSION_GREATER_EQUAL ${RAMSES_VERSION_GE} AND ${ramses-sdk_VERSION} VERSION_LESS ${RAMSES_VERSION_LT})
-        message(STATUS "Using ramses target '${ramses-logic_RAMSES_TARGET}' in version '${ramses-sdk_VERSION}' (for ramses logic)")
-    else()
-        message(FATAL_ERROR "Using incompatible ramses version '${ramses-sdk_VERSION}'. Expected >= ${RAMSES_VERSION_GE} and < ${RAMSES_VERSION_LT}")
-    endif()
+# Requires >= 27.0.1 because we use new rotation API of R27 and it was implemented in patch version
+# Version less than 28 because not tested with 28 yet
+set(RAMSES_VERSION_GE 27.0.1)
+set(RAMSES_VERSION_LT 28)
+if(${ramses-sdk_VERSION} VERSION_GREATER_EQUAL ${RAMSES_VERSION_GE} AND ${ramses-sdk_VERSION} VERSION_LESS ${RAMSES_VERSION_LT})
+    message(STATUS "Using ramses target '${ramses-logic_RAMSES_TARGET}' in version '${ramses-sdk_VERSION}' (for ramses logic)")
+else()
+    message(FATAL_ERROR "Using incompatible ramses version '${ramses-sdk_VERSION}'. Expected >= ${RAMSES_VERSION_GE} and < ${RAMSES_VERSION_LT}")
 endif()

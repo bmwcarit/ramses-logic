@@ -12,7 +12,50 @@ Understand RAMSES Logic architecture and design
 Current Architecture
 -----------------------------------------------------
 
-TODO (Violin/Sven)
+The ``Ramses Logic`` consists of a single library which can be static or dynamic.
+It has a dependency on a ``Ramses`` target which can be static or dynamic library
+itself, or a custom build of ``Ramses``. The following diagram illustrates the
+libraries and their dependencies:
+
+.. image:: res/architecture.png
+
+.. note::
+
+    By default, the ``Logic Engine`` builds a client-only shared library version of
+    Ramses. You can override this behavior by providing your own ``Ramses`` target as
+    described in the :ref:`Build options`.
+
+-----------------------------------------------------
+Source contents
+-----------------------------------------------------
+
+The following list gives a rough overview which parts of the logic engine
+reside in which part of the source tree:
+
+* include/
+    Contains all public include files
+* lib/
+    - flatbuffers/
+        Schema files describing the flatbuffers file structure and generated flatbuffer headers
+    - impl/
+        API classes and their corresponding Impl classes (following the pimpl pattern)
+    - internals/
+        Classes which contain the implementation details. This is the majority of the code.
+* cmake/
+    CMake helper files
+* examples/
+    Contains examples, each in its own folder
+* external/
+    Contains all external dependencies, as described in the :ref:`Current Architecture`
+* doc/
+    The docs source files and configuration (Sphinx and Doxygen)
+* unittests/
+    Unit tests, each file corresponding to a (unit) class or a subset of its functionality
+
+.. note::
+
+    The minimal set of files/folders required to build the logic engine is /include, /lib,
+    /cmake, /external and the root CMakeLists.txt file.
 
 -----------------------------------------------------
 Design decision log

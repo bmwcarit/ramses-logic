@@ -74,7 +74,7 @@ def main():
     }
 
     generated_files = {
-        r'^src/flatbuffers/generated'
+        r'^lib/flatbuffers/generated'
     }
 
     # Externals are allowed to have their own code style

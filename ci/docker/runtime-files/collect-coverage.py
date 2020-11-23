@@ -56,7 +56,7 @@ def main():
     print(f'Generate {merged_executable}')
     subprocess.check_call(['ld', '-r', '-z', 'muldefs', '-o', merged_executable] + executables, shell=False, cwd=profdir)
 
-    exclude_regex = f'{sdkroot}/(external|src/flatbuffers/generated)/'
+    exclude_regex = f'{sdkroot}/(external|lib/flatbuffers/generated)/'
 
     if args.report_dir:
         reportdir = Path(args.report_dir).resolve()

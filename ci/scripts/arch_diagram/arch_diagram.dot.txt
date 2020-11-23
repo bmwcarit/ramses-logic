@@ -21,12 +21,21 @@ digraph FSII {
         RamsesLogicLib   [label="{<f0> \<\<library\>\> | <f1> RAMSES logic lib (MPL 2.0)}"];
     }
 
+    subgraph cluster_ramses_logic_test {
+        node [style=filled];
+        label = "RAMSES logic tests (MPL 2.0)";
+        style=bold;
+
+        # Components
+        Unittests   [label="{<f0> \<\<binary\>\> | <f1> Unit tests (MPL 2.0)}"];
+        Benchmarks   [label="{<f0> \<\<binary\>\> | <f1> Benchmarks (MPL 2.0)}"];
+    }
+
     subgraph cluster_ramses_logic_deps {
         node [style=filled];
         label = "Static dependencies";
 
         # Components
-        gtest       [color="#999999" label="{<f0> \<\<library\>\> | <f1> GoogleTest/GoogleMock (BSD 3 & Apache 2.0)}"];
         FMTlib      [color="#999999" label="{<f0> \<\<library\>\> | <f1> FMT lib (BSD 2)}"];
         Flatbuffers [color="#999999" label="{<f0> \<\<library\>\> | <f1> Flatbuffers (Apache 2.0)}"];
         Lua         [color="#999999" label="{<f0> \<\<library\>\> | <f1> Lua (MIT)}"];
@@ -34,9 +43,20 @@ digraph FSII {
         RamsesLib   [label="{<f0> \<\<library\>\> | <f1> RAMSES libraries (MPL 2.0)}"];
     }
 
+    subgraph cluster_ramses_logic_test_deps {
+        node [style=filled];
+        label = "Static test dep's";
+
+        # Components
+        gtest       [color="#999999" label="{<f0> \<\<library\>\> | <f1> GoogleTest/GoogleMock (BSD 3 & Apache 2.0)}"];
+        gbench      [color="#999999" label="{<f0> \<\<library\>\> | <f1> GoogleBenchmark (Apache 2.0)}"];
+    }
+
     # Just one link needed for the whole cluster of dependencies
     # No way in dot to link directly to cluster, have to specify a random item in the cluster (RamsesLib used here)
-    RamsesLogicLib       -> RamsesLib  [ltail=cluster_ramses_logic lhead=cluster_ramses_logic_deps label="(fc) [static]"];
+    RamsesLogicLib       -> RamsesLib       [ltail=cluster_ramses_logic      lhead=cluster_ramses_logic_deps label="(fc) [static]"];
+    Unittests            -> gtest           [ltail=cluster_ramses_logic_test lhead=cluster_ramses_logic_test_deps label="(fc) [static]"];
+    Unittests            -> RamsesLogicLib  [ltail=cluster_ramses_logic_test lhead=cluster_ramses_logic label="(fc) [static]"];
 
     legend [
         shape=plaintext

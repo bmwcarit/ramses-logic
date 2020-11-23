@@ -13,7 +13,7 @@ find_package(Sphinx QUIET REQUIRED)
 # input files
 file(GLOB_RECURSE
     DOXYGEN_INPUT_LIST
-    ${PROJECT_SOURCE_DIR}/src/include/public/ramses-logic/*.h
+    ${PROJECT_SOURCE_DIR}/include/ramses-logic/*.h
 )
 
 # image dirs
@@ -61,7 +61,7 @@ add_custom_target(rlogic-doxygen
     SOURCES ${DOXYGEN_INPUT_LIST} ${DOXYGEN_CONFIG_FILE_IN}
 )
 
-set_property(TARGET rlogic-doxygen PROPERTY FOLDER "doc")
+folderize_target(rlogic-doxygen "doc")
 
 set(SPHINX_SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sphinx)
 set(SPHINX_TARGET_DIR ${CMAKE_BINARY_DIR}/sphinx)
@@ -95,4 +95,4 @@ add_custom_target(rlogic-sphinx ALL
     SOURCES ${SPHINX_INPUT_LIST} ${SPHINX_SRC_FILES}/conf.py
 )
 
-set_property(TARGET rlogic-sphinx PROPERTY FOLDER "doc")
+folderize_target(rlogic-sphinx "doc")

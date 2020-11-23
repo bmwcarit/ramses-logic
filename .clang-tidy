@@ -366,7 +366,7 @@ modernize-use-default-member-init,
 modernize-use-emplace,
 modernize-use-equals-default,
 modernize-use-equals-delete,
-#modernize-use-nodiscard,
+modernize-use-nodiscard,
 modernize-use-noexcept,
 modernize-use-nullptr,
 modernize-use-override,
@@ -457,9 +457,11 @@ readability-uniqueptr-delete-release,
 # everything that is enabled is also an error
 WarningsAsErrors: '*'
 
-# ignore headers in external because we cannot fix them
-# Also ignore flatbuffers generated files because we can't fix the flatc compiler
-HeaderFilterRegex: '/git/src/(examples|include|src|test)'
+# Filter organized as whitelist in order to exclude:
+# - external/* (can't fix everything in externals)
+# - lib/flatbuffers/* (generated files from flatc, can't fix short-term)
+# - everything else which is not source code (ci/, cmake/, ...)
+HeaderFilterRegex: '/git/(examples|include|unittests|lib/internals|lib/impl)'
 
 AnalyzeTemporaryDtors: false
 FormatStyle:     File

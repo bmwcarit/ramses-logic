@@ -3,6 +3,27 @@ master
 ======
 
 ======
+v0.4.0
+======
+
+**New features**
+
+* Support arrays of complex types
+* Added more logging
+* Upgrade Ramses to v27.0.2
+
+    * Uses correct rotation semantics fixed in Ramses 27.0.1
+    * Currently hardcoded right-handed XYZ Euler rotation (same as Blender default)
+
+**Improvements**
+
+* Added [[nodiscard]] attribute to API methods where it makes sense, mostly getter Methods
+  This will trigger compiler warnings if you call these methods but don't use the result
+* New CMake option 'ramses-logic_FOLDER_PREFIX' to set custom folder prefix for MSVS
+* Restructured folders for easier source redistributions.
+  See `docs <https://genivi.github.io/ramses-logic/dev.html#source-contents>`_ for more info
+
+======
 v0.3.1
 ======
 

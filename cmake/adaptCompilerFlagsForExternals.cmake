@@ -7,6 +7,7 @@
 #  -------------------------------------------------------------------------
 
 # TODO Violin check if we can remove some flags for the ramses logic externals
+# Also, try to use newer CMake methods for this, like add_compile_options()
 
 # #### these compiler flags are disabled for external projects (= Blacklist) ####
 SET(DISABLED_COMPILER_FLAGS

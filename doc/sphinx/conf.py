@@ -19,7 +19,7 @@ copyright = '2020, BMW AG'
 author = 'BMW AG'
 
 # TODO Violin configure with project version from CMake
-release = '0.3.0'
+release = '0.4.0'
 
 
 # -- General configuration ---------------------------------------------------

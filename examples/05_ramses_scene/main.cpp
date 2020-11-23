@@ -143,9 +143,11 @@ SceneAndNode CreateSceneWithTriangle(ramses::RamsesClient& client)
 {
     ramses::Scene* scene = client.createScene(ramses::sceneId_t(123u), ramses::SceneConfig(), "red triangle scene");
 
-    ramses::Camera* camera = scene->createRemoteCamera("my camera");
+    ramses::PerspectiveCamera* camera = scene->createPerspectiveCamera();
+    camera->setFrustum(19.0f, 1.0f, 0.1f, 100.0f);
+    camera->setViewport(0, 0, 800, 800);
     camera->setTranslation(0.0f, 0.0f, 5.0f);
-    ramses::RenderPass* renderPass = scene->createRenderPass("my render pass");
+    ramses::RenderPass* renderPass = scene->createRenderPass();
     renderPass->setClearFlags(ramses::EClearFlags_None);
     renderPass->setCamera(*camera);
     ramses::RenderGroup* renderGroup = scene->createRenderGroup();
@@ -176,12 +178,12 @@ SceneAndNode CreateSceneWithTriangle(ramses::RamsesClient& client)
         }
         )");
 
-    effectDesc.setUniformSemantic("mvpMatrix", ramses::EEffectUniformSemantic_ModelViewProjectionMatrix);
+    effectDesc.setUniformSemantic("mvpMatrix", ramses::EEffectUniformSemantic::ModelViewProjectionMatrix);
 
-    const ramses::Effect* effect = scene->createEffect(effectDesc, ramses::ResourceCacheFlag_DoNotCache, "glsl shader");
-    ramses::Appearance* appearance = scene->createAppearance(*effect, "triangle appearance");
+    const ramses::Effect* effect = scene->createEffect(effectDesc, ramses::ResourceCacheFlag_DoNotCache);
+    ramses::Appearance* appearance = scene->createAppearance(*effect);
 
-    ramses::GeometryBinding* geometry = scene->createGeometryBinding(*effect, "triangle geometry");
+    ramses::GeometryBinding* geometry = scene->createGeometryBinding(*effect);
     ramses::AttributeInput positionsInput;
     effect->findAttributeInput("a_position", positionsInput);
     geometry->setInputBuffer(positionsInput, *vertexPositions);

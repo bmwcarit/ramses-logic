@@ -106,7 +106,7 @@ explicitly created by calling ``create`` and ``destroy`` methods. There are two 
 .. note::
 
     Loading data from files will invalidate all previous pointers to objects in
-    the:class:`rlogic::LogicEngine`. To avoid that, we recommend generally avoiding using
+    the :class:`rlogic::LogicEngine`. To avoid that, we recommend generally avoiding using
     a logicengine instance which already has content to load from files, and instead always
     create a fresh instance.
 

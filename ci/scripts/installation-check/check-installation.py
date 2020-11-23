@@ -93,7 +93,7 @@ def main():
         return 1
 
     # Extract header files from the source tree
-    srcIncludeDir = Path(args.src_dir) / 'src' / 'include' / 'public'
+    srcIncludeDir = Path(args.src_dir) / 'include'
     srcApiHeaders = [str(f.relative_to(srcIncludeDir)) for f in srcIncludeDir.rglob("*") if f.suffix == '.h']
 
     # check which headers are unexpected and which are missing

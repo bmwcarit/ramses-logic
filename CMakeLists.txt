@@ -14,8 +14,8 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 3)
-set(RLOGIC_VERSION_PATCH 1)
+set(RLOGIC_VERSION_MINOR 4)
+set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -27,9 +27,14 @@ project(RamsesLogic
     HOMEPAGE_URL  "https://github.com/GENIVI/ramses-logic"
 )
 
-# Configurable options
+#==========================================================================
+# Configuration options
+#==========================================================================
+
 set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE
     STRING "Set this cache variable to a custom RAMSES target. If this is a valid target name, Ramses Logic will use it instead of building Ramses")
+set(ramses-logic_FOLDER_PREFIX "" CACHE
+    STRING "Set a custom prefix for target folders in Visual Studio. If not set, will be set based on project's relative path")
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
 option(ramses-logic_BUILD_SHARED_LIB "Enable/disable build of Ramses Logic shared lib target" ON)
 option(ramses-logic_BUILD_STATIC_LIB "Enable/disable build of Ramses Logic static lib target" OFF)
@@ -48,17 +53,19 @@ if(NOT ramses-logic_BUILD_STATIC_LIB AND NOT ramses-logic_BUILD_SHARED_LIB)
     message(FATAL_ERROR "One of the ramses-logic_BUILD_SHARED_LIB/ramses-logic_BUILD_STATIC_LIB options must be enabled!")
 endif()
 
-# Standard installation paths
-# TODO Violin/Sven/Tobias consider making configurable from outside?
+#==========================================================================
+# Global project setup
+#==========================================================================
+
 set(RLOGIC_INSTALL_HEADERS_PATH     include)
 set(RLOGIC_INSTALL_RUNTIME_PATH     bin)
 set(RLOGIC_INSTALL_LIBRARY_PATH     lib)
 set(RLOGIC_INSTALL_ARCHIVE_PATH     lib)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules" ${CMAKE_MODULE_PATH})
 
-# TODO violin/tobias discuss which parts we want to reuse from ramses maybe
-# Do we want to use add_compile_options instead?
 include(cmake/platformConfig.cmake)
 include(cmake/externalTools.cmake)
 include(cmake/folderize.cmake)
@@ -83,16 +90,141 @@ if(ramses-logic_BUILD_TESTS)
     include(cmake/testSetup.cmake)
 endif()
 
+#==========================================================================
+# Create project targets
+#==========================================================================
+
 add_subdirectory(external)
-add_subdirectory(src)
+
+if(ramses-logic_ENABLE_FLATBUFFERS_GENERATION)
+    include(${PROJECT_SOURCE_DIR}/cmake/flatbuffersGeneration.cmake)
+endif()
+
+file(GLOB public_headers        include/ramses-logic/*.h)
+file(GLOB impl_headers          lib/impl/*.h)
+file(GLOB internal_headers      lib/internals/*.h)
+file(GLOB flatbuf_gen_headers   lib/flatbuffers/generated/*.h)
+file(GLOB flatbuf_schemas       lib/flatbuffers/schemas/*.fbs)
+
+file(GLOB impl_src      lib/impl/*.cpp)
+file(GLOB internals_src lib/internals/*.cpp)
+
+add_library(ramses-logic-obj OBJECT)
+
+target_sources(ramses-logic-obj
+    PRIVATE
+        ${public_headers}
+        ${impl_headers}
+        ${internal_headers}
+        ${impl_src}
+        ${internals_src}
+        ${flatbuf_gen_headers}
+        ${flatbuf_schemas}
+)
+
+# Not obvious, but this is the only robust way to add files to a VS project with CMake
+# without having them treated as source files
+set_source_files_properties(${flatbuf_gen_headers} PROPERTIES HEADER_FILE_ONLY TRUE)
+set_source_files_properties(${flatbuf_schemas} PROPERTIES HEADER_FILE_ONLY TRUE)
+
+source_group("Header Files" FILES ${public_headers})
+source_group("Header Files\\internals\\impl" FILES ${impl_headers})
+source_group("Header Files\\internals" FILES ${internal_headers})
+source_group("Header Files\\generated" FILES ${flatbuf_gen_headers})
+source_group("Source Files\\impl" FILES ${impl_src})
+source_group("Source Files\\internals" FILES ${internals_src})
+source_group("FlatbufSchemas" FILES ${flatbuf_schemas})
+
+# TODO investigate option to use single-header version of sol2 and flatbuffers
+target_link_libraries(ramses-logic-obj
+    # We use public linking here, because ramses-logic-obj is an object library.
+    # The hiding of this dependencies happens in the ramses-logic target (shared library)
+    PUBLIC
+        sol2::sol2
+        lua::lua
+        rlogic::flatbuffers
+        fmt::fmt
+        ${ramses-logic_RAMSES_TARGET}
+)
+
+# Add dependency to flatbuffer generation target, unless the target is disabled
+if(TARGET FlatbufGen)
+    add_dependencies(ramses-logic-obj FlatbufGen)
+endif()
+
+target_include_directories(ramses-logic-obj
+    PRIVATE
+        include
+        lib
+        lib/flatbuffers
+        ${PROJECT_BINARY_DIR}/BuildConfig
+)
+
+folderize_target(ramses-logic-obj "ramses-logic")
+
+if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
+    target_compile_definitions(ramses-logic-obj PRIVATE RLOGIC_LINK_SHARED_EXPORT=1)
+endif()
+
+# Build static lib when top-level project or if explicitly requested by user, or if unit tests are enabled
+if(ramses-logic_BUILD_STATIC_LIB OR ramses-logic_BUILD_TESTS OR CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    ################## ramses-logic-static ##################
+    add_library(ramses-logic-static STATIC)
+    add_library(rlogic::ramses-logic-static ALIAS ramses-logic-static)
+    target_link_libraries(ramses-logic-static PRIVATE ramses-logic-obj)
+    target_link_libraries(ramses-logic-static PUBLIC ${ramses-logic_RAMSES_TARGET})
+    target_include_directories(ramses-logic-static PUBLIC include)
+    set_target_properties(ramses-logic-static PROPERTIES PUBLIC_HEADER "${public_headers}")
+    folderize_target(ramses-logic-static "ramses-logic")
+endif()
+
+################## ramses-logic (shared library) ##################
+if(ramses-logic_BUILD_SHARED_LIB)
+    add_library(ramses-logic SHARED)
+    add_library(rlogic::ramses-logic ALIAS ramses-logic)
+    target_link_libraries(ramses-logic PRIVATE ramses-logic-obj)
+    target_link_libraries(ramses-logic PUBLIC ${ramses-logic_RAMSES_TARGET})
+    target_include_directories(ramses-logic PUBLIC include)
+    set_target_properties(ramses-logic PROPERTIES
+        PUBLIC_HEADER "${public_headers}"
+        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+    )
+    if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
+        target_compile_definitions(ramses-logic PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)
+    endif()
+
+    folderize_target(ramses-logic "ramses-logic")
+
+    if(ramses-logic_ENABLE_INSTALL)
+        install(
+            TARGETS ramses-logic
+            EXPORT ramses-logic-targets
+            RUNTIME DESTINATION         ${RLOGIC_INSTALL_RUNTIME_PATH}
+            LIBRARY DESTINATION         ${RLOGIC_INSTALL_LIBRARY_PATH}
+            ARCHIVE DESTINATION         ${RLOGIC_INSTALL_ARCHIVE_PATH}
+            PUBLIC_HEADER DESTINATION   ${RLOGIC_INSTALL_HEADERS_PATH}/ramses-logic
+        )
+
+        if (MSVC)
+            install(
+                FILES $<TARGET_PDB_FILE:ramses-logic>
+                DESTINATION ${RLOGIC_INSTALL_RUNTIME_PATH} CONFIGURATIONS Debug RelWithDebInfo)
+        endif()
+    endif()
+endif()
+
+#==========================================================================
+# Optional and complementary targets
+#==========================================================================
+
+if(ramses-logic_BUILD_TESTS)
+    add_subdirectory(unittests)
+endif()
+
 
 if(ramses-logic_BUILD_EXAMPLES)
     add_subdirectory(examples)
 endif()
-
-#==========================================================================
-# target: code style checker
-#==========================================================================
 
 include(cmake/addCheckerTargets.cmake)
 
@@ -112,7 +244,7 @@ if(ramses-logic_ENABLE_INSTALL)
 endif()
 
 #==========================================================================
-# generate CMake config files
+# Installation and packaging
 #==========================================================================
 
 configure_file(
@@ -134,7 +266,7 @@ if(ramses-logic_ENABLE_INSTALL)
         set(ramses-logic_FIND_SCRIPT_INSTALL_DIR "lib/cmake/${ramses-logic-VERSION_DIR}")
     endif()
 
-    # generate CMake config file (use ramses-logicTemplate.cmake.in as base)
+    # generate CMake config file from template
     configure_package_config_file(
         "${CMAKE_CURRENT_SOURCE_DIR}/cmake/templates/ramses-logic-Template.cmake.in"
         "${CMAKE_CURRENT_BINARY_DIR}/ramses-logicConfig.cmake"
@@ -157,11 +289,6 @@ if(ramses-logic_ENABLE_INSTALL)
         DESTINATION ${ramses-logic_FIND_SCRIPT_INSTALL_DIR}
     )
 endif()
-
-
-#==========================================================================
-# CPack package definition
-#==========================================================================
 
 # TODO Violin/Tobias discuss packaging and install + ramses dependency
 set(CPACK_GENERATOR "TGZ")

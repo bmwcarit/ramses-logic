@@ -6,36 +6,21 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-# TODO Violin/Tobias this is a more generic, less ramses-y and no-ACME version of "folderize"
-# Do we want to share such code across projects?
+# When build as submodule and no folder prefix set by user, set prefix based on relative path
+if (ramses-logic_FOLDER_PREFIX)
+    set(RL_FOLDER_PREFIX "${ramses-logic_FOLDER_PREFIX}/")
+elseif (NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    string(REGEX REPLACE "${CMAKE_SOURCE_DIR}/" "" folder_prefix "${PROJECT_SOURCE_DIR}")
+    set(RL_FOLDER_PREFIX "${folder_prefix}/")
+endif()
 
-# extract and set folder name from path
-function(GET_CURRENT_FOLDER_PATH OUT)
-    # first get path relative to project root dir
-    string(REGEX REPLACE "${PROJECT_SOURCE_DIR}/" "" folder_relative_path "${CMAKE_CURRENT_SOURCE_DIR}")
-    string(REGEX REPLACE "/[^/]*$" "" filtered_folder_path "${folder_relative_path}")
-    if (NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
-        # optionally adjust path when built as subdirectory
-        string(REGEX REPLACE "${CMAKE_SOURCE_DIR}/" "" folder_prefix "${PROJECT_SOURCE_DIR}")
-        set(filtered_folder_path "${folder_prefix}/${filtered_folder_path}")
-    endif()
-    set(${OUT} ${filtered_folder_path} PARENT_SCOPE)
-endfunction()
-
-function(FOLDERIZE_TARGET tgt)
-    # skip interface libs because VS generator ignores INTERFACE_FOLDER property
+function(folderize_target tgt folder)
+    # error on interface libs because VS generator ignores INTERFACE_FOLDER property
     get_target_property(tgt_type ${tgt} TYPE)
     if (tgt_type STREQUAL INTERFACE_LIBRARY)
-        return()
+        message(FATAL_ERROR "${tgt} is an interface library and can't be folderized")
     endif()
 
-    GET_CURRENT_FOLDER_PATH(target_folder)
-    set_property(TARGET ${tgt} PROPERTY FOLDER "${target_folder}")
+    set_property(TARGET ${tgt} PROPERTY FOLDER "${RL_FOLDER_PREFIX}${folder}")
 
-endfunction()
-
-function(FOLDERIZE_TARGETS)
-    foreach (tgt ${ARGV})
-        FOLDERIZE_TARGET(${tgt})
-    endforeach()
 endfunction()

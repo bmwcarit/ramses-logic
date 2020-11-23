@@ -30,7 +30,7 @@ function(add_example)
         )
     endif()
 
-    FOLDERIZE_TARGET(${EXAMPLE_NAME})
+    folderize_target(${EXAMPLE_NAME} "examples")
 
     if(ramses-logic_BUILD_TESTS AND ${EXAMPLE_MAKE_TEST})
         MakeTestFromTarget(${EXAMPLE_NAME})

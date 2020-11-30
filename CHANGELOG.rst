@@ -2,6 +2,14 @@
 master
 ======
 
+**New features**
+
+**Improvements**
+
+**Dependencies**
+
+* Added new dependency: google benchmarks, a library for benchmarking
+
 ======
 v0.4.0
 ======

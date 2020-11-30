@@ -61,7 +61,10 @@ listed alongside their licenses here:
 * Flatbuffers (Apache-2.0)
 * Fmtlib (MIT)
 * Googletest (BSD-3-Clause)
+* Google Benchmark (Apache-2.0)
 
+All of the above dependencies are referenced as Git submodules pointing to their original
+repository. Hence, no modifications are made by Ramses Logic.
 
 .. |build-status| image:: https://github.com/GENIVI/ramses-logic/workflows/CMake/badge.svg?branch=master
     :alt: build status

@@ -16,3 +16,6 @@
 [submodule "external/sol"]
     path = external/sol
     url = https://github.com/ThePhD/sol2.git
+[submodule "external/google-benchmark"]
+	path = external/google-benchmark
+	url = https://github.com/google/benchmark.git

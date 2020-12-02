@@ -2,9 +2,17 @@
 master
 ======
 
-**New features**
+======
+v0.4.1
+======
+
+**Bugfixes**
+
+* Fix bug which broke links created between complex data objects
 
 **Improvements**
+
+* Added missing error reporting when trying to link arrays directly
 
 **Dependencies**
 

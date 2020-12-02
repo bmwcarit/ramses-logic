@@ -280,7 +280,7 @@ namespace rlogic::internal
             Property& child = *inputProperty.getChild(i);
 
             // TODO Violin provide type utils to check for complex types - this doesn't scale well
-            if (child.getType() == EPropertyType::Struct)
+            if (child.getType() == EPropertyType::Struct || child.getType() == EPropertyType::Array)
             {
                 updateLinksRecursive(child);
             }
@@ -876,9 +876,10 @@ namespace rlogic::internal
         }
 
         // TODO Violin solve this in a more generic way, it will break as soon as we add other complex types
-        if (sourceProperty.getType() == EPropertyType::Struct && targetProperty.getType() == EPropertyType::Struct)
+        if (sourceProperty.getType() == EPropertyType::Struct ||
+            sourceProperty.getType() == EPropertyType::Array)
         {
-            m_errors.add(fmt::format("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked"));
+            m_errors.add(fmt::format("Can't link properties of complex types directly, currently only primitive properties can be linked"));
             return false;
         }
 

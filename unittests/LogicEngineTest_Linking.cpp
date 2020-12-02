@@ -284,21 +284,44 @@ namespace rlogic
         auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
         auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
 
-        const auto output = sourceScript->getOutputs();
-        const auto input  = targetScript->getInputs();
+        const auto outputs = sourceScript->getOutputs();
+        const auto inputs  = targetScript->getInputs();
 
-        auto structTarget = input->getChild("structTarget");
-        auto structSource = output->getChild("structSource");
+        auto structTarget = inputs->getChild("structTarget");
+        auto structSource = outputs->getChild("structSource");
 
         EXPECT_FALSE(m_logicEngine.link(*structSource, *structTarget));
         auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked", errors[0]);
+        EXPECT_EQ("Can't link properties of complex types directly, currently only primitive properties can be linked", errors[0]);
 
-        EXPECT_FALSE(m_logicEngine.link(*output, *input));
+        EXPECT_FALSE(m_logicEngine.link(*outputs, *inputs));
         errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Can't link properties of type 'Struct' directly, currently only primitive properties can be linked", errors[0]);
+        EXPECT_EQ("Can't link properties of complex types directly, currently only primitive properties can be linked", errors[0]);
+    }
+
+    TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingArrays)
+    {
+        const auto  luaScriptSource = R"(
+            function interface()
+                IN.array = ARRAY(2, INT)
+                OUT.array = ARRAY(2, INT)
+            end
+            function run()
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+
+        auto arrayTarget = targetScript->getInputs()->getChild("array");
+        auto arraySource = sourceScript->getOutputs()->getChild("array");
+
+        EXPECT_FALSE(m_logicEngine.link(*arraySource, *arrayTarget));
+        auto errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_EQ("Can't link properties of complex types directly, currently only primitive properties can be linked", errors[0]);
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_WhenAnotherLinkFromTheSameScriptExists)
@@ -399,11 +422,83 @@ namespace rlogic
 
         EXPECT_TRUE(m_logicEngine.link(*output, *input));
 
-        sourceScript->getInputs()->getChild("target_INT")->set(42);
+        sourceScript->getInputs()->getChild("target_INT")->set<int32_t>(42);
 
         m_logicEngine.update();
 
         EXPECT_EQ(42, *targetScript->getOutputs()->getChild("source_INT")->get<int32_t>());
+    }
+
+    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_ArraysOfStructs)
+    {
+        const std::string_view scriptArrayOfStructs = R"(
+            function interface()
+                IN.data = ARRAY(3,
+                    {
+                        one = INT,
+                        two = INT
+                    }
+                )
+                OUT.data = ARRAY(3,
+                    {
+                        one = INT,
+                        two = INT
+                    }
+                )
+            end
+            function run()
+                OUT.data = IN.data
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "TargetScript");
+
+        auto output = sourceScript->getOutputs()->getChild("data")->getChild(1)->getChild("one");
+        auto input = targetScript->getInputs()->getChild("data")->getChild(1)->getChild("two");
+
+        EXPECT_TRUE(m_logicEngine.link(*output, *input));
+
+        sourceScript->getInputs()->getChild("data")->getChild(1)->getChild("one")->set<int32_t>(42);
+
+        m_logicEngine.update();
+
+        EXPECT_EQ(42, *targetScript->getOutputs()->getChild("data")->getChild(1)->getChild("two")->get<int32_t>());
+    }
+
+    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_StructOfArrays)
+    {
+        const std::string_view scriptArrayOfStructs = R"(
+            function interface()
+                IN.data =
+                {
+                    one = ARRAY(3, INT),
+                    two = ARRAY(3, INT)
+                }
+                OUT.data =
+                {
+                    one = ARRAY(3, INT),
+                    two = ARRAY(3, INT)
+                }
+            end
+            function run()
+                OUT.data = IN.data
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "TargetScript");
+
+        auto output = sourceScript->getOutputs()->getChild("data")->getChild("one")->getChild(1);
+        auto input = targetScript->getInputs()->getChild("data")->getChild("two")->getChild(1);
+
+        EXPECT_TRUE(m_logicEngine.link(*output, *input));
+
+        sourceScript->getInputs()->getChild("data")->getChild("one")->getChild(1)->set<int32_t>(42);
+
+        m_logicEngine.update();
+
+        EXPECT_EQ(42, *targetScript->getOutputs()->getChild("data")->getChild("two")->getChild(1)->get<int32_t>());
     }
 
     // TODO Violin test more corner cases - especially with the value of the unlinked input and different ordering of link/unlink/update calls

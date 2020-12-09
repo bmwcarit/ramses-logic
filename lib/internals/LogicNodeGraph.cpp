@@ -19,10 +19,15 @@ namespace rlogic::internal
 {
     void LogicNodeGraph::updateOrder()
     {
+        if (!m_dirty)
+        {
+            return;
+        }
+
         std::unordered_map<const LogicNodeImpl*, size_t> processed;
         processed.reserve(m_links.size());
 
-        std::vector<LogicNodeImpl*> processVector = findUnboundInputs();
+        LogicNodeVector processVector = findUnboundInputs();
 
         for (size_t i = 0; i < processVector.size(); ++i)
         {
@@ -84,18 +89,12 @@ namespace rlogic::internal
         m_dirty = true;
     }
 
-    std::vector<LogicNodeImpl*>::iterator LogicNodeGraph::begin()
+    const LogicNodeVector& LogicNodeGraph::getOrderedNodesCache() const
     {
-        if (m_dirty)
-        {
-            updateOrder();
-        }
-        return m_order.begin();
-    }
-
-    std::vector<LogicNodeImpl*>::iterator LogicNodeGraph::end()
-    {
-        return m_order.end();
+        // TODO Violin merge update() and get() in one mutable method to avoid the assert
+        // Currently keeping as-is because sorting used to be an expensive operation and can't affort to call too often
+        assert(!m_dirty);
+        return m_order;
     }
 
     void LogicNodeGraph::removeLinksForNode(LogicNodeImpl& source)
@@ -181,9 +180,9 @@ namespace rlogic::internal
         }
     }
 
-    std::vector<LogicNodeImpl*> LogicNodeGraph::findUnboundInputs() const
+    LogicNodeVector LogicNodeGraph::findUnboundInputs() const
     {
-        std::vector<LogicNodeImpl*> processVector;
+        LogicNodeVector processVector;
         processVector.reserve(m_links.size());
 
         std::unordered_set<LogicNodeImpl*> isUnbound;

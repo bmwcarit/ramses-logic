@@ -177,7 +177,7 @@ namespace rlogic::internal
         }
     }
 
-    // TODO Violin This can be refactored... But first need to make it work bug-free
+    // TODO Violin There is code-duplication between this method and populatePropertyMappingCache further down which is very error-prone
     void RamsesAppearanceBindingImpl::createInputProperties(ramses::Appearance& appearance)
     {
         PropertyImpl& inputsImpl = *getInputs()->m_impl;
@@ -191,7 +191,8 @@ namespace rlogic::internal
             effect.getUniformInput(i, uniformInput);
 
             const auto convertedType = ConvertRamsesUniformTypeToPropertyType(uniformInput.getDataType());
-            if (convertedType)
+            // TODO Violin consider making it an error (or warning?) when using appearance with unsupported input types
+            if (convertedType && uniformInput.getElementCount() == 1 && uniformInput.getSemantics() == ramses::EEffectUniformSemantic::Invalid)
             {
                 inputsImpl.addChild(std::make_unique<PropertyImpl>(uniformInput.getName(), *convertedType, EInputOutputProperty::Input));
             }
@@ -215,11 +216,11 @@ namespace rlogic::internal
             effect.getUniformInput(i, *uniformInput);
 
             const auto convertedType = ConvertRamsesUniformTypeToPropertyType(uniformInput->getDataType());
-            if (convertedType)
+            if (convertedType && uniformInput->getElementCount() == 1 && uniformInput->getSemantics() == ramses::EEffectUniformSemantic::Invalid)
             {
-                Property* maybeProperty = inputsImpl.getChild(uniformInput->getName());
-                assert(nullptr != maybeProperty && "This should never happen");
-                m_propertyToUniformInput.insert(std::make_pair(maybeProperty->m_impl.get(), std::move(uniformInput)));
+                Property* property = inputsImpl.getChild(uniformInput->getName());
+                assert(nullptr != property && "This should never happen");
+                m_propertyToUniformInput.insert(std::make_pair(property->m_impl.get(), std::move(uniformInput)));
             }
         }
     }

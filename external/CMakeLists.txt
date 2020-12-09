@@ -49,6 +49,26 @@ include(${PROJECT_SOURCE_DIR}/cmake/adaptCompilerFlagsForExternals.cmake)
 # #### externals that are build with adapted compiler flags ####
 
 ################################################
+################   Google Benchmark  ###########
+################################################
+
+#project specific setup for google benchmark
+if(ramses-logic_BUILD_TESTS AND NOT TARGET benchmark::benchmark)
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE INTERNAL "")
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE INTERNAL "")
+    set(BENCHMARK_ENABLE_INSTALL OFF CACHE INTERNAL "")
+
+    add_subdirectory(google-benchmark)
+
+    folderize_target(benchmark "external")
+    folderize_target(benchmark_main "external")
+endif()
+
+add_library(rlogic-google-benchmark-main INTERFACE)
+target_link_libraries(rlogic-google-benchmark-main INTERFACE benchmark_main)
+add_library(rlogic::google-benchmark-main ALIAS rlogic-google-benchmark-main)
+
+################################################
 ################     Lua      ##################
 ################################################
 

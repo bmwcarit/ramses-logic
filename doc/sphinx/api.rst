@@ -276,19 +276,23 @@ have a look at the :ref:`examples <List of all examples>`.
 Using Lua modules
 ==================================================
 
-The ``Logic Engine`` restricts which Lua modules can be used to the standard modules
+The ``Logic Engine`` restricts which Lua modules can be used to a subset of the standard modules
 of ``Lua 5.1``:
 
 * Base library
 * String
-* I/O
 * Table
 * Math
-* OS
 * Debug
 
 For more information on the standard modules, refer to the official
 `Lua documentation <https://www.lua.org/manual/5.1/manual.html#5>`_ of the standard modules.
+
+Some of the standard modules are deliberately not supported:
+
+* Security/safety concerns (loading files, getting OS/environment info)
+* Not supported on all platforms (e.g. Android forbids direct file access)
+* Stability/integration concerns (e.g. opening relative files in Lua makes the scripts non-relocatable)
 
 ===============================
 Print messages from within Lua
@@ -630,6 +634,20 @@ and force scripts into an automated testing process. We also advise to use hashs
 execute scripts which are tested and verified to be benign.
 
 .. TODO add more docs how environment work, what is the level of isolation between different scripts etc.
+
+
+=========================
+Performance
+=========================
+
+The ``Logic Engine`` is designed to be fast and efficient, as long as the performance improvements are
+not made at cost of unreadable code. In order to be able to track and improve
+the runtime of the ``Logic Engine``, we maintain a set of benchmarks based on the google-benchmark library.
+These benchmarks can be used to measure the time it takes for specific operations under different loads.
+We kindly ask our users and developers to report performance problems by creating a benchmark which describes
+the specific use-case which needs optimizing. Refer to the
+`google-benchmark docs <https://github.com/google/benchmark>`_ for hints how to
+design good benchmarks, to set the time measurement units, derive O-complexity, etc.
 
 =========================
 List of all examples

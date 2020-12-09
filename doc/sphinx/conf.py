@@ -18,10 +18,6 @@ project = 'ramses_logic'
 copyright = '2020, BMW AG'
 author = 'BMW AG'
 
-# TODO Violin configure with project version from CMake
-release = '0.4.0'
-
-
 # -- General configuration ---------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be

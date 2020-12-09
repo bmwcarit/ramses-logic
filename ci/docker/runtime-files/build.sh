@@ -169,7 +169,7 @@ elif [ "$TARGET" = "CLANG_TIDY" ]; then
      $RL_SRC
 
     pushd $RL_SRC
-    $RL_SRC/ci/docker/runtime-files/clang-tidy-wrapper.py $BUILD_DIR/compile_commands.json
+    $RL_SRC/ci/scripts/clang-tidy-wrapper.py --config $RL_SRC/ci/scripts/config/clang-tidy-wrapper.yaml $BUILD_DIR/compile_commands.json
     popd
 
 elif [ "$TARGET" = "TEST_COVERAGE" ]; then

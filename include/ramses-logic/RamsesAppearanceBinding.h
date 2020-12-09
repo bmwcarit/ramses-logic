@@ -27,8 +27,7 @@ namespace rlogic
 {
     /**
      * The RamsesAppearanceBinding is a type of #rlogic::RamsesBinding which allows the #rlogic::LogicEngine to control instances
-     * of ramses::Appearance. Currently, only shader uniforms are supported, except arrays and texture samplers.
-     * RamsesAppearanceBinding's can be created with #rlogic::LogicEngine::createRamsesAppearanceBinding.
+     * of ramses::Appearance. RamsesAppearanceBinding's can be created with #rlogic::LogicEngine::createRamsesAppearanceBinding.
      *
      * Since the RamsesAppearanceBinding derives from #rlogic::RamsesBinding, it also provides the #rlogic::LogicNode::getInputs
      * and #rlogic::LogicNode::getOutputs method. For this particular implementation, the methods behave as follows:
@@ -36,6 +35,14 @@ namespace rlogic
      *  - #rlogic::LogicNode::getInputs: returns the inputs corresponding to the available shader uniforms of ramses::Appearance if such is assigned
      *  - #rlogic::LogicNode::getOutputs: returns always nullptr, because a #RamsesAppearanceBinding does not have outputs,
      *    it implicitly controls the ramses Appearance
+     *
+     * All shader uniforms are supported, except the following:
+     * - uniform arrays (e.g. vec4 u_colors[3])
+     * - texture samplers of any kind
+     * - matrix types (e.g. mat4, mat23 etc.)
+     * - any uniform with attached semantics (e.g. display resolution) - see ramses::EEffectUniformSemantic docs
+     *
+     * Uniform types which are not supported are not available when queried over #rlogic::LogicNode::getInputs.
      *
      * Warning: any references to #rlogic::Property objects are invalidated after a call to #setRamsesAppearance, even if the newly
      * assigned ramses::Appearance has properties with the same name and type!

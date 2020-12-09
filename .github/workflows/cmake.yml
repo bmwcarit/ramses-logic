@@ -3,7 +3,12 @@ name: CMake
 # This is derived from the standard CMake template for github actions.
 # For more details on the settings used, have a look at the template in the marketplace
 
-on: [push]
+# Only pushes and PRs against the master branch are built
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
 
 env:
   BUILD_TYPE: Debug
@@ -76,7 +81,8 @@ jobs:
       run: |
         compile_commands_path=$(pwd)/compile_commands.json
         echo "compile_commands_path: $compile_commands_path"
-        cat $compile_commands_path
         cd $GITHUB_WORKSPACE
-        $GITHUB_WORKSPACE/ci/docker/runtime-files/clang-tidy-wrapper.py $compile_commands_path
+        $GITHUB_WORKSPACE/ci/scripts/clang-tidy-wrapper.py \
+        --config $GITHUB_WORKSPACE/ci/scripts/config/clang-tidy-wrapper.yaml \
+        $compile_commands_path
       if: ${{ matrix.os == 'ubuntu-latest' }}

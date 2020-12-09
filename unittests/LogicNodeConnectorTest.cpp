@@ -24,21 +24,22 @@
 
 namespace rlogic::internal
 {
-    TEST(ALogicNodeConnector, ReturnsFalseForIsLinkedIfLogicNodesAreNotLinked)
+    class ALogicNodeConnector : public ::testing::Test
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
+    protected:
+        std::unique_ptr<LogicNodeDummy> source = LogicNodeDummy::Create("source");
+        std::unique_ptr<LogicNodeDummy> target = LogicNodeDummy::Create("target");
+    };
 
+    TEST_F(ALogicNodeConnector, ReturnsFalseForIsLinkedIfLogicNodesAreNotLinked)
+    {
         LogicNodeConnector lc;
         EXPECT_FALSE(lc.isLinked(source->m_impl));
         EXPECT_FALSE(lc.isLinked(target->m_impl));
     }
 
-    TEST(ALogicNodeConnector, ReturnsTrueDuringLinkingIfLinkedSuccessfully)
+    TEST_F(ALogicNodeConnector, ReturnsTrueDuringLinkingIfLinkedSuccessfully)
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
-
         auto output = source->getOutputs()->getChild("output1");
         auto input  = target->getInputs()->getChild("input1");
 
@@ -48,11 +49,8 @@ namespace rlogic::internal
         EXPECT_TRUE(lc.isLinked(target->m_impl));
     }
 
-    TEST(ALogicNodeConnector, ReturnsFalseDuringLinkinIfAlreadyLinked)
+    TEST_F(ALogicNodeConnector, ReturnsFalseDuringLinkinIfAlreadyLinked)
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
-
         auto output = source->getOutputs()->getChild("output1");
         auto input  = target->getInputs()->getChild("input1");
 
@@ -64,11 +62,8 @@ namespace rlogic::internal
         EXPECT_TRUE(lc.isLinked(target->m_impl));
     }
 
-    TEST(ALogicNodeConnector, ReturnsFalseForIsLinkedAfterUnlink)
+    TEST_F(ALogicNodeConnector, ReturnsFalseForIsLinkedAfterUnlink)
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
-
         auto output = source->getOutputs()->getChild("output1");
         auto input  = target->getInputs()->getChild("input1");
 
@@ -80,11 +75,9 @@ namespace rlogic::internal
         EXPECT_FALSE(lc.isLinked(target->m_impl));
     }
 
-    TEST(ALogicNodeConnector, ReturnsTrueForIsLinkedIfStillALinkIsAvailableAfterUnlink)
+    TEST_F(ALogicNodeConnector, ReturnsTrueForIsLinkedIfStillALinkIsAvailableAfterUnlink)
     {
-        auto source = LogicNodeDummy::Create("source");
         auto middle = LogicNodeDummy::Create("middle");
-        auto target = LogicNodeDummy::Create("target");
 
         auto sourceOutput = source->getOutputs()->getChild("output1");
         auto middleInput  = middle->getInputs()->getChild("input1");
@@ -106,11 +99,9 @@ namespace rlogic::internal
         EXPECT_TRUE(lc.isLinked(target->m_impl));
     }
 
-    TEST(ALogicNodeConnector, ReturnsFalseForIsLinkedAfterUnlinkAll)
+    TEST_F(ALogicNodeConnector, ReturnsFalseForIsLinkedAfterUnlinkAll)
     {
-        auto source = LogicNodeDummy::Create("source");
         auto middle = LogicNodeDummy::Create("middle");
-        auto target = LogicNodeDummy::Create("target");
 
         auto sourceOutput = source->getOutputs()->getChild("output1");
         auto middleInput  = middle->getInputs()->getChild("input1");
@@ -132,18 +123,16 @@ namespace rlogic::internal
         EXPECT_FALSE(lc.isLinked(target->m_impl));
     }
 
-    TEST(ALogicNodeConnector, DoesNotUnlinkUnrelatedLinks)
+    TEST_F(ALogicNodeConnector, DoesNotUnlinkUnrelatedLinks)
     {
-        auto source = LogicNodeDummy::Create("source");
         auto middle = LogicNodeDummy::Create("middle");
-        auto target1 = LogicNodeDummy::Create("target");
         auto target2 = LogicNodeDummy::Create("target2");
 
         auto sourceOutput = source->getOutputs()->getChild("output1");
         auto middleInput  = middle->getInputs()->getChild("input1");
         auto middleOutput = middle->getOutputs()->getChild("output1");
-        auto target1Input1  = target1->getInputs()->getChild("input1");
-        auto target1Input2  = target1->getInputs()->getChild("input2");
+        auto target1Input1  = target->getInputs()->getChild("input1");
+        auto target1Input2  = target->getInputs()->getChild("input2");
         auto target2Input1  = target2->getInputs()->getChild("input1");
 
         LogicNodeConnector lc;
@@ -152,22 +141,19 @@ namespace rlogic::internal
         lc.link(*middleOutput->m_impl, *target1Input2->m_impl);
         lc.link(*sourceOutput->m_impl, *target2Input1->m_impl);
 
-        EXPECT_TRUE(lc.isLinked(target1->m_impl.get()));
+        EXPECT_TRUE(lc.isLinked(target->m_impl.get()));
         EXPECT_TRUE(lc.isLinked(target2->m_impl.get()));
 
         lc.unlinkAll(middle->m_impl.get());
 
         EXPECT_TRUE(lc.isLinked(source->m_impl.get()));
         EXPECT_FALSE(lc.isLinked(middle->m_impl.get()));
-        EXPECT_FALSE(lc.isLinked(target1->m_impl.get()));
+        EXPECT_FALSE(lc.isLinked(target->m_impl.get()));
         EXPECT_TRUE(lc.isLinked(target2->m_impl.get()));
     }
 
-    TEST(ALinkManager, DoesReturnSourcePropertyForTargetPropertyIfLinked)
+    TEST_F(ALogicNodeConnector, DoesReturnSourcePropertyForTargetPropertyIfLinked)
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
-
         auto output = source->getOutputs()->getChild("output1");
         auto input  = target->getInputs()->getChild("input1");
 
@@ -178,18 +164,16 @@ namespace rlogic::internal
         EXPECT_EQ(property, output->m_impl.get());
     }
 
-    TEST(ALinkManager, DoesReturnTargetPropertyForSourcePropertyIfLinked)
+    TEST_F(ALogicNodeConnector, DoesReturnTargetPropertyForSourcePropertyIfLinked)
     {
-        auto source  = LogicNodeDummy::Create("source");
         auto middle  = LogicNodeDummy::Create("middle");
-        auto target1 = LogicNodeDummy::Create("target");
         auto target2 = LogicNodeDummy::Create("target2");
 
         auto sourceOutput  = source->getOutputs()->getChild("output1");
         auto middleInput   = middle->getInputs()->getChild("input1");
         auto middleOutput  = middle->getOutputs()->getChild("output1");
-        auto target1Input1 = target1->getInputs()->getChild("input1");
-        auto target1Input2 = target1->getInputs()->getChild("input2");
+        auto target1Input1 = target->getInputs()->getChild("input1");
+        auto target1Input2 = target->getInputs()->getChild("input2");
         auto target2Input1 = target2->getInputs()->getChild("input1");
 
         LogicNodeConnector lc;
@@ -200,22 +184,19 @@ namespace rlogic::internal
 
         EXPECT_TRUE(lc.isLinked(source->m_impl));
         EXPECT_TRUE(lc.isLinked(middle->m_impl));
-        EXPECT_TRUE(lc.isLinked(target1->m_impl));
+        EXPECT_TRUE(lc.isLinked(target->m_impl));
         EXPECT_TRUE(lc.isLinked(target2->m_impl));
 
         lc.unlinkAll(middle->m_impl);
 
         EXPECT_TRUE(lc.isLinked(source->m_impl));
         EXPECT_FALSE(lc.isLinked(middle->m_impl));
-        EXPECT_FALSE(lc.isLinked(target1->m_impl));
+        EXPECT_FALSE(lc.isLinked(target->m_impl));
         EXPECT_TRUE(lc.isLinked(target2->m_impl));
     }
 
-    TEST(ALogicNodeConnector, DoesReturnNullptrForSourcePropertyIfNotLinked)
+    TEST_F(ALogicNodeConnector, DoesReturnNullptrForSourcePropertyIfNotLinked)
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
-
         auto input  = target->getInputs()->getChild("input1");
 
         LogicNodeConnector lm;
@@ -224,11 +205,8 @@ namespace rlogic::internal
         ASSERT_EQ(nullptr, property);
     }
 
-    TEST(ALogicNodeConnector, DoesReturnNullptrForTargetPropertyIfNotLinked)
+    TEST_F(ALogicNodeConnector, DoesReturnNullptrForTargetPropertyIfNotLinked)
     {
-        auto source = LogicNodeDummy::Create("source");
-        auto target = LogicNodeDummy::Create("target");
-
         auto input = target->getInputs()->getChild("input1");
 
         internal::LogicNodeConnector lm;
@@ -237,7 +215,8 @@ namespace rlogic::internal
         ASSERT_EQ(nullptr, property);
     }
 
-    TEST(ALogicNodeConnector, ConnectsLogicNodesSoThatValuesArePropagated)
+    // TODO Violin this test does not belong here
+    TEST_F(ALogicNodeConnector, ConnectsLogicNodesSoThatValuesArePropagated)
     {
         LogicEngine logicEngine;
         auto        scriptSource = R"(
@@ -276,7 +255,8 @@ namespace rlogic::internal
         EXPECT_EQ("Script1Script2Script3", script3Ouput->get<std::string>());
     }
 
-    TEST(ALogicNodeConnector, ReturnsTrueForIfLinkedForNestedProperties)
+    // TODO Violin this test does not belong here
+    TEST_F(ALogicNodeConnector, ReturnsTrueForIfLinkedForNestedProperties)
     {
         LogicEngine logicEngine;
         auto        scriptSource = R"(

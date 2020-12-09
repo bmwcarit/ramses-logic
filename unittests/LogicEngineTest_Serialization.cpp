@@ -21,6 +21,7 @@
 #include "ramses-framework-api/RamsesVersion.h"
 
 #include "impl/LogicNodeImpl.h"
+#include "impl/LogicEngineImpl.h"
 
 #include "generated/logicengine_gen.h"
 #include "ramses-logic-build-config.h"
@@ -349,7 +350,64 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript));
             EXPECT_TRUE(m_logicEngine.isLinked(*targetScript));
             EXPECT_FALSE(m_logicEngine.isLinked(*notLinkedScript));
+
+            // script without links is not in the internal "LogicNodeConnector"
+            EXPECT_EQ(nullptr, m_logicEngine.m_impl->getLogicNodeConnector().getLinkedOutput(*notLinkedScript->getInputs()->getChild("input")->m_impl));
+            EXPECT_EQ(nullptr, m_logicEngine.m_impl->getLogicNodeConnector().getLinkedInput(*notLinkedScript->getOutputs()->getChild("output")->m_impl));
+
+            // internal "LogicNodeConnector" has pointers from input -> output and vice versa after deserialization
+            EXPECT_EQ(sourceScript->getOutputs()->getChild("output")->m_impl.get(), m_logicEngine.m_impl->getLogicNodeConnector().getLinkedOutput(*targetScript->getInputs()->getChild("input")->m_impl));
+            EXPECT_EQ(targetScript->getInputs()->getChild("input")->m_impl.get(), m_logicEngine.m_impl->getLogicNodeConnector().getLinkedInput(*sourceScript->getOutputs()->getChild("output")->m_impl));
+
+            EXPECT_TRUE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(sourceScript->m_impl));
+            EXPECT_TRUE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(targetScript->m_impl));
         }
+        std::remove("LogicEngine.bin");
+    }
+
+    TEST_F(ALogicEngine_Serialization, InternalLinkDataIsDeletedAfterDeserialization)
+    {
+        std::string_view scriptSource = R"(
+            function interface()
+                IN.input = INT
+                OUT.output = INT
+            end
+            function run()
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+
+        // Save logic engine state without links to file
+        m_logicEngine.saveToFile("LogicEngine.bin");
+
+        // Create link (should be wiped after loading from file)
+        auto output = sourceScript->getOutputs()->getChild("output");
+        auto input = targetScript->getInputs()->getChild("input");
+        m_logicEngine.link(*output, *input);
+
+        EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+
+        auto sourceScriptAfterLoading = findLuaScriptByName("SourceScript");
+        auto targetScriptAfterLoading = findLuaScriptByName("TargetScript");
+
+        const auto& internalNodeGraph = m_logicEngine.m_impl->getLogicNodeGraph();
+
+        // New objects are not linked (because they weren't before saving)
+        EXPECT_FALSE(m_logicEngine.isLinked(*sourceScriptAfterLoading));
+        EXPECT_FALSE(m_logicEngine.isLinked(*targetScriptAfterLoading));
+        EXPECT_FALSE(internalNodeGraph.isLinked(sourceScriptAfterLoading->m_impl));
+        EXPECT_FALSE(internalNodeGraph.isLinked(sourceScriptAfterLoading->m_impl));
+
+        // "Connector" class has no links
+        EXPECT_EQ(0u, m_logicEngine.m_impl->getLogicNodeConnector().getLinks().size());
+
+        // Internal topological graph has no "topologically sorted nodes", neither before nor after update()
+        EXPECT_EQ(0u, internalNodeGraph.getOrderedNodesCache().size());
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(0u, internalNodeGraph.getOrderedNodesCache().size());
+
         std::remove("LogicEngine.bin");
     }
 }

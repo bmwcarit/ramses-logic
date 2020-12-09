@@ -1766,11 +1766,6 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, IncludesStandardLibraries)
     {
-        std::ofstream ofs;
-        ofs.open("test_file.txt", std::ofstream::out);
-        ofs << "This text is from the file";
-        ofs.close();
-
         const std::string_view scriptSrc = R"(
             function debug_func(arg)
                 print(arg)
@@ -1778,23 +1773,15 @@ namespace rlogic
 
             function interface()
                 OUT.floored_float = INT
-                OUT.file_contents = STRING
-                OUT.file_contents_gsub = STRING
+                OUT.string_gsub = STRING
                 OUT.table_maxn = INT
                 OUT.language_of_debug_func = STRING
             end
             function run()
                 -- test math lib
                 OUT.floored_float = math.floor(42.7)
-                -- test io and os libs
-                file = io.open("test_file.txt", "r")
-                io.input(file)
-                OUT.file_contents = io.read()
-                io.close(file)
-                -- test os lib
-                os.remove("test_file.txt")
                 -- test string lib
-                OUT.file_contents_gsub = string.gsub(OUT.file_contents, "text", "modified text")
+                OUT.string_gsub = string.gsub("This is the text", "the text", "the modified text")
                 -- test table lib
                 OUT.table_maxn = table.maxn ({11, 12, 13})
                 -- test debug lib
@@ -1808,13 +1795,9 @@ namespace rlogic
         m_logicEngine.update();
 
         EXPECT_EQ(42, *script->getOutputs()->getChild("floored_float")->get<int32_t>());
-        EXPECT_EQ("This modified text is from the file", *script->getOutputs()->getChild("file_contents_gsub")->get<std::string>());
+        EXPECT_EQ("This is the modified text", *script->getOutputs()->getChild("string_gsub")->get<std::string>());
         EXPECT_EQ(3, *script->getOutputs()->getChild("table_maxn")->get<int32_t>());
         EXPECT_EQ("Lua", *script->getOutputs()->getChild("language_of_debug_func")->get<std::string>());
-
-        // File was deleted by script
-        std::ifstream f("test_file.txt");
-        EXPECT_FALSE(f.good());
     }
 
 }

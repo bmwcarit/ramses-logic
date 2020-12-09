@@ -1,0 +1,49 @@
+//  -------------------------------------------------------------------------
+//  Copyright (C) 2020 BMW AG
+//  -------------------------------------------------------------------------
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//  -------------------------------------------------------------------------
+
+#include "benchmark/benchmark.h"
+
+#include "ramses-logic/LogicEngine.h"
+#include "fmt/format.h"
+
+namespace rlogic
+{
+    static void CompileLua(LogicEngine& logicEngine, std::string_view src)
+    {
+        LuaScript* script = logicEngine.createLuaScriptFromSource(src);
+        logicEngine.destroy(*script);
+    }
+
+    static void BM_CompileLua_Interface(benchmark::State& state)
+    {
+        LogicEngine logicEngine;
+
+        const int64_t scriptSize = state.range(0);
+
+        const std::string scriptSrc = fmt::format(R"(
+            function interface()
+                for i = 0,{},1 do
+                    IN["param"..tostring(i)] = INT
+                end
+            end
+            function run()
+            end
+        )", scriptSize);
+
+        for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
+        {
+            CompileLua(logicEngine, scriptSrc);
+        }
+    }
+
+    // Measures compilation times depending on the number of inputs in the interface
+    // ARG: number of inputs in script's interface()
+    BENCHMARK(BM_CompileLua_Interface)->Arg(1)->Arg(10)->Arg(100);
+}
+
+

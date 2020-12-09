@@ -3,6 +3,27 @@ master
 ======
 
 ======
+v0.4.2
+======
+
+**Features**
+
+* Added benchmarks for basic functionality. Enabled when unit tests are enabled, works based on google-benchmark.
+  To run them, execute the ``benchmarks`` executable after having built the project in release mode for maximum accuracy.
+
+**Bugfixes**
+
+* Fixed an exotic bug related to links and deserialization.
+  Used to trigger when deserializing twice from file which had links.
+* Does not wrongly create array properties out of GLSL uniforms arrays in RamsesAppearanceBinding.
+  Array feature not supported there yet!
+* Does not wrongly create LogicNode inputs out of semantic uniforms in RamsesAppearanceBinding.
+
+**Other**
+
+* Removed support for i/o and os lua libs. See `lua module docs <https://genivi.github.io/ramses-logic/api.html#using-lua-modules>`_ for details
+
+======
 v0.4.1
 ======
 

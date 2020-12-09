@@ -12,6 +12,7 @@
 #include "impl/PropertyImpl.h"
 
 #include "ramses-logic/LogicNode.h"
+#include "ramses-logic/Property.h"
 
 namespace rlogic
 {

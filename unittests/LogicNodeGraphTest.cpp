@@ -20,8 +20,9 @@
 #include "LogicNodeDummy.h"
 
 #include <memory>
+#include "gmock/gmock-matchers.h"
 
-namespace rlogic
+namespace rlogic::internal
 {
 
     class AlogicNodeGraph : public ::testing::Test
@@ -37,10 +38,9 @@ namespace rlogic
 
         graph.addLink(source->m_impl.get(), target->m_impl.get());
 
-        auto iter = graph.begin();
-        EXPECT_EQ(*iter, &source->m_impl.get());
-        ++iter;
-        EXPECT_EQ(*iter, &target->m_impl.get());
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        EXPECT_THAT(sortedNodes, ::testing::ElementsAre(&source->m_impl.get(), &target->m_impl.get()));
     }
 
     TEST_F(AlogicNodeGraph, DoesNotReturnNodesIfLinkIsRemoved)
@@ -54,10 +54,9 @@ namespace rlogic
         graph.addLink(source->m_impl.get(), target->m_impl.get());
         graph.removeLink(source->m_impl.get(), target->m_impl.get());
 
-        const auto begin = graph.begin();
-        const auto end   = graph.end();
-
-        EXPECT_EQ(begin, end);
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        EXPECT_TRUE(sortedNodes.empty());
     }
 
     TEST_F(AlogicNodeGraph, ComputesRightOrderForComplexGraph)
@@ -88,7 +87,9 @@ namespace rlogic
         graph.addLink(n3->m_impl.get(), n6->m_impl.get());
         graph.addLink(n4->m_impl.get(), n5->m_impl.get());
 
-        for (auto node : graph)
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        for (auto node : sortedNodes)
         {
             node->update();
         }
@@ -141,7 +142,9 @@ namespace rlogic
         graph.removeLink(n1->m_impl.get(), n3->m_impl.get());
         graph.addLink(n6->m_impl.get(), n1->m_impl.get());
 
-        for (auto node : graph)
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        for (auto node : sortedNodes)
         {
             node->update();
         }
@@ -192,7 +195,9 @@ namespace rlogic
 
         graph.removeLinksForNode(n2->m_impl.get());
 
-        for (auto node : graph)
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        for (auto node : sortedNodes)
         {
             node->update();
         }
@@ -244,7 +249,9 @@ namespace rlogic
 
         graph.removeLinksForNode(n5->m_impl.get());
 
-        for (auto node : graph)
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        for (auto node : sortedNodes)
         {
             node->update();
         }
@@ -295,7 +302,9 @@ namespace rlogic
 
         graph.removeLinksForNode(n3->m_impl.get());
 
-        for (auto node : graph)
+        graph.updateOrder();
+        const LogicNodeVector& sortedNodes = graph.getOrderedNodesCache();
+        for (auto node : sortedNodes)
         {
             node->update();
         }

@@ -457,11 +457,7 @@ readability-uniqueptr-delete-release,
 # everything that is enabled is also an error
 WarningsAsErrors: '*'
 
-# Filter organized as whitelist in order to exclude:
-# - external/* (can't fix everything in externals)
-# - lib/flatbuffers/* (generated files from flatc, can't fix short-term)
-# - everything else which is not source code (ci/, cmake/, ...)
-HeaderFilterRegex: '/git/(examples|include|unittests|lib/internals|lib/impl)'
+HeaderFilterRegex: '.*'
 
 AnalyzeTemporaryDtors: false
 FormatStyle:     File

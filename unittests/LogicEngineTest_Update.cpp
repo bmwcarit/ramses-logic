@@ -283,17 +283,39 @@ namespace rlogic
             messages.emplace_back(std::make_pair(scriptName, message));
         });
 
+        EXPECT_TRUE(sourceScript->m_impl.get().isDirty());
+        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+
         logicEngine.link(*sourceOutput, *targetInput);
+
+        EXPECT_TRUE(sourceScript->m_impl.get().isDirty());
+        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+
         logicEngine.update();
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
 
         // both scripts are updated, because its the first update
         ASSERT_EQ(2u, messages.size());
         EXPECT_EQ("SourceScript", messages[0].first);
         EXPECT_EQ("TargetScript", messages[1].first);
 
-        targetInput->set(42.f);
         messages.clear();
         logicEngine.update();
+
+        EXPECT_TRUE(messages.empty());
+        messages.clear();
+
+        targetInput->set(42.f);
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+
+        logicEngine.update();
+
+        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
+        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
 
         // Only targetScript is updated, because only the input of the target script has changed
         ASSERT_EQ(1u, messages.size());
@@ -371,23 +393,35 @@ namespace rlogic
         logicEngine.update();
 
         // All scripts are executed
-        ASSERT_EQ(s.size(), messages.size());
+        ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({ "Script0", "Script1", "Script2", "Script3", "Script4", "Script5" }));
         messages.clear();
+
+        logicEngine.update();
+        EXPECT_TRUE(messages.empty());
 
         in2S4->set(1);
         logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script4", "Script5"}));
         messages.clear();
 
+        logicEngine.update();
+        EXPECT_TRUE(messages.empty());
+
         in1S2->set(2);
         logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script1", "Script2", "Script3", "Script4", "Script5"}));
         messages.clear();
 
+        logicEngine.update();
+        EXPECT_TRUE(messages.empty());
+
         in1S0->set(42);
         logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script0", "Script1", "Script3", "Script4", "Script5"}));
         messages.clear();
+
+        logicEngine.update();
+        EXPECT_TRUE(messages.empty());
 
         in1S0->set(24);
         in1S2->set(23);

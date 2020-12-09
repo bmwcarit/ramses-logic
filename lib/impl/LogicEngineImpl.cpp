@@ -322,7 +322,10 @@ namespace rlogic::internal
             unlinkedNode->setDirty(false);
         }
 
-        for (auto logicNode : m_logicNodeGraph)
+        m_logicNodeGraph.updateOrder();
+        const LogicNodeVector& orderedNodes = m_logicNodeGraph.getOrderedNodesCache();
+
+        for (auto logicNode : orderedNodes)
         {
             updateLinksRecursive(*logicNode->getInputs());
 
@@ -397,6 +400,8 @@ namespace rlogic::internal
         m_ramsesAppearanceBindings.clear();
         m_disconnectedNodes.clear();
         m_logicNodes.clear();
+        m_logicNodeGraph = {};
+        m_logicNodeConnector = {};
 
         std::string sFilename(filename);
         std::string buf;
@@ -769,7 +774,7 @@ namespace rlogic::internal
             collectPropertyChildrenMetadata(*inputs);
         }
 
-        auto& allLinks = m_logicNodeConnector.getLinks();
+        const LinksMap& allLinks = m_logicNodeConnector.getLinks();
 
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
         links.reserve(allLinks.size());

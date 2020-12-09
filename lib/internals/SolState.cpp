@@ -34,7 +34,7 @@ namespace rlogic::internal
     SolState::SolState()
         : m_sol(std::make_unique<sol::state>())
     {
-        m_sol->open_libraries();
+        m_sol->open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::table, sol::lib::debug);
         m_sol->set_exception_handler(&solExceptionHandler);
 
         m_sol->new_usertype<ArrayTypeInfo>("ArrayTypeInfo");

@@ -54,10 +54,6 @@ mkdir -p "${BUILD_ROOT}"
 mkdir -p "${PACKAGE_ROOT}"
 mkdir -p "${PERSISTENT_STORAGE}"
 
-if [[ -f ~/.artifactory-token ]]; then
-    cp ~/.artifactory-token ${PERSISTENT_STORAGE}/
-fi
-
 echo "Build root:         $BUILD_ROOT"
 echo "Package root:       $PACKAGE_ROOT"
 echo "Persistent storage: $PERSISTENT_STORAGE"
@@ -68,9 +64,6 @@ if [ -f "${HOME}/.ssh/id_rsa"  ]; then
 fi
 
 # optional link in tokens when existing
-if [ -f ${HOME}/.artifactory-token ]; then
-    TOKEN_MIXIN_ARTIFACTORY=(-v ${HOME}/.artifactory-token:/home/rl-build/.artifactory-token)
-fi
 if [ -f ${HOME}/.github-token ]; then
     TOKEN_MIXIN_GITHUB=(-v ${HOME}/.github-token:/home/rl-build/.github-token)
 fi
@@ -85,7 +78,6 @@ docker run \
         -v $BUILD_ROOT:/home/rl-build/build \
         -v $PACKAGE_ROOT:/home/rl-build/package \
         -v $PERSISTENT_STORAGE:/home/rl-build/persistent-storage \
-        ${TOKEN_MIXIN_ARTIFACTORY[@]} \
         ${TOKEN_MIXIN_GITHUB[@]} \
         -e DEV_UID=$(id -u) \
         -e DEV_GID=$(id -g) \

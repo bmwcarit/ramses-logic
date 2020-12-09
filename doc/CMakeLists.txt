@@ -77,6 +77,7 @@ add_custom_command(OUTPUT ${SPHINX_IDX_FILE}
                     ${SPHINX_EXECUTABLE}
                         -b html
                         -Dbreathe_projects.ramses_logic=${DOXYGEN_TARGET_DIR}/xml
+                        -Drelease=${RLOGIC_VERSION}
                         -W --keep-going
                         ${SPHINX_SRC_FILES} ${SPHINX_TARGET_DIR}
                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}

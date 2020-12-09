@@ -18,6 +18,8 @@ namespace rlogic::internal
     class PropertyImpl;
     class LogicNodeImpl;
 
+    using LinksMap = std::unordered_map<const PropertyImpl*, const PropertyImpl*>;
+
     class LogicNodeConnector
     {
     public:
@@ -28,19 +30,15 @@ namespace rlogic::internal
         const PropertyImpl* getLinkedOutput(const PropertyImpl& input) const;
         const PropertyImpl* getLinkedInput(const PropertyImpl& output) const;
 
-    private:
-        using LinksMap = std::unordered_map<const PropertyImpl*, const PropertyImpl*>;
-
-        LinksMap m_links;
-
-    public:
-        // TODO Violin refactor this once other refactoring PRs are merged (to avoid extra conflicts)
+        // TODO Violin refactor this (class should not have to expose internal data). Currently still used for serialization
         const LinksMap& getLinks() const
         {
             return m_links;
         }
 
     private:
+        LinksMap m_links;
+
         bool isSourceLinked(PropertyImpl& input) const;
         bool isTargetLinked(PropertyImpl& output) const;
     };

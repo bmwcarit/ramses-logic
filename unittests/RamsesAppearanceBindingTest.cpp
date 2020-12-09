@@ -156,6 +156,7 @@ namespace rlogic
         ramses::Effect& createTestEffect(std::string_view vertShader, std::string_view fragShader)
         {
             ramses::EffectDescription effectDesc;
+            effectDesc.setUniformSemantic("u_DisplayBufferResolution", ramses::EEffectUniformSemantic::DisplayBufferResolution);
             effectDesc.setVertexShader(vertShader.data());
             effectDesc.setFragmentShader(fragShader.data());
             return *m_scene->createEffect(effectDesc);
@@ -252,6 +253,8 @@ namespace rlogic
             uniform mediump mat2 u_mat2;            // Not supported
             uniform mediump mat3 u_mat3;            // Not supported
             uniform mediump mat4 u_mat4;            // Not supported
+            uniform mediump vec2 u_vec2Array[2];    // Not supported (yet)
+            uniform mediump vec2 u_DisplayBufferResolution; // explicitly prohibited to set by ramses
             uniform highp ivec2 u_vec2i;
 
             out lowp vec4 color;
@@ -287,16 +290,17 @@ namespace rlogic
         ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_allTypes, m_fragShader_trivial));
         auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
         auto inputs = appearanceBinding.getInputs();
-        ASSERT_TRUE(inputs->getChild("floatUniform")->set(42.42f));
-        ASSERT_TRUE(inputs->getChild("intUniform")->set(42));
-        ASSERT_TRUE(inputs->getChild("vec2Uniform")->set<vec2f>({ 0.1f, 0.2f }));
-        ASSERT_TRUE(inputs->getChild("vec3Uniform")->set<vec3f>({ 1.1f, 1.2f, 1.3f }));
-        ASSERT_TRUE(inputs->getChild("vec4Uniform")->set<vec4f>({ 2.1f, 2.2f, 2.3f, 2.4f }));
-        ASSERT_TRUE(inputs->getChild("ivec2Uniform")->set<vec2i>({ 1, 2 }));
-        ASSERT_TRUE(inputs->getChild("ivec3Uniform")->set<vec3i>({ 3, 4, 5 }));
-        ASSERT_TRUE(inputs->getChild("ivec4Uniform")->set<vec4i>({ 6, 7, 8, 9 }));
+        ASSERT_EQ(9u, inputs->getChildCount());
+        EXPECT_TRUE(inputs->getChild("floatUniform")->set(42.42f));
+        EXPECT_TRUE(inputs->getChild("intUniform")->set(42));
+        EXPECT_TRUE(inputs->getChild("vec2Uniform")->set<vec2f>({ 0.1f, 0.2f }));
+        EXPECT_TRUE(inputs->getChild("vec3Uniform")->set<vec3f>({ 1.1f, 1.2f, 1.3f }));
+        EXPECT_TRUE(inputs->getChild("vec4Uniform")->set<vec4f>({ 2.1f, 2.2f, 2.3f, 2.4f }));
+        EXPECT_TRUE(inputs->getChild("ivec2Uniform")->set<vec2i>({ 1, 2 }));
+        EXPECT_TRUE(inputs->getChild("ivec3Uniform")->set<vec3i>({ 3, 4, 5 }));
+        EXPECT_TRUE(inputs->getChild("ivec4Uniform")->set<vec4i>({ 6, 7, 8, 9 }));
 
-        ASSERT_TRUE(appearanceBinding.m_impl.get().update());
+        EXPECT_TRUE(appearanceBinding.m_impl.get().update());
 
         ramses::UniformInput uniform;
         {
@@ -381,7 +385,7 @@ namespace rlogic
 
         // Can't compare pointers to make sure property is recreated, because we can't assume pointer address is
         // different. Use value comparison instead - when recreated, the property will receive a new value
-        ASSERT_TRUE(propertyPointerBeforeAppearanceChanged->set<float>(0.5f));
+        EXPECT_TRUE(propertyPointerBeforeAppearanceChanged->set<float>(0.5f));
 
         appearanceBinding.setRamsesAppearance(&differentAppearance);
 
@@ -429,11 +433,9 @@ namespace rlogic
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("logic.bin", m_scene));
             auto loadedAppearanceBinding = findBindingByName("AppearanceBinding");
-            ASSERT_EQ(loadedAppearanceBinding->getRamsesAppearance()->getSceneObjectId(), appearance.getSceneObjectId());
+            EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance()->getSceneObjectId(), appearance.getSceneObjectId());
 
             const auto& inputs = loadedAppearanceBinding->getInputs();
-            ASSERT_EQ(9u, inputs->getChildCount());
-
             ASSERT_EQ(9u, inputs->getChildCount());
 
             // check order after deserialization
@@ -509,7 +511,7 @@ namespace rlogic
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("logic.bin", m_scene));
             auto loadedAppearanceBinding = findBindingByName("AppearanceBinding");
-            ASSERT_EQ(loadedAppearanceBinding->getRamsesAppearance()->getSceneObjectId(), recreatedAppearance.getSceneObjectId());
+            EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance()->getSceneObjectId(), recreatedAppearance.getSceneObjectId());
 
             const auto& inputs = loadedAppearanceBinding->getInputs();
             ASSERT_EQ(3u, inputs->getChildCount());

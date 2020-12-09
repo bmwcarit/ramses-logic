@@ -16,22 +16,22 @@ namespace rlogic::internal
 {
     class LogicNodeImpl;
 
-    class LogicNodeGraph {
-    public:
+    using LogicNodeVector = std::vector<LogicNodeImpl*>;
 
-        LogicNodeGraph()  = default;
-        ~LogicNodeGraph() = default;
+    class LogicNodeGraph
+    {
+    public:
 
         void addLink(LogicNodeImpl& source, LogicNodeImpl& target);
         void removeLink(LogicNodeImpl& source, const LogicNodeImpl& target);
         void removeLinksForNode(LogicNodeImpl& source);
-        bool isLinked(LogicNodeImpl& node) const ;
-        std::vector<LogicNodeImpl*>::iterator begin();
-        std::vector<LogicNodeImpl*>::iterator end();
+        bool isLinked(LogicNodeImpl& node) const;
+
+        void updateOrder();
+        const LogicNodeVector& getOrderedNodesCache() const;
 
     private:
 
-        void updateOrder();
 
         struct Link
         {
@@ -42,7 +42,7 @@ namespace rlogic::internal
         std::vector<LogicNodeImpl*> findUnboundInputs() const;
 
         std::unordered_map<LogicNodeImpl*, std::vector<Link>> m_links;
-        std::vector<LogicNodeImpl*>                           m_order;
+        LogicNodeVector m_order;
         bool m_dirty = false;
     };
 }

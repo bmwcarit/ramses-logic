@@ -14,6 +14,7 @@
 #include "ramses-logic/Property.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/Logger.h"
 
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/Effect.h"
@@ -22,20 +23,48 @@
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LogicEngineImpl.h"
+#include "internals/FileUtils.h"
+#include "LogTestUtils.h"
 
 #include "generated/logicengine_gen.h"
 #include "ramses-logic-build-config.h"
-#include "flatbuffers/util.h"
 #include "fmt/format.h"
 
 #include <fstream>
 
-namespace rlogic
+namespace rlogic::internal
 {
     class ALogicEngine_Serialization : public ALogicEngine
     {
     protected:
-        void TearDown() override {
+        static ramses::Appearance* CreateTestAppearance(ramses::Scene& scene)
+        {
+            ramses::EffectDescription effectDesc;
+            effectDesc.setFragmentShader(R"(
+            #version 100
+
+            void main(void)
+            {
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            })");
+
+            effectDesc.setVertexShader(R"(
+            #version 100
+
+            uniform highp float floatUniform;
+            attribute vec3 a_position;
+
+            void main()
+            {
+                gl_Position = floatUniform * vec4(a_position, 1.0);
+            })");
+
+            const ramses::Effect* effect = scene.createEffect(effectDesc);
+            return scene.createAppearance(*effect, "test appearance");
+        }
+
+        void TearDown() override
+        {
             std::remove("no_version.bin");
             std::remove("wrong_ramses_version.bin");
             std::remove("wrong_version.bin");
@@ -60,16 +89,13 @@ namespace rlogic
             );
 
             builder.Finish(logicEngine);
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) No way around this reinterpret-cast
-            ASSERT_TRUE(flatbuffers::SaveFile("no_version.bin", reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize(), true));
+            ASSERT_TRUE(FileUtils::SaveBinary("no_version.bin", builder.GetBufferPointer(), builder.GetSize()));
         }
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("no_version.bin"));
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
         EXPECT_EQ("File 'no_version.bin' doesn't contain logic engine data with readable version specifiers", errors[0]);
-
-        std::remove("no_version.bin");
     }
 
 
@@ -86,8 +112,7 @@ namespace rlogic
             );
 
             builder.Finish(logicEngine);
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) No way around this reinterpret-cast
-            ASSERT_TRUE(flatbuffers::SaveFile("wrong_ramses_version.bin", reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize(), true));
+            ASSERT_TRUE(FileUtils::SaveBinary("wrong_ramses_version.bin", builder.GetBufferPointer(), builder.GetSize()));
         }
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_ramses_version.bin"));
@@ -95,8 +120,6 @@ namespace rlogic
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
         EXPECT_EQ(expectedErrorMessage, errors[0]);
-
-        std::remove("wrong_ramses_version.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongVersion)
@@ -116,8 +139,7 @@ namespace rlogic
             );
 
             builder.Finish(logicEngine);
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) No way around this reinterpret-cast
-            ASSERT_TRUE(flatbuffers::SaveFile("wrong_version.bin", reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize(), true));
+            ASSERT_TRUE(FileUtils::SaveBinary("wrong_version.bin", builder.GetBufferPointer(), builder.GetSize()));
         }
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_version.bin"));
@@ -125,8 +147,6 @@ namespace rlogic
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
         EXPECT_EQ(expectedErrorMessage, errors[0]);
-
-        std::remove("wrong_version.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesNoErrorIfDeserializedWithNoScriptsAndNoNodeBindings)
@@ -139,7 +159,6 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
         }
-        std::remove("LogicEngine.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesNoErrorIfDeserializedWithNoScripts)
@@ -154,14 +173,13 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
-                auto rNodeBinding = findRamsesNodeBindingByName("binding");
+                auto rNodeBinding = m_logicEngine.findNodeBinding("binding");
                 ASSERT_NE(nullptr, rNodeBinding);
                 const auto inputs = rNodeBinding->getInputs();
                 ASSERT_NE(nullptr, inputs);
                 EXPECT_EQ(4u, inputs->getChildCount());
             }
         }
-        std::remove("LogicEngine.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesNoErrorIfDeserilizedWithoutNodeBindings)
@@ -183,14 +201,82 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
-                auto script = findLuaScriptByName("luascript");
+                auto script = m_logicEngine.findScript("luascript");
                 ASSERT_NE(nullptr, script);
                 const auto inputs = script->getInputs();
                 ASSERT_NE(nullptr, inputs);
                 EXPECT_EQ(1u, inputs->getChildCount());
             }
         }
-        std::remove("LogicEngine.bin");
+    }
+
+    TEST_F(ALogicEngine_Serialization, ProducesWarningIfSavedWithBindingValuesWithoutCallingUpdateBefore)
+    {
+        // Put logic engine to a dirty state (create new object and don't call update)
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("binding");
+        ASSERT_TRUE(m_logicEngine.m_impl->isDirty());
+
+        std::string warningMessage;
+        ELogMessageType messageType;
+        ScopedLogContextLevel scopedLogs(ELogMessageType::WARNING, [&warningMessage, &messageType](ELogMessageType msgType, std::string_view message) {
+            warningMessage = message;
+            messageType = msgType;
+        });
+
+        // Set a valud and save -> causes warning
+        nodeBinding->getInputs()->getChild("visibility")->set<bool>(false);
+        m_logicEngine.saveToFile("LogicEngine.bin");
+
+        EXPECT_EQ("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", warningMessage);
+        EXPECT_EQ(ELogMessageType::WARNING, messageType);
+
+        // Unset custom log handler
+        Logger::SetLogHandler([](ELogMessageType msgType, std::string_view message) {
+            (void)message;
+            (void)msgType;
+        });
+    }
+
+    TEST_F(ALogicEngine_Serialization, RefusesToSaveTwoNodeBindingsWhichPointToDifferentScenes)
+    {
+        RamsesTestSetup testSetup;
+        ramses::Scene* scene1 = testSetup.createScene(ramses::sceneId_t(1));
+        ramses::Scene* scene2 = testSetup.createScene(ramses::sceneId_t(2));
+
+        ramses::Node* node1 = scene1->createNode("node1");
+        ramses::Node* node2 = scene2->createNode("node2");
+
+        rlogic::RamsesNodeBinding* binding1 = m_logicEngine.createRamsesNodeBinding("binding1");
+        rlogic::RamsesNodeBinding* binding2 = m_logicEngine.createRamsesNodeBinding("binding2");
+
+        binding1->setRamsesNode(node1);
+        binding2->setRamsesNode(node2);
+
+        EXPECT_FALSE(m_logicEngine.saveToFile("will_not_be_written.logic"));
+        EXPECT_EQ(2u, m_logicEngine.getErrors().size());
+        EXPECT_EQ("Ramses node 'node2' is from scene with id:2 but other objects are from scene with id:1!", m_logicEngine.getErrors()[0]);
+        EXPECT_EQ("Can't save a logic engine to file while it has references to more than one Ramses scene!", m_logicEngine.getErrors()[1]);
+    }
+
+    TEST_F(ALogicEngine_Serialization, RefusesToSaveAppearanceBindingWhichIsFromDifferentSceneThanNodeBinding)
+    {
+        RamsesTestSetup testSetup;
+        ramses::Scene* scene1 = testSetup.createScene(ramses::sceneId_t(1));
+        ramses::Scene* scene2 = testSetup.createScene(ramses::sceneId_t(2));
+
+        ramses::Node* node = scene1->createNode("node");
+        ramses::Appearance* appearance = CreateTestAppearance(*scene2);
+
+        rlogic::RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("node binding");
+        rlogic::RamsesAppearanceBinding* appBinding = m_logicEngine.createRamsesAppearanceBinding("app binding");
+
+        nodeBinding->setRamsesNode(node);
+        appBinding->setRamsesAppearance(appearance);
+
+        EXPECT_FALSE(m_logicEngine.saveToFile("will_not_be_written.logic"));
+        EXPECT_EQ(2u, m_logicEngine.getErrors().size());
+        EXPECT_EQ("Ramses appearance 'test appearance' is from scene with id:2 but other objects are from scene with id:1!", m_logicEngine.getErrors()[0]);
+        EXPECT_EQ("Can't save a logic engine to file while it has references to more than one Ramses scene!", m_logicEngine.getErrors()[1]);
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesNoErrorIfDeserilizedSuccessfully)
@@ -208,31 +294,8 @@ namespace rlogic
                 end
             )", "luascript");
 
-            ramses::EffectDescription effectDesc;
-            effectDesc.setFragmentShader(R"(
-            #version 100
-
-            void main(void)
-            {
-                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-            })");
-
-            effectDesc.setVertexShader(R"(
-            #version 100
-
-            uniform highp float floatUniform;
-            attribute vec3 a_position;
-
-            void main()
-            {
-                gl_Position = floatUniform * vec4(a_position, 1.0);
-            })");
-
-            const ramses::Effect* effect = scene->createEffect(effectDesc, ramses::ResourceCacheFlag_DoNotCache, "glsl shader");
-            ramses::Appearance* appearance = scene->createAppearance(*effect, "triangle appearance");
-
             auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("appearancebinding");
-            appearanceBinding->setRamsesAppearance(appearance);
+            appearanceBinding->setRamsesAppearance(CreateTestAppearance(*scene));
 
             logicEngine.createRamsesNodeBinding("nodebinding");
             logicEngine.saveToFile("LogicEngine.bin");
@@ -242,7 +305,7 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
-                auto script = findLuaScriptByName("luascript");
+                auto script = m_logicEngine.findScript("luascript");
                 ASSERT_NE(nullptr, script);
                 const auto inputs = script->getInputs();
                 ASSERT_NE(nullptr, inputs);
@@ -250,7 +313,7 @@ namespace rlogic
                 EXPECT_TRUE(script->m_impl.get().isDirty());
             }
             {
-                auto rNodeBinding = findRamsesNodeBindingByName("nodebinding");
+                auto rNodeBinding = m_logicEngine.findNodeBinding("nodebinding");
                 ASSERT_NE(nullptr, rNodeBinding);
                 const auto inputs = rNodeBinding->getInputs();
                 ASSERT_NE(nullptr, inputs);
@@ -258,7 +321,7 @@ namespace rlogic
                 EXPECT_TRUE(rNodeBinding->m_impl.get().isDirty());
             }
             {
-                auto rAppearanceBinding = findRamsesAppearanceBindingByName("appearancebinding");
+                auto rAppearanceBinding = m_logicEngine.findAppearanceBinding("appearancebinding");
                 ASSERT_NE(nullptr, rAppearanceBinding);
                 const auto inputs = rAppearanceBinding->getInputs();
                 ASSERT_NE(nullptr, inputs);
@@ -271,7 +334,6 @@ namespace rlogic
                 EXPECT_TRUE(rAppearanceBinding->m_impl.get().isDirty());
             }
         }
-        std::remove("LogicEngine.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, ReplacesCurrentStateWithStateFromFile)
@@ -303,16 +365,15 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
-                ASSERT_EQ(nullptr, findLuaScriptByName("luascript2"));
-                ASSERT_EQ(nullptr, findRamsesNodeBindingByName("binding2"));
+                ASSERT_EQ(nullptr, m_logicEngine.findScript("luascript2"));
+                ASSERT_EQ(nullptr, m_logicEngine.findNodeBinding("binding2"));
 
-                auto script = findLuaScriptByName("luascript");
+                auto script = m_logicEngine.findScript("luascript");
                 ASSERT_NE(nullptr, script);
-                auto rNodeBinding = findRamsesNodeBindingByName("binding");
+                auto rNodeBinding = m_logicEngine.findNodeBinding("binding");
                 ASSERT_NE(nullptr, rNodeBinding);
             }
         }
-        std::remove("LogicEngine.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, DeserializesLinks)
@@ -343,26 +404,25 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
-            auto sourceScript    = findLuaScriptByName("SourceScript");
-            auto targetScript    = findLuaScriptByName("TargetScript");
-            auto notLinkedScript = findLuaScriptByName("NotLinkedScript");
+            auto sourceScript    = m_logicEngine.findScript("SourceScript");
+            auto targetScript    = m_logicEngine.findScript("TargetScript");
+            auto notLinkedScript = m_logicEngine.findScript("NotLinkedScript");
 
             EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript));
             EXPECT_TRUE(m_logicEngine.isLinked(*targetScript));
             EXPECT_FALSE(m_logicEngine.isLinked(*notLinkedScript));
 
+            const internal::LogicNodeDependencies& internalNodeDependencies = m_logicEngine.m_impl->getLogicNodeDependencies();
+
             // script without links is not in the internal "LogicNodeConnector"
-            EXPECT_EQ(nullptr, m_logicEngine.m_impl->getLogicNodeConnector().getLinkedOutput(*notLinkedScript->getInputs()->getChild("input")->m_impl));
-            EXPECT_EQ(nullptr, m_logicEngine.m_impl->getLogicNodeConnector().getLinkedInput(*notLinkedScript->getOutputs()->getChild("output")->m_impl));
+            EXPECT_EQ(nullptr, internalNodeDependencies.getLinkedOutput(*notLinkedScript->getInputs()->getChild("input")->m_impl));
 
-            // internal "LogicNodeConnector" has pointers from input -> output and vice versa after deserialization
-            EXPECT_EQ(sourceScript->getOutputs()->getChild("output")->m_impl.get(), m_logicEngine.m_impl->getLogicNodeConnector().getLinkedOutput(*targetScript->getInputs()->getChild("input")->m_impl));
-            EXPECT_EQ(targetScript->getInputs()->getChild("input")->m_impl.get(), m_logicEngine.m_impl->getLogicNodeConnector().getLinkedInput(*sourceScript->getOutputs()->getChild("output")->m_impl));
+            // internal "LogicNodeConnector" has pointers from input -> output after deserialization
+            EXPECT_EQ(sourceScript->getOutputs()->getChild("output")->m_impl.get(), internalNodeDependencies.getLinkedOutput(*targetScript->getInputs()->getChild("input")->m_impl));
 
-            EXPECT_TRUE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(sourceScript->m_impl));
-            EXPECT_TRUE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(targetScript->m_impl));
+            EXPECT_TRUE(internalNodeDependencies.isLinked(sourceScript->m_impl));
+            EXPECT_TRUE(internalNodeDependencies.isLinked(targetScript->m_impl));
         }
-        std::remove("LogicEngine.bin");
     }
 
     TEST_F(ALogicEngine_Serialization, InternalLinkDataIsDeletedAfterDeserialization)
@@ -389,26 +449,27 @@ namespace rlogic
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
 
-        auto sourceScriptAfterLoading = findLuaScriptByName("SourceScript");
-        auto targetScriptAfterLoading = findLuaScriptByName("TargetScript");
+        auto sourceScriptAfterLoading = m_logicEngine.findScript("SourceScript");
+        auto targetScriptAfterLoading = m_logicEngine.findScript("TargetScript");
 
-        const auto& internalNodeGraph = m_logicEngine.m_impl->getLogicNodeGraph();
+        // Make a copy of the object so that we can call non-const methods on it too (updateTopologicalSorting())
+        // This can't happen in user code, we only do this to test internal data
+        internal::LogicNodeDependencies internalNodeDependencies = m_logicEngine.m_impl->getLogicNodeDependencies();
+        ASSERT_TRUE(internalNodeDependencies.updateTopologicalSorting());
 
         // New objects are not linked (because they weren't before saving)
         EXPECT_FALSE(m_logicEngine.isLinked(*sourceScriptAfterLoading));
         EXPECT_FALSE(m_logicEngine.isLinked(*targetScriptAfterLoading));
-        EXPECT_FALSE(internalNodeGraph.isLinked(sourceScriptAfterLoading->m_impl));
-        EXPECT_FALSE(internalNodeGraph.isLinked(sourceScriptAfterLoading->m_impl));
+        EXPECT_FALSE(internalNodeDependencies.isLinked(sourceScriptAfterLoading->m_impl));
+        EXPECT_FALSE(internalNodeDependencies.isLinked(sourceScriptAfterLoading->m_impl));
 
         // "Connector" class has no links
-        EXPECT_EQ(0u, m_logicEngine.m_impl->getLogicNodeConnector().getLinks().size());
+        EXPECT_EQ(0u, internalNodeDependencies.getLinks().size());
 
-        // Internal topological graph has no "topologically sorted nodes", neither before nor after update()
-        EXPECT_EQ(0u, internalNodeGraph.getOrderedNodesCache().size());
+        // Internal topological graph has two unsorted nodes, before and after update()
+        EXPECT_EQ(2u, internalNodeDependencies.getOrderedNodesCache().size());
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(0u, internalNodeGraph.getOrderedNodesCache().size());
-
-        std::remove("LogicEngine.bin");
+        EXPECT_EQ(2u, internalNodeDependencies.getOrderedNodesCache().size());
     }
 }
 

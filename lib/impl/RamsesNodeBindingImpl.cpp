@@ -30,13 +30,13 @@ namespace rlogic::internal
         assert(nullptr != nodeBinding.logicnode()->name());
         assert(nullptr != nodeBinding.logicnode()->inputs());
 
-        auto inputs = PropertyImpl::Create(nodeBinding.logicnode()->inputs(), EInputOutputProperty::Input);
+        auto inputs = PropertyImpl::Create(*nodeBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
 
         assert (nullptr != inputs);
 
         const auto name = nodeBinding.logicnode()->name()->string_view();
 
-        return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name , std::move(inputs), ramsesNode));
+        return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name, static_cast<ramses::ERotationConvention>(nodeBinding.rotationConvention()), std::move(inputs), ramsesNode));
     }
 
     RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name) noexcept
@@ -47,18 +47,27 @@ namespace rlogic::internal
 
     std::unique_ptr<PropertyImpl> RamsesNodeBindingImpl::CreateNodeProperties()
     {
-        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EInputOutputProperty::Input);
+        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput);
         // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool, EInputOutputProperty::Input));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f, EInputOutputProperty::Input));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f, EInputOutputProperty::Input));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EInputOutputProperty::Input));
+
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool, EPropertySemantics::BindingInput));
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+        inputsImpl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+
+        // Set default values equivalent to those of Ramses
+        // This is important because the binding decides whether to set the value to ramses based on
+        // its current value vs. new value (the whole dirty handling mechanism works based on this logic)
+        inputsImpl->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->setInternal<bool>(true);
+        inputsImpl->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->setInternal<vec3f>({ 1.f, 1.f, 1.f });
+
         return inputsImpl;
     }
 
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept
         : RamsesBindingImpl(name, std::move(inputs), nullptr)
         , m_ramsesNode(ramsesNode)
+        , m_rotationConvention(rotationConvention)
     {
     }
 
@@ -67,11 +76,11 @@ namespace rlogic::internal
         if (m_ramsesNode != nullptr)
         {
             ramses::status_t status = ramses::StatusOK;
-            const PropertyImpl* visibility = getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl.get();
-            if (visibility->wasSet())
+            PropertyImpl& visibility = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl;
+            if (visibility.checkForBindingInputNewValueAndReset())
             {
                 // TODO Violin what about 'Off' state? Worth discussing!
-                if (*visibility->get<bool>())
+                if (*visibility.get<bool>())
                 {
                     status = m_ramsesNode->setVisibility(ramses::EVisibilityMode::Visible);
                 }
@@ -87,11 +96,11 @@ namespace rlogic::internal
                 }
             }
 
-            const PropertyImpl* rotation = getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl.get();
-            if (rotation->wasSet())
+            PropertyImpl& rotation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl;
+            if (rotation.checkForBindingInputNewValueAndReset())
             {
-                vec3f value = *rotation->get<vec3f>();
-                status = m_ramsesNode->setRotation(value[0], value[1], value[2], ramses::ERotationConvention::XYZ);
+                vec3f value = *rotation.get<vec3f>();
+                status = m_ramsesNode->setRotation(value[0], value[1], value[2], m_rotationConvention);
 
                 if (status != ramses::StatusOK)
                 {
@@ -100,10 +109,10 @@ namespace rlogic::internal
                 }
             }
 
-            const PropertyImpl* translation = getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl.get();
-            if (translation->wasSet())
+            PropertyImpl& translation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl;
+            if (translation.checkForBindingInputNewValueAndReset())
             {
-                vec3f value = *translation->get<vec3f>();
+                vec3f value = *translation.get<vec3f>();
                 status = m_ramsesNode->setTranslation(value[0], value[1], value[2]);
 
                 if (status != ramses::StatusOK)
@@ -113,10 +122,10 @@ namespace rlogic::internal
                 }
             }
 
-            const PropertyImpl* scaling = getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl.get();
-            if (scaling->wasSet())
+            PropertyImpl& scaling = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl;
+            if (scaling.checkForBindingInputNewValueAndReset())
             {
-                vec3f value = *scaling->get<vec3f>();
+                vec3f value = *scaling.get<vec3f>();
                 status = m_ramsesNode->setScaling(value[0], value[1], value[2]);
 
                 if (status != ramses::StatusOK)
@@ -140,7 +149,8 @@ namespace rlogic::internal
 
         auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
             LogicNodeImpl::serialize(builder),
-            ramsesNodeId.getValue()
+            ramsesNodeId.getValue(),
+            static_cast<uint8_t>(m_rotationConvention)
         );
         builder.Finish(ramsesNodeBinding);
 
@@ -156,6 +166,17 @@ namespace rlogic::internal
     ramses::Node* RamsesNodeBindingImpl::getRamsesNode() const
     {
         return m_ramsesNode;
+    }
+
+    bool RamsesNodeBindingImpl::setRotationConvention(ramses::ERotationConvention rotationConvention)
+    {
+        m_rotationConvention = rotationConvention;
+        return true;
+    }
+
+    ramses::ERotationConvention RamsesNodeBindingImpl::getRotationConvention() const
+    {
+        return m_rotationConvention;
     }
 
 }

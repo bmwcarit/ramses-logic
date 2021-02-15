@@ -18,8 +18,8 @@ namespace rlogic::internal
 namespace rlogic
 {
     /**
-     * The RamsesBinding is just a base class for all kinds of bindings to RAMSES.
-     * It is here to distinguish internally between common LogicNodes and RAMSES bindings
+     * The RamsesBinding is a shared base class for bindings to Ramses objects.
+     * For details on each type of binding, look at the derived classes.
      */
     class RamsesBinding : public LogicNode
     {

@@ -87,8 +87,8 @@ namespace rlogic
             gl_Position = floatUniform * vec4(a_position, 1.0);
         })");
 
-        const ramses::Effect* effect = scene->createEffect(effectDesc, ramses::ResourceCacheFlag_DoNotCache, "glsl shader");
-        ramses::Appearance* appearance = scene->createAppearance(*effect, "triangle appearance");
+        const ramses::Effect* effect = scene->createEffect(effectDesc);
+        ramses::Appearance* appearance = scene->createAppearance(*effect);
 
         LogicEngine logicEngine;
         auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("appearancebinding");

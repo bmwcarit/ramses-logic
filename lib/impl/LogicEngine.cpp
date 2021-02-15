@@ -47,6 +47,52 @@ namespace rlogic
         return Collection<RamsesAppearanceBinding>(m_impl->getAppearanceBindings());
     }
 
+    LuaScript* LogicEngine::findScript(std::string_view name) const
+    {
+        auto scriptIter = std::find_if(scripts().begin(), scripts().end(),
+            [name](const LuaScript* script)
+            {
+                return script->getName() == name;
+            }
+        );
+        if (scriptIter == scripts().end())
+        {
+            return nullptr;
+        }
+        return *scriptIter;
+    }
+
+    RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name) const
+    {
+        auto bindingIter = std::find_if(ramsesNodeBindings().begin(), ramsesNodeBindings().end(),
+            [name](const RamsesNodeBinding* binding)
+            {
+                return binding->getName() == name;
+            }
+        );
+        if (bindingIter == ramsesNodeBindings().end())
+        {
+            return nullptr;
+        }
+        return *bindingIter;
+    }
+
+    RamsesAppearanceBinding* LogicEngine::findAppearanceBinding(std::string_view name) const
+    {
+        auto bindingIter = std::find_if(ramsesAppearanceBindings().begin(), ramsesAppearanceBindings().end(),
+            [name](const RamsesAppearanceBinding* binding)
+            {
+                return binding->getName() == name;
+            }
+        );
+        if (bindingIter == ramsesAppearanceBindings().end())
+        {
+            return nullptr;
+        }
+        return *bindingIter;
+    }
+
+
     LuaScript* LogicEngine::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
     {
         return m_impl->createLuaScriptFromSource(source, scriptName);

@@ -70,6 +70,7 @@ def pattern_priority_sort(iterable, sort_patterns, pattern_key_fun, fallback_fun
     :param default_priority: Default priority value for elements that do not match any regexp.
     """
     re_patterns = [(re.compile(e[0]), e[1]) for e in sort_patterns]
+
     def key_fun(e):
         prio = None
         for p in re_patterns:

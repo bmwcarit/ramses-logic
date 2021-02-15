@@ -11,6 +11,16 @@
 
 namespace rlogic::Logger
 {
+    void SetLogVerbosityLimit(ELogMessageType verbosityLimit)
+    {
+        internal::LoggerImpl::GetInstance().setLogVerbosityLimit(verbosityLimit);
+    }
+
+    ELogMessageType GetLogVerbosityLimit()
+    {
+        return internal::LoggerImpl::GetInstance().getLogVerbosityLimit();
+    }
+
     void SetLogHandler(const LogHandlerFunc& logHandlerFunc)
     {
         internal::LoggerImpl::GetInstance().setLogHandler(logHandlerFunc);

@@ -14,21 +14,17 @@ Runs all enabled style checking
 """
 
 import sys
-import re
-import string
 import os
 
 import common_modules.common
-import argparse
 
 from check_license import check_license_for_file
+from check_header_guards import check_header_guards
 from check_tabbing_and_spacing import check_tabbing_and_spacing
 from check_tabbing_and_spacing import check_no_spacing_line_end
 from check_tabbing_and_spacing import check_tabs_no_spaces
 from check_enum_style import check_enum_style
 from check_last_line_newline import check_last_line_newline
-from check_header_guards import check_header_guards
-from check_api_export_symbols import check_api_export_symbols
 
 
 def main():
@@ -40,6 +36,8 @@ def main():
     binary_files = {
         r'\.res$',
         r'\.pptx$',
+        r'\.svg',
+        r'\.SVG',
         r'\.png$',
         r'\.PNG$',
         r'\.bmp$',
@@ -67,7 +65,7 @@ def main():
     }
 
     # Whitelist for source files
-    src_whitelist   = {
+    src_whitelist = {
         r'\.h$',
         r'\.hpp$',
         r'\.cpp$'
@@ -88,19 +86,19 @@ def main():
         file_contents, file_lines = common_modules.common.read_file(f)
         clean_file_contents, clean_file_lines = common_modules.common.clean_file_content(file_contents)
 
-        check_header_guards                 (f, file_contents)
-        check_license_for_file              (f, file_contents, root_path)
-        check_tabbing_and_spacing           (f, file_lines)
-        check_enum_style                    (f, clean_file_contents)
-        check_last_line_newline             (f, file_contents)
+        check_header_guards(f, file_contents)
+        check_license_for_file(f, file_contents, root_path)
+        check_tabbing_and_spacing(f, file_lines)
+        check_enum_style(f, clean_file_contents)
+        check_last_line_newline(f, file_contents)
         # TODO figure out a better way to check API symbols are properly exported
-        #check_api_export_symbols            (f, clean_file_contents)
+        # check_api_export_symbols(f, clean_file_contents)
 
     shared_blacklist_non_src_files = shared_blacklist | {
         # Externals allowed to have own formatting and license
         r'^external',
-        r'^CHANGELOG\.rst$', # Doesn't need a license
-        r'^LICENSE\.txt$',   # Contains license info, not related to code/content
+        r'^CHANGELOG\.rst$',  # Doesn't need a license
+        r'^LICENSE\.txt$',  # Contains license info, not related to code/content
     }
 
     blacklist_files_formatting = shared_blacklist_non_src_files
@@ -111,9 +109,9 @@ def main():
     for f in files_formatting:
         file_contents, file_lines = common_modules.common.read_file(f)
 
-        check_tabs_no_spaces                (f, file_lines)
-        check_no_spacing_line_end           (f, file_lines)
-        check_last_line_newline             (f, file_contents)
+        check_tabs_no_spaces(f, file_lines)
+        check_no_spacing_line_end(f, file_lines)
+        check_last_line_newline(f, file_contents)
 
     blacklist_license = shared_blacklist_non_src_files | generated_files | {
         # Can be safely excluded, don't need license header because trivial
@@ -131,7 +129,7 @@ def main():
 
         file_contents, file_lines = common_modules.common.read_file(f)
 
-        check_license_for_file               (f, file_contents, root_path)
+        check_license_for_file(f, file_contents, root_path)
 
     print('checked {0} files'.format(len(set(src_files) | set(files_formatting) | set(files_license_header))))
 
@@ -142,5 +140,5 @@ def main():
         print("detected {0} style guide issues".format(common_modules.common.G_WARNING_COUNT))
         return 1
 
-sys.exit(main())
 
+sys.exit(main())

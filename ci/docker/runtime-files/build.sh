@@ -6,7 +6,7 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-TARGETS="L64_GCC L64_GCCv7 L64_LLVM TEST_COVERAGE DOC_PACKAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE"
+TARGETS="L64_GCC L64_GCCv7 L64_LLVM CHECK_FLATBUF_GEN  TEST_COVERAGE DOC_PACKAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE"
 
 # preset defaults
 CONFIG=Release
@@ -55,7 +55,7 @@ case $TARGET in
     L64_GCC_LTO)
              TOOLCHAIN=$RL_SRC/cmake/toolchain/Linux_X86_64.toolchain
              ;;
-    L64_LLVM|L64_LLVM_COVERAGE)
+    L64_LLVM|L64_LLVM_COVERAGE|CHECK_FLATBUF_GEN)
             TOOLCHAIN=$RL_SRC/cmake/toolchain/Linux_X86_64_llvm.toolchain
             ;;
     L64_GCC_CLIENT_ONLY)
@@ -224,6 +224,22 @@ elif [ "$TARGET" == "THREAD_SANITIZER" ] || [ "$TARGET" == "ADDRESS_SANITIZER" ]
     export LSAN_OPTIONS=symbolize=1:print_stacktrace=1
     ctest --os test -V
 
+# Check that generated files are consistent with checked-in ones
+# Attention: when running this locally, the source tree has to be mounted as rw
+# see start_container.sh for details how to do that
+elif [ "$TARGET" == "CHECK_FLATBUF_GEN" ]; then
+    cmake \
+        -DCMAKE_BUILD_TYPE=$CONFIG \
+        -Dramses-logic_ENABLE_FLATBUFFERS_GENERATION=ON \
+        -G Ninja \
+        $CMAKE_WARNINGS \
+        $RL_SRC
+
+    # Explicitly call FlatbufGen to make sure the _gen.h files are overwritten
+    cmake --build $BUILD_DIR --config $CONFIG --target FlatbufGen
+    #If any file is dirty (i.e. different than the checked-in version), report error
+    git -C $RL_SRC diff --exit-code .
+
 else
     # enable LTO build when requested by target type
     if [ "$TARGET" = "L64_GCC_LTO" ]; then
@@ -234,10 +250,8 @@ else
 
     # enable docs & flatbuffers generation, but only in one build to save build resources
     if [ "$TARGET" = "L64_LLVM" ]; then
-        GEN_FLATBUFFERS=ON
         BUILD_DOCS=ON
     else
-        GEN_FLATBUFFERS=OFF
         BUILD_DOCS=OFF
     fi
 
@@ -260,7 +274,7 @@ else
         -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
         -Dramses-logic_BUILD_DOCS=$BUILD_DOCS \
         -Dramses-logic_BUILD_WITH_LTO=${ENABLE_LTO} \
-        -Dramses-logic_ENABLE_FLATBUFFERS_GENERATION=${GEN_FLATBUFFERS} \
+        -Dramses-logic_ENABLE_FLATBUFFERS_GENERATION=OFF \
         -Dramses-logic_ENABLE_TEST_COVERAGE=${ENABLE_COVERAGE} \
         -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
         -DCPACK_PACKAGE_NAME=${PACKAGE_NAME} \
@@ -273,13 +287,6 @@ else
     if [ "$BUILD_PACKAGE" = True ]; then
         cmake --build $BUILD_DIR --config $CONFIG --target package
         cp $BUILD_DIR/*.tar.gz $PACKAGE_DIR
-    fi
-
-    # Check that generated files are consistent with checked-in ones
-    # Attention: when running this locally, the source tree has to be mounted as rw
-    # see start_container.sh for details how to do that
-    if [ "$GEN_FLATBUFFERS" = "ON" ]; then
-        ninja FlatbufCheck
     fi
 
     if [ "$BUILD_DOCS" = "ON" ]; then

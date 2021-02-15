@@ -31,6 +31,8 @@ namespace rlogic::internal
         static void        NewIndex(LuaScriptPropertyHandler& data, const sol::object& index, const sol::object& rhs);
         static sol::object Index(LuaScriptPropertyHandler& data, const sol::object& index);
 
+        size_t size() const;
+
         sol::object getChildPropertyAsSolObject(std::string_view childName);
 
         [[nodiscard]] const PropertyImpl& getPropertyImpl() const;

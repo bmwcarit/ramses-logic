@@ -24,4 +24,15 @@ namespace rlogic::internal
     {
         m_defaultLogging = loggingEnabled;
     }
+
+    void LoggerImpl::setLogVerbosityLimit(ELogMessageType verbosityLimit)
+    {
+        m_logVerbosityLimit = verbosityLimit;
+    }
+
+    ELogMessageType LoggerImpl::getLogVerbosityLimit() const
+    {
+        return m_logVerbosityLimit;
+    }
+
 }

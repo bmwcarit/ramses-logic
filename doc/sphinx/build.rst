@@ -62,11 +62,22 @@ Build options
 A standard CMake build will create the shared library version of ``Ramses Logic`` by default. A static build alongside other
 things can be enabled using following CMake options:
 
+* -Dramses-logic_SHARED_LIB_TARGET_NAME
+    * options: any custom target name
+    * default: ramses-logic
+    * enables setting a custom name for ramses-logic shared library target.
+
 * -Dramses-logic_RAMSES_TARGET
     * options: ramses-shared-lib-client-only, ramses-shared-lib-<platform>, or a custom target name
     * default: ramses-shared-lib-client-only (will be built from ``Ramses`` sources)
     * enables setting a custom Ramses target instead of building and linking Ramses from source. If set,
       and if the target exists, will use it, otherwise fallback to building from source.
+
+* -Dramses-logic_BUILD_RAMSES_RENDERER
+    * options: ON/OFF
+    * default: OFF
+    * enables building the ramses renderer as part of the build. If this option is set to ON, Dramses-logic_RAMSES_TARGET has to
+      be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0).
 
 * -Dramses-logic_ALLOW_RAMSES_BUILD
     * options: ON/OFF

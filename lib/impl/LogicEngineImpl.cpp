@@ -11,6 +11,9 @@
 #include "impl/PropertyImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
+#include "impl/LoggerImpl.h"
+#include "internals/FileUtils.h"
+#include "internals/TypeUtils.h"
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
@@ -26,15 +29,15 @@
 #include "ramses-framework-api/RamsesVersion.h"
 #include "ramses-client-api/SceneObject.h"
 #include "ramses-client-api/Scene.h"
+#include "ramses-client-api/Node.h"
+#include "ramses-client-api/Appearance.h"
 #include "ramses-utils.h"
 
 #include <string>
 #include <fstream>
 #include <streambuf>
 
-#include "flatbuffers/util.h"
 #include "fmt/format.h"
-#include "impl/LoggerImpl.h"
 
 namespace rlogic::internal
 {
@@ -69,7 +72,7 @@ namespace rlogic::internal
         {
             m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(scriptImpl)));
             auto script = m_scripts.back().get();
-            setupLogicNodeInternal(*script);
+            m_logicNodeDependencies.addNode(script->m_impl);
             return script;
         }
 
@@ -81,8 +84,7 @@ namespace rlogic::internal
         m_errors.clear();
         m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(RamsesNodeBindingImpl::Create(name)));
         auto ramsesBinding = m_ramsesNodeBindings.back().get();
-        m_ramsesBindings.emplace_back(ramsesBinding);
-        setupLogicNodeInternal(*ramsesBinding);
+        m_logicNodeDependencies.addNode(ramsesBinding->m_impl);
         return ramsesBinding;
     }
 
@@ -91,24 +93,13 @@ namespace rlogic::internal
         m_errors.clear();
         m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(RamsesAppearanceBindingImpl::Create(name)));
         auto ramsesBinding = m_ramsesAppearanceBindings.back().get();
-        m_ramsesBindings.emplace_back(ramsesBinding);
-        setupLogicNodeInternal(*ramsesBinding);
+        m_logicNodeDependencies.addNode(ramsesBinding->m_impl);
         return ramsesBinding;
-    }
-
-    void LogicEngineImpl::setupLogicNodeInternal(LogicNode& logicNode)
-    {
-        m_disconnectedNodes.insert(&logicNode.m_impl.get());
-        m_logicNodes.insert(&logicNode.m_impl.get());
     }
 
     bool LogicEngineImpl::destroy(LogicNode& logicNode)
     {
-        m_disconnectedNodes.erase(&logicNode.m_impl.get());
-        m_logicNodes.erase(&logicNode.m_impl.get());
         m_errors.clear();
-
-        unlinkAll(logicNode);
 
         {
             auto luaScript = dynamic_cast<LuaScript*>(&logicNode);
@@ -149,7 +140,7 @@ namespace rlogic::internal
             return false;
         }
 
-        m_logicNodeGraph.removeLinksForNode((*scriptIter)->m_impl);
+        m_logicNodeDependencies.removeNode(luaScript.m_impl);
         m_scripts.erase(scriptIter);
         return true;
     }
@@ -167,7 +158,7 @@ namespace rlogic::internal
             return false;
         }
 
-        m_ramsesBindings.erase(std::find(m_ramsesBindings.begin(), m_ramsesBindings.end(), nodeIter->get()));
+        m_logicNodeDependencies.removeNode(ramsesNodeBinding.m_impl);
         m_ramsesNodeBindings.erase(nodeIter);
 
         return true;
@@ -185,90 +176,15 @@ namespace rlogic::internal
             return false;
         }
 
-        m_ramsesBindings.erase(std::find(m_ramsesBindings.begin(), m_ramsesBindings.end(), appearanceIter->get()));
+        m_logicNodeDependencies.removeNode(ramsesAppearanceBinding.m_impl);
         m_ramsesAppearanceBindings.erase(appearanceIter);
 
         return true;
     }
 
-    void LogicEngineImpl::unlinkAll(LogicNode& logicNode)
-    {
-        std::unordered_set<const LogicNodeImpl*> possibleDisconnectedNodes;
-        {
-            const auto inputs = logicNode.getInputs();
-            if (inputs != nullptr)
-            {
-                const auto linkedLogicNodes = getAllLinkedLogicNodesOfInput(*inputs->m_impl);
-                possibleDisconnectedNodes.insert(linkedLogicNodes.begin(), linkedLogicNodes.end());
-            }
-        }
-
-        {
-            auto outputs = logicNode.getOutputs();
-            if (outputs != nullptr)
-            {
-                const auto linkedLogicNodes = getAllLinkedLogicNodesOfOutput(*outputs->m_impl);
-                possibleDisconnectedNodes.insert(linkedLogicNodes.begin(), linkedLogicNodes.end());
-            }
-        }
-
-        m_logicNodeConnector.unlinkAll(logicNode.m_impl);
-
-        for (const auto possibleDisconnectedNode : possibleDisconnectedNodes)
-        {
-            if (!m_logicNodeConnector.isLinked(*possibleDisconnectedNode))
-            {
-                m_disconnectedNodes.insert(const_cast<LogicNodeImpl*>(possibleDisconnectedNode)); // NOLINT(cppcoreguidelines-pro-type-const-cast) We do this to keep all Parameters in API const
-            }
-        }
-    }
-
-
-    std::unordered_set<const LogicNodeImpl*> LogicEngineImpl::getAllLinkedLogicNodesOfInput(PropertyImpl& property)
-    {
-        std::unordered_set<const LogicNodeImpl*> linkedLogicNodes;
-        {
-            const auto inputCount = property.getChildCount();
-
-            for (size_t i = 0; i < inputCount; ++i)
-            {
-                const auto childProperty = property.getChild(i);
-                const auto linkedProperty = m_logicNodeConnector.getLinkedOutput(*childProperty->m_impl);
-                if (nullptr != linkedProperty)
-                {
-                    linkedLogicNodes.insert(&linkedProperty->getLogicNode());
-                }
-                auto childProperties = getAllLinkedLogicNodesOfInput(*childProperty->m_impl);
-                linkedLogicNodes.insert(childProperties.begin(), childProperties.end());
-            }
-        }
-        return linkedLogicNodes;
-    }
-
-    std::unordered_set<const LogicNodeImpl*> LogicEngineImpl::getAllLinkedLogicNodesOfOutput(PropertyImpl& property)
-    {
-        std::unordered_set<const LogicNodeImpl*> linkedLogicNodes;
-        {
-            const auto outputCount = property.getChildCount();
-
-            for (size_t i = 0; i < outputCount; ++i)
-            {
-                const auto childProperty = property.getChild(i);
-                const auto linkedProperty = m_logicNodeConnector.getLinkedInput(*childProperty->m_impl);
-                if (nullptr != linkedProperty)
-                {
-                    linkedLogicNodes.insert(&linkedProperty->getLogicNode());
-                }
-                auto childProperties = getAllLinkedLogicNodesOfOutput(*childProperty->m_impl);
-                linkedLogicNodes.insert(childProperties.begin(), childProperties.end());
-            }
-        }
-        return linkedLogicNodes;
-    }
-
     bool LogicEngineImpl::isLinked(const LogicNode& logicNode) const
     {
-        return m_disconnectedNodes.find(&logicNode.m_impl.get()) == m_disconnectedNodes.end();
+        return m_logicNodeDependencies.isLinked(logicNode.m_impl);
     }
 
     void LogicEngineImpl::updateLinksRecursive(Property& inputProperty)
@@ -279,17 +195,16 @@ namespace rlogic::internal
         {
             Property& child = *inputProperty.getChild(i);
 
-            // TODO Violin provide type utils to check for complex types - this doesn't scale well
-            if (child.getType() == EPropertyType::Struct || child.getType() == EPropertyType::Array)
+            if (TypeUtils::CanHaveChildren(child.getType()))
             {
                 updateLinksRecursive(child);
             }
             else
             {
-                const PropertyImpl* output = m_logicNodeConnector.getLinkedOutput(*child.m_impl);
+                const PropertyImpl* output = m_logicNodeDependencies.getLinkedOutput(*child.m_impl);
                 if (nullptr != output)
                 {
-                    child.m_impl->set(*output);
+                    child.m_impl->setInternal(*output);
                 }
             }
         }
@@ -300,71 +215,45 @@ namespace rlogic::internal
         m_errors.clear();
         LOG_DEBUG("Begin update");
 
-        for (auto unlinkedNode : m_disconnectedNodes)
+        if (!m_logicNodeDependencies.updateTopologicalSorting())
         {
-            if (disableDirtyTracking || unlinkedNode->isDirty())
+            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!");
+            return false;
+        }
+
+        const NodeVector& sortedNodes = m_logicNodeDependencies.getOrderedNodesCache();
+        for (LogicNodeImpl* logicNode : sortedNodes)
+        {
+            if (!updateLogicNodeInternal(*logicNode, disableDirtyTracking))
             {
-                LOG_DEBUG("Updating LogicNode '{}'", unlinkedNode->getName());
-                if (!unlinkedNode->update())
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    bool LogicEngineImpl::updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking)
+    {
+        updateLinksRecursive(*node.getInputs());
+        if (disableDirtyTracking || node.isDirty())
+        {
+            LOG_DEBUG("Updating LogicNode '{}'", node.getName());
+            if (!node.update())
+            {
+                const auto& errors = node.getErrors();
+                for (const auto& error : errors)
                 {
-                    const auto& errors = unlinkedNode->getErrors();
-                    for (const auto& error : errors)
-                    {
-                        m_errors.add(error);
-                    }
-                    return false;
+                    m_errors.add(error);
                 }
+                return false;
             }
-            else
-            {
-                LOG_DEBUG("Skip update of LogicNode '{}' because no input has changed since the last update", unlinkedNode->getName());
-            }
-            unlinkedNode->setDirty(false);
         }
-
-        m_logicNodeGraph.updateOrder();
-        const LogicNodeVector& orderedNodes = m_logicNodeGraph.getOrderedNodesCache();
-
-        for (auto logicNode : orderedNodes)
+        else
         {
-            updateLinksRecursive(*logicNode->getInputs());
-
-            if (disableDirtyTracking || logicNode->isDirty())
-            {
-                LOG_DEBUG("Updating LogicNode '{}'", logicNode->getName());
-                if (!logicNode->update())
-                {
-                    const auto& errors = logicNode->getErrors();
-                    for (const auto& error : errors)
-                    {
-                        m_errors.add(error);
-                    }
-                    return false;
-                }
-            }
-            else
-            {
-                LOG_DEBUG("Skip update of LogicNode '{}' because no input has changed since the last update", logicNode->getName());
-            }
-            logicNode->setDirty(false);
+            LOG_DEBUG("Skip update of LogicNode '{}' because no input has changed since the last update", node.getName());
         }
-
-        for (auto& ramsesBinding : m_ramsesBindings)
-        {
-            updateLinksRecursive(*ramsesBinding->getInputs());
-            if (disableDirtyTracking || ramsesBinding->m_impl.get().isDirty())
-            {
-                LOG_DEBUG("Updating RamsesBinding '{}'", ramsesBinding->getName());
-                bool success = ramsesBinding->m_impl.get().update();
-                assert(success && "Bindings update can never fail!");
-                (void)success;
-            }
-            else
-            {
-                LOG_DEBUG("Skip update of RamsesBinding '{}' because no input has changed since the last update", ramsesBinding->getName());
-            }
-            ramsesBinding->m_impl.get().setDirty(false);
-        }
+        node.setDirty(false);
         return true;
     }
 
@@ -395,27 +284,22 @@ namespace rlogic::internal
     {
         m_errors.clear();
         m_scripts.clear();
-        m_ramsesBindings.clear();
         m_ramsesNodeBindings.clear();
         m_ramsesAppearanceBindings.clear();
-        m_disconnectedNodes.clear();
-        m_logicNodes.clear();
-        m_logicNodeGraph = {};
-        m_logicNodeConnector = {};
+        m_logicNodeDependencies = {};
 
-        std::string sFilename(filename);
-        std::string buf;
-        if (!flatbuffers::LoadFile(sFilename.c_str(), true, &buf))
+        std::optional<std::vector<char>> maybeBytesFromFile = FileUtils::LoadBinary(std::string(filename));
+        if (!maybeBytesFromFile)
         {
-            m_errors.add(fmt::format("Failed to load file '{}'", sFilename));
+            m_errors.add(fmt::format("Failed to load file '{}'", filename));
             return false;
         }
 
-        const auto logicEngine = rlogic_serialization::GetLogicEngine(buf.data());
+        const auto logicEngine = rlogic_serialization::GetLogicEngine((*maybeBytesFromFile).data());
 
         if (nullptr == logicEngine || nullptr == logicEngine->ramsesVersion() || nullptr == logicEngine->rlogicVersion())
         {
-            m_errors.add(fmt::format("File '{}' doesn't contain logic engine data with readable version specifiers", sFilename));
+            m_errors.add(fmt::format("File '{}' doesn't contain logic engine data with readable version specifiers", filename));
             return false;
         }
 
@@ -423,7 +307,7 @@ namespace rlogic::internal
         if (!CheckRamsesVersionFromFile(ramsesVersion))
         {
             m_errors.add(fmt::format("Version mismatch while loading file '{}'! Expected Ramses version {}.x.x but found {} in file",
-                sFilename, ramses::GetRamsesVersion().major,
+                filename, ramses::GetRamsesVersion().major,
                 ramsesVersion.v_string()->string_view()));
             return false;
         }
@@ -432,7 +316,7 @@ namespace rlogic::internal
         if (!CheckLogicVersionFromFile(rlogicVersion))
         {
             m_errors.add(fmt::format("Version mismatch while loading file '{}'! Expected version {}.{}.x but found {} in file",
-                sFilename, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
+                filename, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
                 rlogicVersion.v_string()->string_view()));
             return false;
         }
@@ -457,7 +341,7 @@ namespace rlogic::internal
             if (nullptr != newScript)
             {
                 m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(newScript)));
-                setupLogicNodeInternal(*m_scripts.back());
+                m_logicNodeDependencies.addNode(m_scripts.back()->m_impl);
             }
         }
 
@@ -487,8 +371,7 @@ namespace rlogic::internal
             auto newBindingImpl = RamsesNodeBindingImpl::Create(*rNodeBinding, ramsesNode);
             assert(nullptr != newBindingImpl);
             m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::move(newBindingImpl)));
-            m_ramsesBindings.emplace_back(m_ramsesNodeBindings.back().get());
-            setupLogicNodeInternal(*m_ramsesBindings.back());
+            m_logicNodeDependencies.addNode(m_ramsesNodeBindings.back()->m_impl);
         }
 
         const auto ramsesappearancebindings = logicEngine->ramsesappearancebindings();
@@ -522,8 +405,7 @@ namespace rlogic::internal
             }
 
             m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::move(newBinding)));
-            m_ramsesBindings.emplace_back(m_ramsesAppearanceBindings.back().get());
-            setupLogicNodeInternal(*m_ramsesBindings.back());
+            m_logicNodeDependencies.addNode(m_ramsesAppearanceBindings.back()->m_impl);
         }
 
         assert(logicEngine->links());
@@ -631,6 +513,54 @@ namespace rlogic::internal
         return sceneObject;
     }
 
+    bool LogicEngineImpl::allBindingsReferToSameRamsesScene()
+    {
+        // Optional because it's OK that no Ramses object is referenced at all (and thus no ramses scene)
+        std::optional<ramses::sceneId_t> sceneId;
+
+        for (const auto& binding : m_ramsesNodeBindings)
+        {
+            const ramses::Node* node = binding->m_nodeBinding->getRamsesNode();
+            if (node)
+            {
+                const ramses::sceneId_t nodeSceneId = node->getSceneId();
+                if (!sceneId)
+                {
+                    sceneId = nodeSceneId;
+                }
+
+                if (*sceneId != nodeSceneId)
+                {
+                    m_errors.add(fmt::format("Ramses node '{}' is from scene with id:{} but other objects are from scene with id:{}!",
+                        node->getName(), nodeSceneId.getValue(), sceneId->getValue()));
+                    return false;
+                }
+            }
+        }
+
+        for (const auto& binding : m_ramsesAppearanceBindings)
+        {
+            const ramses::Appearance* appearance = binding->m_appearanceBinding->getRamsesAppearance();
+            if (appearance)
+            {
+                const ramses::sceneId_t appearanceSceneId = appearance->getSceneId();
+                if (!sceneId)
+                {
+                    sceneId = appearanceSceneId;
+                }
+
+                if (*sceneId != appearanceSceneId)
+                {
+                    m_errors.add(fmt::format("Ramses appearance '{}' is from scene with id:{} but other objects are from scene with id:{}!",
+                        appearance->getName(), appearanceSceneId.getValue(), sceneId->getValue()));
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
     std::optional<ramses::Node*> LogicEngineImpl::findRamsesNodeInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
     {
         ramses::SceneObject*    sceneObject = findRamsesSceneObjectInScene(logicNode, scene, objectId);
@@ -677,10 +607,78 @@ namespace rlogic::internal
         return std::make_optional(ramsesAppearance);
     }
 
+    // TODO Violin this needs more testing (both internal and user-side). Concretely, ensure that:
+    // - if anything is dirty, this will always warn
+    // - the logic engine is never dirty immediately after update()
+    // - some specific cases that need special attention:
+    //      - what is the dirty state after unlink?
+    //      - what is the dirty state when setting a binding property (with same value?)
+    bool LogicEngineImpl::isDirty() const
+    {
+        // TODO Violin the ugliness of this code shows the problems with the current dirty handling implementation
+        // Refactor the dirty handling, and this code will disappear
+
+        // Check if links were changed
+        if (m_logicNodeDependencies.isDirty())
+        {
+            return true;
+        }
+
+        // TODO Violin improve internal management of logic nodes so that we don't have to loop over three
+        // different containers below which all call a method on LogicNode
+
+        // Scripts dirty?
+        for (const auto& script : m_scripts)
+        {
+            if (script->m_impl.get().isDirty())
+            {
+                return true;
+            }
+        }
+
+        if (bindingsDirty())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+    bool LogicEngineImpl::bindingsDirty() const
+    {
+        for (const auto& nodeBinding : m_ramsesNodeBindings)
+        {
+            if (nodeBinding->m_impl.get().isDirty())
+            {
+                return true;
+            }
+        }
+
+        for (const auto& appBinding : m_ramsesAppearanceBindings)
+        {
+            if (appBinding->m_impl.get().isDirty())
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     bool LogicEngineImpl::saveToFile(std::string_view filename)
     {
         m_errors.clear();
-        // TODO Violin/Sven/Tobias implement check belonging of nodes to scene after Ramses has API to get scene of node
+
+        if (!allBindingsReferToSameRamsesScene())
+        {
+            m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!");
+            return false;
+        }
+
+        if (bindingsDirty())
+        {
+            LOG_WARN("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!");
+        }
 
         flatbuffers::FlatBufferBuilder builder;
 
@@ -774,7 +772,14 @@ namespace rlogic::internal
             collectPropertyChildrenMetadata(*inputs);
         }
 
-        const LinksMap& allLinks = m_logicNodeConnector.getLinks();
+        // Refuse save() if logic graph has loops
+        if (!m_logicNodeDependencies.updateTopologicalSorting())
+        {
+            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!");
+            return false;
+        }
+
+        const LinksMap& allLinks = m_logicNodeDependencies.getLinks();
 
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
         links.reserve(allLinks.size());
@@ -819,9 +824,8 @@ namespace rlogic::internal
         );
 
         builder.Finish(logicEngine);
-        std::string sFileName(filename);
 
-        return flatbuffers::SaveFile(sFileName.c_str(), reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize(), true); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast) We know what we do and this is only solvable with reinterpret-cast
+        return FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize());
     }
 
     ScriptsContainer& LogicEngineImpl::getScripts()
@@ -843,116 +847,19 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
-        if (m_logicNodes.find(&sourceProperty.m_impl->getLogicNode()) == m_logicNodes.end())
-        {
-            m_errors.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", sourceProperty.m_impl->getLogicNode().getName()));
-            return false;
-        }
-
-        if (m_logicNodes.find(&targetProperty.m_impl->getLogicNode()) == m_logicNodes.end())
-        {
-            m_errors.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", targetProperty.m_impl->getLogicNode().getName()));
-            return false;
-        }
-
-        if (&sourceProperty.m_impl->getLogicNode() == &targetProperty.m_impl->getLogicNode())
-        {
-            m_errors.add("SourceNode and TargetNode are equal");
-            return false;
-        }
-
-
-        if (!(sourceProperty.m_impl->isOutput() && targetProperty.m_impl->isInput()))
-        {
-            std::string_view lhsType = sourceProperty.m_impl->isOutput() ? "output" : "input";
-            std::string_view rhsType = targetProperty.m_impl->isOutput() ? "output" : "input";
-            m_errors.add(fmt::format("Failed to link {} property '{}' to {} property '{}'. Only outputs can be linked to inputs", lhsType, sourceProperty.getName(), rhsType, targetProperty.getName()));
-            return false;
-        }
-
-        if (sourceProperty.getType() != targetProperty.getType())
-        {
-            m_errors.add(fmt::format("Types of source property '{}:{}' does not match target property '{}:{}'",
-                                              sourceProperty.getName(),
-                                              GetLuaPrimitiveTypeName(sourceProperty.getType()),
-                                              targetProperty.getName(),
-                                              GetLuaPrimitiveTypeName(targetProperty.getType())));
-            return false;
-        }
-
-        // TODO Violin solve this in a more generic way, it will break as soon as we add other complex types
-        if (sourceProperty.getType() == EPropertyType::Struct ||
-            sourceProperty.getType() == EPropertyType::Array)
-        {
-            m_errors.add(fmt::format("Can't link properties of complex types directly, currently only primitive properties can be linked"));
-            return false;
-        }
-
-
-        // TODO Violin/Sven try to find a way to avoid const_cast
-        auto& _targetProperty = const_cast<Property&>(targetProperty); // NOLINT(cppcoreguidelines-pro-type-const-cast) We do this to keep all Parameters in API const
-        auto& _sourceProperty = const_cast<Property&>(sourceProperty); // NOLINT(cppcoreguidelines-pro-type-const-cast) We do this to keep all Parameters in API const
-        auto&  targetNode      = _targetProperty.m_impl->getLogicNode();
-        auto&  sourceNode      = _sourceProperty.m_impl->getLogicNode();
-
-        if(!m_logicNodeConnector.link(*_sourceProperty.m_impl, *_targetProperty.m_impl))
-        {
-            m_errors.add(fmt::format("The property '{}' of LogicNode '{}' is already linked to the property '{}' of LogicNode '{}'",
-                                              sourceProperty.getName(),
-                                              sourceNode.getName(),
-                                              targetProperty.getName(),
-                                              targetNode.getName()
-            ));
-            return false;
-        }
-
-        m_disconnectedNodes.erase(&sourceNode);
-        m_disconnectedNodes.erase(&targetNode);
-        m_logicNodeGraph.addLink(sourceNode, targetNode);
-        targetNode.setDirty(true);
-
-        return true;
+        return m_logicNodeDependencies.link(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
     }
 
     bool LogicEngineImpl::unlink(const Property& sourceProperty, const Property& targetProperty)
     {
         m_errors.clear();
 
-        // TODO Violin/Sven try to find a way to avoid const_cast
-        auto& _targetProperty = const_cast<Property&>(targetProperty); // NOLINT(cppcoreguidelines-pro-type-const-cast) We do this to keep all Parameters in API const
-
-        if(!m_logicNodeConnector.unlink(*_targetProperty.m_impl))
-        {
-            m_errors.add(fmt::format("No link available from source property '{}' to target property '{}'", sourceProperty.getName(), targetProperty.getName()));
-            return false;
-        }
-
-        auto& sourceNode = sourceProperty.m_impl->getLogicNode();
-        auto& targetNode = targetProperty.m_impl->getLogicNode();
-
-        targetNode.setDirty(true);
-
-        if (!m_logicNodeConnector.isLinked(sourceNode))
-        {
-            m_disconnectedNodes.insert(&sourceNode);
-        }
-        if (!m_logicNodeConnector.isLinked(targetNode))
-        {
-            m_disconnectedNodes.insert(&targetNode);
-        }
-
-        m_logicNodeGraph.removeLink(sourceNode, targetNode);
-
-        return true;
+        return m_logicNodeDependencies.unlink(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
     }
 
-    const LogicNodeConnector& LogicEngineImpl::getLogicNodeConnector() const
+    const LogicNodeDependencies& LogicEngineImpl::getLogicNodeDependencies() const
     {
-        return m_logicNodeConnector;
+        return m_logicNodeDependencies;
     }
 
-    const LogicNodeGraph& LogicEngineImpl::getLogicNodeGraph() const
-    {
-        return m_logicNodeGraph;
-    }
 }

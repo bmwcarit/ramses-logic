@@ -72,64 +72,73 @@ add_library(rlogic::google-benchmark-main ALIAS rlogic-google-benchmark-main)
 ################     Lua      ##################
 ################################################
 
-# TODO Violin don't build Lua if target already present
+if(NOT TARGET lua)
+    # Collect all source and header files
+    file(GLOB LUA_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua/*.c)
+    file(GLOB LUA_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/lua/*.h)
 
-# Collect all source and header files
-file(GLOB LUA_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua/*.c)
-file(GLOB LUA_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/lua/*.h)
+    # Remove luac from the list, because it contains a main function
+    list(REMOVE_ITEM LUA_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua/lua.c)
 
-# Remove luac from the list, because it contains a main function
-list(REMOVE_ITEM LUA_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua/lua.c)
+    set_source_files_properties(${LUA_SOURCE} PROPERTIES LANGUAGE CXX)
 
-set_source_files_properties(${LUA_SOURCE} PROPERTIES LANGUAGE CXX)
+    # Create library for lua
+    add_library(lua STATIC ${LUA_SOURCE} ${LUA_HEADER})
 
-# Create library for lua
-add_library(lua STATIC ${LUA_SOURCE} ${LUA_HEADER})
-add_library(lua::lua ALIAS lua)
+    # This is required for Lua on Android to suppress a false-positive fortification trigger when
+    # the garbage collector is invoked
+    if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang" OR ${CMAKE_CXX_COMPILER_ID} STREQUAL "GNU")
+        target_compile_options(lua PRIVATE -fno-stack-protector -U_FORTIFY_SOURCE)
+    endif()
 
-if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
-    # We compile lua as c++ even though it has .c files. convince clang to just do it without complaining
-    target_compile_options(lua PRIVATE -x c++)
+    if (${CMAKE_CXX_COMPILER_ID} STREQUAL "Clang")
+        # We compile lua as c++ even though it has .c files. convince clang to just do it without complaining
+        target_compile_options(lua PRIVATE -x c++)
+    endif()
+
+    target_include_directories(lua
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lua>
+    )
+
+    folderize_target(lua "external")
 endif()
 
-target_include_directories(lua
-    PUBLIC
-        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/lua>
-)
-
-folderize_target(lua "external")
+add_library(lua::lua ALIAS lua)
 
 ################################################
 ################     Sol      ##################
 ################################################
 
-set(SOL2_LUA_VERSION "5.1.1" CACHE STRING "" FORCE)
-set(INSTALL_SOL2 OFF CACHE INTERNAL "")
-add_subdirectory(sol)
+if(NOT TARGET sol2)
+    set(SOL2_LUA_VERSION "5.1.1" CACHE STRING "" FORCE)
+    set(INSTALL_SOL2 OFF CACHE INTERNAL "")
+    add_subdirectory(sol)
 
-# Ensure sol is expecting c++ compiled lua
-target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALWAYS_UNSAFE=1)
+    # Ensure sol is expecting c++ compiled lua
+    target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALWAYS_UNSAFE=1)
+endif()
 
 ################################################
 ################ Flatbuffers  ##################
 ################################################
 
-# TODO don't build flatbuffers if target already present
+if(NOT TARGET flatbuffers)
+    # Don't build flatbuf targets we don't need
+    set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
+    set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
 
-# Don't build flatbuf targets we don't need
-set(FLATBUFFERS_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_INSTALL OFF CACHE BOOL "" FORCE)
-set(FLATBUFFERS_BUILD_FLATHASH OFF CACHE BOOL "" FORCE)
+    # Only add flatc target if flatbuffers header generation needed
+    if(ramses-logic_ENABLE_FLATBUFFERS_GENERATION)
+        set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "Build flatbuffers compiler" FORCE)
+    else()
+        set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "Build flatbuffers compiler" FORCE)
+    endif()
 
-# Only add flatc target if flatbuffers header generation needed
-if(ramses-logic_ENABLE_FLATBUFFERS_GENERATION)
-    set(FLATBUFFERS_BUILD_FLATC ON CACHE BOOL "Build flatbuffers compiler" FORCE)
-else()
-    set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "Build flatbuffers compiler" FORCE)
+    add_subdirectory(flatbuffers)
+    folderize_target(flatbuffers "external")
 endif()
-
-add_subdirectory(flatbuffers)
-folderize_target(flatbuffers "external")
 
 add_library(rlogic::flatbuffers ALIAS flatbuffers)
 
@@ -153,7 +162,6 @@ endif()
 
 if(ramses-logic_RAMSES_TARGET AND TARGET ${ramses-logic_RAMSES_TARGET})
     message(STATUS " + Using existing ramses target '${ramses-logic_RAMSES_TARGET}'")
-    # TODO Violin add version check here once ramses provides CMake variables for it
 else()
     if(ramses-logic_ALLOW_RAMSES_BUILD)
         message(STATUS " + Building ramses from source and using target '${ramses-logic_RAMSES_TARGET}'")
@@ -166,20 +174,35 @@ else()
         set(ramses-sdk_BUILD_DEMO_ECM OFF CACHE BOOL "" FORCE)
         set(ramses-sdk_BUILD_SMOKE_TESTS OFF CACHE BOOL "" FORCE)
         set(ramses-sdk_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_FULL_SHARED_LIB OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB ON CACHE BOOL "" FORCE)
         set(ramses-sdk_ENABLE_DLT OFF CACHE BOOL "" FORCE)
         set(ramses-sdk_FORCE_OFF_SOMEIP_HU ON CACHE BOOL "" FORCE)
         set(ramses-sdk_FORCE_OFF_SOMEIP_IC ON CACHE BOOL "" FORCE)
 
         # Disable some things which don't have a CMake option
         set(ramses-sdk_ramses-daemon          OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_ramses-renderer-lib    OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_renderer_RendererLib   OFF CACHE BOOL "" FORCE)
 
-        add_subdirectory(ramses)
+        #TODO Daniel find a better way to configure ramses renderer
+        if(ramses-logic_BUILD_RAMSES_RENDERER)
+            set(ramses-sdk_BUILD_FULL_SHARED_LIB ON CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB OFF CACHE BOOL "" FORCE)
 
-        set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE STRING "" FORCE)
+            add_subdirectory(ramses)
+            if ((NOT TARGET ${ramses-logic_RAMSES_TARGET})
+                OR (${ramses-logic_RAMSES_TARGET} MATCHES "ramses-shared-lib-client-only")
+                OR (NOT ${ramses-logic_RAMSES_TARGET} MATCHES "ramses-shared-lib-"))
+                message(FATAL_ERROR "Invalid Ramses target '${ramses-logic_RAMSES_TARGET}'. If ramses-logic_BUILD_RAMSES_RENDERER is set, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
+            endif()
+        else()
+            set(ramses-sdk_BUILD_FULL_SHARED_LIB OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB ON CACHE BOOL "" FORCE)
+            # Disable some things which don't have a CMake option
+            set(ramses-sdk_ramses-renderer-lib    OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_renderer_RendererLib   OFF CACHE BOOL "" FORCE)
+
+            add_subdirectory(ramses)
+
+            set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE STRING "" FORCE)
+        endif()
 
         # This is kind of an assert - if this fails, there is a version mismatch with ramses
         if(NOT TARGET ${ramses-logic_RAMSES_TARGET})

@@ -16,6 +16,7 @@
 namespace ramses
 {
     class Node;
+    enum class ERotationConvention;
 }
 
 namespace rlogic::internal
@@ -26,16 +27,16 @@ namespace rlogic::internal
 namespace rlogic
 {
     /**
-     * The RamsesNodeBinding is a specialization of #rlogic::LogicNode which allows manipulation of Ramses nodes.
+     * The RamsesNodeBinding is a type of #rlogic::RamsesBinding which allows manipulation of Ramses nodes.
      * RamsesNodeBinding's can be created with #rlogic::LogicEngine::createRamsesNodeBinding.
      *
      * The RamsesNodeBinding has a fixed set of inputs which correspond to properties of ramses::Node.
-     * They have a fixed type and name:
+     * They have a fixed type, name, and initial value:
      * \rst
-     * 'visibility' (type bool)
-     * 'rotation' (type vec3f)
-     * 'translation' (type vec3f)
-     * 'scaling' (type vec3f)
+     * 'visibility' (type bool) [initialized to: true]
+     * 'rotation' (type vec3f) [initialized to: (0, 0, 0)]
+     * 'translation' (type vec3f) [initialized to: (0, 0, 0)]
+     * 'scaling' (type vec3f) [initialized to: (1, 1, 1)]
 
     .. warning::
 
@@ -94,6 +95,22 @@ namespace rlogic
         * @return the currently bound Ramses node
         */
         [[nodiscard]] RLOGIC_API ramses::Node* getRamsesNode() const;
+
+        /**
+        * Sets the rotation convention used to set the rotation values to a potentially bound ramses::Node. Default is
+        * the same as the ramses default. Use this to change the setting.
+        *
+        * @param rotationConvention the rotation convention to use
+        * @return true if successful, false otherwise
+        */
+        RLOGIC_API bool setRotationConvention(ramses::ERotationConvention rotationConvention);
+
+        /**
+        * Returns the currently used rotation convention for the node rotation property.
+        *
+        * @return the currently used rotation convention
+        */
+        [[nodiscard]] RLOGIC_API ramses::ERotationConvention getRotationConvention() const;
 
         /**
         * Constructor of RamsesNodeBinding. User is not supposed to call this - RamsesNodeBindings are created by other factory classes

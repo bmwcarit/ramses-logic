@@ -16,6 +16,11 @@ namespace rlogic
     class ALogicEngine_ErrorHandling : public ALogicEngine
     {
     protected:
+        void TearDown() override
+        {
+            std::remove("logic.bin");
+        }
+
         const std::string_view m_linkable_script = R"(
             function interface()
                 IN.input = BOOL

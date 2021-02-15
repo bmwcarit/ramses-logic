@@ -12,6 +12,7 @@ import time
 from itertools import zip_longest
 from pathlib import Path
 
+
 class ClangTidyIssue:
     def __init__(self, file, line, column, summary, checks, text, compdb_entry=None):
         self._file = str(Path(file).resolve())
@@ -74,12 +75,12 @@ class ClangTidyIssue:
 
 
 def parse_issues_from_output(clangtidy_stdout, compdb_entry=None):
-    rx = r'^(?P<file>/[^:]+):(?P<line>\d+):(?P<column>\d+):\s+(?P<summary>[^\n[]+)\[(?P<checks>(?:\w|-|,)+)\]$'
+    rx = r'^(?P<file>/[^:]+):(?P<line>\d+):(?P<column>\d+):\s+(?P<summary>[^\n[]+)\s+\[(?P<checks>(?:\w|-|,)+)\]$'
     ms = [m for m in re.finditer(rx, clangtidy_stdout, flags=re.MULTILINE)]
     return [ClangTidyIssue(**cur.groupdict(),
-                            text=clangtidy_stdout[cur.span()[0]:
-                                               next.span()[0]-1 if next else len(clangtidy_stdout)],
-                            compdb_entry=compdb_entry)
+                           text=clangtidy_stdout[cur.span()[0]:
+                                                 next.span()[0] - 1 if next else len(clangtidy_stdout)],
+                           compdb_entry=compdb_entry)
             for cur, next in zip_longest(ms, ms[1:])]
 
 

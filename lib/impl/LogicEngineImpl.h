@@ -10,11 +10,11 @@
 
 #include "internals/SolState.h"
 
-#include "internals/LogicNodeGraph.h"
-#include "internals/LogicNodeConnector.h"
+#include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
+#include "ramses-client-api/ERotationConvention.h"
 
 #include <optional>
 #include <vector>
@@ -50,6 +50,7 @@ namespace rlogic_serialization
 namespace rlogic::internal
 {
     class LogicNodeImpl;
+    class RamsesBindingImpl;
 
     using ScriptsContainer = std::vector<std::unique_ptr<LuaScript>>;
     using NodeBindingsContainer = std::vector<std::unique_ptr<RamsesNodeBinding>>;
@@ -92,10 +93,11 @@ namespace rlogic::internal
         bool unlink(const Property& sourceProperty, const Property& targetProperty);
 
         [[nodiscard]] bool isLinked(const LogicNode& logicNode) const;
+        [[nodiscard]] bool isDirty() const;
+        [[nodiscard]] bool bindingsDirty() const;
 
         // For testing only
-        [[nodiscard]] const LogicNodeGraph& getLogicNodeGraph() const;
-        [[nodiscard]] const LogicNodeConnector& getLogicNodeConnector() const;
+        [[nodiscard]] const LogicNodeDependencies& getLogicNodeDependencies() const;
 
     private:
         SolState                            m_luaState;
@@ -104,25 +106,17 @@ namespace rlogic::internal
         ScriptsContainer                    m_scripts;
         NodeBindingsContainer               m_ramsesNodeBindings;
         AppearanceBindingsContainer         m_ramsesAppearanceBindings;
-        std::vector<RamsesBinding*>         m_ramsesBindings;
-        std::unordered_set<LogicNodeImpl*>  m_logicNodes;
 
-        LogicNodeGraph                      m_logicNodeGraph;
-        LogicNodeConnector                  m_logicNodeConnector;
-
-        // TODO Violin redesign this; we have multiple places where we add/remove things from disconnectedNodes.
-        // It feels like it's tightly coupled with m_logicNodeGraph and maybe worth checking if we can/should move the
-        // logic to decide whether a node is disconnected there
-        std::unordered_set<LogicNodeImpl*>  m_disconnectedNodes;
+        LogicNodeDependencies               m_logicNodeDependencies;
 
         LuaScript* createLuaScriptInternal(std::string_view source, std::string_view filename, std::string_view scriptName);
-        void       setupLogicNodeInternal(LogicNode& logicNode);
         bool       destroyInternal(RamsesNodeBinding& ramsesNodeBinding);
         bool       destroyInternal(LuaScript& luaScript);
         bool       destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding);
 
         void updateLinksRecursive(Property& inputProperty);
 
+        [[nodiscard]] bool allBindingsReferToSameRamsesScene();
         ramses::SceneObject* findRamsesSceneObjectInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
         std::optional<ramses::Node*> findRamsesNodeInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
         std::optional<ramses::Appearance*> findRamsesAppearanceInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
@@ -130,9 +124,6 @@ namespace rlogic::internal
         static bool CheckLogicVersionFromFile(const rlogic_serialization::Version& version);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
-        std::unordered_set<const LogicNodeImpl*> getAllLinkedLogicNodesOfInput(PropertyImpl& property);
-        std::unordered_set<const LogicNodeImpl*> getAllLinkedLogicNodesOfOutput(PropertyImpl& property);
-
-        void unlinkAll(LogicNode& logicNode);
+        [[nodiscard]] bool updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking);
     };
 }

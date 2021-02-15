@@ -3,6 +3,42 @@ master
 ======
 
 ======
+v0.5.0
+======
+
+This version is API-compatible to v0.4.2, but the file-format is not backwards compatible. Please re-export
+all binary content when switching to v0.5.0!
+
+**Features**
+
+* Upgraded Ramses that ships with the logic engine from 27.0.2 to 27.0.5 (backwards compatible)
+* Added support for the '#' operator on non-primitive properties.
+  Semantics is same as for Lua tables - returns the number of elements in the array/struct. Also works for vec2/3/4 (returns 2/3/4)
+* RamsesAppearanceBinding supports uniform arrays
+* Possible to set log verbosity to dynamically adjust how much is being logged
+* Added convenience methods find<Object>(name) in LogicEngine
+* Can set rotation convention on RamsesNodeBinding. Default is still euler XYZ.
+* RamsesNodeBinding's visibility and scaling inputs have the same values like Ramses after initialization
+* Possible to build with ramses renderer
+
+**Semantic changes**
+
+* Changed behavior of ``RamsesBinding``. See
+  `binding docs <https://genivi.github.io/ramses-logic/api.html#linking-scripts-to-ramses-scenes>`_ for details.
+  See `data flow docs <https://genivi.github.io/ramses-logic/api.html#data-flow>`_ for general overview
+  how data flow works in the logic engine.
+
+
+**Bugfixes**
+
+* LogicEngine::saveToFile() correctly reports error if two or more different Ramses scenes are being referenced by binding objects
+* Logic engine crashes no more when nodes with nested links (script, array) are destroyed
+* LogicEngine::unlink() will correctly report error when called with non-primitive properties
+* LogicEngine::isLinked() returns consistent results for nested links (any link, also nested, will cause a node to be reported as linked)
+* Fixed a bug where LogicNode update order was not correctly adjusted when removing and adding links to its properties
+* Reports error when a cycle of links is created (update() and saveToFile() will fail until the cycle is resolved)
+
+======
 v0.4.2
 ======
 

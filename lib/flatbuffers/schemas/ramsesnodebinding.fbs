@@ -14,6 +14,7 @@ table RamsesNodeBinding
 {
     logicnode:LogicNode;
     ramsesNode:uint64;
+    rotationConvention:uint8;
 }
 
 root_type RamsesNodeBinding;

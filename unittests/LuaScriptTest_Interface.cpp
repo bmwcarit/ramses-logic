@@ -350,7 +350,7 @@ namespace rlogic
         const auto inputCount = inputs->getChildCount();
         for (size_t i = 0; i < inputCount; ++i)
         {
-            EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild(i)->m_impl->getInputOutputProperty());
+            EXPECT_EQ(internal::EPropertySemantics::ScriptInput, inputs->getChild(i)->m_impl->getPropertySemantics());
         }
     }
 
@@ -361,7 +361,7 @@ namespace rlogic
         const auto outputCount = outputs->getChildCount();
         for (size_t i = 0; i < outputCount; ++i)
         {
-            EXPECT_EQ(internal::EInputOutputProperty::Output, outputs->getChild(i)->m_impl->getInputOutputProperty());
+            EXPECT_EQ(internal::EPropertySemantics::ScriptOutput, outputs->getChild(i)->m_impl->getPropertySemantics());
         }
     }
 

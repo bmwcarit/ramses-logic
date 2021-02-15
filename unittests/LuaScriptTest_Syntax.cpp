@@ -194,6 +194,125 @@ namespace rlogic
         }
     }
 
+    TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingArraySize)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.array = ARRAY(3, INT)
+                OUT.array_size = INT
+            end
+
+            function run()
+                OUT.array_size = #IN.array
+            end
+        )");
+
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(3, *script->getOutputs()->getChild("array_size")->get<int32_t>());
+    }
+
+    TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingComplexArraySize)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.array = ARRAY(3,
+                    {
+                        vec3 = VEC3F,
+                        vec4i = VEC4I
+                    }
+                )
+                OUT.array_size = INT
+            end
+
+            function run()
+                OUT.array_size = #IN.array
+            end
+        )");
+
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(3, *script->getOutputs()->getChild("array_size")->get<int32_t>());
+    }
+
+    TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingStructSize)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.struct = {
+                    data1 = VEC3F,
+                    data2 = VEC4I,
+                    data3 = INT
+                }
+                OUT.struct_size = INT
+            end
+
+            function run()
+                OUT.struct_size = #IN.struct
+            end
+        )");
+
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(3, *script->getOutputs()->getChild("struct_size")->get<int32_t>());
+    }
+
+    TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingVec234Size)
+    {
+        m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.vec2f = VEC2F
+                IN.vec3f = VEC3F
+                IN.vec4f = VEC4F
+                IN.vec2i = VEC2I
+                IN.vec3i = VEC3I
+                IN.vec4i = VEC4I
+            end
+
+            function run()
+                if #IN.vec2i ~= 2 then error("Expected vec2i has size 2!") end
+                if #IN.vec2f ~= 2 then error("Expected vec2f has size 2!") end
+                if #IN.vec3i ~= 3 then error("Expected vec3i has size 3!") end
+                if #IN.vec3f ~= 3 then error("Expected vec3f has size 3!") end
+                if #IN.vec4i ~= 4 then error("Expected vec4i has size 4!") end
+                if #IN.vec4f ~= 4 then error("Expected vec4f has size 4!") end
+            end
+        )");
+
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingSizeOfStrings)
+    {
+        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.string = STRING
+                OUT.string_size = INT
+            end
+
+            function run()
+                OUT.string_size = #IN.string
+            end
+        )");
+
+        script->getInputs()->getChild("string")->set<std::string>("abcde");
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(5, *script->getOutputs()->getChild("string_size")->get<int32_t>());
+    }
+
+    TEST_F(ALuaScript_Syntax, RaisesErrorWhenTryingToGetSizeOfNonArrayTypes)
+    {
+        m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.notArray = INT
+            end
+
+            function run()
+                local size = #IN.notArray
+            end
+        )");
+
+        ASSERT_FALSE(m_logicEngine.update());
+        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("attempt to get length of field 'notArray' (a number value)"));
+    }
+
     TEST_F(ALuaScript_Syntax, ProdocesErrorWhenIndexingVectorWithNonIntegerIndices)
     {
         auto* script  = m_logicEngine.createLuaScriptFromSource(R"(

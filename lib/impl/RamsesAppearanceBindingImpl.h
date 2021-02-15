@@ -56,9 +56,10 @@ namespace rlogic::internal
         ramses::Appearance* m_appearance;
         // TODO find a solution to directly store ramses::UniformInput inside containers
         // If this is done, think about using a standard vector for storing ramses::UniformInputs
-        std::unordered_map<PropertyImpl*, std::unique_ptr<ramses::UniformInput>> m_propertyToUniformInput;
+        std::unordered_map<const PropertyImpl*, std::unique_ptr<ramses::UniformInput>> m_propertyToUniformInput;
 
-        void setInputValueToUniform(PropertyImpl* property);
+        void setInputValueToUniform(PropertyImpl& property);
+        [[nodiscard]] static bool UniformTypeMatchesBindingInputType(const ramses::UniformInput& uniformInput, const PropertyImpl& bindingInput, ErrorReporting& errorReporting);
         [[nodiscard]] static bool AppearanceCompatibleWithDeserializedInputs(PropertyImpl& deserializedInputs, ramses::Appearance& appearance, ErrorReporting& errorReporting);
         void populatePropertyMappingCache(ramses::Appearance& appearance);
         void createInputProperties(ramses::Appearance& appearance);

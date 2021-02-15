@@ -64,5 +64,44 @@ namespace rlogic
         EXPECT_NE(appearances.begin(), appearances.end());
         EXPECT_NE(appearances.cbegin(), appearances.cend());
     }
+
+    TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("nodebinding");
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding("appbinding");
+
+        EXPECT_EQ(script, m_logicEngine.findScript("script"));
+        EXPECT_EQ(nodeBinding, m_logicEngine.findNodeBinding("nodebinding"));
+        EXPECT_EQ(appearanceBinding, m_logicEngine.findAppearanceBinding("appbinding"));
+    }
+
+    TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CutsNameAtNullTermination)
+    {
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding("appbinding");
+        EXPECT_EQ(appearanceBinding, m_logicEngine.findAppearanceBinding("appbinding\0withsurprise"));
+    }
+
+    TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyIfTypeMatches)
+    {
+        m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        m_logicEngine.createRamsesNodeBinding("nodebinding");
+        m_logicEngine.createRamsesAppearanceBinding("appbinding");
+
+        EXPECT_EQ(nullptr, m_logicEngine.findScript("nodebinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("appbinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("script"));
+    }
+
+    TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyStringMatchesExactly)
+    {
+        m_logicEngine.createRamsesNodeBinding("nodebinding");
+
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("Nodebinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("node"));
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("binding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("Xnodebinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("nodebindinY"));
+    }
 }
 

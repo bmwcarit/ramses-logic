@@ -96,8 +96,6 @@ table Property
     rootType:EPropertyRootType;
     children:[Property];
     value:PropertyValue;
-    // See TODO in code; we need this temporarily (or maybe permanently) in order to NOT set ramses node properties to our default values, when not expected
-    wasSet:bool;
 }
 
 root_type Property;

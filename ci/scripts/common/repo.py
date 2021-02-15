@@ -9,9 +9,11 @@
 import subprocess
 import os
 
+
 def get_sdkroot(from_dir=None):
     """Get sdk root folder by asking git"""
-    return subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], shell=False, cwd=from_dir or os.path.dirname(os.path.realpath(__file__))).decode('utf-8').strip()
+    return subprocess.check_output(['git', 'rev-parse', '--show-toplevel'],
+                                   cwd=from_dir or os.path.dirname(os.path.realpath(__file__))).decode('utf-8').strip()
 
 
 def get_git_files(path, *, including_submodules, relative_to_path=True, make_absolute=False):
@@ -26,4 +28,3 @@ def get_git_files(path, *, including_submodules, relative_to_path=True, make_abs
         base = path if relative_to_path else get_sdkroot(path)
         files = [os.path.join(base, f) for f in files]
     return files
-

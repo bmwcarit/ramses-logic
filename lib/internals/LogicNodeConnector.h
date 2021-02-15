@@ -23,15 +23,14 @@ namespace rlogic::internal
     class LogicNodeConnector
     {
     public:
-        bool link(const PropertyImpl& sourceProperty, const PropertyImpl& targetProperty);
-        bool unlink(const PropertyImpl& targetProperty);
+        [[nodiscard]] bool link(const PropertyImpl& output, const PropertyImpl& input);
+        bool unlinkPrimitiveInput(const PropertyImpl& input);
         void unlinkAll(const LogicNodeImpl& logicNode);
-        bool isLinked(const LogicNodeImpl& logicNode) const;
-        const PropertyImpl* getLinkedOutput(const PropertyImpl& input) const;
-        const PropertyImpl* getLinkedInput(const PropertyImpl& output) const;
+        [[nodiscard]] bool isLinked(const LogicNodeImpl& logicNode) const;
+        [[nodiscard]] const PropertyImpl* getLinkedOutput(const PropertyImpl& input) const;
 
         // TODO Violin refactor this (class should not have to expose internal data). Currently still used for serialization
-        const LinksMap& getLinks() const
+        [[nodiscard]] const LinksMap& getLinks() const
         {
             return m_links;
         }
@@ -39,7 +38,10 @@ namespace rlogic::internal
     private:
         LinksMap m_links;
 
-        bool isSourceLinked(PropertyImpl& input) const;
-        bool isTargetLinked(PropertyImpl& output) const;
+        [[nodiscard]] bool isInputLinked(PropertyImpl& input) const;
+        [[nodiscard]] bool isOutputLinked(PropertyImpl& output) const;
+
+        void unlinkInputRecursive(const PropertyImpl& input);
+        void unlinkOutputRecursive(const PropertyImpl& output);
     };
 }

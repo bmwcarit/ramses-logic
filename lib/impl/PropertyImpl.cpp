@@ -12,6 +12,7 @@
 #include "impl/LogicNodeImpl.h"
 
 #include "internals/SerializationHelper.h"
+#include "internals/TypeUtils.h"
 
 #include "generated/property_gen.h"
 
@@ -20,10 +21,10 @@
 
 namespace rlogic::internal
 {
-    PropertyImpl::PropertyImpl(std::string_view name, EPropertyType type, EInputOutputProperty inputOutput)
+    PropertyImpl::PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics)
         : m_name(name)
         , m_type(type)
-        , m_inputOutputProperty(inputOutput)
+        , m_semantics(semantics)
     {
         switch (type)
         {
@@ -63,60 +64,57 @@ namespace rlogic::internal
         }
     }
 
-    PropertyImpl::PropertyImpl(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput)
-        : m_name(prop->name()->string_view())
-        , m_type(ConvertSerializationTypeToEPropertyType(prop->rootType(), prop->value_type()))
-        // TODO Violin/Sven we can probably save some time by having default values not being deserialized
-        // If we do this, we could also not serialize the m_hasDefaultValue maybe
-        , m_wasSet(prop->wasSet())
-        , m_inputOutputProperty(inputOutput)
+    PropertyImpl::PropertyImpl(const rlogic_serialization::Property& prop, EPropertySemantics semantics)
+        : m_name(prop.name()->string_view())
+        , m_type(ConvertSerializationTypeToEPropertyType(prop.rootType(), prop.value_type()))
+        , m_semantics(semantics)
     {
         // If primitive: set value; otherwise load children
-        if (prop->rootType() == rlogic_serialization::EPropertyRootType::Primitive)
+        if (prop.rootType() == rlogic_serialization::EPropertyRootType::Primitive)
         {
-            switch (prop->value_type())
+            switch (prop.value_type())
             {
             case rlogic_serialization::PropertyValue::float_s:
-                m_value = prop->value_as_float_s()->v();
+                m_value = prop.value_as_float_s()->v();
                 break;
             case rlogic_serialization::PropertyValue::vec2f_s: {
-                auto vec2fValue = prop->value_as_vec2f_s();
+                auto vec2fValue = prop.value_as_vec2f_s();
                 m_value         = vec2f{vec2fValue->x(), vec2fValue->y()};
                 break;
             }
             case rlogic_serialization::PropertyValue::vec3f_s: {
-                auto vec3fValue = prop->value_as_vec3f_s();
+                auto vec3fValue = prop.value_as_vec3f_s();
                 m_value         = vec3f{vec3fValue->x(), vec3fValue->y(), vec3fValue->z()};
                 break;
             }
             case rlogic_serialization::PropertyValue::vec4f_s: {
-                auto vec4fValue = prop->value_as_vec4f_s();
+                auto vec4fValue = prop.value_as_vec4f_s();
                 m_value         = vec4f{vec4fValue->x(), vec4fValue->y(), vec4fValue->z(), vec4fValue->w()};
                 break;
             }
             case rlogic_serialization::PropertyValue::int32_s:
-                m_value = prop->value_as_int32_s()->v();
+                m_value = prop.value_as_int32_s()->v();
                 break;
             case rlogic_serialization::PropertyValue::vec2i_s: {
-                auto vec2iValue = prop->value_as_vec2i_s();
+                auto vec2iValue = prop.value_as_vec2i_s();
                 m_value         = vec2i{vec2iValue->x(), vec2iValue->y()};
                 break;
             }
             case rlogic_serialization::PropertyValue::vec3i_s: {
-                auto vec3iValue = prop->value_as_vec3i_s();
+                auto vec3iValue = prop.value_as_vec3i_s();
                 m_value         = vec3i{vec3iValue->x(), vec3iValue->y(), vec3iValue->z()};
                 break;
             }
             case rlogic_serialization::PropertyValue::vec4i_s: {
-                auto vec4iValue = prop->value_as_vec4i_s();
+                auto vec4iValue = prop.value_as_vec4i_s();
                 m_value         = vec4i{vec4iValue->x(), vec4iValue->y(), vec4iValue->z(), vec4iValue->w()};
                 break;
             }
             case rlogic_serialization::PropertyValue::string_s:
-                m_value = prop->value_as_string_s()->v()->str();
+                m_value = prop.value_as_string_s()->v()->str();
                 break;
             case rlogic_serialization::PropertyValue::bool_s:
-                m_value = prop->value_as_bool_s()->v();
+                m_value = prop.value_as_bool_s()->v();
                 break;
             case rlogic_serialization::PropertyValue::NONE:
                 break;
@@ -124,9 +122,9 @@ namespace rlogic::internal
         }
         else
         {
-            for (auto child : *prop->children())
+            for (auto child : *prop.children())
             {
-                addChild(Create(child, inputOutput));
+                addChild(Create(*child, semantics));
             }
         }
     }
@@ -178,26 +176,13 @@ namespace rlogic::internal
         return nullptr;
     }
 
-    const Property* PropertyImpl::getChild(std::string_view name) const
-    {
-        auto it = std::find_if(
-            m_children.begin(), m_children.end(), [&name](const std::vector<std::unique_ptr<Property>>::value_type& property) { return property->getName() == name; });
-        if (it != m_children.end())
-        {
-            return it->get();
-        }
-        return nullptr;
-    }
-
     void PropertyImpl::addChild(std::unique_ptr<PropertyImpl> child)
     {
         assert(nullptr != child);
-        assert(m_inputOutputProperty == child->m_inputOutputProperty);
-        if (m_type == EPropertyType::Struct || m_type == EPropertyType::Array)
-        {
-            child->setLogicNode(*m_logicNode);
-            m_children.push_back(std::make_unique<Property>(std::move(child)));
-        }
+        assert(m_semantics == child->m_semantics);
+        assert(TypeUtils::CanHaveChildren(m_type));
+        child->setLogicNode(*m_logicNode);
+        m_children.push_back(std::make_unique<Property>(std::move(child)));
     }
 
     flatbuffers::Offset<rlogic_serialization::Property> PropertyImpl::serialize(flatbuffers::FlatBufferBuilder& builder)
@@ -311,21 +296,14 @@ namespace rlogic::internal
             propertyRootType,
             builder.CreateVector(child_vector),
             valueType,
-            valueOffset,
-            m_wasSet
+            valueOffset
         );
         return propertyFB;
     }
 
-    std::unique_ptr<PropertyImpl> PropertyImpl::Create(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput)
+    std::unique_ptr<PropertyImpl> PropertyImpl::Create(const rlogic_serialization::Property& prop, EPropertySemantics semantics)
     {
-        // TODO Violin this should be an assert
-        if (nullptr == prop)
-        {
-            return nullptr;
-        }
-
-        return std::make_unique<PropertyImpl>(prop, inputOutput);
+        return std::make_unique<PropertyImpl>(prop, semantics);
     }
 
     template <typename T> std::optional<T> PropertyImpl::get() const
@@ -355,20 +333,38 @@ namespace rlogic::internal
     {
         if (PropertyTypeToEnum<T>::TYPE == m_type)
         {
+            // TODO Violin Treat setting output values as an error here - it makes no sense semantics-wise to set the value of an
+            // output manually
+
+            // Check if value changed before doing something
             if (std::get<T>(m_value) != value)
             {
                 m_value = value;
                 m_logicNode->setDirty(true);
             }
-            m_wasSet  = true;
+            // Binding inputs behave differently than other inputs
+            if (m_semantics == EPropertySemantics::BindingInput)
+            {
+                m_bindingInputHasNewValue = true;
+                m_logicNode->setDirty(true);
+            }
             return true;
         }
         return false;
     }
 
-    bool PropertyImpl::wasSet() const
+    bool PropertyImpl::bindingInputHasNewValue() const
     {
-        return m_wasSet;
+        // TODO Violin can we make this assert the bindings semantics?
+        return m_bindingInputHasNewValue;
+    }
+
+    bool PropertyImpl::checkForBindingInputNewValueAndReset()
+    {
+        // TODO Violin can we make this assert the bindings semantics?
+        const bool newValue = m_bindingInputHasNewValue;
+        m_bindingInputHasNewValue = false;
+        return newValue;
     }
 
     template bool PropertyImpl::set<float>(float /*value*/);
@@ -382,17 +378,26 @@ namespace rlogic::internal
     template bool PropertyImpl::set<std::string>(std::string /*value*/);
     template bool PropertyImpl::set<bool>(bool /*value*/);
 
-    void PropertyImpl::set(const PropertyImpl& other)
+    // TODO Violin remove code duplication here and in other setters, e.g. by splitting the logic
+    // for value setting, semantics check, and dirty handling and calling separately
+    void PropertyImpl::setInternal(const PropertyImpl& other)
     {
         assert(m_type == other.m_type);
-        // TODO Violin this doesn't scale well. Need some basic type utils, this is not the only place where we need it
-        assert(m_type != EPropertyType::Struct);
-        m_wasSet = true;
+        assert(TypeUtils::IsPrimitiveType(m_type));
+        assert(m_semantics == EPropertySemantics::BindingInput || m_semantics == EPropertySemantics::ScriptInput);
+
+        // Check if value changed before doing something
         if (m_value != other.m_value)
         {
             m_value = other.m_value;
             m_logicNode->setDirty(true);
-            return;
+        }
+
+        // Binding inputs behave differently than other inputs
+        if (m_semantics == EPropertySemantics::BindingInput)
+        {
+            m_bindingInputHasNewValue = true;
+            m_logicNode->setDirty(true);
         }
     }
 
@@ -411,12 +416,6 @@ namespace rlogic::internal
         }
     }
 
-    const LogicNodeImpl& PropertyImpl::getLogicNode() const
-    {
-        assert(m_logicNode != nullptr);
-        return *m_logicNode;
-    }
-
     LogicNodeImpl& PropertyImpl::getLogicNode()
     {
         assert(m_logicNode != nullptr);
@@ -425,23 +424,23 @@ namespace rlogic::internal
 
     bool PropertyImpl::isInput() const
     {
-        return m_inputOutputProperty == EInputOutputProperty::Input;
+        return m_semantics == EPropertySemantics::ScriptInput || m_semantics == EPropertySemantics::BindingInput;
     }
 
     bool PropertyImpl::isOutput() const
     {
-        return m_inputOutputProperty == EInputOutputProperty::Output;
+        return m_semantics == EPropertySemantics::ScriptOutput;
     }
 
-    EInputOutputProperty PropertyImpl::getInputOutputProperty() const
+    EPropertySemantics PropertyImpl::getPropertySemantics() const
     {
-        return m_inputOutputProperty;
+        return m_semantics;
     }
 
     std::unique_ptr<PropertyImpl> PropertyImpl::deepCopy() const
     {
-        assert(!m_wasSet && !m_logicNode && "Deep copy supported only before setting values and attaching to property tree, as means to supplement type expansion only");
-        auto deepCopy = std::make_unique<PropertyImpl>(m_name, m_type, m_inputOutputProperty);
+        assert(!m_bindingInputHasNewValue && !m_logicNode && "Deep copy supported only before setting values and attaching to property tree, as means to supplement type expansion only");
+        auto deepCopy = std::make_unique<PropertyImpl>(m_name, m_type, m_semantics);
 
         for (const auto& child : m_children)
         {
@@ -449,5 +448,4 @@ namespace rlogic::internal
         }
         return deepCopy;
     }
-
 }

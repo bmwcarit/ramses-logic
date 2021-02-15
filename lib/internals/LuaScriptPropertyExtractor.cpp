@@ -92,7 +92,7 @@ namespace rlogic::internal
                 type == EPropertyType::String ||
                 type == EPropertyType::Bool)
             {
-                parentStruct.addChild(std::make_unique<PropertyImpl>(name, type, parentStruct.getInputOutputProperty()));
+                parentStruct.addChild(std::make_unique<PropertyImpl>(name, type, parentStruct.getPropertySemantics()));
             }
             else
             {
@@ -102,7 +102,7 @@ namespace rlogic::internal
         else if (solType == sol::type::table)
         {
             const auto table          = propertyValue.as<sol::table>();
-            auto propertyStruct = std::make_unique<PropertyImpl>(name, EPropertyType::Struct, parentStruct.getInputOutputProperty());
+            auto propertyStruct = std::make_unique<PropertyImpl>(name, EPropertyType::Struct, parentStruct.getPropertySemantics());
 
             for (auto& tableEntry : table)
             {
@@ -119,7 +119,7 @@ namespace rlogic::internal
                 const ArrayTypeInfo& arrayTypeInfo = *maybeArrayTypeInfo;
                 const sol::object& arrayType = arrayTypeInfo.arrayType;
 
-                auto arrayProperty = std::make_unique<PropertyImpl>(name, EPropertyType::Array, parentStruct.getInputOutputProperty());
+                auto arrayProperty = std::make_unique<PropertyImpl>(name, EPropertyType::Array, parentStruct.getPropertySemantics());
 
                 const sol::type solArrayType = arrayType.get_type();
                 // Handles ARRAY(n, T) where T is a primitive type (int, float etc.)
@@ -139,7 +139,7 @@ namespace rlogic::internal
                     {
                         for (size_t i = 0; i < arrayTypeInfo.arraySize; ++i)
                         {
-                            arrayProperty->addChild(std::make_unique<PropertyImpl>("", type, parentStruct.getInputOutputProperty()));
+                            arrayProperty->addChild(std::make_unique<PropertyImpl>("", type, parentStruct.getPropertySemantics()));
                         }
                     }
                     else
@@ -158,7 +158,7 @@ namespace rlogic::internal
 
                     // Create first array element as if it's a normal struct outside of array
                     // TODO Violin extract this code so that it's easier to read (currently not easily possible because of suboptimal class design)
-                    auto firstStructInArray = std::make_unique<PropertyImpl>("", EPropertyType::Struct, parentStruct.getInputOutputProperty());
+                    auto firstStructInArray = std::make_unique<PropertyImpl>("", EPropertyType::Struct, parentStruct.getPropertySemantics());
                     LuaScriptPropertyExtractor structExtractor(m_state, *firstStructInArray);
                     for (const auto& tableEntry : complexTypeDescription)
                     {

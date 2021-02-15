@@ -31,5 +31,15 @@ namespace rlogic
         return m_nodeBinding->getRamsesNode();
     }
 
+    bool RamsesNodeBinding::setRotationConvention(ramses::ERotationConvention rotationConvention)
+    {
+        return m_nodeBinding->setRotationConvention(rotationConvention);
+    }
+
+    ramses::ERotationConvention RamsesNodeBinding::getRotationConvention() const
+    {
+        return m_nodeBinding->getRotationConvention();
+    }
+
     RamsesNodeBinding::~RamsesNodeBinding() noexcept = default;
 }

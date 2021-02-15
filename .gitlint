@@ -53,7 +53,7 @@ line-length=72
 # regex=^US[0-9]*
 
 [body-max-line-length]
-line-length=80
+line-length=160
 
 # [body-min-length]
 # min-length=5

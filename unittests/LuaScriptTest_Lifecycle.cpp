@@ -27,7 +27,8 @@ namespace rlogic::internal
     class ALuaScript_Lifecycle : public ALuaScript
     {
     protected:
-        void TearDown() override {
+        void TearDown() override
+        {
             std::remove("script.bin");
             std::remove("script.lua");
             std::remove("arrays.bin");
@@ -95,7 +96,6 @@ namespace rlogic::internal
 
             EXPECT_TRUE(m_logicEngine.update());
         }
-        std::remove("script.lua");
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_FromEmptySourceFile)
@@ -127,8 +127,6 @@ namespace rlogic::internal
 
             EXPECT_TRUE(m_logicEngine.update());
         }
-        std::remove("script.lua");
-        std::remove("script.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, ProducesErrorWhenLoadedFromFaultyFile)
@@ -148,8 +146,6 @@ namespace rlogic::internal
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("\"script.lua\""));
-
-        std::remove("script.lua");
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_Arrays)
@@ -174,7 +170,7 @@ namespace rlogic::internal
         }
         {
             m_logicEngine.loadFromFile("script.bin");
-            const LuaScript* loadedScript = findLuaScriptByName("MyScript");
+            const LuaScript* loadedScript = m_logicEngine.findScript("MyScript");
 
             const auto inputs = loadedScript->getInputs();
 
@@ -195,7 +191,6 @@ namespace rlogic::internal
             EXPECT_FLOAT_EQ(0.2f, *inputs->getChild(0u)->getChild(1u)->get<float>());
 
         }
-        std::remove("script.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NestedArray)
@@ -219,7 +214,7 @@ namespace rlogic::internal
         }
         {
             m_logicEngine.loadFromFile("arrays.bin");
-            const LuaScript* loadedScript = findLuaScriptByName("MyScript");
+            const LuaScript* loadedScript = m_logicEngine.findScript("MyScript");
 
             const auto inputs = loadedScript->getInputs();
 
@@ -239,7 +234,6 @@ namespace rlogic::internal
             EXPECT_THAT(*nested_array->getChild(0u)->get<vec3f>(), ::testing::ElementsAre(1.1f, 1.2f, 1.3f));
 
         }
-        std::remove("arrays.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NestedProperties)
@@ -310,7 +304,6 @@ namespace rlogic::internal
             EXPECT_TRUE(m_logicEngine.update());
             EXPECT_FLOAT_EQ(47.11f, *outputs->getChild(0u)->get<float>());
         }
-        std::remove("nested_array.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_ArrayOfStructs)
@@ -360,7 +353,6 @@ namespace rlogic::internal
             auto loadedOutput = loadedScript->getOutputs()->getChild("arrayOfStructs")->getChild(1)->getChild("nested_struct")->getChild("nested_array")->getChild(0);
             EXPECT_FLOAT_EQ(100.0f, *loadedOutput->get<float>());
         }
-        std::remove("array_of_structs.bin");
     }
 
     // This is a confidence test which tests all property types, both as inputs and outputs, and as arrays
@@ -409,7 +401,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("arrays.bin"));
-            const LuaScript* loadedScript = findLuaScriptByName("MyScript");
+            const LuaScript* loadedScript = m_logicEngine.findScript("MyScript");
 
             auto inputs = loadedScript->getInputs();
             auto outputs = loadedScript->getOutputs();
@@ -448,7 +440,6 @@ namespace rlogic::internal
                 }
             }
         }
-        std::remove("arrays.bin");
     }
 
     TEST_F(ALuaScript_Lifecycle, OverwritesCurrentData_WhenLoadedASecondTimeFromTheSameFile)
@@ -476,66 +467,6 @@ namespace rlogic::internal
         EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
         loadedScript = *m_logicEngine.scripts().begin();
         EXPECT_EQ(42, *loadedScript->getInputs()->getChild("data")->get<int32_t>());
-
-        std::remove("script.bin");
-    }
-
-    // TODO Violin this test does not make sense - this code path can't be triggered by user. Rework!
-    // What we can test (and should) is that a real script without inputs/outputs can be deserialized properly
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithoutInputs)
-    {
-        flatbuffers::FlatBufferBuilder builder;
-        {
-            auto script = rlogic_serialization::CreateLuaScript(
-                builder, rlogic_serialization::CreateLogicNode(
-                    builder,
-                    builder.CreateString("StcriptName")
-                ),
-                builder.CreateString("Filename"),
-                builder.CreateString("")
-            );
-
-            builder.Finish(script);
-        }
-        {
-            ErrorReporting errors;
-            internal::SolState   state;
-            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
-
-            EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.getErrors().size());
-            EXPECT_EQ("Error during deserialization of inputs", errors.getErrors()[0]);
-        }
-    }
-
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithoutOutputs)
-    {
-        flatbuffers::FlatBufferBuilder builder;
-        {
-            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EInputOutputProperty::Input);
-            auto script = rlogic_serialization::CreateLuaScript(builder,
-                rlogic_serialization::CreateLogicNode(
-                    builder,
-                    builder.CreateString("ScriptName"),
-                    input.serialize(builder)
-
-                ),
-                builder.CreateString("Filename"),
-                builder.CreateString(""),
-                0
-            );
-
-            builder.Finish(script);
-        }
-        {
-            ErrorReporting errors;
-            internal::SolState       state;
-            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
-
-            EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.getErrors().size());
-            EXPECT_EQ("Error during deserialization of outputs", errors.getErrors()[0]);
-        }
     }
 
     // TODO Violin this test does not make sense - should be deleted, and check if there is related code which can be improved
@@ -546,8 +477,8 @@ namespace rlogic::internal
             auto                   source = R"(
                 this.goes.boom
             )";
-            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EInputOutputProperty::Input);
-            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EInputOutputProperty::Output);
+            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EPropertySemantics::ScriptInput);
+            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EPropertySemantics::ScriptOutput);
 
             auto script = rlogic_serialization::CreateLuaScript(
                 builder,
@@ -586,8 +517,8 @@ namespace rlogic::internal
                 end
                 add(2)
             )";
-            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EInputOutputProperty::Input);
-            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EInputOutputProperty::Output);
+            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EPropertySemantics::ScriptInput);
+            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EPropertySemantics::ScriptOutput);
 
             auto script = rlogic_serialization::CreateLuaScript(builder,
                 rlogic_serialization::CreateLogicNode(

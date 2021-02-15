@@ -37,7 +37,6 @@ namespace rlogic
      *    it implicitly controls the ramses Appearance
      *
      * All shader uniforms are supported, except the following:
-     * - uniform arrays (e.g. vec4 u_colors[3])
      * - texture samplers of any kind
      * - matrix types (e.g. mat4, mat23 etc.)
      * - any uniform with attached semantics (e.g. display resolution) - see ramses::EEffectUniformSemantic docs

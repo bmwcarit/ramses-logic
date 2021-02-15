@@ -24,7 +24,6 @@ namespace rlogic::internal
         RamsesBindingImpl& operator=(const RamsesBindingImpl& other)     = delete;
 
     protected:
-        explicit RamsesBindingImpl(std::string_view name) noexcept;
         RamsesBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs);
     };
 }

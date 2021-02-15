@@ -11,9 +11,8 @@ if(NOT CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     return()
 endif()
 
-# This CMake file creates two targets (FlatbufGen and FlatbufCheck)
-# FlatbufGen: re-generates flatbuffers header files from schemas, puts results in source tree
-# FlatbufCheck: checks that generated headers are exactly the same as ones in source tree
+# This CMake file creates a target FlatbufGen which re-generates flatbuffers
+# header files from schemas and puts results back in the source tree
 #
 # Works like this:
 # Case #1: with code generation (default)
@@ -22,21 +21,16 @@ endif()
 #                   # If a new *.fbs file was added, has to re-run cmake (as with any other src files)
 #                   # If existing *.fbs file changes, regenerates ALL *_gen.h files and rebuilds anything that depends on them
 #                   # If no change in *.fbs files, does nothing
-# make FlatbufCheck # Compares *_gen.h files in git tree to *_gen.h files in working tree
-#                   # If *_gen.h files in working tree differ from their git counterparts - prints the diff and fails
-#                   # Otherwise succeeds
-#                   # This job is always executed in CI builds to ensure generated files are consistent with schema changes
 #
 # Case #2: no code generation (explicitly disabled)
 # cmake -Dramses-logic_ENABLE_FLATBUFFERS_GENERATION=OFF <src>
 # make              # Uses checked-in *_gen.h files and ignores any changes in *.fbs files
 # make FlatbufGen   # Fails - no such targets because disabled
-# make FlatbufCheck # Fails - no such targets because disabled
 
 file(GLOB flatbuffers_schemas "${PROJECT_SOURCE_DIR}/lib/flatbuffers/schemas/*.fbs")
 set(flatbuffers_output_dir "${PROJECT_SOURCE_DIR}/lib/flatbuffers/generated")
 
-# create list of *_generated.h out of *.fbs file list
+# create list of *_gen.h out of *.fbs file list
 foreach(schema ${flatbuffers_schemas})
     get_filename_component(filename ${schema} NAME_WE)
     list(APPEND generated_headers "${flatbuffers_output_dir}/${filename}_gen.h")
@@ -79,29 +73,3 @@ set_target_properties(FlatbufGen PROPERTIES
     FOLDER "CMakePredefinedTargets")
 
 message(STATUS " + FlatbufGen")
-
-# Custom command which checks that generated flatbuffers files are not different than checked-in ones
-
-find_package(Git)
-if(Git_FOUND)
-    # TODO Violin/Tobias check if there is a cleaner way to tell CMake to execute this command regardless of dependencies
-    set(NON_EXISTENT_FILE this_file_does_not_exist.stamp)
-    add_custom_command(
-        OUTPUT  ${NON_EXISTENT_FILE}
-        COMMAND ${GIT_EXECUTABLE} -C ${PROJECT_SOURCE_DIR} diff --exit-code ${flatbuffers_output_dir}
-        COMMENT "Ensure flatbuffers header files are content-wise equivalent to checked-in ones"
-        VERBATIM
-    )
-    add_custom_target(FlatbufCheck
-        DEPENDS ${NON_EXISTENT_FILE}
-    )
-
-    # FlatbufCheck target should always be only ever executed if explicitly invoked
-    set_target_properties(FlatbufCheck PROPERTIES
-        EXCLUDE_FROM_ALL TRUE
-        FOLDER "CMakePredefinedTargets")
-
-    message(STATUS " + FlatbufCheck")
-else()
-    message(STATUS " - FlatbufCheck (Git missing)")
-endif()

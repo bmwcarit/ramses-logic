@@ -56,6 +56,7 @@ regarding Ramses and its dependencies.
 
 In addition to Ramses, the Ramses Logic Engine has following dependencies,
 listed alongside their licenses here:
+
 * Lua (MIT)
 * Sol (MIT)
 * Flatbuffers (Apache-2.0)

@@ -17,6 +17,7 @@
 #include "ramses-client-api/RamsesClient.h"
 #include "ramses-client-api/Scene.h"
 #include "ramses-framework-api/RamsesFramework.h"
+#include "ramses-client-api/EffectDescription.h"
 
 namespace rlogic
 {
@@ -39,6 +40,15 @@ namespace rlogic
         void destroyScene(ramses::Scene& scene)
         {
             m_ramsesClient->destroy(scene);
+        }
+
+        static ramses::Appearance& CreateTestAppearance(ramses::Scene& scene, std::string_view vertShader, std::string_view fragShader)
+        {
+            ramses::EffectDescription effectDesc;
+            effectDesc.setUniformSemantic("u_DisplayBufferResolution", ramses::EEffectUniformSemantic::DisplayBufferResolution);
+            effectDesc.setVertexShader(vertShader.data());
+            effectDesc.setFragmentShader(fragShader.data());
+            return *scene.createAppearance(*scene.createEffect(effectDesc), "test appearance");
         }
 
     private:

@@ -9,6 +9,7 @@
 #pragma once
 
 #include "impl/RamsesBindingImpl.h"
+#include "ramses-client-api/ERotationConvention.h"
 
 #include <memory>
 
@@ -53,15 +54,19 @@ namespace rlogic::internal
 
         bool setRamsesNode(ramses::Node* node);
         [[nodiscard]] ramses::Node* getRamsesNode() const;
+
+        bool setRotationConvention(ramses::ERotationConvention rotationConvention);
+        [[nodiscard]] ramses::ERotationConvention getRotationConvention() const;
+
         bool update() override;
 
         flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
     private:
-
         explicit RamsesNodeBindingImpl(std::string_view name) noexcept;
-        RamsesNodeBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept;
+        RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept;
         ramses::Node* m_ramsesNode = nullptr;
+        ramses::ERotationConvention m_rotationConvention = ramses::ERotationConvention::XYZ;
 
         [[nodiscard]] static std::unique_ptr<PropertyImpl> CreateNodeProperties();
     };

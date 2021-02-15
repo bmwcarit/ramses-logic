@@ -9,10 +9,8 @@
 #  -------------------------------------------------------------------------
 
 import sys
-import json
 import os
 import argparse
-import re
 import time
 from pathlib import Path
 import concurrent.futures
@@ -22,37 +20,34 @@ from common import lists
 from common import clangtidy
 from common import yamlconfig
 
-CONFIG_SCHEMA = """
-type: object
-properties:
-  include:
-    type: array
-    items:
-      type: string
-  exclude:
-    type: array
-    items:
-      type: string
-
-  sort-order:
-    type: array
-    items:
-      type: object
-      properties:
-        pattern:
-          type: string
-        priority:
-          type: integer
-
-  remove-duplicate-sources:
-    type: boolean
-  remove-duplicate-reports:
-    type: boolean
-  filter-headers:
-    type: boolean
-
-additionalProperties: false
-"""
+CONFIG_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'include': {
+            'type': 'array',
+            'items': {'type': 'string'},
+        },
+        'exclude': {
+            'type': 'array',
+            'items': {'type': 'string'},
+        },
+        'sort-order': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'pattern': {'type': 'string'},
+                    'priority': {'type': 'integer'},
+                },
+                'additionalProperties': False,
+            },
+        },
+        'remove-duplicate-sources': {'type': 'boolean'},
+        'remove-duplicate-reports': {'type': 'boolean'},
+        'filter-headers': {'type': 'boolean'},
+    },
+    'additionalProperties': False,
+}
 
 CONFIG_DEFAULTS = {
     'include': ['.*'],
@@ -62,6 +57,7 @@ CONFIG_DEFAULTS = {
     'remove-duplicate-reports': True,
     'filter-headers': True,
 }
+
 
 def process_compdb_entries(entries, config, includes_filter):
     if config['remove-duplicate-sources']:
@@ -74,6 +70,7 @@ def process_compdb_entries(entries, config, includes_filter):
                                        sort_patterns=[(e['pattern'], e['priority']) for e in config['sort-order']],
                                        pattern_key_fun=lambda e: e.relative_file,
                                        fallback_funs=[lambda e: Path(e.file).stat().st_size, lambda e: e.relative_file])
+
 
 def filter_result_issues(issues, config, unique_issues):
     if config['filter-headers']:
@@ -88,13 +85,15 @@ def filter_result_issues(issues, config, unique_issues):
             result.append(issue)
     return result
 
+
 def format_dt(dt):
     seconds = int(dt) % 60
     minutes = int(dt) // 60
-    millis  = int(dt * 1000.) % 1000
+    millis = int(dt * 1000.) % 1000
     if minutes != 0:
         return f'{minutes}m{seconds:02}.{millis:03}'
     return f'{seconds}.{millis:03}'
+
 
 def print_slowest_entries(entries, timing_selection):
     entries = sorted(entries, key=lambda e: e.runtime, reverse=True)
@@ -103,20 +102,26 @@ def print_slowest_entries(entries, timing_selection):
     for e in entries[:num_entries]:
         print(f'{format_dt(e.runtime):>10}  {e.compdb_entry.relative_file}')
 
-def print_overall_runtime(entries, num_threads, start_time):
-    wallclock_runtime = time.time() - start_time
+
+def print_overall_runtime(entries, num_threads, start_time, *, end_time=time.time()):
+    wallclock_runtime = end_time - start_time
     total_cpu_runtime = sum([e.runtime for e in entries])
     cpu_usage = ((total_cpu_runtime / num_threads) / wallclock_runtime) * 100
-    print(f'Wallclock runtime {format_dt(wallclock_runtime)}, total thread runtime {format_dt(total_cpu_runtime)}, CPU usage {cpu_usage:.1f}%')
+    print(f'Wallclock runtime {format_dt(wallclock_runtime)}, total thread runtime {format_dt(total_cpu_runtime)}, '
+          f'CPU usage {cpu_usage:.1f}%')
 
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('compdb', help='Full path of compile_commands.json')
-    parser.add_argument('-f', '--filter', default=None, help='filter processed files that match the provided regex')
-    parser.add_argument('--timing', default=None, required=False, help='show timing for X longest entries (or "all" for all)')
-    parser.add_argument('--threads', default=os.cpu_count(), type=int, required=False, help='Number of CPU cores to use (default: all)')
-    parser.add_argument('-c', '--config', default=None, required=False, help='Path to configuration file')
+    parser.add_argument('-f', '--filter', default=None,
+                        help='filter processed files that match the provided regex')
+    parser.add_argument('--timing', default=None, required=False,
+                        help='show timing for X longest entries (or "all" for all)')
+    parser.add_argument('--threads', default=os.cpu_count(), type=int, required=False,
+                        help='Number of CPU cores to use (default: all)')
+    parser.add_argument('-c', '--config', default=None, required=False,
+                        help='Path to configuration file')
     args = parser.parse_args()
 
     start_time = time.time()

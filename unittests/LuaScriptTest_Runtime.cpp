@@ -30,9 +30,6 @@ namespace rlogic
     class ALuaScript_Runtime : public ALuaScript
     {
     protected:
-        void TearDown() override {
-            std::remove("test_file.txt");
-        }
     };
 
     // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
@@ -1717,10 +1714,10 @@ namespace rlogic
 
         logicEngine.update();
 
-        EXPECT_FALSE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
+        EXPECT_TRUE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
-        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(1.f, 1.f, 1.f));
         EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
 
         logicEngine.link(*script1FloatOutput, *script2FloatInput);
@@ -1730,10 +1727,10 @@ namespace rlogic
 
         logicEngine.update();
 
-        EXPECT_FALSE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
+        EXPECT_TRUE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
-        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(1.f, 1.f, 1.f));
         EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
 
         logicEngine.link(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));

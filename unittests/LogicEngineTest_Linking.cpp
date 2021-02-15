@@ -42,6 +42,13 @@ namespace rlogic
         {
         }
 
+        void TearDown() override
+        {
+            std::remove("links.bin");
+            std::remove("nested_links.bin");
+            std::remove("binding_links.bin");
+        }
+
         const std::string_view m_minimalLinkScript = R"(
             function interface()
                 IN.target = BOOL
@@ -69,8 +76,6 @@ namespace rlogic
 
         const Property& m_sourceProperty;
         Property& m_targetProperty;
-
-
     };
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertiesWithMismatchedTypesAreLinked)
@@ -260,6 +265,70 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.link(*floatSource, *floatTarget));
         EXPECT_TRUE(m_logicEngine.link(*vec2Source, *vec2Target));
         EXPECT_TRUE(m_logicEngine.link(*vec3Source, *vec3Target));
+    }
+
+    TEST_F(ALogicEngine_Linking, ProducesErrorOnNextUpdateIfLinkCycleWasCreated)
+    {
+        LuaScript& loopScript = *m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript);
+        const Property* sourceInput = m_sourceScript.getInputs()->getChild("target");
+        const Property* sourceOutput = m_sourceScript.getOutputs()->getChild("source");
+        const Property* targetInput = m_targetScript.getInputs()->getChild("target");
+        const Property* targetOutput = m_targetScript.getOutputs()->getChild("source");
+        const Property* loopInput = loopScript.getInputs()->getChild("target");
+        const Property* loopOutput = loopScript.getOutputs()->getChild("source");
+
+        EXPECT_TRUE(m_logicEngine.link(*sourceOutput, *targetInput));
+        EXPECT_TRUE(m_logicEngine.link(*targetOutput, *loopInput));
+        EXPECT_TRUE(m_logicEngine.link(*loopOutput, *sourceInput));
+        EXPECT_FALSE(m_logicEngine.update());
+        auto errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_EQ("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!", errors[0]);
+
+        // Also refuse to save to file
+        EXPECT_FALSE(m_logicEngine.saveToFile("will_not_write"));
+        errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_EQ("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!", errors[0]);
+    }
+
+    TEST_F(ALogicEngine_Linking, PropagatesValuesAcrossMultipleLinksInAChain)
+    {
+        LogicEngine logicEngine;
+        auto scriptSource = R"(
+            function interface()
+                IN.inString1 = STRING
+                IN.inString2 = STRING
+                OUT.outString = STRING
+            end
+            function run()
+                OUT.outString = IN.inString1 .. IN.inString2
+            end
+        )";
+
+        auto script1 = logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
+        auto script2 = logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
+        auto script3 = logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
+
+        auto script1Input2 = script1->getInputs()->getChild("inString2");
+        auto script2Input1 = script2->getInputs()->getChild("inString1");
+        auto script2Input2 = script2->getInputs()->getChild("inString2");
+        auto script3Input1 = script3->getInputs()->getChild("inString1");
+        auto script3Input2 = script3->getInputs()->getChild("inString2");
+        auto script1Output = script1->getOutputs()->getChild("outString");
+        auto script2Output = script2->getOutputs()->getChild("outString");
+        auto script3Output = script3->getOutputs()->getChild("outString");
+
+        logicEngine.link(*script1Output, *script2Input1);
+        logicEngine.link(*script2Output, *script3Input1);
+
+        script1Input2->set(std::string("Script1"));
+        script2Input2->set(std::string("Script2"));
+        script3Input2->set(std::string("Script3"));
+
+        logicEngine.update();
+
+        EXPECT_EQ("Script1Script2Script3", script3Output->get<std::string>());
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingStructs)
@@ -603,8 +672,8 @@ namespace rlogic
             gl_Position = floatUniform * vec4(1.0);
         })");
 
-        const ramses::Effect* effect     = scene->createEffect(effectDesc, ramses::ResourceCacheFlag_DoNotCache, "glsl shader");
-        ramses::Appearance*   appearance = scene->createAppearance(*effect, "triangle appearance");
+        const ramses::Effect* effect     = scene->createEffect(effectDesc);
+        ramses::Appearance*   appearance = scene->createAppearance(*effect);
 
         const auto  luaScriptSource = R"(
             function interface()
@@ -1103,10 +1172,10 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.link(*scriptOutVec3f, *nodeTranslation));
         EXPECT_TRUE(m_logicEngine.unlink(*scriptOutVec3f, *nodeTranslation));
 
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(nodeBinding.m_impl));
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(outScript->m_impl));
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(nodeBinding.m_impl));
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(outScript->m_impl));
         EXPECT_FALSE(m_logicEngine.m_impl->isLinked(*outScript));
         EXPECT_FALSE(m_logicEngine.m_impl->isLinked(nodeBinding));
 
@@ -1143,10 +1212,10 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.unlink(*scriptVisiblity, *nodeVisibility));
         EXPECT_TRUE(m_logicEngine.unlink(*scriptTranslation, *nodeTranslation));
 
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(nodeBinding.m_impl));
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeConnector().isLinked(outScript->m_impl));
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(nodeBinding.m_impl));
-        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeGraph().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(outScript->m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(nodeBinding.m_impl));
+        EXPECT_FALSE(m_logicEngine.m_impl->getLogicNodeDependencies().isLinked(outScript->m_impl));
         EXPECT_FALSE(m_logicEngine.m_impl->isLinked(*outScript));
         EXPECT_FALSE(m_logicEngine.m_impl->isLinked(nodeBinding));
 
@@ -1226,13 +1295,13 @@ namespace rlogic
             ASSERT_TRUE(m_logicEngine.loadFromFile("links.bin"));
 
             // Internal check that deserialization did not result in more link copies
-            const auto& links = m_logicEngine.m_impl->getLogicNodeConnector().getLinks();
+            const auto& links = m_logicEngine.m_impl->getLogicNodeDependencies().getLinks();
             EXPECT_EQ(links.size(), 3u);
 
             // Load all scripts and their properties
-            auto scriptC = findLuaScriptByName("ScriptC");
-            auto scriptB = findLuaScriptByName("ScriptB");
-            auto scriptA = findLuaScriptByName("ScriptA");
+            auto scriptC = m_logicEngine.findScript("ScriptC");
+            auto scriptB = m_logicEngine.findScript("ScriptB");
+            auto scriptA = m_logicEngine.findScript("ScriptA");
 
             auto scriptAInput = scriptA->getInputs()->getChild("input");
             auto scriptAOutput = scriptA->getOutputs()->getChild("output");
@@ -1269,9 +1338,6 @@ namespace rlogic
             EXPECT_EQ(std::string("forward forward 'A++'"), *scriptBOutput->get<std::string>());
             EXPECT_EQ(std::string("A: forward 'A++' & B: forward forward 'A++'"), *scriptC_concatenate_AB->get<std::string>());
         }
-
-        // TODO Violin discuss moving removal of files to test fixtures dtor
-        std::remove("links.bin");
     }
 
     TEST_F(ALogicEngine_Linking, PreservesNestedLinksBetweenScriptsAfterSavingAndLoadingFromFile)
@@ -1335,12 +1401,12 @@ namespace rlogic
             ASSERT_TRUE(m_logicEngine.loadFromFile("nested_links.bin"));
 
             // Internal check that deserialization did not result in more link copies
-            const auto& links = m_logicEngine.m_impl->getLogicNodeConnector().getLinks();
+            const auto& links = m_logicEngine.m_impl->getLogicNodeDependencies().getLinks();
             EXPECT_EQ(links.size(), 3u);
 
             // Load all scripts and their properties
-            auto scriptA = findLuaScriptByName("ScriptA");
-            auto scriptB = findLuaScriptByName("ScriptB");
+            auto scriptA = m_logicEngine.findScript("ScriptA");
+            auto scriptB = m_logicEngine.findScript("ScriptB");
 
             auto scriptAOutput = scriptA->getOutputs()->getChild("output");
             auto scriptAnested_str1 = scriptA->getOutputs()->getChild("nested")->getChild("str1");
@@ -1377,8 +1443,6 @@ namespace rlogic
 
             EXPECT_EQ(std::string("str1 {foo, str2!bar}"), *scriptB_concatenated->get<std::string>());
         }
-
-        std::remove("nested_links.bin");
     }
 
     class ALogicEngine_Linking_WithBindings : public ALogicEngine_Linking
@@ -1435,7 +1499,7 @@ namespace rlogic
 
         ramses::Appearance& createTestAppearance(ramses::Effect& effect)
         {
-            return *m_scene->createAppearance(effect, "test appearance");
+            return *m_scene->createAppearance(effect);
         }
 
         const std::string_view m_vertShader = R"(
@@ -1537,8 +1601,8 @@ namespace rlogic
             ExpectValues(*ramsesNode1, ENodePropertyStaticIndex::Translation, { 0.0f, 0.0f, 0.0f });
             EXPECT_EQ(ramsesNode1->getVisibility(), ramses::EVisibilityMode::Visible);
 
-            auto nodeBinding1 = findRamsesNodeBindingByName("NodeBinding1");
-            auto nodeBinding2 = findRamsesNodeBindingByName("NodeBinding2");
+            auto nodeBinding1 = m_logicEngine.findNodeBinding("NodeBinding1");
+            auto nodeBinding2 = m_logicEngine.findNodeBinding("NodeBinding2");
 
             auto binding1TranslationInput = nodeBinding1->getInputs()->getChild("translation");
             auto binding2RotationInput = nodeBinding2->getInputs()->getChild("rotation");
@@ -1568,8 +1632,6 @@ namespace rlogic
             ExpectValues(*ramsesNode2, ENodePropertyStaticIndex::Scaling, { 1.0f, 1.0f, 1.0f });
             EXPECT_EQ(ramsesNode2->getVisibility(), ramses::EVisibilityMode::Visible);
         }
-
-        std::remove("binding_links.bin");
     }
 
     TEST_F(ALogicEngine_Linking_WithBindings, PreservesLinksToAppearanceBindingsAfterSavingAndLoadingFromFile)
@@ -1638,8 +1700,8 @@ namespace rlogic
             ExpectVec3f(appearance2, "uniform1", { 0.0f, 0.0f, 0.0f });
             ExpectVec3f(appearance2, "uniform2", { 0.0f, 0.0f, 0.0f });
 
-            auto appBinding1 = findRamsesAppearanceBindingByName("AppBinding1");
-            auto appBinding2 = findRamsesAppearanceBindingByName("AppBinding2");
+            auto appBinding1 = m_logicEngine.findAppearanceBinding("AppBinding1");
+            auto appBinding2 = m_logicEngine.findAppearanceBinding("AppBinding2");
 
             auto binding1uniform1 = appBinding1->getInputs()->getChild("uniform1");
             auto binding1uniform2 = appBinding1->getInputs()->getChild("uniform2");
@@ -1660,11 +1722,9 @@ namespace rlogic
             ExpectVec3f(appearance2, "uniform1", { 100.0f, 200.0f, 300.0f });
             ExpectVec3f(appearance2, "uniform2", { 100.0f, 200.0f, 300.0f });
         }
-
-        std::remove("binding_links.bin");
     }
 
-    TEST_F(ALogicEngine_Linking, ReturnsTrueIfLogicNodeIsLinked)
+    TEST_F(ALogicEngine_Linking, ReportsNodeAsLinked_IFF_ItHasIncomingOrOutgoingLinks)
     {
         LogicEngine logicEngine;
         auto        scriptSource = R"(
@@ -1800,5 +1860,115 @@ namespace rlogic
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_TRUE(targetBinding->m_impl.get().isDirty());
+    }
+
+    class ALogicEngine_Linking_Confidence : public ALogicEngine
+    {
+    protected:
+        const std::string_view m_scriptNestedStructs = R"(
+            function interface()
+                IN.struct = {
+                    nested = {
+                        vec3f = VEC3F
+                    }
+                }
+
+                OUT.struct = {
+                    nested = {
+                        vec3f = VEC3F
+                    }
+                }
+            end
+
+            function run()
+            end
+        )";
+
+        const std::string_view m_scriptArrayOfStructs = R"(
+            function interface()
+                IN.array = ARRAY(2, {
+                        vec3f = VEC3F
+                    })
+
+                OUT.array = ARRAY(2, {
+                        vec3f = VEC3F
+                    })
+            end
+
+            function run()
+            end
+        )";
+    };
+
+    TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedScriptsWithComplexTypes_WithLinkStillActive_DestroySourceFirst)
+    {
+        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+        LuaScript& targetScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+
+        const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
+        Property& targetVec(*targetScript.getInputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
+
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.link(sourceVec, targetVec));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(sourceScript));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(targetScript));
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedScriptsWithComplexTypes_WithLinkStillActive_DestroyTargetFirst)
+    {
+        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+        LuaScript& targetScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+
+        const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
+        Property& targetVec(*targetScript.getInputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
+
+        // Update in-between each step, to make sure no crashes
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.link(sourceVec, targetVec));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(targetScript));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(sourceScript));
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedScriptsWithComplexTypes_WithLinkStillActive_ArrayOfStructs)
+    {
+        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptArrayOfStructs));
+        LuaScript& targetScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+
+        const Property& sourceVec(*sourceScript.getOutputs()->getChild("array")->getChild(0)->getChild("vec3f"));
+        Property& targetVec(*targetScript.getInputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
+
+        // Update in-between each step, to make sure no crashes
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.link(sourceVec, targetVec));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(sourceScript));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(targetScript));
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedBinding_WithNestedLinkStillActive)
+    {
+        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto translationProperty = targetBinding->getInputs()->getChild("translation");
+
+        const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild(0)->getChild("vec3f"));
+
+        // Update in-between each step, to make sure no crashes
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.link(sourceVec, *translationProperty));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(sourceScript));
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.destroy(*targetBinding));
+        EXPECT_TRUE(m_logicEngine.update());
     }
 }

@@ -35,18 +35,19 @@ namespace rlogic::internal
 {
     class LogicNodeImpl;
 
-    enum class EInputOutputProperty : uint8_t
+    enum class EPropertySemantics : uint8_t
     {
-        Input,
-        Output
+        ScriptInput,
+        BindingInput,
+        ScriptOutput
     };
 
     class PropertyImpl
     {
     public:
-        PropertyImpl(std::string_view name, EPropertyType type, EInputOutputProperty inputOutput);
-        PropertyImpl(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput);
-        static std::unique_ptr<PropertyImpl> Create(const rlogic_serialization::Property* prop, EInputOutputProperty inputOutput);
+        PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics);
+        PropertyImpl(const rlogic_serialization::Property& prop, EPropertySemantics semantics);
+        static std::unique_ptr<PropertyImpl> Create(const rlogic_serialization::Property& prop, EPropertySemantics semantics);
 
         // Move-able (noexcept); Not copy-able
         ~PropertyImpl() noexcept = default;
@@ -61,14 +62,16 @@ namespace rlogic::internal
         [[nodiscard]] size_t getChildCount() const;
         [[nodiscard]] EPropertyType getType() const;
         [[nodiscard]] std::string_view getName() const;
-        [[nodiscard]] bool wasSet() const;
+
+        [[nodiscard]] bool bindingInputHasNewValue() const;
+        [[nodiscard]] bool checkForBindingInputNewValueAndReset();
 
         [[nodiscard]] const Property* getChild(size_t index) const;
-        [[nodiscard]] const Property* getChild(std::string_view name) const;
 
+        // TODO Violin these 3 methods have redundancy, refactor
         [[nodiscard]] bool isInput() const;
         [[nodiscard]] bool isOutput() const;
-        [[nodiscard]] EInputOutputProperty getInputOutputProperty() const;
+        [[nodiscard]] EPropertySemantics getPropertySemantics() const;
 
         [[nodiscard]] Property* getChild(size_t index);
         [[nodiscard]] Property* getChild(std::string_view name);
@@ -76,15 +79,27 @@ namespace rlogic::internal
         void addChild(std::unique_ptr<PropertyImpl> child);
         void clearChildren();
 
+        // TODO Violin refactor the different setters below to reduce code duplication
+        // and make better readable (have only one place where values are set, and a consistent
+        // "dirtyness" check)
+
         template <typename T> [[nodiscard]] std::optional<T> get() const;
         template <typename T> bool set(T value);
-        void set(const PropertyImpl& other);
+
+        // This version is used by links to avoid type expansion
+        void setInternal(const PropertyImpl& other);
+        // This version is used for non-default value initialization (to avoid having templated constructor)
+        template <typename T> void setInternal(T value)
+        {
+            assert (PropertyTypeToEnum<T>::TYPE == m_type);
+            assert (std::get<T>(m_value) != value && "Use this only to set non-default values!");
+            m_value = value;
+        }
 
         flatbuffers::Offset<rlogic_serialization::Property> serialize(flatbuffers::FlatBufferBuilder& builder);
 
         void setLogicNode(LogicNodeImpl& logicNode);
         [[nodiscard]] LogicNodeImpl& getLogicNode();
-        [[nodiscard]] const LogicNodeImpl& getLogicNode() const;
 
     private:
         std::string                                     m_name;
@@ -94,9 +109,8 @@ namespace rlogic::internal
 
         // TODO Violin/Sven consider solving this more elegantly
         LogicNodeImpl*                                  m_logicNode = nullptr;
-        // TODO Violin/Sven/Tobias re-consider if we want to track it this way after we have implemented dirty handling and more binding types
-        bool m_wasSet = false;
-        EInputOutputProperty                            m_inputOutputProperty;
+        bool m_bindingInputHasNewValue = false;
+        EPropertySemantics                              m_semantics;
 
         flatbuffers::Offset<rlogic_serialization::Property> serialize_recursive(flatbuffers::FlatBufferBuilder& builder);
     };

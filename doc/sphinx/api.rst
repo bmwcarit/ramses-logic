@@ -10,6 +10,81 @@ Overview
     Prefer learning by example? Jump straight to the :ref:`examples <List of all examples>`!
     Looking for a specific class or method? Check the :ref:`class index <Class Index>`
 
+--------------------------------------
+Object types and their relationships
+--------------------------------------
+
+The ``Logic Engine`` consists of a network of ``Lua`` scripts with a set of inputs and outputs with
+links between them. A special type of object we call `binding` serves as a bridge to a Ramses scene.
+
+The following graph shows an example of such script network:
+
+.. image:: res/overview.svg
+
+The scripts have inputs and outputs which together define the script's ``interface``
+(:ref:`more info on scripts <Script creation>`). Scripts
+can be linked together directionally, so that the output of a script can provide its data to
+the input of another script (:ref:`more info on links <Creating links between scripts>`).
+Scripts can't interact with Ramses objects directly. Instead, they
+can link to ``Bindings`` which are designed to "bind" ``Ramses`` objects and modify
+their properties' values (node visibility, transformation values, material properties etc.) (:ref:`more info on bindings <Linking scripts to Ramses scenes>`).
+
+The greyed-out slots in the image above represent input properties which are neither linked nor
+have a statically configured value. In bindings, this denotes that the corresponding ``Ramses`` property
+is not being updated by the ``Logic Engine`` (see also :ref:`next section <Data Flow>`). In scripts, these
+properties will receive a default value at runtime (0, 0.0f, "", true etc.) unless explicitly set by the application
+logic. Usually, script inputs without a configured value or a link to other output are considered the ``interface``
+of the logic network towards a runtime application, and their values are supposed to be explicitly set at runtime.
+
+.. note::
+
+    One of the planned features of the ``Logic Engine`` is to formalize interface inputs in a special
+    interface class in a future release.
+
+--------------------------------------
+Data flow
+--------------------------------------
+
+The cornerstone of the ``Logic Engine`` is the :func:`rlogic::LogicEngine::update` method which
+"executes" the script network and updates the values of the ``Ramses`` scene bound to it. The nodes
+are executed based on a topological graph sort, where the traversal direction is given by the link
+pairs (A, B) where A is an output and B is an input property in the logic graph
+(as shown :ref:`here <Object types and their relationships>`).
+
+In order to save performance, logic nodes are not executed again if none of their input values changed since
+the last update. ``Bindings`` are an exception to this rule - setting a value of a binding input always results in
+the value of that input being passed further to the bound ``Ramses`` object, regardless if the corresponding value in ``Ramses`` is the
+same or not. This can be useful when you want to force re-apply the value to ``Ramses`` e.g. you can have your own logic
+to control the visibility of all ``Ramses`` nodes, and only use ``Logic Engine`` to control transformation properties. In that case
+you should never set the "visibility" property of a Binding object, instead set the visibility directly on the bound ramses::Node.
+
+.. warning::
+
+    We strongly discourage setting values to ``Ramses`` objects and to ``Ramses Logic`` bindings in the same update cycle
+    to avoid unexpected behavior. At any given time, use one *or* the other, not both mechanisms to set values!
+
+The execution logic is slightly different for scripts and bindings. Scripts will set the values of their outputs
+based on the logic in their ``run()`` function, which may set all, a subset or none of the script's outputs.
+Bindings execution logic processes each of its input slots individually and checks if
+a value was explicitly set on it (either from user code or from an incoming link). Only those inputs
+which have such value are also set on the bound ``Ramses`` object.
+
+--------------------------------------
+Save/load to file
+--------------------------------------
+
+.. todo: Violin this behavior is still a bit inconsistent... Maybe we should change this to: scripts and bindings are not executed after load, unless an input is set before. This would be much more consistent!
+
+The ``Logic Engine`` is designed to be serialized and deserialized into binary files for fast loading. The first call to
+:func:`rlogic::LogicEngine::update` after loading from file will execute all scripts. Bindings will only be executed if
+some or all of their inputs are linked to a script output. Binding values will only be passed further to ``Ramses``
+if their values were modified, e.g. by a link which produced a different value than before saving, or if the application
+called :func:`rlogic::Property::set` explicitly on any of the bindings' input properties
+
+===================================
+Script creation
+===================================
+
 The entry point to ``RAMSES logic`` is a factory-style class :class:`rlogic::LogicEngine` which can
 create instances of all other types of objects supported by ``RAMSES Logic``:
 
@@ -197,14 +272,12 @@ scripts which provide data to other scripts' inputs are executed first. In this 
 the 'destionationScript' because it provides data to it over the link.
 
 Creating links as shown above enforces a so-called 'directed acyclic graph', or ``DAG``, to the :class:`rlogic::LogicNode` inside a given
-:class:`rlogic::LogicEngine`. In order to ensure data consistency, this graph can not have cyclic dependencies, thus following error
-conditions will cause undefined behavior:
+:class:`rlogic::LogicEngine`. In order to ensure data consistency, this graph can not have cyclic dependencies, thus following operations
+will cause an error:
 
-.. todo: (Violin) Fix docs after we have implemented cycle detection
-
-* A :class:`rlogic::LogicNode` can not create links to itself
-* Node A can not be linked to node B if node B is linked to node A (links have a direction!)
-* Any set of :class:`rlogic::LogicNode` instances whose links form a (directed) circle, e.g. A->B->C->A
+* Creating a link from any :class:`rlogic::LogicNode` to itself
+* Creating a link from node A to node B if node B is linked to node A (links have a direction and this creates a two-node loop!)
+* Any set of :class:`rlogic::LogicNode` instances whose links form a (directed) circle, e.g. A->B->C->A (this is caught at update time, not at link creation time)
 
 A link can be removed in a similar fashion:
 
@@ -242,12 +315,45 @@ The reason for that is two-fold:
 
 
 .. note::
-    Bindings alre always 'updated' in the end of :func:`rlogic::LogicEngine::update`, regardless how they are linked. This
-    ensures that updates to the ``Ramses`` scene are only ever applied if all of the ``Lua`` scripts ran without errors. This prevents
-    partial graphics updates if a any of the scripts has an error.
+    Bindings are 'updated' slightly differently than :class:`rlogic::LuaScript`. A script will be executed if and only if any of
+    its input values have changed since last time it was executed. A :class:`rlogic::RamsesBinding` in contrast will also check
+    if its input properties have a value which was explicitly set by the user, either by direct :func:`rlogic::Property::set` or
+    indirectly with a :func:`rlogic::LogicEngine::link`. This way, only intended changes are passed further to ``Ramses`` objects
+    and you can mix and match different control systems. For example, you can use script logic to control the transformation properties
+    of nodes, but have your own logic/code for controlling the visibility or resource loading.
 
-If you destroy a still linked LogicNode with :func:`rlogic::LogicEngine::destroy`, all links from and to this :class:`rlogic::LogicNode` will
-be removed aswell.
+If you destroy a LogicNode calling :func:`rlogic::LogicEngine::destroy`, all links from and to this :class:`rlogic::LogicNode` will
+be automatically removed.
+
+==================================================
+What happens on update
+==================================================
+
+The ``Logic Engine`` manages a network of Logic Nodes of various types which are executed in every
+update loop (as triggered by :func:`rlogic::LogicEngine::update`). But what happens inside each update loop?
+
+First, all :class:`rlogic::LogicNode` objects are ordered based on the links between them (as described in
+the :ref:`section explaining links <Creating links between scripts>`). Then, each of the nodes is executed
+according to that order, unless it does not need to be executed. A node needs to be executed if:
+
+* it was never executed before, i.e.:
+
+    * it was just created
+    * it was loaded from a file
+
+* it was executed in a previous update loop, but the value of at least one of its inputs changed. The cause of such change can either be:
+
+    * Setting the value directly over :func:`rlogic::Property::set`, or...
+    * An output of another :class:`rlogic::LogicNode` which changed in the same update loop is linked to this input or...
+    * A link to this input was just created
+
+In other words, the network of logic nodes is traversed along the links between them, the values of nodes' outputs
+is carried over to the linked nodes' inputs, and if no input changed for a given node, its execution is skipped to
+save CPU cycles.
+
+The execution logic is different for each type of :class:`rlogic::LogicNode`. :class:`rlogic::LuaScript` instances execute their ``run()`` method
+while :class:`rlogic::RamsesBinding` set the values of bound Ramses objects. For more details, consult the documentation of the specific
+classes.
 
 ==================================================
 Performance and caching
@@ -365,14 +471,15 @@ further for more details.
     and its scripts in a single file, we decided to not do this but instead keep the content in separate files and load/save it independently.
     This allows to have the same Ramses scene stored multiple times or with different settings, but using the same logic content,
     as well as the other way around - having different logic implementations based on the same Ramses scene. It also leaves more freedom
-    to choose how to store the Ramses scene.
+    to choose how to store the Ramses scene. This implies that at most a single Ramses scene can be referenced at the time of saving,
+    having more than one scene will result in error.
 
 --------------------------------------------------
 Object lifecycle when saving and loading to files
 --------------------------------------------------
 
 After loading,
-the current state of the object will be completely overwritten by the contents from the file. If you don't want this behavior,
+the current state of the logic engine objects will be completely overwritten by the contents from the file. If you don't want this behavior,
 use two different instances of the class - one dedicated for loading from files and nothing else.
 
 Here is a simple example which demonstrates how saving/loading from file works in the simplest case (i.e. no references to Ramses objects):
@@ -414,6 +521,13 @@ to specify the scene from which the references to Ramses objects should be resol
 or ID.
 
 For a full-fledged example, have a look at `the serialization example <https://github.com/GENIVI/ramses-logic/tree/master/examples/06_serialization>`_.
+
+.. warning::
+
+    The ``LogicEngine`` expects that immediately after loading, the state of the ``Ramses`` scene is the same as it was right before saving, and will not
+    modify ``Ramses`` objects which are attached to bindings in the ``LogicEngine`` in its first update, unless they are linked to scripts or explicitly
+    overwritten by :func:`rlogic::Property::set` calls after loading from the file. We strongly advice to always save and load
+    both the ``Ramses`` scene and the ``LogicEngine`` scene together to avoid data inconsistencies!
 
 =====================================
 Additional Lua syntax specifics
@@ -552,8 +666,8 @@ Internally there are four log levels available.
 * Warn
 * Error
 
-By default all internal logging messages are sended to std::cout. If you want to handle the messages yourself,
-you can register your own log handler function. This function is called each time a log message occurs.
+By default all internal logging messages are sent to std::cout. You can toggle this with :func:`rlogic::Logger::SetDefaultLogging`.
+In addition, it is possible to have a custom log handler function which is called each time a log message is issued.
 
 .. code-block::
     :linenos:
@@ -576,8 +690,8 @@ Inside the log handler function, you get the type of the message and the message
 Keep in mind, that you can't store the std::string_view. It will be invalid after the call to the log handler
 function. If you need the message for later usage, store it in a std::string.
 
-Note that having a custom logger does not disable the default logging - you have to do this explicitly
-if you don't want to see the ramses logic default logs using :func:`rlogic::Logger::SetDefaultLogging`.
+The amount of logging can be configured with :func:`rlogic::Logger::SetLogVerbosity`. This affects both the default
+logging and the custom logger.
 
 
 ======================================

@@ -11,6 +11,4 @@
 skip_list:
   - '106' # Role name {...} does not match ^[a-z][a-z0-9_]+$ pattern
   - '301' # Commands should not change things if nothing needs doing
-  - '303' # TODO Violin Using command rather than module
-  - '305' # TODO Violin Use shell only when shell functionality is required
 use_default_rules: true

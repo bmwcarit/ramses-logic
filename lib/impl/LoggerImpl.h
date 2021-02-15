@@ -58,6 +58,8 @@ namespace rlogic::internal
         template<typename ...ARGS>
         void log(ELogMessageType messageType, const ARGS&... args);
 
+        void setLogVerbosityLimit(ELogMessageType verbosityLimit);
+        ELogMessageType getLogVerbosityLimit() const;
         void setLogHandler(Logger::LogHandlerFunc logHandlerFunc);
         void setDefaultLogging(bool loggingEnabled);
 
@@ -66,29 +68,29 @@ namespace rlogic::internal
     private:
         LoggerImpl() noexcept;
 
-        [[nodiscard]] bool logMessageExceedsAllowedLogLevel(ELogMessageType messageType) const
+        [[nodiscard]] bool logMessageExceedsVerbosityLimit(ELogMessageType messageType) const
         {
-            return (messageType > m_allowedLogLevel);
+            return (messageType > m_logVerbosityLimit);
         }
 
         Logger::LogHandlerFunc m_logHandler;
         bool                   m_defaultLogging = true;
 
-        // TODO Violin add API to set this
-        const ELogMessageType m_allowedLogLevel = ELogMessageType::INFO;
+        ELogMessageType m_logVerbosityLimit = ELogMessageType::INFO;
 
     };
 
     template <typename... ARGS>
     inline void LoggerImpl::log(ELogMessageType messageType, const ARGS&... args)
     {
-        if (!m_defaultLogging && !m_logHandler)
+        // Early exit if log level exceeded, or no logger configured
+        if (logMessageExceedsVerbosityLimit(messageType) || (!m_defaultLogging && !m_logHandler))
         {
             return;
         }
 
         const auto formattedMessage = fmt::format(args...);
-        if (m_defaultLogging && !logMessageExceedsAllowedLogLevel(messageType))
+        if (m_defaultLogging)
         {
             std::cout << "[ " << GetLogMessageTypeString(messageType) << " ] " << formattedMessage << std::endl;
         }

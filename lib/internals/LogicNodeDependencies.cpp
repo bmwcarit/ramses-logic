@@ -1,0 +1,166 @@
+//  -------------------------------------------------------------------------
+//  Copyright (C) 2020 BMW AG
+//  -------------------------------------------------------------------------
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//  -------------------------------------------------------------------------
+
+#include "internals/LogicNodeDependencies.h"
+
+#include "ramses-logic/Property.h"
+
+#include "impl/LogicNodeImpl.h"
+#include "impl/PropertyImpl.h"
+
+#include "internals/ErrorReporting.h"
+#include "internals/TypeUtils.h"
+
+#include <cassert>
+#include "fmt/format.h"
+
+namespace rlogic::internal
+{
+
+    void LogicNodeDependencies::addNode(LogicNodeImpl& node)
+    {
+        m_logicNodeDAG.addNode(node);
+    }
+
+    void LogicNodeDependencies::removeNode(LogicNodeImpl& node)
+    {
+        m_logicNodeConnector.unlinkAll(node);
+        m_logicNodeDAG.removeNode(node);
+    }
+
+    bool LogicNodeDependencies::isLinked(const LogicNodeImpl& node) const
+    {
+        return m_logicNodeConnector.isLinked(node);
+    }
+
+    bool LogicNodeDependencies::updateTopologicalSorting()
+    {
+        return m_logicNodeDAG.updateTopologicalSorting();
+    }
+
+    const NodeVector& LogicNodeDependencies::getOrderedNodesCache() const
+    {
+        return m_logicNodeDAG.getCachedTopologicallySortedNodes();
+    }
+
+    const PropertyImpl* LogicNodeDependencies::getLinkedOutput(PropertyImpl& inputProperty) const
+    {
+        return m_logicNodeConnector.getLinkedOutput(inputProperty);
+    }
+
+    const LinksMap& LogicNodeDependencies::getLinks() const
+    {
+        return m_logicNodeConnector.getLinks();
+    }
+
+    bool LogicNodeDependencies::link(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting)
+    {
+        if (!m_logicNodeDAG.containsNode(output.getLogicNode()))
+        {
+            errorReporting.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", output.getLogicNode().getName()));
+            return false;
+        }
+
+        if (!m_logicNodeDAG.containsNode(input.getLogicNode()))
+        {
+            errorReporting.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", input.getLogicNode().getName()));
+            return false;
+        }
+
+        if (&output.getLogicNode() == &input.getLogicNode())
+        {
+            errorReporting.add("SourceNode and TargetNode are equal");
+            return false;
+        }
+
+
+        if (!(output.isOutput() && input.isInput()))
+        {
+            std::string_view lhsType = output.isOutput() ? "output" : "input";
+            std::string_view rhsType = input.isOutput() ? "output" : "input";
+            errorReporting.add(fmt::format("Failed to link {} property '{}' to {} property '{}'. Only outputs can be linked to inputs", lhsType, output.getName(), rhsType, input.getName()));
+            return false;
+        }
+
+        if (output.getType() != input.getType())
+        {
+            errorReporting.add(fmt::format("Types of source property '{}:{}' does not match target property '{}:{}'",
+                output.getName(),
+                GetLuaPrimitiveTypeName(output.getType()),
+                input.getName(),
+                GetLuaPrimitiveTypeName(input.getType())));
+            return false;
+        }
+
+        // No need to also test input type, above check already makes sure output and input are of the same type
+        if (!TypeUtils::IsPrimitiveType(output.getType()))
+        {
+            errorReporting.add(fmt::format("Can't link properties of complex types directly, currently only primitive properties can be linked"));
+            return false;
+        }
+
+        auto& targetNode = input.getLogicNode();
+        auto& sourceNode = output.getLogicNode();
+
+        if (!m_logicNodeConnector.link(output, input))
+        {
+            errorReporting.add(fmt::format("The property '{}' of LogicNode '{}' is already linked to the property '{}' of LogicNode '{}'",
+                output.getName(),
+                sourceNode.getName(),
+                input.getName(),
+                targetNode.getName()
+            ));
+            return false;
+        }
+
+        // TODO Violin these two calls set two different things to dirty. Try to not have redundant dirty
+        // flags and consolidate dirtiness to one place
+        m_logicNodeDAG.addEdge(sourceNode, targetNode);
+        targetNode.setDirty(true);
+
+        return true;
+    }
+
+    bool LogicNodeDependencies::unlink(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting)
+    {
+        if (TypeUtils::CanHaveChildren(input.getType()))
+        {
+            errorReporting.add(fmt::format("Can't unlink properties of complex types directly!"));
+            return false;
+        }
+
+        if (!m_logicNodeConnector.unlinkPrimitiveInput(input))
+        {
+            errorReporting.add(fmt::format("No link available from source property '{}' to target property '{}'", output.getName(), input.getName()));
+            return false;
+        }
+
+        auto& sourceNode = output.getLogicNode();
+        auto& targetNode = input.getLogicNode();
+
+        // TODO violin check if we can remove this (removing a link should not have to set dirty)
+        // Also, as with the link() case, this sets two things to dirty -> might hide problems
+        targetNode.setDirty(true);
+        m_logicNodeDAG.removeEdge(sourceNode, targetNode);
+
+        return true;
+    }
+
+    bool LogicNodeDependencies::isDirty() const
+    {
+        // TODO Violin test this in depth, might hide bugs because of current complexity
+        // (two classes, which each have their own weirdness around dirty handling. Also see other TODOs in this class)
+        if (m_logicNodeDAG.isDirty())
+        {
+            return true;
+        }
+
+        return false;
+    }
+
+}

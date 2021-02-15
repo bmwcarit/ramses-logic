@@ -7,118 +7,94 @@
 //  -------------------------------------------------------------------------
 
 #include "gtest/gtest.h"
+#include "gmock/gmock-matchers.h"
 
 #include "ramses-logic/Logger.h"
 #include "ramses-logic/ELogMessageType.h"
 
 #include "impl/LoggerImpl.h"
 
+#include "LogTestUtils.h"
+
 namespace rlogic
 {
-    TEST(ALogger, CanLogDifferentLogLevels)
+    // Test default state without fixture
+    TEST(ALogger_ByDefault, HasInfoAsVerbosityLimit)
     {
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::INFO, "Info Message");
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::ERROR, "Error Message");
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::WARNING, "Warning Message");
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::DEBUG, "Debug Message");
+        EXPECT_EQ(ELogMessageType::INFO, Logger::GetLogVerbosityLimit());
     }
 
-    TEST(ALogger, CanLogFormattedMessage)
+    class ALogger : public ::testing::Test
     {
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::INFO, "Info Message {}", 42);
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::ERROR, "Error Message {}", 42);
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::WARNING, "Warning Message {}", 42);
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::DEBUG, "Debug Message {}", 42);
+    protected:
+        std::vector<ELogMessageType> m_logTypes;
+        std::vector<std::string> m_logMessages;
+        ScopedLogContextLevel m_logCollector{ ELogMessageType::DEBUG, [this](ELogMessageType type, std::string_view message)
+            {
+                m_logTypes.emplace_back(type);
+                m_logMessages.emplace_back(message);
+        }
+        };
+    };
+
+    TEST_F(ALogger, LogsDifferentLogLevelsSequentially)
+    {
+        LOG_INFO("Info");
+        LOG_ERROR("Error");
+        LOG_WARN("Warning");
+        LOG_DEBUG("Debug");
+
+        EXPECT_THAT(m_logTypes, ::testing::ElementsAre(ELogMessageType::INFO, ELogMessageType::ERROR, ELogMessageType::WARNING, ELogMessageType::DEBUG));
+        EXPECT_THAT(m_logMessages, ::testing::ElementsAre("Info", "Error", "Warning", "Debug"));
     }
 
-    TEST(ALogger, CanLogFormattedMessageWithMultipleArguments)
+    TEST_F(ALogger, LogsFormattedMessage)
     {
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::INFO, "Info Message {} {} {}", 42, 42.0f, "42");
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::ERROR, "Error Message {} {} {}", 42, 42.0f, "42");
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::WARNING, "Warning Message {} {} {}", 42, 42.0f, "42");
-        internal::LoggerImpl::GetInstance().log(ELogMessageType::DEBUG, "Debug Message {} {} {}", 42, 42.0f, "42");
+        LOG_INFO("Info Message {}", 42);
+
+        EXPECT_EQ(m_logMessages[0], "Info Message 42");
     }
 
-    TEST(ALogger, CanLogDifferentLogLevelsWithMacros)
+    TEST_F(ALogger, LogsFormattedMessageWithMultipleArgumentsAndTypes)
     {
-        internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::INFO, "Info message");
-        LOG_INFO("Info message");
-        LOG_ERROR("Error message");
-        LOG_WARN("Warning message");
-        LOG_DEBUG("Debug message");
+        LOG_INFO("Info Message {} {} {} {}", 42, 0.5f, "bool:", true);
+
+        EXPECT_EQ(m_logMessages[0], "Info Message 42 0.5 bool: true");
     }
 
-    TEST(ALogger, CanLogFormattedMessageWithMacros)
-    {
-        LOG_INFO("Info message {}", 42);
-        LOG_ERROR("Error message {}", 42);
-        LOG_WARN("Warning message {}", 42);
-        LOG_DEBUG("Debug message {}", 42);
-    }
-
-    TEST(ALogger, CanLogFormattedMessageWithMultipleArgumentsWithMacros)
-    {
-        LOG_INFO("Info Message {} {} {}", 42, 42.0f, "42");
-        LOG_ERROR("Error Message {} {} {}", 42, 42.0f, "42");
-        LOG_WARN("Warning Message {} {} {}", 42, 42.0f, "42");
-        LOG_DEBUG("Debug Message {} {} {}", 42, 42.0f, "42");
-    }
-
-    TEST(ALogger, SetsDefaultLoggingOffAndOnAgain)
+    TEST_F(ALogger, SetsDefaultLoggingOffAndOnAgain)
     {
         Logger::SetDefaultLogging(false);
         LOG_INFO("Info Message {} {} {}", 42, 42.0f, "42");
         Logger::SetDefaultLogging(true);
         LOG_INFO("Info Message {} {} {}", 42, 42.0f, "43");
+
+        // Can't expect anything because default logging goes to stdout
     }
 
-    TEST(ALogger, CallsLogHandlerIfRegistered)
+    TEST_F(ALogger, SetsDefaultLoggingOff_DoesNotAffectCustomLogHandler)
     {
-        bool called = false;
-        Logger::SetLogHandler([&called](ELogMessageType type, std::string_view message) {
-            EXPECT_EQ(ELogMessageType::ERROR, type);
-            EXPECT_EQ("Error message", message);
-            called = true;
-        });
+        Logger::SetDefaultLogging(false);
 
-        LOG_ERROR("Error message");
-        EXPECT_TRUE(called);
-        called = false;
+        LOG_INFO("info");
+        EXPECT_EQ(m_logMessages[0], "info");
 
-        Logger::SetLogHandler([&called](ELogMessageType type, std::string_view message) {
-            EXPECT_EQ(ELogMessageType::WARNING, type);
-            EXPECT_EQ("Warn message", message);
-            called = true;
-        });
+        // Reset to not affect other tests
+        Logger::SetDefaultLogging(true);
+    }
 
-        LOG_WARN("Warn message");
-        EXPECT_TRUE(called);
-        called = false;
+    TEST_F(ALogger, ChangesLogVerbosityAffectsWhichMessagesAreProcessed)
+    {
+        Logger::SetLogVerbosityLimit(ELogMessageType::ERROR);
 
-        Logger::SetLogHandler([&called](ELogMessageType type, std::string_view message) {
-            EXPECT_EQ(ELogMessageType::DEBUG, type);
-            EXPECT_EQ("Debug message", message);
-            called = true;
-        });
+        // Simulate logs of all types
+        LOG_DEBUG("debug");
+        LOG_ERROR("error");
+        LOG_WARN("warning");
+        LOG_INFO("info");
+        LOG_DEBUG("debug");
+        LOG_ERROR("error");
 
-        LOG_DEBUG("Debug message");
-        EXPECT_TRUE(called);
-        called = false;
-
-        Logger::SetLogHandler([&called](ELogMessageType type, std::string_view message) {
-            EXPECT_EQ(ELogMessageType::INFO, type);
-            EXPECT_EQ("Info message", message);
-            called = true;
-        });
-
-        LOG_INFO("Info message");
-        EXPECT_TRUE(called);
-
-        // Can't "unset" a custom logger because of the lambda approach
-        // Set to an empty lambda, otherwise this test influences other tests which trigger logs
-        Logger::SetLogHandler([](ELogMessageType type, std::string_view message){
-            (void)type;
-            (void)message;
-        });
+        EXPECT_THAT(m_logTypes, ::testing::ElementsAre(ELogMessageType::ERROR, ELogMessageType::ERROR));
     }
 }

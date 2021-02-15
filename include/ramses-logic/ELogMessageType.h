@@ -14,7 +14,7 @@ namespace rlogic
 {
     /**
      * ELogMessageType lists the types of available log messages. The integer represents the
-     * priority of the log messages (lower means more important and higher priority).
+     * priority of the log messages (lower means more important, thus higher priority).
      */
     enum class ELogMessageType : int
     {

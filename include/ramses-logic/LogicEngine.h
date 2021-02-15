@@ -76,6 +76,30 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API Collection<RamsesAppearanceBinding> ramsesAppearanceBindings() const;
 
         /**
+         * Returns a pointer to the first occurrence of a script with a given \p name if such exists, and nullptr otherwise.
+         *
+         * @param name the name of the script to search for
+         * @return a pointer to the script, or nullptr if none was found
+         */
+        [[nodiscard]] RLOGIC_API LuaScript* findScript(std::string_view name) const;
+
+        /**
+         * Returns a pointer to the first occurrence of a node binding with a given \p name if such exists, and nullptr otherwise.
+         *
+         * @param name the name of the node binding to search for
+         * @return a pointer to the node binding, or nullptr if none was found
+         */
+        [[nodiscard]] RLOGIC_API RamsesNodeBinding* findNodeBinding(std::string_view name) const;
+
+        /**
+         * Returns a pointer to the first occurrence of an appearance binding with a given \p name if such exists, and nullptr otherwise.
+         *
+         * @param name the name of the appearance binding to search for
+         * @return a pointer to the appearance binding, or nullptr if none was found
+         */
+        [[nodiscard]] RLOGIC_API RamsesAppearanceBinding* findAppearanceBinding(std::string_view name) const;
+
+        /**
          * Creates a new #rlogic::LuaScript from an existing Lua source file. Refer to the #rlogic::LuaScript class documentation
          * for requirements that Lua scripts must fulfill in order to be added to the #LogicEngine.
          *
@@ -146,7 +170,8 @@ namespace rlogic
          * between then are executed in arbitrary order, but the order is always the same between two
          * invocations of #update without any calls to #link or #unlink between them.
          * As an optimization #rlogic::LogicNode's are only updated, if at least one input of a #rlogic::LogicNode
-         * has changed since the last call to #update.
+         * has changed since the last call to #update. If the links between logic nodes create a loop,
+         * this method will fail with an error and will not execute any of the logic nodes.
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
@@ -162,10 +187,14 @@ namespace rlogic
          * are executed - if node A provides data to node B, then node A will be executed
          * before node B.
          *
-         * The #link() method will result in undefined behavior when creating links:
-         * - which are created between properties of the same #rlogic::LogicNode
-         * - for which the \p sourceProperty is not an output (see #rlogic::LogicNode::getOutputs())
-         * - which create a 'link cycle', i.e. a set of #rlogic::LogicNode's which are connected in a cyclic fashion
+         * The #link() method will fail when:
+         * - \p sourceProperty and \p targetProperty belong to the same #rlogic::LogicNode
+         * - \p sourceProperty is not an output (see #rlogic::LogicNode::getOutputs())
+         * - \p targetProperty is not an input (see #rlogic::LogicNode::getInputs())
+         *
+         * Creating link loops will cause the next call to #update() to fail with an error. Loops
+         * are directional, it is OK to have A->B, A->C and B->C, but is not OK to have
+         * A->B->C->A.
          *
          * After calling #link, the value of the \p targetProperty will not change until the next call to #update. Creating
          * and destroying links generally has no effect until #update is called.
@@ -177,7 +206,6 @@ namespace rlogic
          * @return true if linking was successful, false otherwise. To get more detailed
          * error information use #getErrors()
          */
-        // TODO Violin/Sven fix above docs once we have implemented cycle detection
         RLOGIC_API bool link(const Property& sourceProperty, const Property& targetProperty);
 
         /**
@@ -222,6 +250,9 @@ namespace rlogic
          * to have objects with the same name, they have to be the exact same objects as during saving!
          * For more in-depth information regarding saving and loading, refer to the online documentation at
          * https://genivi.github.io/ramses-logic/api.html#serialization-deserialization
+         *
+         * Note: The method reports error and aborts if the #rlogic::RamsesBinding objects reference more than one
+         * Ramses scene (this is acceptable during runtime, but not for saving to file).
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *

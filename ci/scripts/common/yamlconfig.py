@@ -9,9 +9,9 @@
 import yaml
 import jsonschema
 
+
 def read_config_with_defaults(path, schema, defaults, *, path_may_be_none=True):
     if path:
-        schema = yaml.safe_load(schema)
         with open(path, 'r') as f:
             config = yaml.safe_load(f) or {}
             jsonschema.validate(config, schema)

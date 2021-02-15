@@ -36,6 +36,25 @@ namespace rlogic::Logger
     using LogHandlerFunc = std::function<void(ELogMessageType, std::string_view)>;
 
     /**
+    * Controls how verbose the logging is. \p verbosityLimit has the following semantics:
+    * - if log message has message type with higher or equal priority as verbosityLimit, then it is logged
+    * - log priority is as documented by #rlogic::ELogMessageType (Errors are more important than Warnings, etc)
+    * - the default value is #rlogic::ELogMessageType::INFO, meaning that log messages are processed if they
+    * have INFO priority or higher.
+    *
+    * @param verbosityLimit least priority a log message must have in order to be processed
+    */
+    RLOGIC_API void SetLogVerbosityLimit(ELogMessageType verbosityLimit);
+
+    /**
+    * Returns the current log verbosity limit of the logger. See #rlogic::Logger::SetLogVerbosityLimit for
+    * more info on semantics.
+    *
+    * @return current log verbosity limit
+    */
+    RLOGIC_API ELogMessageType GetLogVerbosityLimit();
+
+    /**
     * Sets a custom log handler function, which is called each time a log message occurs.
     * Note: setting a custom logger incurs a slight performance cost because log messages
     * will be assembled and reported, even if default logging is disabled (#SetDefaultLogging).

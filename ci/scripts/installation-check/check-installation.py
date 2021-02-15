@@ -8,9 +8,6 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-import glob
-import os
-import sys
 import subprocess
 import re
 import argparse
@@ -18,13 +15,12 @@ from pathlib import Path
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Script to verify that installation of the project has no unexpected or missing files, and that all installed includes compile stand-alone')
+    parser = argparse.ArgumentParser(description='Script to verify that installation of the project has no unexpected or \
+        missing files, and that all installed includes compile stand-alone')
     parser.add_argument('--src-dir', required=True, help='Ramses logic source dir')
     parser.add_argument('--install-dir', required=True, help='Directory where ramses logic was installed')
     parser.add_argument('--ignore', required=False, action='append', nargs='*', help='Ignore file patterns from the installation folder')
     args = parser.parse_args()
-
-    install_dir = Path(args.install_dir)
 
     # Expect exactly these files after installation (don't list header files here, they are cross-checked with source tree)
     expectNonheaderFiles = [
@@ -77,11 +73,10 @@ def main():
 
     if args.ignore:
         # This is required because we use the more compatible 'append' option of argparse in favor of 'extend'
-        patterns = ignore = [i[0] for i in args.ignore]
+        patterns = [i[0] for i in args.ignore]
         print(f"Ignoring file patterns: {', '.join(patterns)}")
-        unexpectedFiles         = [f for f in unexpectedFiles       if not any([re.search(p, f) for p in patterns])]
-        expectNonheaderFiles    = [f for f in expectNonheaderFiles  if not any([re.search(p, f) for p in patterns])]
-
+        unexpectedFiles = [f for f in unexpectedFiles if not any([re.search(p, f) for p in patterns])]
+        expectNonheaderFiles = [f for f in expectNonheaderFiles if not any([re.search(p, f) for p in patterns])]
 
     # If all "expected" files were found, the list should be empty now - if not, report error
     if expectNonheaderFiles:
@@ -111,7 +106,7 @@ def main():
     print("Checking strict header compilation")
     numPedanticErrors = 0
     for h in installedHeaders:
-        temp_file = f"/tmp/rlogic_pedantic_header.cpp"
+        temp_file = "/tmp/rlogic_pedantic_header.cpp"
         with open(temp_file, "w") as file:
             file.writelines(f"#include \"{h}\"\n\n")
             file.writelines("int main() {return 0;}")
@@ -133,6 +128,7 @@ def main():
     print("Done")
 
     return 0
+
 
 if __name__ == "__main__":
     exit(main())

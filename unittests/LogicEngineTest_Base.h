@@ -32,50 +32,5 @@ namespace rlogic
 
         const std::string_view m_invalid_empty_script = R"(
         )";
-
-        LuaScript* findLuaScriptByName(std::string_view name)
-        {
-            auto maybeScript = std::find_if(m_logicEngine.scripts().begin(), m_logicEngine.scripts().end(),
-                [name](const LuaScript* script)
-                {
-                    return script->getName() == name;
-                }
-            );
-            if (maybeScript == m_logicEngine.scripts().end())
-            {
-                return nullptr;
-            }
-            return *maybeScript;
-        }
-
-        RamsesNodeBinding* findRamsesNodeBindingByName(std::string_view name)
-        {
-            auto maybeBinding = std::find_if(m_logicEngine.ramsesNodeBindings().begin(), m_logicEngine.ramsesNodeBindings().end(),
-                [name](const RamsesNodeBinding* binding)
-                {
-                    return binding->getName() == name;
-                }
-            );
-            if (maybeBinding == m_logicEngine.ramsesNodeBindings().end())
-            {
-                return nullptr;
-            }
-            return *maybeBinding;
-        }
-
-        RamsesAppearanceBinding* findRamsesAppearanceBindingByName(std::string_view name)
-        {
-            auto maybeBinding = std::find_if(m_logicEngine.ramsesAppearanceBindings().begin(), m_logicEngine.ramsesAppearanceBindings().end(),
-                [name](const RamsesAppearanceBinding* binding)
-                {
-                    return binding->getName() == name;
-                }
-            );
-            if (maybeBinding == m_logicEngine.ramsesAppearanceBindings().end())
-            {
-                return nullptr;
-            }
-            return *maybeBinding;
-        }
     };
 }

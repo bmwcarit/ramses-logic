@@ -10,6 +10,7 @@ import json
 import re
 from pathlib import Path
 
+
 class CompilationEntry:
     def __init__(self, compdb_entry, compdb_path, project_root=None):
         self._directory = compdb_entry['directory']

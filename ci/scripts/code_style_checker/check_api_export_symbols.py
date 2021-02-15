@@ -6,8 +6,8 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-import sys, re, string
-from common_modules.common import *
+import re
+from common_modules import common
 
 
 def check_api_export_symbols(filename, clean_file_contents):
@@ -17,7 +17,7 @@ def check_api_export_symbols(filename, clean_file_contents):
     """
 
     is_api = ("include/public" in filename)
-    is_header =  (filename[-2:] == ".h") or (filename[-4:] == ".hpp")
+    is_header = (filename[-2:] == ".h") or (filename[-4:] == ".hpp")
     is_api_header = is_api and is_header
 
     if is_api_header:
@@ -34,32 +34,35 @@ def check_api_export_symbols(filename, clean_file_contents):
 
             symbolNameGroups = symbol_match.groups()
             isTemplate = symbolNameGroups[0] is not None
-            isEnum     = symbolNameGroups[1].strip() == "enum"
-            isStruct   = symbolNameGroups[1].strip() == "struct"
+            isEnum = symbolNameGroups[1].strip() == "enum"
+            isStruct = symbolNameGroups[1].strip() == "struct"
             isEnumClass = "enum " in symbolNameGroups[1].strip()
-            firstWord  = symbolNameGroups[3].strip()
+            firstWord = symbolNameGroups[3].strip()
             secondWord = symbolNameGroups[5].strip()
 
             # check special cases that should NOT have RLOGIC_API
             if isEnum:
                 if firstWord == "RLOGIC_API":
-                    log_warning("check_api_export_symbols", filename, line_number + 1, "Enum exported as RLOGIC_API: " + secondWord)
+                    common.log_warning("check_api_export_symbols", filename, line_number + 1, "Enum exported as RLOGIC_API: " + secondWord)
             elif isEnumClass:
                 if firstWord == "RLOGIC_API":
-                    log_warning("check_api_export_symbols", filename, line_number + 1, "Enum class exported as RLOGIC_API: " + secondWord)
+                    common.log_warning("check_api_export_symbols", filename, line_number + 1, "Enum class exported as RLOGIC_API: " + secondWord)
             elif isStruct:
                 if firstWord == "RLOGIC_API":
-                    log_warning("check_api_export_symbols", filename, line_number + 1, "Struct exported as RLOGIC_API: " + secondWord)
+                    common.log_warning("check_api_export_symbols", filename, line_number + 1, "Struct exported as RLOGIC_API: " + secondWord)
             elif isTemplate:
                 if firstWord == "RLOGIC_API":
-                    log_warning("check_api_export_symbols", filename, line_number + 1, "Template exported as RLOGIC_API: " + secondWord)
+                    common.log_warning("check_api_export_symbols", filename, line_number + 1, "Template exported as RLOGIC_API: " + secondWord)
             else:
                 # remaining cases should have RLOGIC_API
                 if firstWord != "RLOGIC_API":
-                    log_warning("check_api_export_symbols", filename, line_number + 1, "Public symbol not exported as RLOGIC_API: " + firstWord)
+                    common.log_warning("check_api_export_symbols", filename, line_number + 1, "Public symbol not exported as RLOGIC_API: " + firstWord)
     else:
         # Will find occurances of RLOGIC_API surrounded by space(s)
         RLOGIC_API_re = re.compile(r'(?<!\w)(RLOGIC_API)\s')
         for symbol_match in re.finditer(RLOGIC_API_re, clean_file_contents):
             line_number = clean_file_contents[:symbol_match.start()].count("\n")
-            log_warning("check_api_export_symbols", filename, line_number + 1, "Exporting API symbol in a non-API-header file! This symbol will be unusable.")
+            common.log_warning("check_api_export_symbols",
+                               filename,
+                               line_number + 1,
+                               "Exporting API symbol in a non-API-header file! This symbol will be unusable.")

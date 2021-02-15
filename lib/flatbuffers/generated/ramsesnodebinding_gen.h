@@ -19,7 +19,8 @@ struct RamsesNodeBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_LOGICNODE = 4,
-    VT_RAMSESNODE = 6
+    VT_RAMSESNODE = 6,
+    VT_ROTATIONCONVENTION = 8
   };
   const rlogic_serialization::LogicNode *logicnode() const {
     return GetPointer<const rlogic_serialization::LogicNode *>(VT_LOGICNODE);
@@ -27,11 +28,15 @@ struct RamsesNodeBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   uint64_t ramsesNode() const {
     return GetField<uint64_t>(VT_RAMSESNODE, 0);
   }
+  uint8_t rotationConvention() const {
+    return GetField<uint8_t>(VT_ROTATIONCONVENTION, 0);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_LOGICNODE) &&
            verifier.VerifyTable(logicnode()) &&
            VerifyField<uint64_t>(verifier, VT_RAMSESNODE) &&
+           VerifyField<uint8_t>(verifier, VT_ROTATIONCONVENTION) &&
            verifier.EndTable();
   }
 };
@@ -45,6 +50,9 @@ struct RamsesNodeBindingBuilder {
   }
   void add_ramsesNode(uint64_t ramsesNode) {
     fbb_.AddElement<uint64_t>(RamsesNodeBinding::VT_RAMSESNODE, ramsesNode, 0);
+  }
+  void add_rotationConvention(uint8_t rotationConvention) {
+    fbb_.AddElement<uint8_t>(RamsesNodeBinding::VT_ROTATIONCONVENTION, rotationConvention, 0);
   }
   explicit RamsesNodeBindingBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -61,10 +69,12 @@ struct RamsesNodeBindingBuilder {
 inline flatbuffers::Offset<RamsesNodeBinding> CreateRamsesNodeBinding(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<rlogic_serialization::LogicNode> logicnode = 0,
-    uint64_t ramsesNode = 0) {
+    uint64_t ramsesNode = 0,
+    uint8_t rotationConvention = 0) {
   RamsesNodeBindingBuilder builder_(_fbb);
   builder_.add_ramsesNode(ramsesNode);
   builder_.add_logicnode(logicnode);
+  builder_.add_rotationConvention(rotationConvention);
   return builder_.Finish();
 }
 

@@ -9,6 +9,7 @@
 #include "internals/SolHelper.h"
 #include "internals/LuaScriptPropertyHandler.h"
 #include "internals/LuaScriptPropertySetter.h"
+#include "internals/TypeUtils.h"
 
 #include "impl/PropertyImpl.h"
 
@@ -76,8 +77,9 @@ namespace rlogic::internal
 
     void LuaScriptPropertyHandler::setChildProperty(const sol::object& propertyIndex, const sol::object& rhs)
     {
-        Property* childProperty = nullptr;
+        assert(TypeUtils::CanHaveChildren(m_propertyDescription.getType()));
 
+        Property* childProperty = nullptr;
         if (m_propertyDescription.getType() == EPropertyType::Struct)
         {
             childProperty = getStructProperty(propertyIndex);
@@ -104,7 +106,7 @@ namespace rlogic::internal
             const Property* arrayProperty = getArrayProperty(propertyIndex);
             return convertPropertyToSolObject(*arrayProperty->m_impl);
         }
-        // Not a struct -> assume it's an array-like type
+        // Not a struct and not an array -> assume it's an array-like type (vec2/3/4 etc.)
         const size_t maxIndex   = GetMaxIndexForVectorType(propertyType);
         std::optional<size_t> maybeUInt = ExtractSpecificType<size_t>(propertyIndex);
         if (!maybeUInt)
@@ -190,4 +192,33 @@ namespace rlogic::internal
     {
         return m_propertyDescription;
     }
+
+    // Overrides the '#' operator in Lua (sol3 template substitution)
+    size_t LuaScriptPropertyHandler::size() const
+    {
+        switch (m_propertyDescription.getType())
+        {
+        case EPropertyType::Array:
+        case EPropertyType::Struct:
+            return m_propertyDescription.getChildCount();
+        case EPropertyType::Vec2f:
+        case EPropertyType::Vec2i:
+            return 2u;
+        case EPropertyType::Vec3f:
+        case EPropertyType::Vec3i:
+            return 3u;
+        case EPropertyType::Vec4f:
+        case EPropertyType::Vec4i:
+            return 4u;
+        // This is unreachable code (Lua handles size of primitive types)
+        case EPropertyType::Float:
+        case EPropertyType::Int32:
+        case EPropertyType::Bool:
+        case EPropertyType::String:
+        default:
+            assert(false && "Unreachable code!");
+            return 0u;
+        }
+    }
+
 }

@@ -448,8 +448,7 @@ struct Property FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_ROOTTYPE = 6,
     VT_CHILDREN = 8,
     VT_VALUE_TYPE = 10,
-    VT_VALUE = 12,
-    VT_WASSET = 14
+    VT_VALUE = 12
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
@@ -497,9 +496,6 @@ struct Property FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::bool_s *value_as_bool_s() const {
     return value_type() == rlogic_serialization::PropertyValue::bool_s ? static_cast<const rlogic_serialization::bool_s *>(value()) : nullptr;
   }
-  bool wasSet() const {
-    return GetField<uint8_t>(VT_WASSET, 0) != 0;
-  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
@@ -511,7 +507,6 @@ struct Property FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_VALUE_TYPE) &&
            VerifyOffset(verifier, VT_VALUE) &&
            VerifyPropertyValue(verifier, value(), value_type()) &&
-           VerifyField<uint8_t>(verifier, VT_WASSET) &&
            verifier.EndTable();
   }
 };
@@ -575,9 +570,6 @@ struct PropertyBuilder {
   void add_value(flatbuffers::Offset<void> value) {
     fbb_.AddOffset(Property::VT_VALUE, value);
   }
-  void add_wasSet(bool wasSet) {
-    fbb_.AddElement<uint8_t>(Property::VT_WASSET, static_cast<uint8_t>(wasSet), 0);
-  }
   explicit PropertyBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -596,13 +588,11 @@ inline flatbuffers::Offset<Property> CreateProperty(
     rlogic_serialization::EPropertyRootType rootType = rlogic_serialization::EPropertyRootType::Primitive,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Property>>> children = 0,
     rlogic_serialization::PropertyValue value_type = rlogic_serialization::PropertyValue::NONE,
-    flatbuffers::Offset<void> value = 0,
-    bool wasSet = false) {
+    flatbuffers::Offset<void> value = 0) {
   PropertyBuilder builder_(_fbb);
   builder_.add_value(value);
   builder_.add_children(children);
   builder_.add_name(name);
-  builder_.add_wasSet(wasSet);
   builder_.add_value_type(value_type);
   builder_.add_rootType(rootType);
   return builder_.Finish();
@@ -619,8 +609,7 @@ inline flatbuffers::Offset<Property> CreatePropertyDirect(
     rlogic_serialization::EPropertyRootType rootType = rlogic_serialization::EPropertyRootType::Primitive,
     const std::vector<flatbuffers::Offset<rlogic_serialization::Property>> *children = nullptr,
     rlogic_serialization::PropertyValue value_type = rlogic_serialization::PropertyValue::NONE,
-    flatbuffers::Offset<void> value = 0,
-    bool wasSet = false) {
+    flatbuffers::Offset<void> value = 0) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   auto children__ = children ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Property>>(*children) : 0;
   return rlogic_serialization::CreateProperty(
@@ -629,8 +618,7 @@ inline flatbuffers::Offset<Property> CreatePropertyDirect(
       rootType,
       children__,
       value_type,
-      value,
-      wasSet);
+      value);
 }
 
 inline bool VerifyPropertyValue(flatbuffers::Verifier &verifier, const void *obj, PropertyValue type) {

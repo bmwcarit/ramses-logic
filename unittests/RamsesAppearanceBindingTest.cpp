@@ -34,6 +34,11 @@ namespace rlogic
     class ARamsesAppearanceBinding : public ::testing::Test
     {
     protected:
+        void TearDown() override
+        {
+            std::remove("appearancebinding.bin");
+        }
+
         RamsesAppearanceBinding& createAppearanceBindingForTest(std::string_view name, ramses::Appearance* ramsesAppearance = nullptr)
         {
             auto appBinding = m_logicEngine.createRamsesAppearanceBinding(name);
@@ -42,21 +47,6 @@ namespace rlogic
                 appBinding->setRamsesAppearance(ramsesAppearance);
             }
             return *appBinding;
-        }
-
-        RamsesAppearanceBinding* findBindingByName(std::string_view name)
-        {
-            auto maybeBinding = std::find_if(m_logicEngine.ramsesAppearanceBindings().begin(), m_logicEngine.ramsesAppearanceBindings().end(),
-                [name](const RamsesAppearanceBinding* binding)
-                {
-                    return binding->getName() == name;
-                }
-            );
-            if (maybeBinding == m_logicEngine.ramsesAppearanceBindings().end())
-            {
-                return nullptr;
-            }
-            return *maybeBinding;
         }
 
         LogicEngine m_logicEngine;
@@ -98,13 +88,12 @@ namespace rlogic
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("appearancebinding.bin"));
-            auto loadedAppearanceBinding = findBindingByName("AppearanceBinding");
+            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
             EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance(), nullptr);
             EXPECT_EQ(loadedAppearanceBinding->getInputs()->getChildCount(), 0u);
             EXPECT_EQ(loadedAppearanceBinding->getOutputs(), nullptr);
             EXPECT_EQ(loadedAppearanceBinding->getName(), "AppearanceBinding");
         }
-        std::remove("appearancebinding.bin");
     }
 
     class ARamsesAppearanceBinding_WithRamses : public ARamsesAppearanceBinding
@@ -116,6 +105,15 @@ namespace rlogic
         {
         }
 
+        void TearDown() override
+        {
+            std::remove("logic.bin");
+            std::remove("SomeValuesSet.bin");
+            std::remove("SomeValuesLinked.bin");
+            std::remove("SomeValuesSet.bin");
+            std::remove("SomeValuesLinked.bin");
+        }
+
         const std::string_view m_vertShader_simple = R"(
             #version 300 es
 
@@ -124,6 +122,17 @@ namespace rlogic
             void main()
             {
                 gl_Position = floatUniform * vec4(1.0);
+            })";
+
+        const std::string_view m_vertShader_twoUniforms = R"(
+            #version 300 es
+
+            uniform highp float floatUniform1;
+            uniform highp float floatUniform2;
+
+            void main()
+            {
+                gl_Position = floatUniform1 *  floatUniform2 * vec4(1.0);
             })";
 
         const std::string_view m_vertShader_allTypes = R"(
@@ -137,6 +146,12 @@ namespace rlogic
             uniform highp vec2  vec2Uniform;
             uniform highp vec3  vec3Uniform;
             uniform highp vec4  vec4Uniform;
+            uniform highp ivec2 ivec2Array[2];
+            uniform highp vec2  vec2Array[2];
+            uniform highp ivec3 ivec3Array[2];
+            uniform highp vec3  vec3Array[2];
+            uniform highp ivec4 ivec4Array[2];
+            uniform highp vec4  vec4Array[2];
             uniform highp vec4  vec4Uniform_shouldHaveDefaultValue;
 
             void main()
@@ -180,6 +195,25 @@ namespace rlogic
             EXPECT_EQ(std::string(errorMessage), m_logicEngine.getErrors()[0]);
         }
 
+        static float GetUniformValueFloat(ramses::Appearance& appearance, const char* uniformName)
+        {
+            ramses::UniformInput uniform;
+            appearance.getEffect().findUniformInput(uniformName, uniform);
+            assert(uniform.isValid());
+            float value = 0.f;
+            appearance.getInputValueFloat(uniform, value);
+            return value;
+        }
+
+
+        static void SetUniformValueFloat(ramses::Appearance& appearance, const char* uniformName, float value)
+        {
+            ramses::UniformInput uniform;
+            appearance.getEffect().findUniformInput(uniformName, uniform);
+            assert(uniform.isValid());
+            appearance.setInputValueFloat(uniform, value);
+        }
+
         RamsesTestSetup m_ramsesTestSetup;
         ramses::sceneId_t m_ramsesSceneIdWhichIsAlwaysTheSame;
         ramses::Scene* m_scene = nullptr;
@@ -210,7 +244,7 @@ namespace rlogic
         EXPECT_EQ(EPropertyType::Float, floatUniform->getType());
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, MarksInputsAsInput)
+    TEST_F(ARamsesAppearanceBinding_WithRamses, GivesInputs_BindingInputSemantics)
     {
         ramses::Appearance& appearance        = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
         auto&               appearanceBinding = createAppearanceBindingForTest("AppearanceBinding");
@@ -220,7 +254,7 @@ namespace rlogic
         const auto inputCount  = inputs->getChildCount();
         for (size_t i = 0; i < inputCount; ++i)
         {
-            EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild(i)->m_impl->getInputOutputProperty());
+            EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild(i)->m_impl->getPropertySemantics());
         }
     }
 
@@ -253,9 +287,11 @@ namespace rlogic
             uniform mediump mat2 u_mat2;            // Not supported
             uniform mediump mat3 u_mat3;            // Not supported
             uniform mediump mat4 u_mat4;            // Not supported
-            uniform mediump vec2 u_vec2Array[2];    // Not supported (yet)
             uniform mediump vec2 u_DisplayBufferResolution; // explicitly prohibited to set by ramses
             uniform highp ivec2 u_vec2i;
+            // Arrays
+            uniform mediump vec2 u_vec2Array[2];
+            uniform mediump ivec2 u_ivec2Array[2];
 
             out lowp vec4 color;
             void main(void)
@@ -272,7 +308,7 @@ namespace rlogic
         auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
 
         const auto inputs = appearanceBinding.getInputs();
-        ASSERT_EQ(5u, inputs->getChildCount());
+        ASSERT_EQ(7u, inputs->getChildCount());
         EXPECT_EQ("floatUniform", inputs->getChild(0)->getName());
         EXPECT_EQ(EPropertyType::Float, inputs->getChild(0)->getType());
         EXPECT_EQ("u_vec2f", inputs->getChild(1)->getName());
@@ -283,6 +319,27 @@ namespace rlogic
         EXPECT_EQ(EPropertyType::Int32, inputs->getChild(3)->getType());
         EXPECT_EQ("u_vec2i", inputs->getChild(4)->getName());
         EXPECT_EQ(EPropertyType::Vec2i, inputs->getChild(4)->getType());
+
+        // Arrays, also check their children
+        Property* vec2fArray = inputs->getChild(5);
+        EXPECT_EQ("u_vec2Array", vec2fArray->getName());
+        EXPECT_EQ(EPropertyType::Array, vec2fArray->getType());
+        EXPECT_EQ(2u, vec2fArray->getChildCount());
+        for (size_t i = 0; i < 2; ++i)
+        {
+            EXPECT_EQ("", vec2fArray->getChild(i)->getName());
+            EXPECT_EQ(EPropertyType::Vec2f, vec2fArray->getChild(i)->getType());
+        }
+
+        Property* vec2iArray = inputs->getChild(6);
+        EXPECT_EQ("u_ivec2Array", vec2iArray->getName());
+        EXPECT_EQ(EPropertyType::Array, vec2iArray->getType());
+        EXPECT_EQ(2u, vec2iArray->getChildCount());
+        for (size_t i = 0; i < 2; ++i)
+        {
+            EXPECT_EQ("", vec2iArray->getChild(i)->getName());
+            EXPECT_EQ(EPropertyType::Vec2i, vec2iArray->getChild(i)->getType());
+        }
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses, UpdatesAppearanceIfInputValuesWereSet)
@@ -290,7 +347,7 @@ namespace rlogic
         ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_allTypes, m_fragShader_trivial));
         auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
         auto inputs = appearanceBinding.getInputs();
-        ASSERT_EQ(9u, inputs->getChildCount());
+        ASSERT_EQ(15u, inputs->getChildCount());
         EXPECT_TRUE(inputs->getChild("floatUniform")->set(42.42f));
         EXPECT_TRUE(inputs->getChild("intUniform")->set(42));
         EXPECT_TRUE(inputs->getChild("vec2Uniform")->set<vec2f>({ 0.1f, 0.2f }));
@@ -299,6 +356,18 @@ namespace rlogic
         EXPECT_TRUE(inputs->getChild("ivec2Uniform")->set<vec2i>({ 1, 2 }));
         EXPECT_TRUE(inputs->getChild("ivec3Uniform")->set<vec3i>({ 3, 4, 5 }));
         EXPECT_TRUE(inputs->getChild("ivec4Uniform")->set<vec4i>({ 6, 7, 8, 9 }));
+        EXPECT_TRUE(inputs->getChild("ivec2Array")->getChild(0)->set<vec2i>({ 11, 12 }));
+        EXPECT_TRUE(inputs->getChild("ivec2Array")->getChild(1)->set<vec2i>({ 13, 14 }));
+        EXPECT_TRUE(inputs->getChild("vec2Array")->getChild(0)->set<vec2f>({ .11f, .12f }));
+        EXPECT_TRUE(inputs->getChild("vec2Array")->getChild(1)->set<vec2f>({ .13f, .14f }));
+        EXPECT_TRUE(inputs->getChild("ivec3Array")->getChild(0)->set<vec3i>({ 31, 32, 33 }));
+        EXPECT_TRUE(inputs->getChild("ivec3Array")->getChild(1)->set<vec3i>({ 34, 35, 36 }));
+        EXPECT_TRUE(inputs->getChild("vec3Array")->getChild(0)->set<vec3f>({ .31f, .32f, .33f }));
+        EXPECT_TRUE(inputs->getChild("vec3Array")->getChild(1)->set<vec3f>({ .34f, .35f, .36f }));
+        EXPECT_TRUE(inputs->getChild("ivec4Array")->getChild(0)->set<vec4i>({ 41, 42, 43, 44 }));
+        EXPECT_TRUE(inputs->getChild("ivec4Array")->getChild(1)->set<vec4i>({ 45, 46, 47, 48 }));
+        EXPECT_TRUE(inputs->getChild("vec4Array")->getChild(0)->set<vec4f>({ .41f, .42f, .43f, .44f }));
+        EXPECT_TRUE(inputs->getChild("vec4Array")->getChild(1)->set<vec4f>({ .45f, .46f, .47f, .48f }));
 
         EXPECT_TRUE(appearanceBinding.m_impl.get().update());
 
@@ -355,6 +424,90 @@ namespace rlogic
             appearance.getInputValueVector4i(uniform, result[0], result[1], result[2], result[3]);
             EXPECT_THAT(result, ::testing::ElementsAre(6, 7, 8, 9));
         }
+        // Arrays
+        {
+            std::array<int32_t, 4> result = { 0, 0, 0, 0 };
+            ASSERT_EQ(ramses::StatusOK, appearance.getEffect().findUniformInput("ivec2Array", uniform));
+            appearance.getInputValueVector2i(uniform, 2, &result[0]);
+            EXPECT_THAT(result, ::testing::ElementsAre(11, 12, 13, 14));
+        }
+        {
+            std::array<float, 4> result = { 0.0f, 0.0f, 0.0f, 0.0f };
+            ASSERT_EQ(ramses::StatusOK, appearance.getEffect().findUniformInput("vec2Array", uniform));
+            appearance.getInputValueVector2f(uniform, 2, &result[0]);
+            EXPECT_THAT(result, ::testing::ElementsAre(.11f, .12f, .13f, .14f));
+        }
+        {
+            std::array<int32_t, 6> result = { 0, 0, 0, 0, 0, 0 };
+            ASSERT_EQ(ramses::StatusOK, appearance.getEffect().findUniformInput("ivec3Array", uniform));
+            appearance.getInputValueVector3i(uniform, 2, &result[0]);
+            EXPECT_THAT(result, ::testing::ElementsAre(31, 32, 33, 34, 35, 36));
+        }
+        {
+            std::array<float, 6> result = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+            ASSERT_EQ(ramses::StatusOK, appearance.getEffect().findUniformInput("vec3Array", uniform));
+            appearance.getInputValueVector3f(uniform, 2, &result[0]);
+            EXPECT_THAT(result, ::testing::ElementsAre(.31f, .32f, .33f, .34f, .35f, .36f));
+        }
+        {
+            std::array<int32_t, 8> result = { 0, 0, 0, 0, 0, 0, 0, 0 };
+            ASSERT_EQ(ramses::StatusOK, appearance.getEffect().findUniformInput("ivec4Array", uniform));
+            appearance.getInputValueVector4i(uniform, 2, &result[0]);
+            EXPECT_THAT(result, ::testing::ElementsAre(41, 42, 43, 44, 45, 46, 47, 48));
+        }
+        {
+            std::array<float, 8> result = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+            ASSERT_EQ(ramses::StatusOK, appearance.getEffect().findUniformInput("vec4Array", uniform));
+            appearance.getInputValueVector4f(uniform, 2, &result[0]);
+            EXPECT_THAT(result, ::testing::ElementsAre(.41f, .42f, .43f, .44f, .45f, .46f, .47f, .48f));
+        }
+    }
+
+    TEST_F(ARamsesAppearanceBinding_WithRamses, PropagateItsInputsToRamsesAppearanceOnUpdate_OnlyWhenExplicitlySet)
+    {
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_twoUniforms, m_fragShader_trivial));
+        auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
+
+        // Set values directly to ramses appearance
+        SetUniformValueFloat(appearance, "floatUniform1", 11.f);
+        SetUniformValueFloat(appearance, "floatUniform2", 22.f);
+
+        // Set only one of the inputs to the binding object, the other one (floatUniform2) not
+        EXPECT_TRUE(appearanceBinding.getInputs()->getChild("floatUniform1")->set(100.f));
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        // Only propagate the value which was also set in the binding object
+        EXPECT_FLOAT_EQ(100.f, GetUniformValueFloat(appearance, "floatUniform1"));
+        EXPECT_FLOAT_EQ(22.f, GetUniformValueFloat(appearance, "floatUniform2"));
+    }
+
+    TEST_F(ARamsesAppearanceBinding_WithRamses, PropagatesItsInputsToRamsesAppearanceOnUpdate_WithLinksInsteadOfSetCall)
+    {
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_twoUniforms, m_fragShader_trivial));
+        auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
+
+        // Set values directly to ramses appearance
+        SetUniformValueFloat(appearance, "floatUniform1", 11.f);
+        SetUniformValueFloat(appearance, "floatUniform2", 22.f);
+
+        // Link binding input to a script (binding is not set directly, but is linked)
+        const std::string_view scriptSrc = R"(
+                function interface()
+                    OUT.float = FLOAT
+                end
+                function run()
+                    OUT.float = 42.42
+                end
+            )";
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("float"), *appearanceBinding.getInputs()->getChild("floatUniform1")));
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        // Only propagate the value which was also linked over the binding object's input to a script
+        EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform1"));
+        EXPECT_FLOAT_EQ(22.f, GetUniformValueFloat(appearance, "floatUniform2"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses, UpdatesItsInputsAfterADifferentRamsesAppearanceWasAssigned)
@@ -427,16 +580,20 @@ namespace rlogic
             inputs->getChild("ivec2Uniform")->set<vec2i>({ 1, 2 });
             inputs->getChild("ivec3Uniform")->set<vec3i>({ 3, 4, 5 });
             inputs->getChild("ivec4Uniform")->set<vec4i>({ 6, 7, 8, 9 });
+            inputs->getChild("ivec2Array")->getChild(0)->set<vec2i>({ 11, 12 });
+            inputs->getChild("ivec2Array")->getChild(1)->set<vec2i>({ 13, 14 });
+            inputs->getChild("vec2Array")->getChild(0)->set<vec2f>({ .11f, .12f });
+            inputs->getChild("vec2Array")->getChild(1)->set<vec2f>({ .13f, .14f });
             ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
         }
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("logic.bin", m_scene));
-            auto loadedAppearanceBinding = findBindingByName("AppearanceBinding");
+            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
             EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance()->getSceneObjectId(), appearance.getSceneObjectId());
 
             const auto& inputs = loadedAppearanceBinding->getInputs();
-            ASSERT_EQ(9u, inputs->getChildCount());
+            ASSERT_EQ(15u, inputs->getChildCount());
 
             // check order after deserialization
             for (size_t i = 0; i < inputOrderBeforeSaving.size(); ++i)
@@ -447,21 +604,31 @@ namespace rlogic
             auto expectValues = [&inputs](){
                 EXPECT_FLOAT_EQ(42.42f, *inputs->getChild("floatUniform")->get<float>());
                 EXPECT_EQ(42, *inputs->getChild("intUniform")->get<int32_t>());
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("intUniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("intUniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec2Uniform")->get<vec2f>(), ::testing::ElementsAre(0.1f, 0.2f));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("vec2Uniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec2Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec3Uniform")->get<vec3f>(), ::testing::ElementsAre(1.1f, 1.2f, 1.3f));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("vec3Uniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec3Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec4Uniform")->get<vec4f>(), ::testing::ElementsAre(2.1f, 2.2f, 2.3f, 2.4f));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("vec4Uniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec4Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec4Uniform_shouldHaveDefaultValue")->get<vec4f>(), ::testing::ElementsAre(.0f, .0f, .0f, .0f));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("vec4Uniform_shouldHaveDefaultValue")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec4Uniform_shouldHaveDefaultValue")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec2Uniform")->get<vec2i>(), ::testing::ElementsAre(1, 2));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("ivec2Uniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec2Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec3Uniform")->get<vec3i>(), ::testing::ElementsAre(3, 4, 5));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("ivec3Uniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec3Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec4Uniform")->get<vec4i>(), ::testing::ElementsAre(6, 7, 8, 9));
-                EXPECT_EQ(internal::EInputOutputProperty::Input, inputs->getChild("ivec4Uniform")->m_impl->getInputOutputProperty());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec4Uniform")->m_impl->getPropertySemantics());
+
+                // Arrays
+                EXPECT_EQ(EPropertyType::Array, inputs->getChild("ivec2Array")->getType());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec2Array")->m_impl->getPropertySemantics());
+                EXPECT_THAT(*inputs->getChild("ivec2Array")->getChild(0)->get<vec2i>(), ::testing::ElementsAre(11, 12));
+                EXPECT_THAT(*inputs->getChild("ivec2Array")->getChild(1)->get<vec2i>(), ::testing::ElementsAre(13, 14));
+                EXPECT_EQ(EPropertyType::Array, inputs->getChild("vec2Array")->getType());
+                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec2Array")->m_impl->getPropertySemantics());
+                EXPECT_THAT(*inputs->getChild("vec2Array")->getChild(0)->get<vec2f>(), ::testing::ElementsAre(.11f, .12f));
+                EXPECT_THAT(*inputs->getChild("vec2Array")->getChild(1)->get<vec2f>(), ::testing::ElementsAre(.13f, .14f));
             };
 
             expectValues();
@@ -470,7 +637,6 @@ namespace rlogic
 
             expectValues();
         }
-        std::remove("logic.bin");
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses, ContainsItsInputsAfterDeserialization_WhenRamsesSceneIsRecreatedBetweenSaveAndLoad)
@@ -510,7 +676,7 @@ namespace rlogic
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("logic.bin", m_scene));
-            auto loadedAppearanceBinding = findBindingByName("AppearanceBinding");
+            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
             EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance()->getSceneObjectId(), recreatedAppearance.getSceneObjectId());
 
             const auto& inputs = loadedAppearanceBinding->getInputs();
@@ -524,7 +690,6 @@ namespace rlogic
 
             EXPECT_FLOAT_EQ(42.42f, *inputs->getChild("floatUniform1")->get<float>());
         }
-        std::remove("logic.bin");
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses, ProducesErrorIfAppearanceDoesNotHaveSameAmountOfInputsThanSerializedAppearanceBinding)
@@ -551,8 +716,7 @@ namespace rlogic
 
         expectErrorWhenLoadingFile("logic.bin",
             "Fatal error while loading from file: ramses appearance binding input (Name: intUniform) was not found in appearance 'test appearance'!)");
-        EXPECT_EQ(nullptr, findBindingByName("AppearanceBinding"));
-        std::remove("logic.bin");
+        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses, ProducesErrorIfAppearanceInputsHasDifferentNamesThanSerializedAppearanceBinding)
@@ -584,8 +748,7 @@ namespace rlogic
 
         expectErrorWhenLoadingFile("logic.bin",
             "Fatal error while loading from file: ramses appearance binding input (Name: floatUniform) was not found in appearance 'test appearance'!)");
-        EXPECT_EQ(nullptr, findBindingByName("AppearanceBinding"));
-        std::remove("logic.bin");
+        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses, ProducesErrorIfAppearanceInputsHasDifferentTypeThanSerializedAppearanceBinding)
@@ -616,7 +779,94 @@ namespace rlogic
 
         expectErrorWhenLoadingFile("logic.bin",
             "Fatal error while loading from file: ramses appearance binding input (Name: floatUniform) is expected to be of type FLOAT, but instead it is VEC2F!)");
-        EXPECT_EQ(nullptr, findBindingByName("AppearanceBinding"));
-        std::remove("logic.bin");
+        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
+    }
+
+    TEST_F(ARamsesAppearanceBinding_WithRamses, DoesNotReapplyAppearanceUniformValuesToRamses_WhenLoadingFromFileAndCallingUpdate_UntilSetToANewValue)
+    {
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
+
+        {
+            auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
+            auto inputs = appearanceBinding.getInputs();
+
+            // Set a different input over the binding object
+            inputs->getChild("floatUniform")->set<float>(42.42f);
+            ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesSet.bin"));
+        }
+
+        // Set uniform to a different value than the one set on the ramses binding
+        SetUniformValueFloat(appearance, "floatUniform", 100.0f);
+
+        {
+            EXPECT_TRUE(m_logicEngine.loadFromFile("SomeValuesSet.bin", m_scene));
+            EXPECT_TRUE(m_logicEngine.update());
+
+            // loadFromFile and update should not set any values whatsoever ...
+            EXPECT_FLOAT_EQ(100.f, GetUniformValueFloat(appearance, "floatUniform"));
+
+            // ... unless explicitly set again on the binding object + update() called
+            m_logicEngine.findAppearanceBinding("AppearanceBinding")->getInputs()->getChild("floatUniform")->set<float>(42.42f);
+            EXPECT_TRUE(m_logicEngine.update());
+            EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform"));
+        }
+    }
+
+    // This is sort of a confidence test, testing a combination of:
+    // - bindings only propagating their values to ramses appearance if the value was set by an incoming link
+    // - saving and loading files
+    // - value only re-applied to ramses if changed. Otherwise not.
+    // The general expectation is that after loading + update(), the logic scene would overwrite ramses
+    // properties wrapped by a LogicBinding if they are linked to a script
+    TEST_F(ARamsesAppearanceBinding_WithRamses, SetsOnlyAppearanceUniformsForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
+    {
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_twoUniforms, m_fragShader_trivial));
+
+        {
+            const std::string_view scriptSrc = R"(
+                function interface()
+                    IN.float = FLOAT
+                    OUT.float = FLOAT
+                end
+                function run()
+                    OUT.float = IN.float
+                end
+            )";
+
+            LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+            auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
+
+            script->getInputs()->getChild("float")->set<float>(42.42f);
+            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("float"), *appearanceBinding.getInputs()->getChild("floatUniform1")));
+            ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesLinked.bin"));
+        }
+
+        // Set uniform1 to a different value than the one set by the link
+        SetUniformValueFloat(appearance, "floatUniform1", 100.0f);
+        // Set uniform2 to custom value - it should not be overwritten by logic at all, because there is no link
+        // or any set() calls to the corresponding RamsesAppearanceBinding input
+        SetUniformValueFloat(appearance, "floatUniform2", 200.0f);
+
+        {
+            EXPECT_TRUE(m_logicEngine.loadFromFile("SomeValuesLinked.bin", m_scene));
+
+            // nothing happens before update()
+            EXPECT_FLOAT_EQ(100.0f, GetUniformValueFloat(appearance, "floatUniform1"));
+            EXPECT_FLOAT_EQ(200.0f, GetUniformValueFloat(appearance, "floatUniform2"));
+
+            EXPECT_TRUE(m_logicEngine.update());
+
+            // Script is executed -> link is activated -> binding is updated, only for the linked uniform
+            EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform1"));
+            EXPECT_FLOAT_EQ(200.0f, GetUniformValueFloat(appearance, "floatUniform2"));
+
+            // Reset uniform manually and call update currently re-applies value to ramses
+            // TODO Violin optimize this - we are not making us favors by spaming the ramses API with setters with
+            // the same value
+            SetUniformValueFloat(appearance, "floatUniform1", 100.0f);
+            EXPECT_TRUE(m_logicEngine.update());
+            EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform1"));
+            EXPECT_FLOAT_EQ(200.0f, GetUniformValueFloat(appearance, "floatUniform2"));
+        }
     }
 }

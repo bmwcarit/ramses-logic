@@ -14,8 +14,8 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 4)
-set(RLOGIC_VERSION_PATCH 2)
+set(RLOGIC_VERSION_MINOR 5)
+set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -31,10 +31,12 @@ project(RamsesLogic
 # Configuration options
 #==========================================================================
 
+set(ramses-logic_SHARED_LIB_TARGET_NAME "ramses-logic" CACHE STRING "Name of ramses-logic shared library target")
 set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE
     STRING "Set this cache variable to a custom RAMSES target. If this is a valid target name, Ramses Logic will use it instead of building Ramses")
 set(ramses-logic_FOLDER_PREFIX "" CACHE
     STRING "Set a custom prefix for target folders in Visual Studio. If not set, will be set based on project's relative path")
+set(ramses-logic_BUILD_RAMSES_RENDERER false CACHE BOOL "Set whether the ramses renderer will be built as part of this build. If this option is set to ON, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
 option(ramses-logic_BUILD_SHARED_LIB "Enable/disable build of Ramses Logic shared lib target" ON)
 option(ramses-logic_BUILD_STATIC_LIB "Enable/disable build of Ramses Logic static lib target" OFF)
@@ -166,38 +168,21 @@ if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
     target_compile_definitions(ramses-logic-obj PRIVATE RLOGIC_LINK_SHARED_EXPORT=1)
 endif()
 
+include(cmake/addRamsesLogicTarget.cmake)
+
 # Build static lib when top-level project or if explicitly requested by user, or if unit tests are enabled
 if(ramses-logic_BUILD_STATIC_LIB OR ramses-logic_BUILD_TESTS OR CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     ################## ramses-logic-static ##################
-    add_library(ramses-logic-static STATIC)
-    add_library(rlogic::ramses-logic-static ALIAS ramses-logic-static)
-    target_link_libraries(ramses-logic-static PRIVATE ramses-logic-obj)
-    target_link_libraries(ramses-logic-static PUBLIC ${ramses-logic_RAMSES_TARGET})
-    target_include_directories(ramses-logic-static PUBLIC include)
-    set_target_properties(ramses-logic-static PROPERTIES PUBLIC_HEADER "${public_headers}")
-    folderize_target(ramses-logic-static "ramses-logic")
+    add_ramses_logic_target("ramses-logic-static" "STATIC")
 endif()
 
 ################## ramses-logic (shared library) ##################
 if(ramses-logic_BUILD_SHARED_LIB)
-    add_library(ramses-logic SHARED)
-    add_library(rlogic::ramses-logic ALIAS ramses-logic)
-    target_link_libraries(ramses-logic PRIVATE ramses-logic-obj)
-    target_link_libraries(ramses-logic PUBLIC ${ramses-logic_RAMSES_TARGET})
-    target_include_directories(ramses-logic PUBLIC include)
-    set_target_properties(ramses-logic PROPERTIES
-        PUBLIC_HEADER "${public_headers}"
-        SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    )
-    if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
-        target_compile_definitions(ramses-logic PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)
-    endif()
-
-    folderize_target(ramses-logic "ramses-logic")
+    add_ramses_logic_target(${ramses-logic_SHARED_LIB_TARGET_NAME} "SHARED")
 
     if(ramses-logic_ENABLE_INSTALL)
         install(
-            TARGETS ramses-logic
+            TARGETS ${ramses-logic_SHARED_LIB_TARGET_NAME}
             EXPORT ramses-logic-targets
             RUNTIME DESTINATION         ${RLOGIC_INSTALL_RUNTIME_PATH}
             LIBRARY DESTINATION         ${RLOGIC_INSTALL_LIBRARY_PATH}
@@ -291,7 +276,6 @@ if(ramses-logic_ENABLE_INSTALL)
     )
 endif()
 
-# TODO Violin/Tobias discuss packaging and install + ramses dependency
 set(CPACK_GENERATOR "TGZ")
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_PACKAGE_VENDOR "ramses")

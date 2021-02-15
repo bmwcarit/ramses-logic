@@ -64,8 +64,8 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        auto inputsImpl  = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EInputOutputProperty::Input);
-        auto outputsImpl = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EInputOutputProperty::Output);
+        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput);
+        auto outputsImpl = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput);
 
         (*env)["IN"]  = solState.createUserObject(LuaScriptPropertyExtractor(solState, *inputsImpl));
         (*env)["OUT"] = solState.createUserObject(LuaScriptPropertyExtractor(solState, *outputsImpl));
@@ -125,17 +125,19 @@ namespace rlogic::internal
         // TODO Violin/Sven re-enable this once bytecode is implemented and tested
         //load_source = std::string_view(reinterpret_cast<const char*>(luaScript->bytecode()->data()) , luaScript->bytecode()->size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast) We know what we do and this is only solvable with reinterpret-cast
         assert(nullptr != luaScript->source());
+        assert(nullptr != luaScript->logicnode()->inputs());
+        assert(nullptr != luaScript->logicnode()->outputs());
         load_source = luaScript->source()->string_view();
         string_source = load_source;
 
-        auto inputs = PropertyImpl::Create(luaScript->logicnode()->inputs(), EInputOutputProperty::Input);
+        auto inputs = PropertyImpl::Create(*luaScript->logicnode()->inputs(), EPropertySemantics::ScriptInput);
         if (nullptr == inputs)
         {
             errorReporting.add("Error during deserialization of inputs");
             return nullptr;
         }
 
-        auto outputs = PropertyImpl::Create(luaScript->logicnode()->outputs(), EInputOutputProperty::Output);
+        auto outputs = PropertyImpl::Create(*luaScript->logicnode()->outputs(), EPropertySemantics::ScriptOutput);
         if (nullptr == outputs)
         {
             errorReporting.add("Error during deserialization of outputs");

@@ -21,7 +21,9 @@ import github3
 
 def get_sdkroot():
     """Get sdk root folder by asking git"""
-    return subprocess.check_output(['git', 'rev-parse', '--show-toplevel'], shell=False, cwd=os.path.dirname(os.path.realpath(__file__))).decode('utf-8').strip()
+    return subprocess.check_output(['git', 'rev-parse', '--show-toplevel'],
+                                   cwd=os.path.dirname(os.path.realpath(__file__))).decode('utf-8').strip()
+
 
 def load_coverage(fp):
     with open(fp, 'r') as f:
@@ -30,7 +32,6 @@ def load_coverage(fp):
     assert content['version'].startswith('2')
 
     sdkroot = get_sdkroot()
-    segment_files = {str(Path(e['filename']).relative_to(sdkroot)) for e in content['data'][0]['files']}
     res = {}
     for f in content['data'][0]['functions']:
         try:
@@ -42,8 +43,8 @@ def load_coverage(fp):
             pass
     return res
 
+
 def merge_file_regions(regions):
-    res = []
     regstate = {}
     for reg in regions:
         line_start, col_start, line_end, col_end, cnt, file_id, exp_file_id, reg_kind = reg
@@ -58,8 +59,9 @@ def merge_file_regions(regions):
             regstate[key] = [line_start, col_start, line_end, col_end, cnt]
     return sorted(regstate.values(), key=lambda x: (x[0], x[1]))
 
+
 def line_coverage_for_file(cov, fname):
-    if not fname in cov:
+    if fname not in cov:
         return {}
     raw_regions = []
     for e in cov[fname]:
@@ -68,9 +70,10 @@ def line_coverage_for_file(cov, fname):
     covmap = {}
     for reg in regions:
         line_start, col_start, line_end, col_end, cnt = reg
-        for l in range(line_start, line_end+1):
-            covmap[l] = cnt
+        for line_idx in range(line_start, line_end + 1):
+            covmap[line_idx] = cnt
     return covmap
+
 
 def create_annotated_patch_html(patch, cov):
     html_template = """
@@ -167,6 +170,7 @@ def create_annotated_patch_html(patch, cov):
         'untested_lines': totalUntestedLines
     }
 
+
 def get_api_token():
     """Read github API token from file"""
     api_token_file = os.path.expanduser("~/.github-token")
@@ -175,18 +179,23 @@ def get_api_token():
     with open(api_token_file, 'r') as f:
         return f.read().strip()
 
+
 def get_github_pr(github_url, owner, repo, pr_num):
     gh = github3.github.GitHubEnterprise(url=github_url, token=get_api_token())
     repo = gh.repository(owner, repo)
     return repo.pull_request(pr_num)
 
+
 def download_patch_from_pr(pr):
     return pr.diff().decode('utf-8')
 
+
 def post_issue_comment(link_base, html, pr, annotated_patch):
     html_file = Path(html).name
-    body = f'Check out [PR coverage]({link_base}/{html_file})\n\nCoverage report summary [tested:{annotated_patch["tested_lines"]}] [untested:{annotated_patch["untested_lines"]}]'
+    body = f'Check out [PR coverage]({link_base}/{html_file})\n\nCoverage report \
+        summary [tested:{annotated_patch["tested_lines"]}] [untested:{annotated_patch["untested_lines"]}]'
     pr.create_comment(body)
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -198,7 +207,8 @@ def main():
     parser.add_argument('--repo-owner', required=True, help='Project owner (org)')
     parser.add_argument('--repo-name', required=True, help='Project name (repo)')
     parser.add_argument('--html-output', required=True, help='Location of html output file')
-    parser.add_argument('--post-log-link-in-issue', required=False, default=None, help='Post link to <arg>/<html-output name> to PR given in --pr')
+    parser.add_argument('--post-log-link-in-issue', required=False, default=None,
+                        help='Post link to <arg>/<html-output name> to PR given in --pr')
     args = parser.parse_args()
 
     if args.post_log_link_in_issue and not args.pr:
@@ -216,6 +226,7 @@ def main():
 
     if args.post_log_link_in_issue:
         post_issue_comment(args.post_log_link_in_issue, args.html_output, pr, annotated_patch)
+
 
 if __name__ == '__main__':
     sys.exit(main())

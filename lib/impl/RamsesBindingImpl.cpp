@@ -11,14 +11,10 @@
 #include "impl/PropertyImpl.h"
 
 #include "ramses-logic/Property.h"
+#include "internals/TypeUtils.h"
 
 namespace rlogic::internal
 {
-    RamsesBindingImpl::RamsesBindingImpl(std::string_view name) noexcept
-        : LogicNodeImpl(name)
-    {
-    }
-
     RamsesBindingImpl::RamsesBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs)
         : LogicNodeImpl(name, std::move(inputs), std::move(outputs))
     {

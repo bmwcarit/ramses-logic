@@ -9,9 +9,3 @@
 #include "ramses-logic/Property.h"
 
 #include "LogicNodeDummy.h"
-
-namespace rlogic
-{
-    uint32_t LogicNodeDummyImpl::UpdateCounter = 0;
-
-}

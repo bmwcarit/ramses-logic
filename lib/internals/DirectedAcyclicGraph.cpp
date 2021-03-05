@@ -20,7 +20,6 @@ namespace rlogic::internal
     {
         assert(!containsNode(node));
         m_nodeOutgoingEdges.insert({ &node, std::vector<Edge>() });
-        m_dirty = true;
     }
 
     void DirectedAcyclicGraph::removeNode(Node& nodeToRemove)
@@ -44,26 +43,18 @@ namespace rlogic::internal
         // Remove outgoing edges by simply removing the node from m_nodeOutgoingEdges
         assert(m_nodeOutgoingEdges.find(&nodeToRemove) != m_nodeOutgoingEdges.end());
         m_nodeOutgoingEdges.erase(&nodeToRemove);
-
-        // TODO Violin this can be removed - removing nodes does not change topological order
-        // Make sure we have enough tests and then remove it
-        m_dirty = true;
     }
 
-    // This is a very difficult to read sorting algorithm for DAGs
+    // This is a slightly exotic sorting algorithm for DAGs
     // It works based on these general principles:
     // - Traverse the DAG starting from the root nodes
     // - Keep the nodes in a sparsely sorted queue (with more slots than actual nodes, and some empty slots)
     // - Any time a new 'edge' is traversed, moves the 'target' node of the edge to the last position of the queue
+    // - If number of iterations exceeds N^2, there was a loop in the graph -> abort
     // This is supposed to work fast, because the queue is never re-allocated or re-sorted, only grows incrementally, and
     // we only need to run a second time and remove the 'empty slots' to get the final order.
-    bool DirectedAcyclicGraph::updateTopologicalSorting()
+    std::optional<NodeVector> DirectedAcyclicGraph::getTopologicallySortedNodes() const
     {
-        if (!m_dirty)
-        {
-            return true;
-        }
-
         const size_t totalNodeCount = m_nodeOutgoingEdges.size();
 
         // This remembers temporarily the position of node N in 'nodeQueue' (see below)
@@ -81,7 +72,7 @@ namespace rlogic::internal
         // Cycle condition - can't find root nodes among a non-empty set of nodes
         if (sparseNodeQueue.empty() && !m_nodeOutgoingEdges.empty())
         {
-            return false;
+            return std::nullopt;
         }
 
         // sparseNodeQueue grows here all the time
@@ -93,7 +84,7 @@ namespace rlogic::internal
                 // TODO Violin this is a primitive loop detection. Replace with a proper graph-based solution!
                 // The inner and the outer loop are bound by N(number of nodes), so exceeding that is a
                 // sufficient condition that there was a loop
-                return false;
+                return std::nullopt;
             }
 
             // Get the next node in the queue and process based on its outgoing edges
@@ -135,21 +126,21 @@ namespace rlogic::internal
             }
         }
 
-        m_cachedTopologicallySortedNodes.clear();
+        NodeVector topologicallySortedNodes;
+        topologicallySortedNodes.reserve(totalNodeCount);
         for (auto sortedNode : sparseNodeQueue)
         {
             // Some nodes are nullptr because of the special 'bubble sort' sorting method
             if (sortedNode != nullptr)
             {
-                m_cachedTopologicallySortedNodes.push_back(sortedNode);
+                topologicallySortedNodes.emplace_back(sortedNode);
             }
         }
 
-        m_dirty = false;
-        return true;
+        return topologicallySortedNodes;
     }
 
-    void DirectedAcyclicGraph::addEdge(Node& source, Node& target)
+    bool DirectedAcyclicGraph::addEdge(Node& source, Node& target)
     {
         auto nodeEdges = m_nodeOutgoingEdges.find(&source);
         assert (nodeEdges != m_nodeOutgoingEdges.end());
@@ -159,24 +150,17 @@ namespace rlogic::internal
         });
 
         // Did not find outgoing edge to target node? Create one, with weight 0 (will be increased to one in next step)
+        bool isNewEdge = false;
         if (outgoingEdgeIter == nodeEdges->second.end())
         {
             nodeEdges->second.push_back({ &target, 0 });
             outgoingEdgeIter = std::prev(nodeEdges->second.end());
+            isNewEdge = true;
         }
 
         // Increase weight (we have one more link between these two nodes)
         outgoingEdgeIter->multiplicity++;
-
-        m_dirty = true;
-    }
-
-    const NodeVector& DirectedAcyclicGraph::getCachedTopologicallySortedNodes() const
-    {
-        // TODO Violin merge update() and get() in one mutable method to avoid the assert
-        // Currently keeping as-is because sorting used to be an expensive operation and can't afford to call too often
-        assert(!m_dirty);
-        return m_cachedTopologicallySortedNodes;
+        return isNewEdge;
     }
 
     void DirectedAcyclicGraph::removeEdge(Node& source, const Node& target)
@@ -193,9 +177,6 @@ namespace rlogic::internal
         if (outgoingEdge->multiplicity == 0)
         {
             srcNodeEdges->second.erase(outgoingEdge);
-
-            // TODO Violin this looks suspicious - why set dirty? Removing links should never cause topological reordering
-            m_dirty = true;
         }
     }
 
@@ -257,11 +238,6 @@ namespace rlogic::internal
         }
 
         return rootNodes;
-    }
-
-    bool DirectedAcyclicGraph::isDirty() const
-    {
-        return m_dirty;
     }
 
     bool DirectedAcyclicGraph::containsNode(Node& node) const

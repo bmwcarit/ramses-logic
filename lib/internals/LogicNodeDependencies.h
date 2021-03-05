@@ -26,8 +26,7 @@ namespace rlogic::internal
     {
     public:
         // The primary purpose of this class
-        bool updateTopologicalSorting();
-        [[nodiscard]] const NodeVector& getOrderedNodesCache() const;
+        [[nodiscard]] std::optional<NodeVector> getTopologicallySortedNodes();
 
         // Nodes management
         void addNode(LogicNodeImpl& node);
@@ -40,11 +39,13 @@ namespace rlogic::internal
         [[nodiscard]] const LinksMap& getLinks() const;
         [[nodiscard]] const PropertyImpl* getLinkedOutput(PropertyImpl& inputProperty) const;
 
-        [[nodiscard]] bool isDirty() const;
-
     private:
         // TODO Violin redesign these classes, they have redundant data
         DirectedAcyclicGraph                m_logicNodeDAG;
         LogicNodeConnector                  m_logicNodeConnector;
+
+        // Initial state: no nodes and no need to re-compute node topology
+        std::optional<NodeVector> m_cachedTopologicallySortedNodes = NodeVector{};
+        bool m_nodeTopologyChanged = false;
     };
 }

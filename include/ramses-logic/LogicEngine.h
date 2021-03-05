@@ -249,7 +249,7 @@ namespace rlogic
          * will result in errors if the Logic Engine is loaded from the file again. Note that it is not sufficient
          * to have objects with the same name, they have to be the exact same objects as during saving!
          * For more in-depth information regarding saving and loading, refer to the online documentation at
-         * https://genivi.github.io/ramses-logic/api.html#serialization-deserialization
+         * https://ramses-logic.readthedocs.io/en/latest/api.html#save-load-to-file
          *
          * Note: The method reports error and aborts if the #rlogic::RamsesBinding objects reference more than one
          * Ramses scene (this is acceptable during runtime, but not for saving to file).
@@ -273,7 +273,7 @@ namespace rlogic
          * Otherwise, the call to #loadFromFile will fail with an error. In case of errors, the #LogicEngine
          * may be left in an inconsistent state.
          * For more in-depth information regarding saving and loading, refer to the online documentation at
-         * https://genivi.github.io/ramses-logic/api.html#serialization-deserialization
+         * https://ramses-logic.readthedocs.io/en/latest/api.html#save-load-to-file
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *

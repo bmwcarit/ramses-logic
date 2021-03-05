@@ -1831,7 +1831,7 @@ namespace rlogic
         EXPECT_TRUE(targetScript->m_impl.get().isDirty());
     }
 
-    TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterUnlink)
+    TEST_F(ALogicEngine_Linking, SetsNeitherTargetNodeNorSourceNodeToDirtyAfterUnlink)
     {
         LogicEngine logicEngine;
         auto        scriptSource = R"(
@@ -1859,7 +1859,7 @@ namespace rlogic
         logicEngine.unlink(*output, *input);
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_TRUE(targetBinding->m_impl.get().isDirty());
+        EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
     }
 
     class ALogicEngine_Linking_Confidence : public ALogicEngine

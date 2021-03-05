@@ -6,19 +6,13 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-TARGETS="L64_GCC L64_GCCv7 L64_LLVM CHECK_FLATBUF_GEN  TEST_COVERAGE DOC_PACKAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE"
+TARGETS="L64_GCC L64_GCCv7 L64_LLVM CHECK_FLATBUF_GEN  TEST_COVERAGE DOC_PACKAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE L64_LLVM_SHUFFLE"
 
 # preset defaults
 CONFIG=Release
 BUILD_PACKAGE=False
-RUN_TESTS=False
 
-if [ $# -eq 4 ]; then
-    TARGET=$1
-    CONFIG=$2
-    BUILD_PACKAGE=$3
-    RUN_TESTS=$4
-elif [ $# -eq 3 ]; then
+if [ $# -eq 3 ]; then
     TARGET=$1
     CONFIG=$2
     BUILD_PACKAGE=$3
@@ -28,7 +22,7 @@ elif [ $# -eq 2 ]; then
 elif [ $# -eq 1 ]; then
     TARGET=$1
 else
-    echo "Usage: $0 <target> [config (default Release)] [Build package (default False)] [Run unittests (default False)]"
+    echo "Usage: $0 <target> [config (default Release)] [Build package (default False)]"
     echo ""
     echo "target             one of: $TARGETS"
     echo "config             one of: Debug Release (or any other supported CMake build type)"
@@ -55,7 +49,7 @@ case $TARGET in
     L64_GCC_LTO)
              TOOLCHAIN=$RL_SRC/cmake/toolchain/Linux_X86_64.toolchain
              ;;
-    L64_LLVM|L64_LLVM_COVERAGE|CHECK_FLATBUF_GEN)
+    L64_LLVM|L64_LLVM_COVERAGE|L64_LLVM_SHUFFLE|CHECK_FLATBUF_GEN)
             TOOLCHAIN=$RL_SRC/cmake/toolchain/Linux_X86_64_llvm.toolchain
             ;;
     L64_GCC_CLIENT_ONLY)
@@ -84,7 +78,7 @@ case $TARGET in
              ;;
     *)
              echo "$0 error: unknown target '$TARGET', valid targets = $TARGETS"
-             exit -1
+             exit 1
 esac
 
 set -e
@@ -248,7 +242,7 @@ else
         ENABLE_LTO=OFF
     fi
 
-    # enable docs & flatbuffers generation, but only in one build to save build resources
+    # enable docs generation, but only in one build to save build resources
     if [ "$TARGET" = "L64_LLVM" ]; then
         BUILD_DOCS=ON
     else
@@ -260,6 +254,12 @@ else
         ENABLE_COVERAGE=ON
     else
         ENABLE_COVERAGE=OFF
+    fi
+
+    # enable test shuffling when requested by target type
+    if [ "$TARGET" = "L64_LLVM_SHUFFLE" ]; then
+        export GTEST_REPEAT=20
+        export GTEST_SHUFFLE=1
     fi
 
     # Test with GCC7 to make sure the project works out of the box on Ubuntu 18.04 (current LTS)

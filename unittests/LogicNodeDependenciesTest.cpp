@@ -20,14 +20,12 @@ namespace rlogic::internal
     protected:
         void expectSortedNodeOrder(std::initializer_list<LogicNodeImpl*> nodes)
         {
-            EXPECT_TRUE(m_dependencies.updateTopologicalSorting());
-            EXPECT_THAT(m_dependencies.getOrderedNodesCache(), ::testing::ElementsAreArray(nodes));
+            EXPECT_THAT(*m_dependencies.getTopologicallySortedNodes(), ::testing::ElementsAreArray(nodes));
         }
 
         void expectUnsortedNodeOrder(std::initializer_list<LogicNodeImpl*> nodes)
         {
-            EXPECT_TRUE(m_dependencies.updateTopologicalSorting());
-            EXPECT_THAT(m_dependencies.getOrderedNodesCache(), ::testing::UnorderedElementsAreArray(nodes));
+            EXPECT_THAT(*m_dependencies.getTopologicallySortedNodes(), ::testing::UnorderedElementsAreArray(nodes));
         }
 
         LogicNodeDummyImpl m_nodeA{ "A", false };
@@ -39,11 +37,11 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeDependencies, IsEmptyAfterConstruction)
     {
-        EXPECT_TRUE(m_dependencies.getOrderedNodesCache().empty());
+        EXPECT_TRUE((*m_dependencies.getTopologicallySortedNodes()).empty());
         EXPECT_TRUE(m_dependencies.getLinks().empty());
     }
 
-    TEST_F(ALogicNodeDependencies, UnregistersRegisteredNode_RemovesItFromAllLists)
+    TEST_F(ALogicNodeDependencies, RemovingNode_RemovesItFromAllLists)
     {
         m_dependencies.addNode(m_nodeA);
         m_dependencies.removeNode(m_nodeA);
@@ -138,6 +136,33 @@ namespace rlogic::internal
         const LinksMap& links = m_dependencies.getLinks();
         EXPECT_EQ(0u, links.size());
         EXPECT_EQ(nullptr, m_dependencies.getLinkedOutput(input));
+    }
+
+    TEST_F(ALogicNodeDependencies, RemovingMiddleNode_DoesNotAffectRelativeOrderOfOtherNodes)
+    {
+        LogicNodeDummyImpl nodeM{ "M", false };
+
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(nodeM);
+        m_dependencies.addNode(m_nodeB);
+
+        // A   ->    M    ->   B
+        //   \               /
+        //      ---->-------
+        EXPECT_TRUE(m_dependencies.link(*m_nodeA.getOutputs()->getChild("output1")->m_impl, *nodeM.getInputs()->getChild("input1")->m_impl, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*nodeM.getOutputs()->getChild("output1")->m_impl, *m_nodeB.getInputs()->getChild("input1")->m_impl, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nodeA.getOutputs()->getChild("output2")->m_impl, *m_nodeB.getInputs()->getChild("input2")->m_impl, m_errorReporting));
+
+        expectSortedNodeOrder({ &m_nodeA, &nodeM, &m_nodeB });
+
+        m_dependencies.removeNode(nodeM);
+
+        // only other two nodes left (A and B). Their relative order is not changed
+        expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
+
+        // Only link A->B remains
+        const LinksMap& links = m_dependencies.getLinks();
+        EXPECT_EQ(1u, links.size());
     }
 
     TEST_F(ALogicNodeDependencies, ReversingDependencyOfTwoNodes_InvertsTopologicalOrder)

@@ -33,17 +33,6 @@ namespace rlogic
         {
         }
 
-        void TearDown() override
-        {
-            std::remove("OneBinding.bin");
-            std::remove("WithRamsesNode.bin");
-            std::remove("RamsesNodeDeleted.bin");
-            std::remove("NoValuesSet.bin");
-            std::remove("SomeValuesSet.bin");
-            std::remove("AllValuesSet.bin");
-            std::remove("SomeInputsLinked.bin");
-        }
-
         RamsesTestSetup m_ramsesTestSetup;
         ramses::Scene& m_testScene;
         LogicEngine m_logicEngine;
@@ -350,7 +339,7 @@ namespace rlogic
         EXPECT_EQ(ramsesNode->getVisibility(), ramses::EVisibilityMode::Invisible);
     }
 
-    TEST_F(ARamsesNodeBinding, DoesNotOverrideExistingValuesAfterNodeIsBound)
+    TEST_F(ARamsesNodeBinding, DoesNotOverrideExistingValuesAfterRamsesNodeIsAssignedToBinding)
     {
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("NodeBinding");
 
@@ -426,7 +415,22 @@ namespace rlogic
 
     }
 
-    TEST_F(ARamsesNodeBinding, ContainsItsDataAfterDeserialization)
+    class ARamsesNodeBinding_WithSerialization : public ARamsesNodeBinding
+    {
+    protected:
+        void TearDown() override
+        {
+            std::remove("OneBinding.bin");
+            std::remove("WithRamsesNode.bin");
+            std::remove("RamsesNodeDeleted.bin");
+            std::remove("NoValuesSet.bin");
+            std::remove("SomeValuesSet.bin");
+            std::remove("AllValuesSet.bin");
+            std::remove("SomeInputsLinked.bin");
+        }
+    };
+
+    TEST_F(ARamsesNodeBinding_WithSerialization, ContainsItsDataAfterDeserialization)
     {
         {
             LogicEngine tempEngineForSaving;
@@ -481,7 +485,7 @@ namespace rlogic
     }
 
 
-    TEST_F(ARamsesNodeBinding, RestoresLinkToRamsesNodeAfterLoadingFromFile)
+    TEST_F(ARamsesNodeBinding_WithSerialization, RestoresLinkToRamsesNodeAfterLoadingFromFile)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -497,7 +501,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesNodeBinding, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_ButNoSceneWasProvided)
+    TEST_F(ARamsesNodeBinding_WithSerialization, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_ButNoSceneWasProvided)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -514,7 +518,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesNodeBinding, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_WhichWasDeleted)
+    TEST_F(ARamsesNodeBinding_WithSerialization, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_WhichWasDeleted)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -534,7 +538,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesNodeBinding, DoesNotModifyRamsesNodePropertiesAfterLoadingFromFile_WhenNoValuesWereExplicitlySetBeforeSaving)
+    TEST_F(ARamsesNodeBinding_WithSerialization, DoesNotModifyRamsesNodePropertiesAfterLoadingFromFile_WhenNoValuesWereExplicitlySetBeforeSaving)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -553,7 +557,7 @@ namespace rlogic
 
     // Tests that the node properties don't overwrite ramses' values after loading from file, until
     // set() is called again explicitly after loadFromFile()
-    TEST_F(ARamsesNodeBinding, DoesNotReapplyPropertiesToRamsesAfterLoading_UntilExplicitlySetAgain)
+    TEST_F(ARamsesNodeBinding_WithSerialization, DoesNotReapplyPropertiesToRamsesAfterLoading_UntilExplicitlySetAgain)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -602,7 +606,7 @@ namespace rlogic
     // - saving and loading files
     // The general expectation is that after loading + update(), the logic scene would overwrite only ramses
     // properties wrapped by a LogicBinding which is linked to a script
-    TEST_F(ARamsesNodeBinding, SetsOnlyRamsesNodePropertiesForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
+    TEST_F(ARamsesNodeBinding_WithSerialization, SetsOnlyRamsesNodePropertiesForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
 
@@ -657,5 +661,113 @@ namespace rlogic
             EXPECT_TRUE(m_logicEngine.update());
             ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 2.f, 3.f });
         }
+    }
+
+    // Larger confidence tests which verify and document the entire data flow cycle of bindings
+    // There are smaller tests which test only properties and their data propagation rules (see property unit tests)
+    // There are also "dirtiness" tests which test when a node is being re-updated (see logic engine dirtiness tests)
+    // These tests test everything in combination
+    class ARamsesNodeBinding_DataFlow : public ARamsesNodeBinding
+    {
+    };
+
+    TEST_F(ARamsesNodeBinding_DataFlow, WithExplicitSet)
+    {
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("");
+
+        // Create node and preset values
+        ramses::Node* ramsesNode = createTestRamsesNode();
+        ramsesNode->setRotation(1.f, 1.f, 1.f, ramses::ERotationConvention::XYZ);
+        ramsesNode->setScaling(2.f, 2.f, 2.f);
+        ramsesNode->setTranslation(3.f, 3.f, 3.f);
+        ramsesNode->setVisibility(ramses::EVisibilityMode::Invisible);
+
+        nodeBinding.setRamsesNode(ramsesNode);
+
+        m_logicEngine.update();
+
+        // Nothing happened - binding did not overwrite preset values because no user value set()
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 1.f, 1.f });
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Scaling, vec3f{ 2.f, 2.f, 2.f });
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Translation, vec3f{ 3.f, 3.f, 3.f });
+        EXPECT_EQ(ramsesNode->getVisibility(), ramses::EVisibilityMode::Invisible);
+
+        // Set rotation only
+        Property* inputs = nodeBinding.getInputs();
+        inputs->getChild("rotation")->set<vec3f>(vec3f{ 42.f, 42.f, 42.f });
+
+        // Update not called yet -> still has preset values for rotation in ramses node
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 1.f, 1.f });
+
+        // Update() only propagates rotation and does not touch other data
+        m_logicEngine.update();
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 42.f, 42.f, 42.f });
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Scaling, vec3f{ 2.f, 2.f, 2.f });
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Translation, vec3f{ 3.f, 3.f, 3.f });
+        EXPECT_EQ(ramsesNode->getVisibility(), ramses::EVisibilityMode::Invisible);
+
+        // Calling update again does not "rewrite" the data to ramses. Check this by setting a value manually and call update() again
+        ramsesNode->setRotation(1.f, 1.f, 1.f, ramses::ERotationConvention::XYZ);
+        m_logicEngine.update();
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 1.f, 1.f });
+
+        // Set all properties manually this time
+        inputs->getChild("rotation")->set<vec3f>(vec3f{ 100.f, 100.f, 100.f });
+        inputs->getChild("scaling")->set<vec3f>(vec3f{ 200.f, 200.f, 200.f });
+        inputs->getChild("translation")->set<vec3f>(vec3f{ 300.f, 300.f, 300.f });
+        inputs->getChild("visibility")->set<bool>(true);
+        m_logicEngine.update();
+
+        // All of the property values were passed to ramses
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 100.f, 100.f, 100.f });
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Scaling, vec3f{ 200.f, 200.f, 200.f });
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Translation, vec3f{ 300.f, 300.f, 300.f });
+        EXPECT_EQ(ramsesNode->getVisibility(), ramses::EVisibilityMode::Visible);
+    }
+
+    TEST_F(ARamsesNodeBinding_DataFlow, WithLinks)
+    {
+        const std::string_view scriptSrc = R"(
+            function interface()
+                OUT.rotation = VEC3F
+            end
+            function run()
+                OUT.rotation = {1, 2, 3}
+            end
+        )";
+
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("NodeBinding");
+
+        // Create node and preset values
+        ramses::Node* ramsesNode = createTestRamsesNode();
+        ramsesNode->setRotation(1.f, 1.f, 1.f, ramses::ERotationConvention::XYZ);
+        ramsesNode->setScaling(2.f, 2.f, 2.f);
+        ramsesNode->setTranslation(3.f, 3.f, 3.f);
+        ramsesNode->setVisibility(ramses::EVisibilityMode::Off);
+
+        nodeBinding.setRamsesNode(ramsesNode);
+
+        // Adding and removing link does not set anything in ramses
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("rotation"), *nodeBinding.getInputs()->getChild("rotation")));
+        ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("rotation"), *nodeBinding.getInputs()->getChild("rotation")));
+        m_logicEngine.update();
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 1.f, 1.f });
+
+        // Create link and calling update -> sets values to ramses
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("rotation"), *nodeBinding.getInputs()->getChild("rotation")));
+        m_logicEngine.update();
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 2.f, 3.f });
+
+        // As long as link is active, binding overwrites value which was manually set directly to the ramses node
+        ramsesNode->setRotation(100.f, 100.f, 100.f, ramses::ERotationConvention::XYZ);
+        m_logicEngine.update();
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 2.f, 3.f });
+
+        // Remove link -> value is not overwritten any more
+        ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("rotation"), *nodeBinding.getInputs()->getChild("rotation")));
+        ramsesNode->setRotation(100.f, 100.f, 100.f, ramses::ERotationConvention::XYZ);
+        m_logicEngine.update();
+        ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 100.f, 100.f, 100.f });
     }
 }

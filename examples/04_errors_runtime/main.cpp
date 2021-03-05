@@ -50,7 +50,7 @@ int main()
     {
         /**
          * The stack trace is coming from the Lua VM and has limited information on the error. See the
-         * docs at https://genivi.github.io/ramses-logic/api.html#additional-lua-syntax-specifics for more information
+         * docs at https://ramses-logic.readthedocs.io/en/latest/api.html#additional-lua-syntax-specifics for more information
          */
         std::cout << error << std::endl;
     }

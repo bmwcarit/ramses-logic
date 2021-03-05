@@ -25,14 +25,6 @@ FUNCTION(ADD_FLAGS VAR)
     SET(${VAR} ${TMP} PARENT_SCOPE)
 ENDFUNCTION()
 
-FUNCTION(REMOVE_FLAGS VAR)
-    SET(TMP "${${VAR}}")
-    FOREACH(flags ${ARGN})
-        STRING(REPLACE "${flags}" "" TMP "${TMP}")
-    ENDFOREACH()
-    SET(${VAR} ${TMP} PARENT_SCOPE)
-ENDFUNCTION()
-
 FUNCTION(REMOVE_FROM_FLAGS flags toRemoveList outVar)
     string(REGEX REPLACE " +" ";" flags_LIST "${flags}")   # to list
     list(REMOVE_ITEM flags_LIST ${toRemoveList})           # filter list
@@ -142,6 +134,42 @@ IF(${CMAKE_SYSTEM_NAME} MATCHES "Android")
     SET(ENV{PKG_CONFIG_LIBDIR} "${CMAKE_SYSROOT}/usr/lib/pkgconfig:${CMAKE_SYSROOT}/usr/share/pkgconfig")
     SET(ENV{PKG_CONFIG_SYSROOT_DIR} ${CMAKE_SYSROOT})
 ENDIF()
+
+# Special handling for C++17 filesystem
+# Unfortunately not trivial, please keep this CMake config in one place!
+
+# GCC prior version 9.1 puts filesystem in a separate static lib (stdc++fs) and potentially in the experimental namespace
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
+    link_libraries(stdc++fs)
+    # gcc prior version 8 puts symbols in the experimental namespace
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
+        add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
+    endif()
+endif()
+
+# llvm prior version 9 puts filesystem in a separate static lib, similar but not exactly the same as GCC above
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9)
+    # libc++ requires different settings than stdlibc++
+    # check if libc++ is used by inspecting global flags
+    string(FIND "${CMAKE_CXX_FLAGS}" "-stdlib=libc++" USES_LIBCXX)
+    if(USES_LIBCXX EQUAL -1)
+        # Link stdc++fs from the std lib
+        link_libraries(stdc++fs)
+        # llvm prior version 7 puts symbols in the experimental namespace
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+            add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
+        endif()
+    else()
+        message(STATUS "Detected usage of libc++, using libc++ specific compiler flags")
+        # See docs for more details https://libcxx.llvm.org/docs/UsingLibcxx.html#using-libc-experimental-and-experimental
+        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+            link_libraries(c++experimental)
+            add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
+        else()
+            link_libraries(libc++fs)
+        endif()
+    endif()
+endif()
 
 # distribute to the correct cmake variables
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${RLOGIC_CXX_FLAGS} ${RLOGIC_C_CXX_FLAGS} ")

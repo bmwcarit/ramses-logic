@@ -9,6 +9,7 @@
 #pragma once
 
 #include <vector>
+#include <optional>
 #include <unordered_map>
 #include <cstdint>
 
@@ -41,17 +42,14 @@ namespace rlogic::internal
         void removeNode(Node& node);
         [[nodiscard]] bool containsNode(Node& node) const;
 
-        void addEdge(Node& source, Node& target);
+        bool addEdge(Node& source, Node& target);
         void removeEdge(Node& source, const Node& target);
 
-        [[nodiscard]] bool updateTopologicalSorting();
-        const NodeVector& getCachedTopologicallySortedNodes() const;
+        [[nodiscard]] std::optional<NodeVector> getTopologicallySortedNodes() const;
 
         // For testing only
         size_t getInDegree(Node& node) const;
         size_t getOutDegree(Node& node) const;
-
-        [[nodiscard]] bool isDirty() const;
 
     private:
         struct Edge
@@ -69,8 +67,5 @@ namespace rlogic::internal
         // If a node has no outgoing links, the 'EdgeList' is empty
         // Each entry in 'EdgeList' represents an edge to another node
         std::unordered_map<Node*, EdgeList> m_nodeOutgoingEdges;
-
-        NodeVector m_cachedTopologicallySortedNodes;
-        bool m_dirty = false;
     };
 }

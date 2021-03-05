@@ -145,8 +145,6 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
     }
 
-    // TODO Violin/Tobias this is probably wrong in our implementation - discuss and decide
-    // I am creating the test based on my expectations, and commenting out the lines which don't work
     TEST_F(ALogicEngine_Dirtiness, NotDirty_WhenRemovingLink)
     {
         LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
@@ -157,13 +155,11 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
         m_logicEngine.unlink(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
 
-        //EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
-        //m_logicEngine.update();
-        //EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
+        EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
     }
 
-    // TODO Violin/Tobias same as above
-    // I am creating the test based on my expectations, and commenting out the lines which don't work
     TEST_F(ALogicEngine_Dirtiness, NotDirty_WhenRemovingNestedLink)
     {
         LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_nested_properties_script);
@@ -174,9 +170,9 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
         m_logicEngine.unlink(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
 
-        //EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
-        //m_logicEngine.update();
-        //EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
+        EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
     }
 
     class ALogicEngine_BindingDirtiness : public ALogicEngine_Dirtiness
@@ -254,25 +250,20 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.m_impl->bindingsDirty());
     }
 
-    // TODO Violin/Tobias this is probably wrong in our implementation - discuss and decide
-    // I am creating the test based on my expectations, and commenting out the lines which don't work
-    TEST_F(ALogicEngine_BindingDirtiness, NotDirty_WhenAddingLink)
+    TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenAddingLink)
     {
-        m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
-        m_logicEngine.createRamsesNodeBinding("");
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding("");
         m_logicEngine.update();
 
-        // Just adding link does not change binding state, no value was propagated
-        //m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
-        //EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
+        m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
+        EXPECT_TRUE(m_logicEngine.m_impl->bindingsDirty());
 
-        // After update - also not dirty!
+        // After update - not dirty
         m_logicEngine.update();
         EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
     }
 
-    // TODO Violin/Tobias this is probably wrong in our implementation - discuss and decide
-    // I am creating the test based on my expectations, and commenting out the lines which don't work
     TEST_F(ALogicEngine_BindingDirtiness, NotDirty_WhenRemovingLink)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
@@ -283,9 +274,27 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
         m_logicEngine.unlink(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
 
-        //EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
-        //m_logicEngine.update();
-        //EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
+        EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
+    }
+
+    // Special case, but worth testing as we want that bindings are always
+    // executed when adding link, even if the link was just "re-added"
+    TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenReAddingLink)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding("");
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation")));
+        m_logicEngine.update();
+
+        EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
+        m_logicEngine.unlink(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
+        m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
+
+        EXPECT_TRUE(m_logicEngine.m_impl->isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
     }
 
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenSettingDataToNestedAppearanceBindingInputs)

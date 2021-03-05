@@ -452,10 +452,10 @@ namespace rlogic::internal
         auto sourceScriptAfterLoading = m_logicEngine.findScript("SourceScript");
         auto targetScriptAfterLoading = m_logicEngine.findScript("TargetScript");
 
-        // Make a copy of the object so that we can call non-const methods on it too (updateTopologicalSorting())
+        // Make a copy of the object so that we can call non-const methods on it too (getTopologicallySortedNodes())
         // This can't happen in user code, we only do this to test internal data
         internal::LogicNodeDependencies internalNodeDependencies = m_logicEngine.m_impl->getLogicNodeDependencies();
-        ASSERT_TRUE(internalNodeDependencies.updateTopologicalSorting());
+        ASSERT_TRUE(internalNodeDependencies.getTopologicallySortedNodes().has_value());
 
         // New objects are not linked (because they weren't before saving)
         EXPECT_FALSE(m_logicEngine.isLinked(*sourceScriptAfterLoading));
@@ -467,9 +467,9 @@ namespace rlogic::internal
         EXPECT_EQ(0u, internalNodeDependencies.getLinks().size());
 
         // Internal topological graph has two unsorted nodes, before and after update()
-        EXPECT_EQ(2u, internalNodeDependencies.getOrderedNodesCache().size());
+        EXPECT_EQ(2u, (*internalNodeDependencies.getTopologicallySortedNodes()).size());
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(2u, internalNodeDependencies.getOrderedNodesCache().size());
+        EXPECT_EQ(2u, (*internalNodeDependencies.getTopologicallySortedNodes()).size());
     }
 }
 

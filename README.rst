@@ -10,7 +10,7 @@ limitation for more complex applications. ``RAMSES logic`` addresses this limita
 load and run ``Lua`` scripts and provides a standard set of tools to let these scripts interact between each other and control
 a sophisticated ``RAMSES`` scene.
 
-You can find the full documentation of ``RAMSES logic`` `here <https://genivi.github.io/ramses-logic>`_.
+You can find the full documentation of ``RAMSES logic`` `here <https://ramses-logic.readthedocs.io/en/latest>`_.
 
 .. _quickstart:
 
@@ -37,13 +37,13 @@ Configure and build with CMake (CMake 3.13 or newer required):
 You can find the compiler version of the examples in ``<path>/build/bin``.
 
 For more in-depth build instructions and customization options, have a look at
-the `detailed build documentation <https://genivi.github.io/ramses-logic/build.html>`_.
+the `detailed build documentation <https://ramses-logic.readthedocs.io/en/latest/build.html>`_.
 
 ========================
 Examples
 ========================
 
-Prefer to learn by example? Have a look at our `self-contained example snippets <https://genivi.github.io/ramses-logic/api.html#list-of-all-examples>`_.
+Prefer to learn by example? Have a look at our `self-contained example snippets <https://ramses-logic.readthedocs.io/en/latest/api.html#list-of-all-examples>`_.
 
 
 ========================

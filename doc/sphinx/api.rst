@@ -150,6 +150,8 @@ which are otherwise statically typed languages. Note that in the example above, 
 set<T> to interact with the scripts. The underlying :class:`rlogic::Property` class also has a :func:`rlogic::Property::getType`
 method which provides the type of the property as an enum value.
 
+See also the section on ``Lua`` :ref:`syntax specifics <Additional Lua syntax specifics>` imposed by the ``Logic Engine``.
+
 You can :ref:`link scripts <Creating links between scripts>` to form a more sophisticated logic execution graph.
 
 You can :ref:`bind to Ramses objects <Linking scripts to Ramses scenes>` to control a 3D ``Ramses`` scene.
@@ -536,6 +538,17 @@ Additional Lua syntax specifics
 ``RAMSES Logic`` fuses ``C++`` and ``Lua`` code which are quite different, both in terms of language semantics,
 type system and memory management. This is mostly transparent to the user, but there are some noteworthy
 special cases worth explaining.
+
+-----------------------------------------------------
+Vec2/3/4 types
+-----------------------------------------------------
+
+While the property types which reflect Lua built-in types (BOOL, INT, FLOAT, STRING) inherit the standard
+Lua value semantics, the more complex types (VEC2/3/4/I/F) have no representation in Lua, and are wrapped as
+``Lua`` tables. They have the additional constraint that all values must be set simultaneously. It's not possible
+for example to set just one component of a VEC3F - all three must be set at once. The reason for this design decision
+is to ensure consistent behavior when propagating these values - for example when setting ``Ramses`` node properties
+or uniforms.
 
 -----------------------------------------------------
 The global IN and OUT objects

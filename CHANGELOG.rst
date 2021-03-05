@@ -3,6 +3,14 @@ master
 ======
 
 ======
+v0.5.2
+======
+
+**Features**
+
+* Upgraded Ramses that ships with the logic engine from 27.0.5 to 27.0.100 (backwards compatible)
+
+======
 v0.5.0
 ======
 
@@ -24,8 +32,8 @@ all binary content when switching to v0.5.0!
 **Semantic changes**
 
 * Changed behavior of ``RamsesBinding``. See
-  `binding docs <https://genivi.github.io/ramses-logic/api.html#linking-scripts-to-ramses-scenes>`_ for details.
-  See `data flow docs <https://genivi.github.io/ramses-logic/api.html#data-flow>`_ for general overview
+  `binding docs <https://ramses-logic.readthedocs.io/en/latest/api.html#linking-scripts-to-ramses-scenes>`_ for details.
+  See `data flow docs <https://ramses-logic.readthedocs.io/en/latest/api.html#data-flow>`_ for general overview
   how data flow works in the logic engine.
 
 
@@ -57,7 +65,7 @@ v0.4.2
 
 **Other**
 
-* Removed support for i/o and os lua libs. See `lua module docs <https://genivi.github.io/ramses-logic/api.html#using-lua-modules>`_ for details
+* Removed support for i/o and os lua libs. See `lua module docs <https://ramses-logic.readthedocs.io/en/latest/api.html#using-lua-modules>`_ for details
 
 ======
 v0.4.1
@@ -94,7 +102,7 @@ v0.4.0
   This will trigger compiler warnings if you call these methods but don't use the result
 * New CMake option 'ramses-logic_FOLDER_PREFIX' to set custom folder prefix for MSVS
 * Restructured folders for easier source redistributions.
-  See `docs <https://genivi.github.io/ramses-logic/dev.html#source-contents>`_ for more info
+  See `docs <https://ramses-logic.readthedocs.io/en/latest/dev.html#source-contents>`_ for more info
 
 ======
 v0.3.1

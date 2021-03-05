@@ -57,7 +57,7 @@ namespace rlogic
     * global table entries after the script is loaded to the Lua state, and leaves only the run()
     * function.
     *
-    * See also the full documentation at https://genivi.github.io/ramses-logic/api.html for more details on Lua and
+    * See also the full documentation at https://ramses-logic.readthedocs.io/en/latest/api.html for more details on Lua and
     * its interaction with C++.
     */
     class LuaScript : public LogicNode

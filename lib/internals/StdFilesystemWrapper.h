@@ -1,5 +1,5 @@
 //  -------------------------------------------------------------------------
-//  Copyright (C) 2020 BMW AG
+//  Copyright (C) 2021 BMW AG
 //  -------------------------------------------------------------------------
 //  This Source Code Form is subject to the terms of the Mozilla Public
 //  License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -8,16 +8,11 @@
 
 #pragma once
 
-#include <string>
-#include <optional>
-#include <vector>
+#ifdef RLOGIC_STD_FILESYSTEM_EXPERIMENTAL
+#include <experimental/filesystem>
+namespace fs = std::experimental::filesystem;
+#else
+#include <filesystem>
+namespace fs = std::filesystem;
+#endif
 
-namespace rlogic::internal
-{
-    class FileUtils
-    {
-    public:
-        static bool SaveBinary(const std::string& filename, const uint8_t* binaryBuffer, size_t bufferLength);
-        static std::optional<std::vector<char>> LoadBinary(const std::string& filename);
-    };
-}

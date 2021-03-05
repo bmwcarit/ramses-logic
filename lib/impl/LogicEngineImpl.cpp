@@ -215,14 +215,14 @@ namespace rlogic::internal
         m_errors.clear();
         LOG_DEBUG("Begin update");
 
-        if (!m_logicNodeDependencies.updateTopologicalSorting())
+        const std::optional<NodeVector> sortedNodes = m_logicNodeDependencies.getTopologicallySortedNodes();
+        if (!sortedNodes)
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!");
             return false;
         }
 
-        const NodeVector& sortedNodes = m_logicNodeDependencies.getOrderedNodesCache();
-        for (LogicNodeImpl* logicNode : sortedNodes)
+        for (LogicNodeImpl* logicNode : *sortedNodes)
         {
             if (!updateLogicNodeInternal(*logicNode, disableDirtyTracking))
             {
@@ -618,12 +618,6 @@ namespace rlogic::internal
         // TODO Violin the ugliness of this code shows the problems with the current dirty handling implementation
         // Refactor the dirty handling, and this code will disappear
 
-        // Check if links were changed
-        if (m_logicNodeDependencies.isDirty())
-        {
-            return true;
-        }
-
         // TODO Violin improve internal management of logic nodes so that we don't have to loop over three
         // different containers below which all call a method on LogicNode
 
@@ -773,7 +767,7 @@ namespace rlogic::internal
         }
 
         // Refuse save() if logic graph has loops
-        if (!m_logicNodeDependencies.updateTopologicalSorting())
+        if (!m_logicNodeDependencies.getTopologicallySortedNodes())
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!");
             return false;

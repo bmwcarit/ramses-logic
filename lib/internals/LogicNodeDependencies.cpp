@@ -25,12 +25,22 @@ namespace rlogic::internal
     void LogicNodeDependencies::addNode(LogicNodeImpl& node)
     {
         m_logicNodeDAG.addNode(node);
+        m_nodeTopologyChanged = true;
     }
 
     void LogicNodeDependencies::removeNode(LogicNodeImpl& node)
     {
         m_logicNodeConnector.unlinkAll(node);
         m_logicNodeDAG.removeNode(node);
+
+        // Remove the node from the cache without reordering the rest (unless there is no cache yet)
+        // Removing nodes does not require topology update (we don't guarantee specific ordering when
+        // nodes are not related, we only guarantee relative ordering when nodes are linked)
+        if (m_cachedTopologicallySortedNodes)
+        {
+            NodeVector& cachedNodes = *m_cachedTopologicallySortedNodes;
+            cachedNodes.erase(std::remove(cachedNodes.begin(), cachedNodes.end(), &node), cachedNodes.end());
+        }
     }
 
     bool LogicNodeDependencies::isLinked(const LogicNodeImpl& node) const
@@ -38,14 +48,15 @@ namespace rlogic::internal
         return m_logicNodeConnector.isLinked(node);
     }
 
-    bool LogicNodeDependencies::updateTopologicalSorting()
+    std::optional<NodeVector> LogicNodeDependencies::getTopologicallySortedNodes()
     {
-        return m_logicNodeDAG.updateTopologicalSorting();
-    }
+        if (m_nodeTopologyChanged)
+        {
+            m_cachedTopologicallySortedNodes = m_logicNodeDAG.getTopologicallySortedNodes();
+            m_nodeTopologyChanged = false;
+        }
 
-    const NodeVector& LogicNodeDependencies::getOrderedNodesCache() const
-    {
-        return m_logicNodeDAG.getCachedTopologicallySortedNodes();
+        return m_cachedTopologicallySortedNodes;
     }
 
     const PropertyImpl* LogicNodeDependencies::getLinkedOutput(PropertyImpl& inputProperty) const
@@ -77,7 +88,6 @@ namespace rlogic::internal
             errorReporting.add("SourceNode and TargetNode are equal");
             return false;
         }
-
 
         if (!(output.isOutput() && input.isInput()))
         {
@@ -118,9 +128,13 @@ namespace rlogic::internal
             return false;
         }
 
-        // TODO Violin these two calls set two different things to dirty. Try to not have redundant dirty
+        // TODO Violin below code sets two different things to dirty. Try to not have redundant dirty
         // flags and consolidate dirtiness to one place
-        m_logicNodeDAG.addEdge(sourceNode, targetNode);
+        const bool isNewEdge = m_logicNodeDAG.addEdge(sourceNode, targetNode);
+        if (isNewEdge)
+        {
+            m_nodeTopologyChanged = true;
+        }
         targetNode.setDirty(true);
 
         return true;
@@ -143,24 +157,8 @@ namespace rlogic::internal
         auto& sourceNode = output.getLogicNode();
         auto& targetNode = input.getLogicNode();
 
-        // TODO violin check if we can remove this (removing a link should not have to set dirty)
-        // Also, as with the link() case, this sets two things to dirty -> might hide problems
-        targetNode.setDirty(true);
         m_logicNodeDAG.removeEdge(sourceNode, targetNode);
 
         return true;
     }
-
-    bool LogicNodeDependencies::isDirty() const
-    {
-        // TODO Violin test this in depth, might hide bugs because of current complexity
-        // (two classes, which each have their own weirdness around dirty handling. Also see other TODOs in this class)
-        if (m_logicNodeDAG.isDirty())
-        {
-            return true;
-        }
-
-        return false;
-    }
-
 }

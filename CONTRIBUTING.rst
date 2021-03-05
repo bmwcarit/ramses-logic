@@ -59,9 +59,9 @@ favor of just disliking a piece of code.
 Review requirements
 -----------------------------------------------------------------
 
-Before asking for review, please make sure `the code works <https://genivi.github.io/ramses-logic/dev.html#continuous-integration>`_,
+Before asking for review, please make sure `the code works <https://ramses-logic.readthedocs.io/en/latest/dev.html#continuous-integration>`_,
 there are unit tests (even for proof-of-concept code), and there are `no code style or
-formatting violations <https://genivi.github.io/ramses-logic/dev.html#code-style>`_.
+formatting violations <https://ramses-logic.readthedocs.io/en/latest/dev.html#code-style>`_.
 The PR source branch has to be based on the latest
 released branch HEAD revision, unless the requested change is a hotfix for an existing
 release. Please don't rebase branches after you asked for a review, unless the reviewer
@@ -75,7 +75,7 @@ Review steps
 As soon as a PR is created, it will be looked at by a reviewer. If you want to signal
 that it's being worked on/changed, put a WIP in the name, or add a WIP label. After a
 review round, address the comments of the review, and wait for the reviewer to mark
-them as 'resolved'. Once everything is resolved, the PR will enter the `integration process <https://genivi.github.io/ramses-logic/dev.html#continuous-integration>`_.
+them as 'resolved'. Once everything is resolved, the PR will enter the `integration process <https://ramses-logic.readthedocs.io/en/latest/dev.html#continuous-integration>`_.
 
 =================================================================
 Code style
@@ -89,7 +89,7 @@ code can be meaningfully reviewed.
 Clang Tidy
 -----------------------------------------------------------------
 
-Clang-tidy is performed as an automated build step within the `continuous integration pipeline <https://genivi.github.io/ramses-logic/dev.html#continuous-integration>`_.
+Clang-tidy is performed as an automated build step within the `continuous integration pipeline <https://ramses-logic.readthedocs.io/en/latest/dev.html#continuous-integration>`_.
 Check its documentation for instructions how to execute it locally before submitting code.
 
 -----------------------------------------------------------------
@@ -231,7 +231,7 @@ Testing Linux builds with Docker
 -----------------------------------------------------------------
 
 You can build and start the docker container for building by following the
-`build instructions for Docker <https://genivi.github.io/ramses-logic/build.html#building-in-docker-windows-or-linux>`_. The possible builds
+`build instructions for Docker <https://ramses-logic.readthedocs.io/en/latest/build.html#building-in-docker-windows-or-linux>`_. The possible builds
 and options are listed when executing the build.sh script in the container
 without any parameters.
 
@@ -239,7 +239,7 @@ without any parameters.
 Testing Windows builds locally
 -----------------------------------------------------------------
 
-You can follow the `build instructions for Windows <https://genivi.github.io/ramses-logic/build.html#building-on-windows>`_ and then execute the RUN_TESTS target of Visual Studio,
+You can follow the `build instructions for Windows <https://ramses-logic.readthedocs.io/en/latest/build.html#building-on-windows>`_ and then execute the RUN_TESTS target of Visual Studio,
 or use the ctest command in the build folder.
 
 =================================================================

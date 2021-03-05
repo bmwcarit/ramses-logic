@@ -54,12 +54,16 @@ namespace rlogic::internal
         {
             m_ordering.clear();
 
-            EXPECT_TRUE(m_graph.updateTopologicalSorting());
-            const auto& orderedNodes = m_graph.getCachedTopologicallySortedNodes();
+            const NodeVector orderedNodes = *m_graph.getTopologicallySortedNodes();
             for (size_t i = 0; i < orderedNodes.size(); ++i)
             {
                 m_ordering.insert({orderedNodes[i], i});
             }
+        }
+
+        NodeVector getSortedTestNodes()
+        {
+            return *m_graph.getTopologicallySortedNodes();
         }
 
         size_t getRank(const LogicNodeImpl& node) const
@@ -156,8 +160,21 @@ namespace rlogic::internal
 
         // Confidence - check that removed node is really gone
         updateOrdering();
-        EXPECT_EQ(1u, m_graph.getCachedTopologicallySortedNodes().size());
-        EXPECT_EQ(&N2, m_graph.getCachedTopologicallySortedNodes()[0]);
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N2));
+    }
+
+    TEST_F(ADirectedAcyclicGraph, ReportsNewEdgeOnlyTheFirstTimeTwoNodesAreConnected)
+    {
+        addTestNodesToGraph(2);
+        EXPECT_TRUE(m_graph.addEdge(N1, N2));
+        EXPECT_FALSE(m_graph.addEdge(N1, N2));
+        EXPECT_FALSE(m_graph.addEdge(N1, N2));
+
+        // Remove all three edges, and add again -> new edge reported again
+        m_graph.removeEdge(N1, N2);
+        m_graph.removeEdge(N1, N2);
+        m_graph.removeEdge(N1, N2);
+        EXPECT_TRUE(m_graph.addEdge(N1, N2));
     }
 
     TEST_F(ADirectedAcyclicGraph, RemovingTargetNode_ResultsInCorrectInAndOutDegreesOfSourceNode)
@@ -173,8 +190,7 @@ namespace rlogic::internal
 
         // Confidence - check that removed node is really gone
         updateOrdering();
-        EXPECT_EQ(1u, m_graph.getCachedTopologicallySortedNodes().size());
-        EXPECT_EQ(&N1, m_graph.getCachedTopologicallySortedNodes()[0]);
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N1));
     }
 
     TEST_F(ADirectedAcyclicGraph, RemovingMiddleNode_ResultsInCorrectInAndOutDegreeOfOtherNodes)
@@ -200,7 +216,7 @@ namespace rlogic::internal
 
         // Confidence - check that removed node is really gone
         updateOrdering();
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N3));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N3));
     }
 
     TEST_F(ADirectedAcyclicGraph, RemovingOneSourceNode_DoesNotAffectEdgesOfOtherSourceNodes)
@@ -226,7 +242,7 @@ namespace rlogic::internal
 
         // Confidence - check that removed node is really gone
         updateOrdering();
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N2, &N3));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N2, &N3));
     }
 
     TEST_F(ADirectedAcyclicGraph, RemovingOneTargetNode_DoesNotAffectEdgesOfOtherTargetNodes)
@@ -252,7 +268,7 @@ namespace rlogic::internal
 
         // Confidence - check that removed node is really gone
         updateOrdering();
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N3));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N3));
     }
 
     TEST_F(ADirectedAcyclicGraph, ReturnsTwoNodesInRightOrder)
@@ -262,8 +278,7 @@ namespace rlogic::internal
 
         updateOrdering();
 
-        const NodeVector& sortedNodes = m_graph.getCachedTopologicallySortedNodes();
-        EXPECT_THAT(sortedNodes, ::testing::ElementsAre(&N1, &N2));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N1, &N2));
     }
 
     TEST_F(ADirectedAcyclicGraph, ReversesOrderIfLinkIsReversed)
@@ -271,13 +286,11 @@ namespace rlogic::internal
         addTestNodesToGraph(2);
 
         m_graph.addEdge(N1, N2);
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N1, &N2));
+
         m_graph.removeEdge(N1, N2);
         m_graph.addEdge(N2, N1);
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
-
-        const NodeVector& sortedNodes = m_graph.getCachedTopologicallySortedNodes();
-        EXPECT_THAT(sortedNodes, ::testing::ElementsAre(&N2, &N1));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N2, &N1));
     }
 
     TEST_F(ADirectedAcyclicGraph, ComputesRightOrderForComplexGraph)
@@ -391,7 +404,7 @@ namespace rlogic::internal
         EXPECT_LT(getRank(N4), getRank(N5));
 
         // Confidence - check that removed node is really gone
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N3, &N4, &N5, &N6));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N3, &N4, &N5, &N6));
     }
 
     TEST_F(ADirectedAcyclicGraph, ComputesRightOrderIfANodeIsRemovedFromEnd)
@@ -433,7 +446,7 @@ namespace rlogic::internal
         EXPECT_LT(getRank(N3), getRank(N6));
 
         // Confidence - check that removed node is really gone
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N2, &N3, &N4, &N6));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N2, &N3, &N4, &N6));
     }
 
     TEST_F(ADirectedAcyclicGraph, ComputesRightOrderIfANodeIsRemovedFromTheMiddle)
@@ -474,7 +487,7 @@ namespace rlogic::internal
         EXPECT_LT(getRank(N4), getRank(N5));
 
         // Confidence - check that removed node is really gone
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N2, &N4, &N5, &N6));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N2, &N4, &N5, &N6));
     }
 
     TEST_F(ADirectedAcyclicGraph, CycleDoesNotCauseStackOverflow_NoIdentifyableRootNode)
@@ -486,9 +499,9 @@ namespace rlogic::internal
         m_graph.addEdge(N2, N3);
         m_graph.addEdge(N3, N1);
 
-        EXPECT_FALSE(m_graph.updateTopologicalSorting());
+        EXPECT_FALSE(m_graph.getTopologicallySortedNodes().has_value());
         // Can call again, still reports false and does not crash
-        EXPECT_FALSE(m_graph.updateTopologicalSorting());
+        EXPECT_FALSE(m_graph.getTopologicallySortedNodes().has_value());
     }
 
     TEST_F(ADirectedAcyclicGraph, CycleDoesNotCauseStackOverflow_WithRootNode)
@@ -501,9 +514,9 @@ namespace rlogic::internal
         m_graph.addEdge(N3, N4);
         m_graph.addEdge(N4, N2);
 
-        EXPECT_FALSE(m_graph.updateTopologicalSorting());
+        EXPECT_FALSE(m_graph.getTopologicallySortedNodes().has_value());
         // Can call again, still reports false and does not crash
-        EXPECT_FALSE(m_graph.updateTopologicalSorting());
+        EXPECT_FALSE(m_graph.getTopologicallySortedNodes().has_value());
     }
 
     TEST_F(ADirectedAcyclicGraph, RemovesMultiLinksBetweenTwoNodes_OneByOne)
@@ -516,21 +529,18 @@ namespace rlogic::internal
         m_graph.addEdge(N1, N2);
         m_graph.addEdge(N1, N2);
 
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::ElementsAre(&N1, &N2));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N1, &N2));
 
         m_graph.removeEdge(N1, N2);
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::ElementsAre(&N1, &N2));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N1, &N2));
         /*
         * N1   -x1->   N2
         */
 
         m_graph.removeEdge(N1, N2);
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
 
         // Both nodes still here, but no ordering guarantees any more
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N2));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N2));
     }
 
     TEST_F(ADirectedAcyclicGraph, Confidence_ReAddingNode_WithMultiLinksToNeighbours_AndReversingOrderOfLinks_ReversesOrderOfNodes)
@@ -546,17 +556,15 @@ namespace rlogic::internal
         m_graph.addEdge(N2, N3);
         m_graph.addEdge(N2, N3);
 
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::ElementsAre(&N1, &N2, &N3));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N1, &N2, &N3));
 
         /*
         * N1      (removed)       N3
         */
         m_graph.removeNode(N2);
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
 
         // No links -> No ordering. Check that the removed node is not in the list now
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::UnorderedElementsAre(&N1, &N3));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::UnorderedElementsAre(&N1, &N3));
 
         // Re-add the node, and create links in the other direction
         m_graph.addNode(N2);
@@ -567,7 +575,6 @@ namespace rlogic::internal
         m_graph.addEdge(N3, N2);
         m_graph.addEdge(N2, N1);
 
-        EXPECT_TRUE(m_graph.updateTopologicalSorting());
-        EXPECT_THAT(m_graph.getCachedTopologicallySortedNodes(), ::testing::ElementsAre(&N3, &N2, &N1));
+        EXPECT_THAT(getSortedTestNodes(), ::testing::ElementsAre(&N3, &N2, &N1));
     }
 }

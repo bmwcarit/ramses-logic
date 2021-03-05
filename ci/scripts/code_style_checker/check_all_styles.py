@@ -120,6 +120,7 @@ def main():
         r'^ci/scripts/config/ubsan_suppressions$',   # config file, can't add license
         r'\.md$',               # .md files don't need a license
         r'\.rst$',              # TODO Violin check if possible to add license
+        r'^android/aar/AndroidManifest\.xml',
     }
 
     files_license_header = common_modules.common.get_all_files_with_filter(root_path, root_path, {r'.*'}, blacklist_license)

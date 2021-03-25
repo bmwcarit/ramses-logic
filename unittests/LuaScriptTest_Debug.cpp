@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "LuaScriptTest_Base.h"
+#include "WithTempDirectory.h"
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
@@ -17,11 +18,6 @@ namespace rlogic
 {
     class ALuaScript_Debug : public ALuaScript
     {
-    protected:
-        void TearDown() override
-        {
-            std::remove("script.lua");
-        }
     };
 
     TEST_F(ALuaScript_Debug, ProducesErrorWithStackTraceInRun)
@@ -46,6 +42,8 @@ namespace rlogic
 
     TEST_F(ALuaScript_Debug, ErrorMessageContainsFilenameAndScriptnameWithSemicolonWhenBothAvailable)
     {
+        WithTempDirectory tempFolder;
+
         std::ofstream ofs;
         ofs.open("script.lua", std::ofstream::out);
         ofs << R"(

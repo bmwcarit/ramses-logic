@@ -57,6 +57,7 @@ namespace rlogic::internal
         void                            clearErrors();
 
         [[nodiscard]] std::string_view getName() const;
+        void setName(std::string_view name);
 
         void setDirty(bool dirty);
         [[nodiscard]] bool isDirty() const;

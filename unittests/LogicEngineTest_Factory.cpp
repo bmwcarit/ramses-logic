@@ -13,6 +13,7 @@
 
 #include "impl/LogicNodeImpl.h"
 
+#include "WithTempDirectory.h"
 #include <fstream>
 
 namespace rlogic
@@ -20,10 +21,7 @@ namespace rlogic
     class ALogicEngine_Factory : public ALogicEngine
     {
     protected:
-        void TearDown() override {
-            std::remove("empty.lua");
-            std::remove("valid.lua");
-        }
+        WithTempDirectory tempFolder;
     };
 
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenCreatingEmptyScript)
@@ -61,7 +59,7 @@ namespace rlogic
         auto script = m_logicEngine.createLuaScriptFromFile("valid.lua");
         ASSERT_TRUE(nullptr != script);
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
-        // TODO fix this test!
+        // TODO Violin fix this test!
         //EXPECT_EQ("what name do we want here?", script->getName());
         EXPECT_EQ("valid.lua", script->getFilename());
     }
@@ -124,6 +122,21 @@ namespace rlogic
         ASSERT_FALSE(m_logicEngine.destroy(*binding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0], "Can't find RamsesAppearanceBinding in logic engine!");
+    }
+
+    TEST_F(ALogicEngine_Factory, RenamesObjectsAfterCreation)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "");
+        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto ramsesAppearanceBinding = m_logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
+
+        script->setName("same name twice");
+        ramsesNodeBinding->setName("same name twice");
+        ramsesAppearanceBinding->setName("");
+
+        EXPECT_EQ("same name twice", script->getName());
+        EXPECT_EQ("same name twice", ramsesNodeBinding->getName());
+        EXPECT_EQ("", ramsesAppearanceBinding->getName());
     }
 
     TEST_F(ALogicEngine_Factory, ProducesErrorIfWrongObjectTypeIsDestroyed)

@@ -10,17 +10,8 @@
 #include "gmock/gmock.h"
 
 #include "internals/LogicNodeConnector.h"
-#include "impl/PropertyImpl.h"
-#include "impl/LogicNodeImpl.h"
-#include "ramses-logic/Property.h"
-#include "ramses-logic/LogicEngine.h"
-#include "ramses-logic/LuaScript.h"
-#include "ramses-logic/RamsesNodeBinding.h"
-#include "ramses-logic/RamsesAppearanceBinding.h"
 
 #include "LogicNodeDummy.h"
-
-
 
 namespace rlogic::internal
 {

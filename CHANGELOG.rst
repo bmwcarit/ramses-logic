@@ -3,6 +3,22 @@ master
 ======
 
 ======
+v0.5.3
+======
+
+**Features**
+
+* Possible to load from memory buffer instead of file
+* Bindings' name is empty string by default
+* Upgrade ramses to 27.0.101
+* Possible to rename objects after their creation
+
+**Bugfixes**
+
+* LogicEngine::loadFromFile() and loadFromBuffer() check for data corruption by default (possible to disable)
+* LogicEngine::saveToFile() fails if target is a folder; loadFromFile() does not crash when giving folder as a path
+
+======
 v0.5.2
 ======
 

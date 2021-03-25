@@ -11,32 +11,14 @@
 # This file describes the settings to be used by the documentation system
 # doxygen (www.doxygen.org) for a project
 
-PROJECT_NAME           = "RAMSES Logic Documentation"
-
-PROJECT_NUMBER         = "@PROJECT_VERSION@"
-
-PROJECT_BRIEF          = "Information for RAMSES Logic users and developers"
-
 OUTPUT_DIRECTORY       = "@DOXYGEN_TARGET_DIR@"
 
-EXAMPLE_PATH           = "@DOXYGEN_EXAMPLE_PATH@"
-
-# Use this to hide classes not part of the docs
-#EXCLUDE_SYMBOLS        = Stuff
-
 INPUT                  = @DOXYGEN_INPUT@
-IMAGE_PATH             = @DOXYGEN_IMAGE_PATH@
+RECURSIVE              = YES
 
 INPUT_ENCODING         = ISO-8859-1
 
 FILE_PATTERNS          = *.h
-FILE_PATTERNS         += *.cpp
-FILE_PATTERNS         += *.dox
-
-EXTENSION_MAPPING      = dox=C++
-
-EXCLUDE_PATTERNS       = */test/*
-EXCLUDE_SYMBOLS        = rlogic::internal::LogicEngineImpl rlogic::internal::LuaScriptImpl rlogic::internal::PropertyImpl rlogic::internal::LogicNodeImpl rlogic::internal::RamsesNodeBindingImpl
 
 GENERATE_XML           = YES
 GENERATE_LATEX         = NO

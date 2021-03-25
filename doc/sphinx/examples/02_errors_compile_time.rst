@@ -5,6 +5,6 @@
 Handling compilation errors
 ============================
 
-.. literalinclude:: ../../../examples/03_errors_compile_time/main.cpp
+.. literalinclude:: ../../../examples/02_errors_compile_time/main.cpp
     :start-after: #include <iostream>
 

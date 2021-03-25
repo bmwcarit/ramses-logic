@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "LuaScriptTest_Base.h"
+#include "WithTempDirectory.h"
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
@@ -27,14 +28,7 @@ namespace rlogic::internal
     class ALuaScript_Lifecycle : public ALuaScript
     {
     protected:
-        void TearDown() override
-        {
-            std::remove("script.bin");
-            std::remove("script.lua");
-            std::remove("arrays.bin");
-            std::remove("nested_array.bin");
-            std::remove("array_of_structs.bin");
-        }
+        WithTempDirectory tempFolder;
     };
 
     TEST_F(ALuaScript_Lifecycle, HasEmptyFilenameWhenCreatedFromSource)

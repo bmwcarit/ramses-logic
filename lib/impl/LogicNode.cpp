@@ -39,4 +39,9 @@ namespace rlogic
         return m_impl.get().getName();
     }
 
+    void LogicNode::setName(std::string_view name)
+    {
+        m_impl.get().setName(name);
+    }
+
 }

@@ -531,6 +531,15 @@ For a full-fledged example, have a look at `the serialization example <https://g
     overwritten by :func:`rlogic::Property::set` calls after loading from the file. We strongly advice to always save and load
     both the ``Ramses`` scene and the ``LogicEngine`` scene together to avoid data inconsistencies!
 
+--------------------------------------------------
+Using memory buffer instead of file
+--------------------------------------------------
+
+You can use :func:`rlogic::LogicEngine::loadFromBuffer` to load the contents of the logic engine from your own memory. This can be useful
+if you have your own file management logic, or the data comes from a different source than a file on disk. Be mindful that passing data buffers
+over the boundaries of libraries can be unsafe with C++, and some errors/abuse can't be reliably prevented. Make sure you check the size of
+the buffer and don't load from memory of untrusted origins.
+
 =====================================
 Additional Lua syntax specifics
 =====================================
@@ -762,6 +771,15 @@ execute scripts which are tested and verified to be benign.
 
 .. TODO add more docs how environment work, what is the level of isolation between different scripts etc.
 
+-----------------------------------------------------
+Sanitizing of files and buffers
+-----------------------------------------------------
+
+Since the ``Logic Engine`` can deserialize itself from files and memory buffers, it opens possibilities for data corruption and
+truncation. To mitigate those risks, we use Flatbuffer's "Verify" feature which checks the integrity of data,
+detects possible index-out-of-range issues and prevents binary data abuse. What it *doesn't* check is
+whether the actual memory buffer size (passed in :func:`rlogic::LogicEngine::loadFromBuffer`) is consistent with the size provided
+by the user. The application must ensure that this size does not exceed the size of the actual memory!
 
 =========================
 Performance
@@ -785,12 +803,14 @@ List of all examples
     :caption: Examples
 
     examples/00_minimal
-    examples/01_properties_simple
-    examples/02_properties_complex
-    examples/03_errors_compile_time
-    examples/04_errors_runtime
-    examples/05_ramses_scene
-    examples/06_serialization
+    examples/01a_primitive_properties
+    examples/01b_struct_properties
+    examples/01c_array_properties
+    examples/02_errors_compile_time
+    examples/03_errors_runtime
+    examples/04_ramses_scene
+    examples/05_serialization
+    examples/06_override_print
 
 =========================
 Class Index

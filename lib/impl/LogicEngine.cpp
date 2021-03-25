@@ -123,9 +123,14 @@ namespace rlogic
         return m_impl->update();
     }
 
-    bool LogicEngine::loadFromFile(std::string_view filename, ramses::Scene* ramsesScene /* = nullptr*/)
+    bool LogicEngine::loadFromFile(std::string_view filename, ramses::Scene* ramsesScene /* = nullptr*/, bool enableMemoryVerification /* = true */)
     {
-        return m_impl->loadFromFile(filename, ramsesScene);
+        return m_impl->loadFromFile(filename, ramsesScene, enableMemoryVerification);
+    }
+
+    bool LogicEngine::loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* ramsesScene /* = nullptr*/, bool enableMemoryVerification /* = true */)
+    {
+        return m_impl->loadFromBuffer(rawBuffer, bufferSize, ramsesScene, enableMemoryVerification);
     }
 
     bool LogicEngine::saveToFile(std::string_view filename)

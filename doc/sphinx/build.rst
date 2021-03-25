@@ -209,13 +209,3 @@ Assuming you have met the :ref:`build requirements`, you can build ``RAMSES logi
     cmake $OPTIONS ../
     make
 
-
-============================================================
-Typical build errors and how to solve them
-============================================================
-
-* not able to find something in external/ folder
-    * Check that you downloaded the submodules as shown in :ref:`cloning`
-* CMake can't identify the compiler of ``Visual Studio Community edition``
-    * You need to download a Windows SDK 8.1
-

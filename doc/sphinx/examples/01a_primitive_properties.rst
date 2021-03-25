@@ -2,8 +2,8 @@
 .. highlight:: cpp
 
 ============================================
-Simple example with (primitive) properties
+Example with primitive properties
 ============================================
 
-.. literalinclude:: ../../../examples/01_properties_simple/main.cpp
+.. literalinclude:: ../../../examples/01a_primitive_properties/main.cpp
     :start-after: #include <iostream>

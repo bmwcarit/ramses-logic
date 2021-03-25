@@ -5,6 +5,6 @@
 Handling runtime errors
 =========================
 
-.. literalinclude:: ../../../examples/04_errors_runtime/main.cpp
+.. literalinclude:: ../../../examples/03_errors_runtime/main.cpp
     :start-after: #include <iostream>
 

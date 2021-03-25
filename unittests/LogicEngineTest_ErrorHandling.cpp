@@ -11,16 +11,13 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/Property.h"
 
+#include "WithTempDirectory.h"
+
 namespace rlogic
 {
     class ALogicEngine_ErrorHandling : public ALogicEngine
     {
     protected:
-        void TearDown() override
-        {
-            std::remove("logic.bin");
-        }
-
         const std::string_view m_linkable_script = R"(
             function interface()
                 IN.input = BOOL
@@ -74,6 +71,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnSaveAndLoadFromFile)
     {
+        WithTempDirectory tempFolder;
+
         m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
 
         // Generate error, so that we can test it's cleared by saveToFile()
@@ -89,8 +88,6 @@ namespace rlogic
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("logic.bin"));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
-
-        std::remove("logic.bin");
     }
 
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnLinkAndUnlink)

@@ -69,6 +69,13 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API std::string_view getName() const;
 
         /**
+        * Sets the name of this #LogicNode.
+        *
+        * @param name new name of the #LogicNode
+        */
+        RLOGIC_API void setName(std::string_view name);
+
+        /**
         * Destructor of #LogicNode
         */
         virtual ~LogicNode() noexcept;

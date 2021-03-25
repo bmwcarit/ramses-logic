@@ -11,6 +11,13 @@ if(POLICY CMP0054)
    cmake_policy(SET CMP0054 NEW)
 endif(POLICY CMP0054)
 
+function(ensure_submodule_exists SUBMOD_NAME)
+    if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/${SUBMOD_NAME}")
+        message(FATAL_ERROR "Missing submodule /external/${SUBMOD_NAME}. Please fetch Git submodules! (see build documentation)")
+    endif()
+endfunction()
+
+
 # #### externals that are build with normal compiler flags ####
 
 ################################################
@@ -22,6 +29,8 @@ set(gtest_force_shared_crt true CACHE BOOL "Must be enabled for linking our unit
 if(ramses-logic_BUILD_TESTS AND NOT TARGET gmock)
     set(INSTALL_GTEST OFF CACHE INTERNAL "")
     set(INSTALL_GMOCK OFF CACHE INTERNAL "")
+
+    ensure_submodule_exists(googletest)
 
     add_subdirectory(googletest)
     target_include_directories(gmock INTERFACE "googletest/googletest/include")
@@ -58,6 +67,8 @@ if(ramses-logic_BUILD_TESTS AND NOT TARGET benchmark::benchmark)
     set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE INTERNAL "")
     set(BENCHMARK_ENABLE_INSTALL OFF CACHE INTERNAL "")
 
+    ensure_submodule_exists(google-benchmark)
+
     add_subdirectory(google-benchmark)
 
     folderize_target(benchmark "external")
@@ -73,6 +84,8 @@ add_library(rlogic::google-benchmark-main ALIAS rlogic-google-benchmark-main)
 ################################################
 
 if(NOT TARGET lua)
+    ensure_submodule_exists(lua)
+
     # Collect all source and header files
     file(GLOB LUA_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/lua/*.c)
     file(GLOB LUA_HEADER ${CMAKE_CURRENT_SOURCE_DIR}/lua/*.h)
@@ -113,6 +126,9 @@ add_library(lua::lua ALIAS lua)
 if(NOT TARGET sol2)
     set(SOL2_LUA_VERSION "5.1.1" CACHE STRING "" FORCE)
     set(INSTALL_SOL2 OFF CACHE INTERNAL "")
+
+    ensure_submodule_exists(sol)
+
     add_subdirectory(sol)
 
     # Ensure sol is expecting c++ compiled lua
@@ -136,6 +152,8 @@ if(NOT TARGET flatbuffers)
         set(FLATBUFFERS_BUILD_FLATC OFF CACHE BOOL "Build flatbuffers compiler" FORCE)
     endif()
 
+    ensure_submodule_exists(flatbuffers)
+
     add_subdirectory(flatbuffers)
     folderize_target(flatbuffers "external")
 endif()
@@ -151,6 +169,8 @@ endif()
 ################################################
 
 if (NOT TARGET fmt)
+    ensure_submodule_exists(fmt)
+
     add_subdirectory(fmt)
     folderize_target(fmt "external")
 endif()
@@ -180,6 +200,8 @@ else()
 
         # Disable some things which don't have a CMake option
         set(ramses-sdk_ramses-daemon          OFF CACHE BOOL "" FORCE)
+
+        ensure_submodule_exists(ramses)
 
         #TODO Daniel find a better way to configure ramses renderer
         if(ramses-logic_BUILD_RAMSES_RENDERER)

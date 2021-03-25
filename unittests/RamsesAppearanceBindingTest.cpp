@@ -10,6 +10,7 @@
 #include "gmock/gmock.h"
 
 #include "RamsesTestUtils.h"
+#include "WithTempDirectory.h"
 
 #include "impl/LogicEngineImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
@@ -34,11 +35,6 @@ namespace rlogic
     class ARamsesAppearanceBinding : public ::testing::Test
     {
     protected:
-        void TearDown() override
-        {
-            std::remove("appearancebinding.bin");
-        }
-
         RamsesAppearanceBinding& createAppearanceBindingForTest(std::string_view name, ramses::Appearance* ramsesAppearance = nullptr)
         {
             auto appBinding = m_logicEngine.createRamsesAppearanceBinding(name);
@@ -79,23 +75,6 @@ namespace rlogic
         EXPECT_TRUE(appearanceBinding.m_impl.get().getErrors().empty());
     }
 
-    TEST_F(ARamsesAppearanceBinding, KeepsItsPropertiesAfterDeserialization_WhenNoRamsesLinksAndSceneProvided)
-    {
-        {
-            createAppearanceBindingForTest("AppearanceBinding");
-            ASSERT_TRUE(m_logicEngine.saveToFile("appearancebinding.bin"));
-        }
-
-        {
-            ASSERT_TRUE(m_logicEngine.loadFromFile("appearancebinding.bin"));
-            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
-            EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance(), nullptr);
-            EXPECT_EQ(loadedAppearanceBinding->getInputs()->getChildCount(), 0u);
-            EXPECT_EQ(loadedAppearanceBinding->getOutputs(), nullptr);
-            EXPECT_EQ(loadedAppearanceBinding->getName(), "AppearanceBinding");
-        }
-    }
-
     class ARamsesAppearanceBinding_WithRamses : public ARamsesAppearanceBinding
     {
     protected:
@@ -103,15 +82,6 @@ namespace rlogic
             : m_ramsesSceneIdWhichIsAlwaysTheSame(1)
             , m_scene(m_ramsesTestSetup.createScene(m_ramsesSceneIdWhichIsAlwaysTheSame))
         {
-        }
-
-        void TearDown() override
-        {
-            std::remove("logic.bin");
-            std::remove("SomeValuesSet.bin");
-            std::remove("SomeValuesLinked.bin");
-            std::remove("SomeValuesSet.bin");
-            std::remove("SomeValuesLinked.bin");
         }
 
         const std::string_view m_vertShader_simple = R"(
@@ -557,7 +527,30 @@ namespace rlogic
         EXPECT_FLOAT_EQ(0.0f, *recreatedProperty->get<float>());
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, ContainsItsInputsAfterDeserialization_WithoutReorderingThem)
+    class ARamsesAppearanceBinding_WithRamses_AndFiles : public ARamsesAppearanceBinding_WithRamses
+    {
+    protected:
+        WithTempDirectory tempFolder;
+    };
+
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, KeepsItsPropertiesAfterDeserialization_WhenNoRamsesLinksAndSceneProvided)
+    {
+        {
+            createAppearanceBindingForTest("AppearanceBinding");
+            ASSERT_TRUE(m_logicEngine.saveToFile("appearancebinding.bin"));
+        }
+
+        {
+            ASSERT_TRUE(m_logicEngine.loadFromFile("appearancebinding.bin"));
+            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
+            EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance(), nullptr);
+            EXPECT_EQ(loadedAppearanceBinding->getInputs()->getChildCount(), 0u);
+            EXPECT_EQ(loadedAppearanceBinding->getOutputs(), nullptr);
+            EXPECT_EQ(loadedAppearanceBinding->getName(), "AppearanceBinding");
+        }
+    }
+
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ContainsItsInputsAfterDeserialization_WithoutReorderingThem)
     {
         std::vector<std::string> inputOrderBeforeSaving;
 
@@ -639,7 +632,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, ContainsItsInputsAfterDeserialization_WhenRamsesSceneIsRecreatedBetweenSaveAndLoad)
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ContainsItsInputsAfterDeserialization_WhenRamsesSceneIsRecreatedBetweenSaveAndLoad)
     {
         std::vector<std::string> inputOrderBeforeSaving;
 
@@ -692,7 +685,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, ProducesErrorIfAppearanceDoesNotHaveSameAmountOfInputsThanSerializedAppearanceBinding)
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceDoesNotHaveSameAmountOfInputsThanSerializedAppearanceBinding)
     {
         {
             ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_allTypes, m_fragShader_trivial));
@@ -719,7 +712,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, ProducesErrorIfAppearanceInputsHasDifferentNamesThanSerializedAppearanceBinding)
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceInputsHasDifferentNamesThanSerializedAppearanceBinding)
     {
         {
             ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
@@ -751,7 +744,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, ProducesErrorIfAppearanceInputsHasDifferentTypeThanSerializedAppearanceBinding)
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceInputsHasDifferentTypeThanSerializedAppearanceBinding)
     {
         {
             ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
@@ -782,7 +775,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
-    TEST_F(ARamsesAppearanceBinding_WithRamses, DoesNotReapplyAppearanceUniformValuesToRamses_WhenLoadingFromFileAndCallingUpdate_UntilSetToANewValue)
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, DoesNotReapplyAppearanceUniformValuesToRamses_WhenLoadingFromFileAndCallingUpdate_UntilSetToANewValue)
     {
         ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
 
@@ -818,7 +811,7 @@ namespace rlogic
     // - value only re-applied to ramses if changed. Otherwise not.
     // The general expectation is that after loading + update(), the logic scene would overwrite ramses
     // properties wrapped by a LogicBinding if they are linked to a script
-    TEST_F(ARamsesAppearanceBinding_WithRamses, SetsOnlyAppearanceUniformsForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, SetsOnlyAppearanceUniformsForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
     {
         ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_twoUniforms, m_fragShader_trivial));
 

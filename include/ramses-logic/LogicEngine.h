@@ -149,7 +149,7 @@ namespace rlogic
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The binding can be destroyed by calling the #destroy method
          */
-        RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(std::string_view name);
+        RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(std::string_view name = "");
 
         /**
          * Creates a new #rlogic::RamsesAppearanceBinding which can be used to set the properties of a Ramses Appearance object.
@@ -161,7 +161,7 @@ namespace rlogic
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The binding can be destroyed by calling the #destroy method
          */
-        RLOGIC_API RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name);
+        RLOGIC_API RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name = "");
 
         /**
          * Updates all #rlogic::LogicNode's which were created by this #LogicEngine instance.
@@ -263,7 +263,7 @@ namespace rlogic
         RLOGIC_API bool saveToFile(std::string_view filename);
 
         /**
-         * Loads the whole LogicEngine from the given file. See also #saveToFile().
+         * Loads the whole LogicEngine data from the given file. See also #saveToFile().
          * After loading, the previous state of the #LogicEngine will be overwritten with the
          * contents loaded from the file, i.e. all previously created objects (scripts, bindings, etc.)
          * will be deleted and pointers to them will be invalid. The (optionally) provided ramsesScene
@@ -279,10 +279,29 @@ namespace rlogic
          *
          * @param filename path to file from which to load content (relative or absolute)
          * @param ramsesScene pointer to the Ramses Scene which holds the objects referenced in the Ramses Logic file
+         * @param enableMemoryVerification flag to enable memory verifier (a flatbuffers feature which checks bounds and ranges).
+         *        Disable this only if the file comes from a trusted source and performance is paramount.
          * @return true if deserialization was successful, false otherwise. To get more detailed
          * error information use #getErrors()
          */
-        RLOGIC_API bool loadFromFile(std::string_view filename, ramses::Scene* ramsesScene = nullptr);
+        RLOGIC_API bool loadFromFile(std::string_view filename, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
+
+        /**
+        * Loads the whole LogicEngine data from the given memory buffer. This method is equivalent to
+        * #loadFromFile but allows to have the file-opening
+        * logic done by the user and only pass the data as a buffer. The logic engine only reads the
+        * data, does not take ownership of it and does not modify it. The memory can be freed or
+        * modified after the call returns, the #LogicEngine keeps no references to it.
+        *
+        * @param rawBuffer pointer to the raw data in memory
+        * @param bufferSize size of the data (bytes)
+        * @param ramsesScene pointer to the Ramses Scene which holds the objects referenced in the Ramses Logic file
+        * @param enableMemoryVerification flag to enable memory verifier (a flatbuffers feature which checks bounds and ranges).
+        *        Disable this only if the file comes from a trusted source and performance is paramount.
+        * @return true if deserialization was successful, false otherwise. To get more detailed
+        * error information use #getErrors()
+        */
+        RLOGIC_API bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
 
         /**
         * Copy Constructor of LogicEngine is deleted because logic engines hold named resources and are not supposed to be copied

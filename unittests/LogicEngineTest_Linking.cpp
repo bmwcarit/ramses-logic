@@ -9,6 +9,7 @@
 #include "LogicEngineTest_Base.h"
 
 #include "RamsesTestUtils.h"
+#include "WithTempDirectory.h"
 
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/Effect.h"
@@ -40,13 +41,6 @@ namespace rlogic
             , m_sourceProperty(*m_sourceScript.getOutputs()->getChild("source"))
             , m_targetProperty(*m_targetScript.getInputs()->getChild("target"))
         {
-        }
-
-        void TearDown() override
-        {
-            std::remove("links.bin");
-            std::remove("nested_links.bin");
-            std::remove("binding_links.bin");
         }
 
         const std::string_view m_minimalLinkScript = R"(
@@ -1233,7 +1227,13 @@ namespace rlogic
         EXPECT_FALSE(*nodeVisibility->get<bool>());
     }
 
-    TEST_F(ALogicEngine_Linking, PreservesLinksBetweenScriptsAfterSavingAndLoadingFromFile)
+    class ALogicEngine_Linking_WithFiles : public ALogicEngine_Linking
+    {
+    protected:
+        WithTempDirectory tempFolder;
+    };
+
+    TEST_F(ALogicEngine_Linking_WithFiles, PreservesLinksBetweenScriptsAfterSavingAndLoading)
     {
         {
             /*
@@ -1340,7 +1340,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking, PreservesNestedLinksBetweenScriptsAfterSavingAndLoadingFromFile)
+    TEST_F(ALogicEngine_Linking_WithFiles, PreservesNestedLinksBetweenScriptsAfterSavingAndLoading)
     {
         {
             LogicEngine tmpLogicEngine;
@@ -1445,7 +1445,7 @@ namespace rlogic
         }
     }
 
-    class ALogicEngine_Linking_WithBindings : public ALogicEngine_Linking
+    class ALogicEngine_Linking_WithBindings : public ALogicEngine_Linking_WithFiles
     {
     protected:
         ALogicEngine_Linking_WithBindings()

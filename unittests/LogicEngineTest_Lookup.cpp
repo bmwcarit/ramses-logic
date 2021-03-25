@@ -82,6 +82,28 @@ namespace rlogic
         EXPECT_EQ(appearanceBinding, m_logicEngine.findAppearanceBinding("appbinding\0withsurprise"));
     }
 
+    TEST_F(ALogicEngine_Lookup, FindsObjectsAfterRenaming_ByNewNameOnly)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("nodebinding");
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding("appbinding");
+
+        // Rename
+        script->setName("S");
+        nodeBinding->setName("NB");
+        appearanceBinding->setName("AB");
+
+        // Can't find by old name
+        EXPECT_EQ(nullptr, m_logicEngine.findScript("script"));
+        EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("nodebinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("appbinding"));
+
+        // Found by new name
+        EXPECT_EQ(script, m_logicEngine.findScript("S"));
+        EXPECT_EQ(nodeBinding, m_logicEngine.findNodeBinding("NB"));
+        EXPECT_EQ(appearanceBinding, m_logicEngine.findAppearanceBinding("AB"));
+    }
+
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyIfTypeMatches)
     {
         m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");

@@ -12,20 +12,25 @@
 
 namespace rlogic::internal
 {
-    bool FileUtils::SaveBinary(const std::string& filename, const uint8_t* binaryBuffer, size_t bufferLength)
+    bool FileUtils::SaveBinary(const std::string& filename, const void* binaryBuffer, size_t bufferLength)
     {
         std::ofstream fileStream(filename, std::ofstream::binary);
         if (!fileStream.is_open())
         {
             return false;
         }
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) This reinterpret-cast is needed because of signed/unsigned mismatch between flatbuffers and fstream methods
-        fileStream.write(reinterpret_cast<const char*>(binaryBuffer), bufferLength);
+        fileStream.write(static_cast<const char*>(binaryBuffer), bufferLength);
         return !fileStream.bad();
     }
 
     std::optional<std::vector<char>> FileUtils::LoadBinary(const std::string& filename)
     {
+        // ifstream does not prevent opening directories (and crashes in some cases), have to use filesystem to check
+        if(fs::is_directory(filename))
+        {
+            return std::nullopt;
+        }
+
         std::ifstream fileStream(filename, std::ifstream::binary);
         if (!fileStream.is_open())
         {

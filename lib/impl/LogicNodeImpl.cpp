@@ -87,6 +87,11 @@ namespace rlogic::internal
         return m_name;
     }
 
+    void LogicNodeImpl::setName(std::string_view name)
+    {
+        m_name = name;
+    }
+
     void LogicNodeImpl::setDirty(bool dirty)
     {
         m_dirty = dirty;

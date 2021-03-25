@@ -2,7 +2,7 @@
 Introduction
 ========================
 
-|build-status|
+|build-status|  |docs-status|
 
 ``RAMSES logic`` extends the `RAMSES rendering ecosystem <https://github.com/GENIVI/ramses>`_ with scripting support based on
 `Lua <https://github.com/lua/lua>`_. ``RAMSES`` is designed to be minimalistic and closely aligned to OpenGL, which can be a
@@ -70,3 +70,7 @@ repository. Hence, no modifications are made by Ramses Logic.
 .. |build-status| image:: https://github.com/GENIVI/ramses-logic/workflows/CMake/badge.svg?branch=master
     :alt: build status
     :target: https://github.com/GENIVI/ramses-logic/actions?query=branch%3Amaster
+
+.. |docs-status| image:: https://readthedocs.org/projects/ramses-logic/badge/?style=flat
+    :alt: docs status
+    :target: https://ramses-logic.readthedocs.io/en/latest/

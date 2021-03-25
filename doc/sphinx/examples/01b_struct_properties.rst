@@ -2,9 +2,9 @@
 .. highlight:: cpp
 
 ============================================
-Simple example with (complex) properties
+Example with structured properties
 ============================================
 
-.. literalinclude:: ../../../examples/02_properties_complex/main.cpp
+.. literalinclude:: ../../../examples/01b_struct_properties/main.cpp
     :start-after: #include <cassert>
 

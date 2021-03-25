@@ -50,7 +50,6 @@ namespace rlogic::internal
         iStream.open(std::string(filename), std::ios_base::in);
         if (iStream.fail())
         {
-            // TODO Violin need to report error here too! Error mechanism needs rethinking
             m_errors.add("Failed opening file " + std::string(filename) + "!");
             return nullptr;
         }
@@ -278,16 +277,13 @@ namespace rlogic::internal
         return static_cast<int>(ramsesVersion.v_major()) == ramses::GetRamsesVersion().major;
     }
 
-    // TODO Violin/Sven consider handling errors gracefully, e.g. don't change state when error occurs
-    // Idea: collect data, and only move() in the end when everything was loaded correctly
-    bool LogicEngineImpl::loadFromFile(std::string_view filename, ramses::Scene* scene)
+    bool LogicEngineImpl::loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification)
     {
-        m_errors.clear();
-        m_scripts.clear();
-        m_ramsesNodeBindings.clear();
-        m_ramsesAppearanceBindings.clear();
-        m_logicNodeDependencies = {};
+        return loadFromByteData(rawBuffer, bufferSize, scene, enableMemoryVerification, fmt::format("data buffer '{}' (size: {})", rawBuffer, bufferSize));
+    }
 
+    bool LogicEngineImpl::loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification)
+    {
         std::optional<std::vector<char>> maybeBytesFromFile = FileUtils::LoadBinary(std::string(filename));
         if (!maybeBytesFromFile)
         {
@@ -295,19 +291,46 @@ namespace rlogic::internal
             return false;
         }
 
-        const auto logicEngine = rlogic_serialization::GetLogicEngine((*maybeBytesFromFile).data());
+        const size_t fileSize = (*maybeBytesFromFile).size();
+        return loadFromByteData((*maybeBytesFromFile).data(), fileSize, scene, enableMemoryVerification, fmt::format("file '{}' (size: {})", filename, fileSize));
+    }
+
+    // TODO Violin consider handling errors gracefully, e.g. don't change state when error occurs
+    // Idea: collect data, and only move() in the end when everything was loaded correctly
+    bool LogicEngineImpl::loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSource)
+    {
+        m_errors.clear();
+
+        if (enableMemoryVerification)
+        {
+            flatbuffers::Verifier bufferVerifier(static_cast<const uint8_t*>(byteData), byteSize);
+            const bool bufferOK = rlogic_serialization::VerifyLogicEngineBuffer(bufferVerifier);
+
+            if (!bufferOK)
+            {
+                m_errors.add(fmt::format("{} contains corrupted data!", dataSource));
+                return false;
+            }
+        }
+
+        m_scripts.clear();
+        m_ramsesNodeBindings.clear();
+        m_ramsesAppearanceBindings.clear();
+        m_logicNodeDependencies = {};
+
+        const auto logicEngine = rlogic_serialization::GetLogicEngine(byteData);
 
         if (nullptr == logicEngine || nullptr == logicEngine->ramsesVersion() || nullptr == logicEngine->rlogicVersion())
         {
-            m_errors.add(fmt::format("File '{}' doesn't contain logic engine data with readable version specifiers", filename));
+            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSource));
             return false;
         }
 
         const auto& ramsesVersion = *logicEngine->ramsesVersion();
         if (!CheckRamsesVersionFromFile(ramsesVersion))
         {
-            m_errors.add(fmt::format("Version mismatch while loading file '{}'! Expected Ramses version {}.x.x but found {} in file",
-                filename, ramses::GetRamsesVersion().major,
+            m_errors.add(fmt::format("Version mismatch while loading {}! Expected Ramses version {}.x.x but found {}",
+                dataSource, ramses::GetRamsesVersion().major,
                 ramsesVersion.v_string()->string_view()));
             return false;
         }
@@ -315,8 +338,8 @@ namespace rlogic::internal
         const auto& rlogicVersion = *logicEngine->rlogicVersion();
         if (!CheckLogicVersionFromFile(rlogicVersion))
         {
-            m_errors.add(fmt::format("Version mismatch while loading file '{}'! Expected version {}.{}.x but found {} in file",
-                filename, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
+            m_errors.add(fmt::format("Version mismatch while loading {}! Expected version {}.{}.x but found {}",
+                dataSource, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
                 rlogicVersion.v_string()->string_view()));
             return false;
         }
@@ -474,7 +497,8 @@ namespace rlogic::internal
             if (!success)
             {
                 m_errors.add(
-                    fmt::format("Fatal error during loading from file! Could not link property '{}' (from LogicNode {}) to property '{}' (from LogicNode {})!",
+                    fmt::format("Fatal error during loading from {}! Could not link property '{}' (from LogicNode {}) to property '{}' (from LogicNode {})!",
+                        dataSource,
                         sourceProperty->getName(),
                         srcLogicNode->getName(),
                         targetProperty->getName(),
@@ -819,7 +843,13 @@ namespace rlogic::internal
 
         builder.Finish(logicEngine);
 
-        return FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize());
+        if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
+        {
+            m_errors.add(fmt::format("Failed to save content to path '{}'!", filename));
+            return false;
+        }
+
+        return true;
     }
 
     ScriptsContainer& LogicEngineImpl::getScripts()
@@ -855,5 +885,4 @@ namespace rlogic::internal
     {
         return m_logicNodeDependencies;
     }
-
 }

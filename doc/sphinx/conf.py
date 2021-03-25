@@ -12,6 +12,28 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
+import subprocess, os
+
+# Have to invoke doxygen directly on Read the Docs' servers
+if 'READTHEDOCS' in os.environ:
+    api_includes_dir = '../../include'
+    output_dir = 'doxygen_build'
+
+    with open('../doxygen/Doxyfile.in', 'r') as file :
+        doxyfile_contents = file.read()
+
+    doxyfile_contents = doxyfile_contents.replace('@DOXYGEN_INPUT@', api_includes_dir)
+    doxyfile_contents = doxyfile_contents.replace('@DOXYGEN_TARGET_DIR@', output_dir)
+
+    with open('Doxyfile', 'w') as file:
+        file.write(doxyfile_contents)
+
+    subprocess.check_call('doxygen', shell=True)
+    breathe_projects = {
+        'ramses_logic': output_dir + '/xml'
+    }
+
+
 # -- Project information -----------------------------------------------------
 
 project = 'ramses_logic'

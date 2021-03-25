@@ -86,7 +86,8 @@ namespace rlogic::internal
         bool                            update(bool disableDirtyTracking = false);
         const std::vector<std::string>& getErrors() const;
 
-        bool loadFromFile(std::string_view filename, ramses::Scene* ramsesScene);
+        bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
+        bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
         bool saveToFile(std::string_view filename);
 
         bool link(const Property& sourceProperty, const Property& targetProperty);
@@ -125,5 +126,7 @@ namespace rlogic::internal
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
         [[nodiscard]] bool updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking);
+
+        [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSource);
     };
 }

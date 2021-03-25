@@ -11,41 +11,25 @@
 #include <iostream>
 
 /**
- * This example demonstrates basic functionality of the LuaScript class:
- * - creating properties of primitive types
- * - simple debugging by overloading the print() method
+ * This example demonstrates how to use primitive property types (int, bool, string etc.)
  */
 int main()
 {
     rlogic::LogicEngine logicEngine;
 
-    // Create a simple script which does some simple math and optionally prints a debug message
+    // Create a simple script which multiplies two numbers and stores the result in a string
     rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
         function interface()
             IN.param1 = INT
             IN.param2 = FLOAT
-            IN.enable_debug = BOOL
-            IN.debug_message = STRING
 
-            OUT.result = FLOAT
+            OUT.result = STRING
         end
 
         function run()
-            OUT.result = IN.param1 * IN.param2
-
-            if IN.enable_debug then
-                print(IN.debug_message)
-            end
+            OUT.result = "Calculated result is: " .. IN.param1 * IN.param2
         end
-    )", "MyScript");
-
-    // Override Lua's print() function so that we can get the result in C++
-    script->overrideLuaPrint(
-        [](std::string_view scriptName, std::string_view message)
-        {
-            std::cout << "From C++: script '" << scriptName << "' printed message '" << message << "'!\n";
-        }
-    );
+    )", "MultiplyScript");
 
     /**
      * Query the inputs of the script. The inputs are
@@ -57,7 +41,7 @@ int main()
     for (size_t i = 0u; i < inputs->getChildCount(); ++i)
     {
         rlogic::Property* input = inputs->getChild(i);
-        std::cout << "Input: " << input->getName() << " of type: " << rlogic::GetLuaPrimitiveTypeName(input->getType()) << std::endl;
+        std::cout << "Input: " << input->getName() << " is of type: " << rlogic::GetLuaPrimitiveTypeName(input->getType()) << std::endl;
     }
 
     // We can do the same with the outputs
@@ -66,16 +50,14 @@ int main()
     for (size_t i = 0u; i < outputs->getChildCount(); ++i)
     {
         const rlogic::Property* output = outputs->getChild(i);
-        std::cout << "Output: " << output->getName() << " of type: " << rlogic::GetLuaPrimitiveTypeName(output->getType()) << std::endl;
+        std::cout << "Output: " << output->getName() << " is of type: " << rlogic::GetLuaPrimitiveTypeName(output->getType()) << std::endl;
     }
 
     // Set some test values to the inputs before executing the script
     inputs->getChild("param1")->set<int32_t>(21);
     inputs->getChild("param2")->set<float>(2.f);
-    inputs->getChild("enable_debug")->set<bool>(true);
-    inputs->getChild("debug_message")->set<std::string>("hello!");
 
-    // Update the logic engine including our script
+    // Update the logic engine (executes the script we created above)
     logicEngine.update();
 
     /**
@@ -83,13 +65,13 @@ int main()
      * The getters of the values are returned as std::optional
      * to ensure the combination of name and type matches an existing input.
      */
-    auto result = outputs->getChild("result")->get<float>();
+    std::optional<std::string> result = outputs->getChild("result")->get<std::string>();
     if (result)
     {
-        std::cout << "Calculated result is: " << *result << std::endl;
+        std::cout << *result << std::endl;
     }
 
-    // To delete the script we need to call the destroy method on LogEngine
+    // To delete the script call the destroy method on the LogicEngine instance
     logicEngine.destroy(*script);
 
     return 0;

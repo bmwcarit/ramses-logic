@@ -10,6 +10,7 @@
 #include "gmock/gmock-matchers.h"
 
 #include "RamsesTestUtils.h"
+#include "WithTempDirectory.h"
 
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/Property.h"
@@ -418,16 +419,7 @@ namespace rlogic
     class ARamsesNodeBinding_WithSerialization : public ARamsesNodeBinding
     {
     protected:
-        void TearDown() override
-        {
-            std::remove("OneBinding.bin");
-            std::remove("WithRamsesNode.bin");
-            std::remove("RamsesNodeDeleted.bin");
-            std::remove("NoValuesSet.bin");
-            std::remove("SomeValuesSet.bin");
-            std::remove("AllValuesSet.bin");
-            std::remove("SomeInputsLinked.bin");
-        }
+        WithTempDirectory tempFolder;
     };
 
     TEST_F(ARamsesNodeBinding_WithSerialization, ContainsItsDataAfterDeserialization)

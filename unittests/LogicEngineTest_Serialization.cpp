@@ -9,6 +9,7 @@
 #include "LogicEngineTest_Base.h"
 
 #include "RamsesTestUtils.h"
+#include "WithTempDirectory.h"
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
@@ -63,13 +64,28 @@ namespace rlogic::internal
             return scene.createAppearance(*effect, "test appearance");
         }
 
-        void TearDown() override
+        static std::vector<char> CreateTestBuffer()
         {
-            std::remove("no_version.bin");
-            std::remove("wrong_ramses_version.bin");
-            std::remove("wrong_version.bin");
-            std::remove("LogicEngine.bin");
+            LogicEngine logicEngineForSaving;
+            logicEngineForSaving.createLuaScriptFromSource(R"(
+                function interface()
+                    IN.param = INT
+                end
+                function run()
+                end
+            )", "luascript");
+
+            logicEngineForSaving.saveToFile("tempfile.bin");
+
+            return *FileUtils::LoadBinary("tempfile.bin");
         }
+
+        static void SaveBufferToFile(const std::vector<char>& bufferData, const std::string& file)
+        {
+            FileUtils::SaveBinary(file, static_cast<const void*>(bufferData.data()), bufferData.size());
+        }
+
+        WithTempDirectory m_tempDirectory;
     };
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromInvalidFile)
@@ -77,49 +93,60 @@ namespace rlogic::internal
         EXPECT_FALSE(m_logicEngine.loadFromFile("invalid"));
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Failed to load file 'invalid'", errors[0]);
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("Failed to load file 'invalid'"));
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithoutVersionInfo)
     {
-        {
-            flatbuffers::FlatBufferBuilder builder;
-            auto logicEngine = rlogic_serialization::CreateLogicEngine(
-                builder
-            );
+        flatbuffers::FlatBufferBuilder builder;
+        auto logicEngine = rlogic_serialization::CreateLogicEngine(
+            builder
+        );
 
-            builder.Finish(logicEngine);
-            ASSERT_TRUE(FileUtils::SaveBinary("no_version.bin", builder.GetBufferPointer(), builder.GetSize()));
-        }
+        builder.Finish(logicEngine);
+        ASSERT_TRUE(FileUtils::SaveBinary("no_version.bin", builder.GetBufferPointer(), builder.GetSize()));
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("no_version.bin"));
-        const auto& errors = m_logicEngine.getErrors();
+        auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("File 'no_version.bin' doesn't contain logic engine data with readable version specifiers", errors[0]);
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("file 'no_version.bin' (size: "));
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("doesn't contain logic engine data with readable version specifiers"));
+
+        //Also test with buffer version of the API
+        EXPECT_FALSE(m_logicEngine.loadFromBuffer(builder.GetBufferPointer(), builder.GetSize()));
+        errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("data buffer "));
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("(size: 12) doesn't contain logic engine data with readable version specifiers"));
     }
 
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongRamsesVersion)
     {
-        {
-            flatbuffers::FlatBufferBuilder builder;
-            auto logicEngine = rlogic_serialization::CreateLogicEngine(
-                builder,
-                rlogic_serialization::CreateVersion(builder,
-                    10, 20, 900, builder.CreateString("10.20.900-suffix")),
-                rlogic_serialization::CreateVersion(builder,
-                    100, 200, 9000, builder.CreateString("100.200.9000-suffix"))
-            );
+        flatbuffers::FlatBufferBuilder builder;
+        auto logicEngine = rlogic_serialization::CreateLogicEngine(
+            builder,
+            rlogic_serialization::CreateVersion(builder,
+                10, 20, 900, builder.CreateString("10.20.900-suffix")),
+            rlogic_serialization::CreateVersion(builder,
+                100, 200, 9000, builder.CreateString("100.200.9000-suffix"))
+        );
 
-            builder.Finish(logicEngine);
-            ASSERT_TRUE(FileUtils::SaveBinary("wrong_ramses_version.bin", builder.GetBufferPointer(), builder.GetSize()));
-        }
+        builder.Finish(logicEngine);
+        ASSERT_TRUE(FileUtils::SaveBinary("wrong_ramses_version.bin", builder.GetBufferPointer(), builder.GetSize()));
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_ramses_version.bin"));
-        const std::string expectedErrorMessage(fmt::format("Version mismatch while loading file 'wrong_ramses_version.bin'! Expected Ramses version {}.x.x but found 10.20.900-suffix in file", ramses::GetRamsesVersion().major));
-        const auto& errors = m_logicEngine.getErrors();
+        auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(expectedErrorMessage, errors[0]);
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("Version mismatch while loading file 'wrong_ramses_version.bin' (size: "));
+        EXPECT_THAT(errors[0], ::testing::HasSubstr(fmt::format("Expected Ramses version {}.x.x but found 10.20.900-suffix", ramses::GetRamsesVersion().major)));
+
+        //Also test with buffer version of the API
+        EXPECT_FALSE(m_logicEngine.loadFromBuffer(builder.GetBufferPointer(), builder.GetSize()));
+        errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("Version mismatch while loading data buffer"));
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("(size: 124)! Expected Ramses version 27.x.x but found 10.20.900-suffix"));
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongVersion)
@@ -143,11 +170,119 @@ namespace rlogic::internal
         }
 
         EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_version.bin"));
-        const std::string expectedErrorMessage(fmt::format("Version mismatch while loading file 'wrong_version.bin'! Expected version {}.{}.x but found 100.200.9000-suffix in file", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR));
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(expectedErrorMessage, errors[0]);
+        EXPECT_THAT(errors[0], ::testing::HasSubstr("Version mismatch while loading file 'wrong_version.bin' (size: "));
+        EXPECT_THAT(errors[0], ::testing::HasSubstr(fmt::format("Expected version {}.{}.x but found 100.200.9000-suffix", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR)));
     }
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorWhenProvidingAFolderAsTargetForSaving)
+    {
+        fs::create_directories("folder");
+        EXPECT_FALSE(m_logicEngine.saveToFile("folder"));
+        EXPECT_EQ("Failed to save content to path 'folder'!", m_logicEngine.getErrors()[0]);
+    }
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFolder)
+    {
+        fs::create_directories("folder");
+        EXPECT_FALSE(m_logicEngine.loadFromFile("folder"));
+        EXPECT_EQ("Failed to load file 'folder'", m_logicEngine.getErrors()[0]);
+    }
+
+    TEST_F(ALogicEngine_Serialization, DeserializesFromMemoryBuffer)
+    {
+        const std::vector<char> bufferData = CreateTestBuffer();
+
+        EXPECT_TRUE(m_logicEngine.loadFromBuffer(bufferData.data(), bufferData.size()));
+        EXPECT_TRUE(m_logicEngine.getErrors().empty());
+
+        {
+            auto script = m_logicEngine.findScript("luascript");
+            ASSERT_NE(nullptr, script);
+            const auto inputs = script->getInputs();
+            ASSERT_NE(nullptr, inputs);
+            EXPECT_EQ(1u, inputs->getChildCount());
+        }
+    }
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserializedFromCorruptedData)
+    {
+        // Emulate data corruption
+        {
+            std::vector<char> bufferData = CreateTestBuffer();
+            ASSERT_GT(bufferData.size(), 60u);
+            // Do a random byte corruption
+            // byte 60 happens to break the format - found out by trial and error
+            bufferData[60] = 42;
+            SaveBufferToFile(bufferData, "LogicEngine.bin");
+        }
+
+        // Test with file API
+        {
+            EXPECT_FALSE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("contains corrupted data!"));
+        }
+
+        // Test with buffer API
+        {
+            std::vector<char> corruptedMemory = *FileUtils::LoadBinary("LogicEngine.bin");
+            EXPECT_FALSE(m_logicEngine.loadFromBuffer(corruptedMemory.data(), corruptedMemory.size()));
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("contains corrupted data!"));
+        }
+    }
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserializedFromTruncatedData)
+    {
+        // Emulate data truncation
+        {
+            std::vector<char> bufferData = CreateTestBuffer();
+            ASSERT_GT(bufferData.size(), 60u);
+
+            // Cutting off the data at byte 60 breaks deserialization (found by trial and error)
+            std::vector<char> truncated(bufferData.begin(), bufferData.begin() + 60);
+            SaveBufferToFile(truncated, "LogicEngine.bin");
+        }
+
+        // Test with file API
+        {
+            EXPECT_FALSE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("(size: 60) contains corrupted data!"));
+        }
+
+        // Test with buffer API
+        {
+            std::vector<char> truncatedMemory = *FileUtils::LoadBinary("LogicEngine.bin");
+            EXPECT_FALSE(m_logicEngine.loadFromBuffer(truncatedMemory.data(), truncatedMemory.size()));
+            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("(size: 60) contains corrupted data!"));
+        }
+    }
+
+// The Windows API doesn't allow non-admin access to symlinks, this breaks on dev machines
+#ifndef _WIN32
+    TEST_F(ALogicEngine_Serialization, CanBeDeserializedFromHardLink)
+    {
+        EXPECT_TRUE(m_logicEngine.saveToFile("testfile.bin"));
+        fs::create_hard_link("testfile.bin", "hardlink");
+        EXPECT_TRUE(m_logicEngine.loadFromFile("hardlink"));
+    }
+
+    TEST_F(ALogicEngine_Serialization, CanBeDeserializedFromSymLink)
+    {
+        EXPECT_TRUE(m_logicEngine.saveToFile("testfile.bin"));
+        fs::create_symlink("testfile.bin", "symlink");
+        EXPECT_TRUE(m_logicEngine.loadFromFile("symlink"));
+    }
+
+    TEST_F(ALogicEngine_Serialization, FailsGracefullyWhenTryingToOpenFromDanglingSymLink)
+    {
+        EXPECT_TRUE(m_logicEngine.saveToFile("testfile.bin"));
+        fs::create_symlink("testfile.bin", "dangling_symlink");
+        fs::remove("testfile.bin");
+        EXPECT_FALSE(m_logicEngine.loadFromFile("dangling_symlink"));
+        EXPECT_EQ("Failed to load file 'dangling_symlink'", m_logicEngine.getErrors()[0]);
+    }
+#endif
 
     TEST_F(ALogicEngine_Serialization, ProducesNoErrorIfDeserializedWithNoScriptsAndNoNodeBindings)
     {

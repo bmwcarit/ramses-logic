@@ -27,7 +27,7 @@ if (CMAKE_SYSTEM_NAME MATCHES "Linux")
 else ()
     find_library(ramses-logic_LIBRARY
         NAMES "ramses-logic"
-        HINTS @PACKAGE_RLOGIC_INSTALL_RUNTIME_PATH@
+        HINTS @PACKAGE_RLOGIC_INSTALL_LIBRARY_PATH@
     )
 endif()
 

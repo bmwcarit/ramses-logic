@@ -17,7 +17,7 @@ namespace rlogic::internal
     class FileUtils
     {
     public:
-        static bool SaveBinary(const std::string& filename, const uint8_t* binaryBuffer, size_t bufferLength);
+        static bool SaveBinary(const std::string& filename, const void* binaryBuffer, size_t bufferLength);
         static std::optional<std::vector<char>> LoadBinary(const std::string& filename);
     };
 }

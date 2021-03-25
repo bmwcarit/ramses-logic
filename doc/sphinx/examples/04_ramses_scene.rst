@@ -5,6 +5,6 @@
 Example with Ramses
 =========================
 
-.. literalinclude:: ../../../examples/05_ramses_scene/main.cpp
+.. literalinclude:: ../../../examples/04_ramses_scene/main.cpp
     :start-after: #include <thread>
 

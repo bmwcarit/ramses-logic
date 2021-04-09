@@ -9,6 +9,7 @@
 include "luascript.fbs";
 include "ramsesnodebinding.fbs";
 include "ramsesappearancebinding.fbs";
+include "ramsescamerabinding.fbs";
 include "link.fbs";
 
 namespace rlogic_serialization;
@@ -29,6 +30,7 @@ table LogicEngine
     luascripts:[LuaScript];
     ramsesnodebindings:[RamsesNodeBinding];
     ramsesappearancebindings:[RamsesAppearanceBinding];
+    ramsescamerabindings:[RamsesCameraBinding];
     links:[Link];
 }
 

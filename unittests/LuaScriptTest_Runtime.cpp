@@ -13,6 +13,7 @@
 #include "fmt/format.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 
 #include "ramses-framework-api/RamsesFramework.h"
 #include "ramses-client-api/RamsesClient.h"
@@ -22,6 +23,7 @@
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/UniformInput.h"
 #include "ramses-client-api/Node.h"
+#include "ramses-client-api/PerspectiveCamera.h"
 
 #include <fstream>
 
@@ -47,7 +49,7 @@ namespace rlogic
         ASSERT_EQ(nullptr, script);
 
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Special global symbol 'IN' should not be overwritten with other types in run() function!!");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in run() function!!");
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedInputIsUsedInRun)
@@ -63,7 +65,7 @@ namespace rlogic
         ASSERT_NE(nullptr, script);
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Tried to access undefined struct property 'undefined'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Tried to access undefined struct property 'undefined'"));
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedOutputIsUsedInRun)
@@ -79,7 +81,24 @@ namespace rlogic
         ASSERT_NE(nullptr, script);
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Tried to access undefined struct property 'undefined'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Tried to access undefined struct property 'undefined'"));
+    }
+
+    TEST_F(ALuaScript_Runtime, ReportsSourceNodeOnRuntimeError)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+            end
+            function run()
+                error("this causes an error")
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("this causes an error"));
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToAccessPropertiesWithNonStringIndexAtRunTime)
@@ -111,7 +130,7 @@ namespace rlogic
             m_logicEngine.update();
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
             m_logicEngine.destroy(*script);
         }
     }
@@ -465,7 +484,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 1"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 1"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -495,7 +514,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 3"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 3"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -526,7 +545,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Assigning 'INT' to string output 'field2'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning 'INT' to string output 'field2'!"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -562,7 +581,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Not possible to partially assign structs!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Not possible to partially assign structs!"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -647,7 +666,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
             m_logicEngine.destroy(*script);
         }
     }
@@ -689,7 +708,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
             m_logicEngine.destroy(*script);
         }
     }
@@ -768,7 +787,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
 
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Element size mismatch when assigning array property 'int_array'! Expected: 3 Received: 2"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning array property 'int_array'! Expected: 3 Received: 2"));
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayFromLuaTableWithCorrectSizeButWrongIndices)
@@ -788,7 +807,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
 
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Error during assignment of array property 'int_array'! Expected a value at index 2"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Error during assignment of array property 'int_array'! Expected a value at index 2"));
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArraysWrongValues)
@@ -834,7 +853,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
             m_logicEngine.destroy(*script);
         }
     }
@@ -967,7 +986,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(aCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(aCase.expectedErrorMessage));
             EXPECT_TRUE(m_logicEngine.destroy(*script));
         }
     }
@@ -1002,7 +1021,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(aCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(aCase.expectedErrorMessage));
             EXPECT_TRUE(m_logicEngine.destroy(*script));
         }
     }
@@ -1032,7 +1051,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Implicit rounding during assignment of integer output 'int' (value: 2.5)!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Implicit rounding during assignment of integer output 'int' (value: 2.5)!"));
         EXPECT_EQ(1, *intOutput->get<int32_t>());
     }
 
@@ -1049,7 +1068,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Assigning nil to INT output 'int'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to INT output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
@@ -1066,7 +1085,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Assigning boolean to 'INT' output 'int' !"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning boolean to 'INT' output 'int' !"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
@@ -1084,7 +1103,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Assigning boolean to 'STRING' output 'str' !"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning boolean to 'STRING' output 'str' !"));
         EXPECT_EQ("this is quite ok", *script->getOutputs()->getChild("str")->get<std::string>());
     }
 
@@ -1101,7 +1120,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Assigning wrong type (number) to output 'str'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning wrong type (number) to output 'str'!"));
     }
 
     TEST_F(ALuaScript_Runtime, SupportsMultipleLevelsOfNestedInputs_confidenceTest)
@@ -1172,7 +1191,7 @@ namespace rlogic
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
             m_logicEngine.destroy(*script);
         }
     }
@@ -1200,7 +1219,7 @@ namespace rlogic
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
             m_logicEngine.destroy(*script);
         }
     }
@@ -1260,7 +1279,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Not allowed to call interface() function inside run() function!");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Not allowed to call interface() function inside run() function!");
         EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
         EXPECT_FALSE(m_logicEngine.update());
         EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
@@ -1473,7 +1492,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Not allowed to overwrite run() function inside of itself!");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Not allowed to overwrite run() function inside of itself!");
         EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
         EXPECT_FALSE(m_logicEngine.update());
         EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
@@ -1700,6 +1719,7 @@ namespace rlogic
 
         auto nodeBinding       = logicEngine.createRamsesNodeBinding("NodeBinding");
         auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
+        auto cameraBinding     = logicEngine.createRamsesCameraBinding("CameraBinding");
 
         ramses::RamsesFramework ramsesFramework;
         auto                    ramsesClient = ramsesFramework.createClient("client");
@@ -1712,6 +1732,9 @@ namespace rlogic
         auto ramsesAppearance = ramsesScene->createAppearance(*ramsesEffect);
         appearanceBinding->setRamsesAppearance(ramsesAppearance);
 
+        ramses::PerspectiveCamera* camera = ramsesScene->createPerspectiveCamera();
+        cameraBinding->setRamsesCamera(camera);
+
         logicEngine.update();
 
         EXPECT_TRUE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
@@ -1719,6 +1742,14 @@ namespace rlogic
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(1.f, 1.f, 1.f));
         EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+        EXPECT_EQ(camera->getViewportX(), 0);
+        EXPECT_EQ(camera->getViewportY(), 0);
+        EXPECT_EQ(camera->getViewportWidth(), 16u);
+        EXPECT_EQ(camera->getViewportHeight(), 16u);
+        EXPECT_NEAR(camera->getVerticalFieldOfView(), 168.579f, 0.001f);
+        EXPECT_EQ(camera->getAspectRatio(), 1.f);
+        EXPECT_EQ(camera->getNearPlane(), 0.1f);
+        EXPECT_EQ(camera->getFarPlane(), 1.f);
 
         logicEngine.link(*script1FloatOutput, *script2FloatInput);
         logicEngine.link(*script2FloatOutput, *script3FloatInput);
@@ -1732,6 +1763,14 @@ namespace rlogic
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(1.f, 1.f, 1.f));
         EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+        EXPECT_EQ(camera->getViewportX(), 0);
+        EXPECT_EQ(camera->getViewportY(), 0);
+        EXPECT_EQ(camera->getViewportWidth(), 16u);
+        EXPECT_EQ(camera->getViewportHeight(), 16u);
+        EXPECT_NEAR(camera->getVerticalFieldOfView(), 168.579f, 0.001f);
+        EXPECT_EQ(camera->getAspectRatio(), 1.f);
+        EXPECT_EQ(camera->getNearPlane(), 0.1f);
+        EXPECT_EQ(camera->getFarPlane(), 1.f);
 
         logicEngine.link(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
 
@@ -1742,12 +1781,14 @@ namespace rlogic
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
 
         logicEngine.link(*script3FloatOutput, *appearanceBinding->getInputs()->getChild("floatUniform"));
+        logicEngine.link(*script3FloatOutput, *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane"));
 
         script1FloatInput->set(42.f);
 
         logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+        EXPECT_EQ(42.f, *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane")->get<float>());
 
         logicEngine.unlink(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
 
@@ -1758,6 +1799,7 @@ namespace rlogic
 
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
         EXPECT_FLOAT_EQ(23.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+        EXPECT_EQ(23.f, *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane")->get<float>());
     }
 
 

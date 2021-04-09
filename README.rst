@@ -34,7 +34,7 @@ Configure and build with CMake (CMake 3.13 or newer required):
     cmake -G"Visual Studio 16 2019" ../   # Or any other generator!
     cmake --build .
 
-You can find the compiler version of the examples in ``<path>/build/bin``.
+You can find the compiled version of the examples in ``<path>/build/bin``.
 
 For more in-depth build instructions and customization options, have a look at
 the `detailed build documentation <https://ramses-logic.readthedocs.io/en/latest/build.html>`_.
@@ -44,7 +44,6 @@ Examples
 ========================
 
 Prefer to learn by example? Have a look at our `self-contained example snippets <https://ramses-logic.readthedocs.io/en/latest/api.html#list-of-all-examples>`_.
-
 
 ========================
 License

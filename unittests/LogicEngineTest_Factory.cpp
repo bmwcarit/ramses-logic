@@ -10,6 +10,7 @@
 
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 
 #include "impl/LogicNodeImpl.h"
 
@@ -18,18 +19,12 @@
 
 namespace rlogic
 {
+    // There are more specific "create/destroy" tests in ApiObjects unit tests!
     class ALogicEngine_Factory : public ALogicEngine
     {
     protected:
         WithTempDirectory tempFolder;
     };
-
-    TEST_F(ALogicEngine_Factory, ProducesErrorsWhenCreatingEmptyScript)
-    {
-        auto script = m_logicEngine.createLuaScriptFromSource("");
-        ASSERT_EQ(nullptr, script);
-        EXPECT_FALSE(m_logicEngine.getErrors().empty());
-    }
 
     TEST_F(ALogicEngine_Factory, FailsToCreateScriptFromFile_WhenFileDoesNotExist)
     {
@@ -64,13 +59,6 @@ namespace rlogic
         EXPECT_EQ("valid.lua", script->getFilename());
     }
 
-    TEST_F(ALogicEngine_Factory, DestroysScriptWithoutErrors)
-    {
-        auto script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
-        ASSERT_TRUE(script);
-        ASSERT_TRUE(m_logicEngine.destroy(*script));
-    }
-
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingScriptFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
@@ -78,22 +66,7 @@ namespace rlogic
         ASSERT_TRUE(script);
         ASSERT_FALSE(m_logicEngine.destroy(*script));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Can't find script in logic engine!");
-    }
-
-    TEST_F(ALogicEngine_Factory, CreatesRamsesNodeBindingWithoutErrors)
-    {
-        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
-        EXPECT_NE(nullptr, ramsesNodeBinding);
-        EXPECT_TRUE(m_logicEngine.getErrors().empty());
-    }
-
-    TEST_F(ALogicEngine_Factory, DestroysRamsesNodeBindingWithoutErrors)
-    {
-        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
-        ASSERT_NE(nullptr, ramsesNodeBinding);
-        m_logicEngine.destroy(*ramsesNodeBinding);
-        EXPECT_TRUE(m_logicEngine.getErrors().empty());
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find script in logic engine!");
     }
 
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesNodeBindingFromAnotherEngineInstance)
@@ -104,14 +77,7 @@ namespace rlogic
         ASSERT_TRUE(ramsesNodeBinding);
         ASSERT_FALSE(m_logicEngine.destroy(*ramsesNodeBinding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Can't find RamsesNodeBinding in logic engine!");
-    }
-
-    TEST_F(ALogicEngine_Factory, DestroysRamsesAppearanceBindingWithoutErrors)
-    {
-        auto binding = m_logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
-        ASSERT_TRUE(binding);
-        ASSERT_TRUE(m_logicEngine.destroy(*binding));
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesNodeBinding in logic engine!");
     }
 
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesAppearanceBindingFromAnotherEngineInstance)
@@ -121,7 +87,24 @@ namespace rlogic
         ASSERT_TRUE(binding);
         ASSERT_FALSE(m_logicEngine.destroy(*binding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Can't find RamsesAppearanceBinding in logic engine!");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesAppearanceBinding in logic engine!");
+    }
+
+    TEST_F(ALogicEngine_Factory, DestroysRamsesCameraBindingWithoutErrors)
+    {
+        auto binding = m_logicEngine.createRamsesCameraBinding("CameraBinding");
+        ASSERT_TRUE(binding);
+        ASSERT_TRUE(m_logicEngine.destroy(*binding));
+    }
+
+    TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesCameraBindingFromAnotherEngineInstance)
+    {
+        LogicEngine otherLogicEngine;
+        auto binding = otherLogicEngine.createRamsesCameraBinding("CameraBinding");
+        ASSERT_TRUE(binding);
+        ASSERT_FALSE(m_logicEngine.destroy(*binding));
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesCameraBinding in logic engine!");
     }
 
     TEST_F(ALogicEngine_Factory, RenamesObjectsAfterCreation)
@@ -129,14 +112,17 @@ namespace rlogic
         auto script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "");
         auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
         auto ramsesAppearanceBinding = m_logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
+        auto ramsesCameraBinding = m_logicEngine.createRamsesCameraBinding("CameraBinding");
 
         script->setName("same name twice");
         ramsesNodeBinding->setName("same name twice");
         ramsesAppearanceBinding->setName("");
+        ramsesCameraBinding->setName("");
 
         EXPECT_EQ("same name twice", script->getName());
         EXPECT_EQ("same name twice", ramsesNodeBinding->getName());
         EXPECT_EQ("", ramsesAppearanceBinding->getName());
+        EXPECT_EQ("", ramsesCameraBinding->getName());
     }
 
     TEST_F(ALogicEngine_Factory, ProducesErrorIfWrongObjectTypeIsDestroyed)
@@ -164,6 +150,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.destroy(unknownObject));
         const auto& errors = m_logicEngine.getErrors();
         EXPECT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0], "Tried to destroy object 'name' with unknown type");
+        EXPECT_EQ(errors[0].message, "Tried to destroy object 'name' with unknown type");
+        EXPECT_EQ(errors[0].node, &unknownObject);
     }
 }

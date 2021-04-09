@@ -16,6 +16,12 @@ Ramses Logic documentation
 
 .. toctree::
     :maxdepth: 3
+    :caption: Lua Syntax
+
+    lua_syntax
+
+.. toctree::
+    :maxdepth: 3
     :caption: API
 
     api

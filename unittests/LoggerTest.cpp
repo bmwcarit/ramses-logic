@@ -21,7 +21,7 @@ namespace rlogic
     // Test default state without fixture
     TEST(ALogger_ByDefault, HasInfoAsVerbosityLimit)
     {
-        EXPECT_EQ(ELogMessageType::INFO, Logger::GetLogVerbosityLimit());
+        EXPECT_EQ(ELogMessageType::Info, Logger::GetLogVerbosityLimit());
     }
 
     class ALogger : public ::testing::Test
@@ -29,7 +29,7 @@ namespace rlogic
     protected:
         std::vector<ELogMessageType> m_logTypes;
         std::vector<std::string> m_logMessages;
-        ScopedLogContextLevel m_logCollector{ ELogMessageType::DEBUG, [this](ELogMessageType type, std::string_view message)
+        ScopedLogContextLevel m_logCollector{ ELogMessageType::Trace, [this](ELogMessageType type, std::string_view message)
             {
                 m_logTypes.emplace_back(type);
                 m_logMessages.emplace_back(message);
@@ -39,13 +39,15 @@ namespace rlogic
 
     TEST_F(ALogger, LogsDifferentLogLevelsSequentially)
     {
-        LOG_INFO("Info");
+        LOG_FATAL("Fatal");
         LOG_ERROR("Error");
-        LOG_WARN("Warning");
+        LOG_WARN("Warn");
+        LOG_INFO("Info");
         LOG_DEBUG("Debug");
+        LOG_TRACE("Trace");
 
-        EXPECT_THAT(m_logTypes, ::testing::ElementsAre(ELogMessageType::INFO, ELogMessageType::ERROR, ELogMessageType::WARNING, ELogMessageType::DEBUG));
-        EXPECT_THAT(m_logMessages, ::testing::ElementsAre("Info", "Error", "Warning", "Debug"));
+        EXPECT_THAT(m_logTypes, ::testing::ElementsAre(ELogMessageType::Fatal, ELogMessageType::Error, ELogMessageType::Warn, ELogMessageType::Info, ELogMessageType::Debug, ELogMessageType::Trace));
+        EXPECT_THAT(m_logMessages, ::testing::ElementsAre("Fatal", "Error", "Warn", "Info", "Debug", "Trace"));
     }
 
     TEST_F(ALogger, LogsFormattedMessage)
@@ -85,16 +87,17 @@ namespace rlogic
 
     TEST_F(ALogger, ChangesLogVerbosityAffectsWhichMessagesAreProcessed)
     {
-        Logger::SetLogVerbosityLimit(ELogMessageType::ERROR);
+        Logger::SetLogVerbosityLimit(ELogMessageType::Error);
 
-        // Simulate logs of all types
+        // Simulate logs of all types. Only error and fatal error should be logged
+        LOG_TRACE("trace");
         LOG_DEBUG("debug");
-        LOG_ERROR("error");
-        LOG_WARN("warning");
+        LOG_FATAL("fatal");
+        LOG_WARN("warn");
         LOG_INFO("info");
         LOG_DEBUG("debug");
         LOG_ERROR("error");
 
-        EXPECT_THAT(m_logTypes, ::testing::ElementsAre(ELogMessageType::ERROR, ELogMessageType::ERROR));
+        EXPECT_THAT(m_logTypes, ::testing::ElementsAre(ELogMessageType::Fatal, ELogMessageType::Error));
     }
 }

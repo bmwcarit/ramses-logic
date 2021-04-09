@@ -30,7 +30,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnCreateNewLuaScript)
     {
-        auto                        script = m_logicEngine.createLuaScriptFromFile("somefile.txt");
+        auto script = m_logicEngine.createLuaScriptFromFile("somefile.txt");
         ASSERT_EQ(nullptr, script);
         EXPECT_FALSE(m_logicEngine.getErrors().empty());
 
@@ -109,6 +109,5 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.unlink(*script1->getOutputs()->getChild("output"), *script2->getInputs()->getChild("input")));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
     }
-
 }
 

@@ -24,13 +24,13 @@ namespace rlogic::internal
 {
     std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting)
     {
-        std::string chunkname = BuildChunkName(scriptName, filename);
+        const std::string chunkname = BuildChunkName(scriptName, filename);
         sol::load_result load_result = solState.loadScript(source, chunkname);
 
         if (!load_result.valid())
         {
             sol::error error = load_result;
-            errorReporting.add(error.what());
+            errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()));
             return nullptr;
         }
 
@@ -52,7 +52,7 @@ namespace rlogic::internal
 
         if (!intf.valid())
         {
-            errorReporting.add("No 'interface' method defined in the script");
+            errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname));
             return nullptr;
         }
 
@@ -60,7 +60,7 @@ namespace rlogic::internal
 
         if (!run.valid())
         {
-            errorReporting.add("No 'run' method defined in the script");
+            errorReporting.add(fmt::format("[{}] No 'run' function defined!", chunkname));
             return nullptr;
         }
 
@@ -75,7 +75,7 @@ namespace rlogic::internal
         if (!intfResult.valid())
         {
             sol::error error = intfResult;
-            errorReporting.add(error.what());
+            errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()));
             return nullptr;
         }
 

@@ -79,7 +79,8 @@ The ``Logic Engine`` is designed to be serialized and deserialized into binary f
 :func:`rlogic::LogicEngine::update` after loading from file will execute all scripts. Bindings will only be executed if
 some or all of their inputs are linked to a script output. Binding values will only be passed further to ``Ramses``
 if their values were modified, e.g. by a link which produced a different value than before saving, or if the application
-called :func:`rlogic::Property::set` explicitly on any of the bindings' input properties
+called :func:`rlogic::Property::set` explicitly on any of the bindings' input properties. For more details on saving and loading,
+see the :ref:`section further down <Saving/Loading from file>`.
 
 ===================================
 Script creation
@@ -91,6 +92,7 @@ create instances of all other types of objects supported by ``RAMSES Logic``:
 * :class:`rlogic::LuaScript`
 * :class:`rlogic::RamsesNodeBinding`
 * :class:`rlogic::RamsesAppearanceBinding`
+* :class:`rlogic::RamsesCameraBinding`
 
 You can create multiple instances of :class:`rlogic::LogicEngine`, but each copy owns the objects it
 created, and must be used to destroy them, as befits a factory class.
@@ -124,33 +126,10 @@ You can create scripts using the :class:`rlogic::LogicEngine` class like this:
     float speed = script->getOutputs()->getChild("speed")->get<float>();
     std::cout << "OUT.speed == " << speed;
 
-The syntax required in all scripts is plain ``Lua`` (version 5.1) with the special addition of the
-special ``interface()`` and ``run()`` functions which every script needs to have. The ``interface()``
-function is the place where script inputs and outputs are declared using the special global objects
-``IN`` and ``OUT``. The ``run()`` function can access the values of inputs and may set
-the values of outputs using the ``IN`` and ``OUT`` globals respectively.
+For details regarding the ``Lua`` syntax and its specifics, check the :ref:`dedicated section on Lua <Basics of Lua>`.
 
-Even though the ``IN`` and ``OUT`` objects are accessible in both ``interface()`` and ``run()`` functions,
-they have different semantics in each function. The ``interface`` function only **declares** the interface
-of the script, thus properties declared there can **only have a type**, they don't have a **value** yet -
-similar to function signatures in programming languages.
-
-In contrast to the ``interface()`` function, the ``run()`` function can't declare new properties any more,
-but the properties have a value which can be read and written.
-
-The ``interface()`` function is only ever executed once - during the creation of the script. The ``run()``
-function is executed every time one or more of the values in ``IN`` changes, either when the ``C++`` application
-changed them explicitly, or when any of the inputs is linked to another script's output whose value changed.
-
-For more information about ``Lua`` scripts, refer to the :class:`rlogic::LuaScript` class documentation.
-
-The ``interface()`` method enforces static types on the script's interface, while Lua is a dynamically typed
-language. This is meant to make it easier and less error-prone to integrate Lua scripts with C++/Java code,
-which are otherwise statically typed languages. Note that in the example above, the C++ code used get<T> and
-set<T> to interact with the scripts. The underlying :class:`rlogic::Property` class also has a :func:`rlogic::Property::getType`
-method which provides the type of the property as an enum value.
-
-See also the section on ``Lua`` :ref:`syntax specifics <Additional Lua syntax specifics>` imposed by the ``Logic Engine``.
+:class:`rlogic::LogicNode` (the base class of :class:`rlogic::LuaScript`) provides an interface to access the inputs and outputs declared by the ``interface()``
+function - see :func:`rlogic::LogicNode::getInputs()` and :func:`rlogic::LogicNode::getOutputs()`.
 
 You can :ref:`link scripts <Creating links between scripts>` to form a more sophisticated logic execution graph.
 
@@ -186,47 +165,6 @@ explicitly created by calling ``create`` and ``destroy`` methods. There are two 
     the :class:`rlogic::LogicEngine`. To avoid that, we recommend generally avoiding using
     a logicengine instance which already has content to load from files, and instead always
     create a fresh instance.
-
-==================================================
-Indexing inside and outside Lua
-==================================================
-
-``Lua`` has traditionally used indexing starting at 1, countrary to other popular script or
-programming languages. Thus, the syntax and type checks of the ``Ramses Logic`` runtime honours
-standard indexing used in Lua (starting by 1). This allows for example to use ``Lua`` tables as initializer
-lists for arrays, without having to provide indices. Take a look at the following code sample:
-
-.. code-block:: lua
-    :linenos:
-    :emphasize-lines: 7,9-12,14-17
-
-    function interface()
-        OUT.array = ARRAY(2, INT)
-    end
-
-    function run()
-        -- This will work
-        OUT.array = {11, 12}
-        -- This will also work
-        OUT.array = {
-            [1] = 11,
-            [2] = 12
-        }
-        -- This will not work and will result in error
-        OUT.array = {
-            [0] = 11,
-            [1] = 12
-        }
-    end
-
-The first two snippets are equivalent and will work. The first syntax (line 7) is obviously most convenient - just
-provide all array elements in the Lua table. Note that **Lua will implicitly index elements starting from 1 with this syntax**.
-The second syntax (line 9-12) is equivalent to the first one, but explicitly sets table indices. The third syntax (line 14-17)
-is the one which feels intuitive for ``C/C++`` developers, but will result in errors inside Lua scripts.
-
-In order to achieve memory efficiency, but also to be consistent with ``C/C++`` rules, the ``C++`` API of ``Ramses Logic``
-provides index access starting from 0 (for example :func:`rlogic::Property::getChild`). The index mapping is taken over by
-the ``Ramses Logic`` library.
 
 ==================================================
 Creating links between scripts
@@ -374,33 +312,14 @@ Error handling
 Some of the ``RAMSES Logic`` classes' methods can issue errors when used incorrectly or when
 a ``Lua`` script encounters a compile-time or run-time error. Those errors are globally collected
 by the :class:`rlogic::LogicEngine` class and can be obtained by calling :func:`rlogic::LogicEngine::getErrors()`.
+The error information stored in :struct:`rlogic::ErrorData` contains additional stack trace information for Lua runtime errors,
+and a pointer to the originating :class:`rlogic::LogicNode` which caused the error for errors which occured during :func:`rlogic::LogicEngine::update()`
+and can't be directly attributed to a specific API call.
 Beware that any of the mutable methods of :class:`rlogic::LogicEngine` clear the previously generated errors
-in the list, so that the list only ever contains the errors since the last method call.
+in the list, so that the list only ever contains the errors since the last method call!
 
 For code samples which demonstrate how compile-time and runtime errors can be gracefully handled,
 have a look at the :ref:`examples <List of all examples>`.
-
-==================================================
-Using Lua modules
-==================================================
-
-The ``Logic Engine`` restricts which Lua modules can be used to a subset of the standard modules
-of ``Lua 5.1``:
-
-* Base library
-* String
-* Table
-* Math
-* Debug
-
-For more information on the standard modules, refer to the official
-`Lua documentation <https://www.lua.org/manual/5.1/manual.html#5>`_ of the standard modules.
-
-Some of the standard modules are deliberately not supported:
-
-* Security/safety concerns (loading files, getting OS/environment info)
-* Not supported on all platforms (e.g. Android forbids direct file access)
-* Stability/integration concerns (e.g. opening relative files in Lua makes the scripts non-relocatable)
 
 ===============================
 Print messages from within Lua
@@ -522,7 +441,7 @@ to specify the scene from which the references to Ramses objects should be resol
 :func:`rlogic::LogicEngine::loadFromFile` will report error and fail. ``Ramses Logic`` makes no assumptions on the origin of the scene, its name
 or ID.
 
-For a full-fledged example, have a look at `the serialization example <https://github.com/GENIVI/ramses-logic/tree/master/examples/06_serialization>`_.
+For a full-fledged example, have a look at :ref:`the serialization example <Save/load from file example>`.
 
 .. warning::
 
@@ -539,143 +458,6 @@ You can use :func:`rlogic::LogicEngine::loadFromBuffer` to load the contents of 
 if you have your own file management logic, or the data comes from a different source than a file on disk. Be mindful that passing data buffers
 over the boundaries of libraries can be unsafe with C++, and some errors/abuse can't be reliably prevented. Make sure you check the size of
 the buffer and don't load from memory of untrusted origins.
-
-=====================================
-Additional Lua syntax specifics
-=====================================
-
-``RAMSES Logic`` fuses ``C++`` and ``Lua`` code which are quite different, both in terms of language semantics,
-type system and memory management. This is mostly transparent to the user, but there are some noteworthy
-special cases worth explaining.
-
------------------------------------------------------
-Vec2/3/4 types
------------------------------------------------------
-
-While the property types which reflect Lua built-in types (BOOL, INT, FLOAT, STRING) inherit the standard
-Lua value semantics, the more complex types (VEC2/3/4/I/F) have no representation in Lua, and are wrapped as
-``Lua`` tables. They have the additional constraint that all values must be set simultaneously. It's not possible
-for example to set just one component of a VEC3F - all three must be set at once. The reason for this design decision
-is to ensure consistent behavior when propagating these values - for example when setting ``Ramses`` node properties
-or uniforms.
-
------------------------------------------------------
-The global IN and OUT objects
------------------------------------------------------
-
-The ``IN`` and ``OUT`` objects are global ``Lua`` variables accessible anywhere. They are so-called user
-types, meaning that the logic to deal with them is in ``C++`` code, not in ``Lua``. This means that any kind of
-error which is not strictly a ``Lua`` syntax error will be handled in ``C++`` code. For example, assigning a boolean value
-to a variable which was declared of string type is valid in ``Lua``, but will cause a type error when using
-``RAMSES Logic``. This is intended and desired, however the ``Lua`` VM will not know where this error comes from
-other than "somewhere from within the overloaded ``C++`` code". This, stack traces look something like this
-when such errors happen:
-
-.. code-block:: text
-
-    lua: error: Assigning boolean to string output 'my_property'!
-    stack traceback:
-        [C]: in ?
-        [string \"MyScript\"]:3: in function <[string \"MyScript\"]:2>
-
-The top line in this stack is to be interpreted like this:
-
-* The error happened somewhere in the ``C`` code (remember, ``Lua`` is based on ``C``, not on ``C++``)
-* The function where the error happened is not known (**?**) - ``Lua`` doesn't know the name of the function
-
-The rest of the information is coming from ``Lua``, thus it makes more sense - the printed error message originates
-from ``C++`` code, but is passed to the ``Lua`` VM as a verbose error. The lower parts of the stack trace are
-coming from ``Lua`` source code and ``Lua`` knows where that code is.
-
-Furthermore, assigning any other value to the ``IN`` and ``OUT`` globals is perfectly fine in ``Lua``, but will
-result in unexpected behavior. The ``C++`` runtime will have no way of knowing that this happened, and will
-not receive any notification that something is being written in the newly created objects.
-
------------------------------------------------------
-Things you should never do
------------------------------------------------------
-
-There are other things which will result in undefined behavior, and ``RAMSES Logic`` has no way of capturing
-this and reporting errors. Here is a list:
-
-* Assign ``IN`` directly to ``OUT``. This will not have the effect you expect (assigning values), but instead it
-  will set the ``OUT`` label to point to the ``IN`` object, essentialy yielding two *pointers* to the same object - the ``IN`` object.
-  If you want to be able to assign all input values to all output values, put them in a struct and assign the struct, e.g.:
-
-.. code:: lua
-
-    function interface()
-        IN.struct = {}
-        OUT.struct = {} -- must have the exact same properties as IN.struct!!
-    end
-
-    function run()
-        -- This will work!
-        OUT.struct = IN.struct
-        -- This will not work!
-        OUT = IN
-    end
-
-* Do anything with ``IN`` and ``OUT`` in the global script scope - these objects don't exist there. However, you
-  can pass ``IN`` and ``OUT`` as arguments to other functions, but consider :ref:`Special case: using OUT object in other functions`
-* Calling the ``interface()`` method from within the ``run()`` method or vice-versa
-* Using recursion in the ``interface()`` or ``run()`` methods
-* Overwriting the ``IN`` and ``OUT`` objects. Exception to this is assigning ``OUT = IN`` in the ``run()`` method
-* using threads or coroutines. We might add this in future, but for now - don't use them
-
------------------------------------------------------
-Things you should avoid if possible
------------------------------------------------------
-
-Even though it is not strictly prohibited, it is not advised to store and read global variables
-inside the ``run()`` function, as this introduces a side effect and makes the script more vulnerable
-to errors. Instead, design the script so that it needs only be executed if the values of any of the
-inputs changed - similar to how functional programming works.
-:class:`rlogic::LogicNode` provides an interface to access the inputs and outputs declared by the ``interface()``
-function - see :func:`rlogic::LogicNode::getInputs()` and :func:`rlogic::LogicNode::getOutputs()`.
-
------------------------------------------------------
-Special case: using OUT object in other functions
------------------------------------------------------
-
-It is possible to pass the OUT struct from the run() function to a different function to set the output values.
-But be aware that not all constellations are working. Here are some examples to explain the working variants:
-
-.. code-block:: lua
-    :linenos:
-    :emphasize-lines: 13,18-20
-
-    function interface()
-        OUT.param1 = INT
-        OUT.struct1 = {
-            param2 = INT
-        }
-    end
-
-    function setParam1(out)
-        out.param1 = 42 -- OK
-    end
-
-    function setDirect(p)
-        p = 42 -- NOT OK: Will create local variable "p" with value 42
-    end
-
-    function setStruct(struct)
-        struct.param2 = 42 -- OK
-        struct = {
-            param2 = 42 -- NOT OK: Will create local variable "struct" with table
-        }
-    end
-
-    function run()
-        setParam1(OUT)
-        setDirect(OUT.param1)
-        setStruct(OUT.struct1)
-    end
-
-As the above example demonstrates, passing objects to functions in ``Lua`` is done by reference. However, whenever the
-reference is overwritten with something else, this has no effect on the object which was passed from outside, but only
-lets the local copy of the reference point to a different value.
 
 =========================
 Logging
@@ -811,6 +593,7 @@ List of all examples
     examples/04_ramses_scene
     examples/05_serialization
     examples/06_override_print
+    examples/07_links
 
 =========================
 Class Index
@@ -822,6 +605,7 @@ Top-level API classes:
 * :class:`rlogic::LuaScript`
 * :class:`rlogic::RamsesNodeBinding`
 * :class:`rlogic::RamsesAppearanceBinding`
+* :class:`rlogic::RamsesCameraBinding`
 * :class:`rlogic::Property`
 
 Base classes:
@@ -844,5 +628,9 @@ Type traits:
 
 * :struct:`rlogic::PropertyTypeToEnum`
 * :struct:`rlogic::IsPrimitiveProperty`
+
+Error information:
+
+* :struct:`rlogic::ErrorData`
 
 .. doxygenindex::

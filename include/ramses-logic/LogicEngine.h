@@ -11,9 +11,9 @@
 #include "ramses-logic/APIExport.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Collection.h"
+#include "ramses-logic/ErrorData.h"
 
 #include <vector>
-#include <string>
 #include <string_view>
 
 namespace ramses
@@ -31,6 +31,7 @@ namespace rlogic
     class LuaScript;
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
+    class RamsesCameraBinding;
 
     /**
     * Central object which creates and manages the lifecycle and execution
@@ -76,6 +77,13 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API Collection<RamsesAppearanceBinding> ramsesAppearanceBindings() const;
 
         /**
+         * Returns an iterable #rlogic::Collection of all #rlogic::RamsesCameraBinding instances created by this LogicEngine.
+         *
+         * @return an iterable #rlogic::Collection with all #rlogic::RamsesCameraBinding created by this #LogicEngine
+         */
+        [[nodiscard]] RLOGIC_API Collection<RamsesCameraBinding> ramsesCameraBindings() const;
+
+        /**
          * Returns a pointer to the first occurrence of a script with a given \p name if such exists, and nullptr otherwise.
          *
          * @param name the name of the script to search for
@@ -98,6 +106,14 @@ namespace rlogic
          * @return a pointer to the appearance binding, or nullptr if none was found
          */
         [[nodiscard]] RLOGIC_API RamsesAppearanceBinding* findAppearanceBinding(std::string_view name) const;
+
+        /**
+         * Returns a pointer to the first occurrence of a camera binding with a given \p name if such exists, and nullptr otherwise.
+         *
+         * @param name the name of the camera binding to search for
+         * @return a pointer to the camera binding, or nullptr if none was found
+         */
+        [[nodiscard]] RLOGIC_API RamsesCameraBinding* findCameraBinding(std::string_view name) const;
 
         /**
          * Creates a new #rlogic::LuaScript from an existing Lua source file. Refer to the #rlogic::LuaScript class documentation
@@ -162,6 +178,18 @@ namespace rlogic
          * The binding can be destroyed by calling the #destroy method
          */
         RLOGIC_API RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name = "");
+
+        /**
+         * Creates a new #rlogic::RamsesCameraBinding which can be used to set the properties of a Ramses Camera object.
+         *
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param name a name for the the new #rlogic::RamsesCameraBinding.
+         * @return a pointer to the created object or nullptr if
+         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
+         */
+        RLOGIC_API RamsesCameraBinding* createRamsesCameraBinding(std::string_view name ="");
 
         /**
          * Updates all #rlogic::LogicNode's which were created by this #LogicEngine instance.
@@ -231,15 +259,19 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API bool isLinked(const LogicNode& logicNode) const;
 
         /**
-         * If an internal error occurs e.g. during loading or execution of a #rlogic::LuaScript, a
-         * detailed error description can be retrieved with this method. The list of errors is reset before
-         * each #LogicEngine method is called, and contains potential errors created by that method after it returns.
+         * Returns the list of all errors which occurred during the last API call to a #LogicEngine method
+         * or any other method of its subclasses (scripts, bindings etc). Note that errors get wiped by all
+         * mutable methods of the #LogicEngine.
          *
-         * @return a list of (potentially multi-line) strings with detailed error information. For Lua errors, an extra stack
-         * trace is contained in the error string. Error strings contain new line characters and spaces, and in the case of Lua errors
-         * it also contains the error stack trace captured by Lua.
+         * This method can be used in two different ways:
+         * - To debug the correct usage of the Logic Engine API (e.g. by wrapping all API calls with a check
+         *   for their return value and using this method to find out the cause of the error)
+         * - To check for runtime errors of scripts which come from a dynamic source, e.g. by calling the
+         *   method after an unsuccessful call to #update() with a faulty script
+         *
+         * @return a list of errors
          */
-        [[nodiscard]] RLOGIC_API const std::vector<std::string>& getErrors() const;
+        [[nodiscard]] RLOGIC_API const std::vector<ErrorData>& getErrors() const;
 
         /**
          * Writes the whole #LogicEngine and all of its objects to a binary file with the given filename. The RAMSES scene

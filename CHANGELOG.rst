@@ -3,6 +3,26 @@ master
 ======
 
 ======
+v0.6.0
+======
+
+This release contains minor API improvements and a new feature (RamsesCameraBinding), which requires a change in the serialization format. Therefore
+it is not API and binary compatible with 0.5.3!
+
+**Features**
+
+* [API break!] Log message types are consistent with those of Ramses and DLT. Existing ones are the same (but camel-case instead of upper case).
+  New log levels added (Off, Fatal, Debug and Trace)
+* Update ramses to 27.0.102
+* Add RamsesCameraBinding to control RamsesCamera
+* Setting output and linked input Properties with Property::set<T> is now treated as an error
+* [API breaking!] LogicEngine::getErrors() returns a vector of structs holding additional error information.
+
+**Bugfixes**
+
+* Fix exotic bug where loading from file/buffer silently ignores ramses objects with mismatched types
+
+======
 v0.5.3
 ======
 

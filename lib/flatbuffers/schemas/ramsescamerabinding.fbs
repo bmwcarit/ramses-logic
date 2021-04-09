@@ -1,29 +1,19 @@
 //  -------------------------------------------------------------------------
-//  Copyright (C) 2020 BMW AG
+//  Copyright (C) 2021 BMW AG
 //  -------------------------------------------------------------------------
 //  This Source Code Form is subject to the terms of the Mozilla Public
 //  License, v. 2.0. If a copy of the MPL was not distributed with this
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "logicnode.fbs";
+
 namespace rlogic_serialization;
 
-enum ELogicNodeType:uint8
+table RamsesCameraBinding
 {
-    Script = 0,
-    RamsesNodeBinding = 1,
-    RamsesAppearanceBinding = 2,
-    RamsesCameraBinding = 3,
+    logicnode:LogicNode;
+    ramsesCamera:uint64;
 }
 
-table Link
-{
-    sourceLogicNodeType:ELogicNodeType;
-    targetLogicNodeType:ELogicNodeType;
-    sourceLogicNodeId:uint32;
-    targetLogicNodeId:uint32;
-    sourcePropertyNestedIndex:[uint32];
-    targetPropertyNestedIndex:[uint32];
-}
-
-root_type Link;
+root_type RamsesCameraBinding;

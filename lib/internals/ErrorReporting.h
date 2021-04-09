@@ -10,6 +10,7 @@
 
 #include <vector>
 #include <string>
+#include "ramses-logic/ErrorData.h"
 
 namespace rlogic::internal
 {
@@ -19,10 +20,11 @@ namespace rlogic::internal
 
         void clear();
         void add(std::string errorMessage);
+        void add(std::string errorMessage, LogicNode& logicNode);
 
-        [[nodiscard]] const std::vector<std::string>& getErrors() const;
+        [[nodiscard]] const std::vector<rlogic::ErrorData>& getErrors() const;
 
     private:
-        std::vector<std::string> m_errors;
+        std::vector<rlogic::ErrorData> m_errors;
     };
 }

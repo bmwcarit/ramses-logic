@@ -12,16 +12,14 @@
 
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
+#include "internals/ApiObjects.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
-#include "ramses-client-api/ERotationConvention.h"
 
 #include <optional>
 #include <vector>
 #include <string>
 #include <string_view>
-#include <unordered_map>
-#include <unordered_set>
 
 namespace ramses
 {
@@ -29,13 +27,14 @@ namespace ramses
     class SceneObject;
     class Node;
     class Appearance;
+    class Camera;
 }
 
 namespace rlogic
 {
-    class RamsesBinding;
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
+    class RamsesCameraBinding;
     class LuaScript;
     class LogicNode;
     class Property;
@@ -43,7 +42,6 @@ namespace rlogic
 
 namespace rlogic_serialization
 {
-    struct LogicNode;
     struct Version;
 }
 
@@ -51,10 +49,6 @@ namespace rlogic::internal
 {
     class LogicNodeImpl;
     class RamsesBindingImpl;
-
-    using ScriptsContainer = std::vector<std::unique_ptr<LuaScript>>;
-    using NodeBindingsContainer = std::vector<std::unique_ptr<RamsesNodeBinding>>;
-    using AppearanceBindingsContainer = std::vector<std::unique_ptr<RamsesAppearanceBinding>>;
 
     class LogicEngineImpl
     {
@@ -70,21 +64,17 @@ namespace rlogic::internal
         LogicEngineImpl(const LogicEngineImpl& other)                = delete;
         LogicEngineImpl& operator=(const LogicEngineImpl& other) = delete;
 
-        bool destroy(LogicNode& logicNode);
-
-
+        // Public API
         LuaScript* createLuaScriptFromFile(std::string_view filename, std::string_view scriptName);
         LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName);
-
         RamsesNodeBinding* createRamsesNodeBinding(std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name);
+        RamsesCameraBinding* createRamsesCameraBinding(std::string_view name);
 
-        [[nodiscard]] ScriptsContainer& getScripts();
-        [[nodiscard]] NodeBindingsContainer& getNodeBindings();
-        [[nodiscard]] AppearanceBindingsContainer& getAppearanceBindings();
+        bool destroy(LogicNode& logicNode);
 
         bool                            update(bool disableDirtyTracking = false);
-        const std::vector<std::string>& getErrors() const;
+        const std::vector<ErrorData>&   getErrors() const;
 
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
@@ -94,39 +84,31 @@ namespace rlogic::internal
         bool unlink(const Property& sourceProperty, const Property& targetProperty);
 
         [[nodiscard]] bool isLinked(const LogicNode& logicNode) const;
+
+        // Internally used
         [[nodiscard]] bool isDirty() const;
         [[nodiscard]] bool bindingsDirty() const;
 
-        // For testing only
-        [[nodiscard]] const LogicNodeDependencies& getLogicNodeDependencies() const;
+        [[nodiscard]] ApiObjects& getApiObjects();
+        [[nodiscard]] const ApiObjects& getApiObjects() const;
 
     private:
-        SolState                            m_luaState;
-        ErrorReporting                      m_errors;
-        // TODO Sven move the containers to store instances to seperate resource manager
-        ScriptsContainer                    m_scripts;
-        NodeBindingsContainer               m_ramsesNodeBindings;
-        AppearanceBindingsContainer         m_ramsesAppearanceBindings;
-
-        LogicNodeDependencies               m_logicNodeDependencies;
-
-        LuaScript* createLuaScriptInternal(std::string_view source, std::string_view filename, std::string_view scriptName);
-        bool       destroyInternal(RamsesNodeBinding& ramsesNodeBinding);
-        bool       destroyInternal(LuaScript& luaScript);
-        bool       destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding);
+        SolState m_luaState;
+        ApiObjects m_apiObjects;
+        ErrorReporting m_errors;
 
         void updateLinksRecursive(Property& inputProperty);
 
-        [[nodiscard]] bool allBindingsReferToSameRamsesScene();
-        ramses::SceneObject* findRamsesSceneObjectInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
-        std::optional<ramses::Node*> findRamsesNodeInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
-        std::optional<ramses::Appearance*> findRamsesAppearanceInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
+        ramses::SceneObject* findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
+        std::optional<ramses::Node*> findRamsesNodeInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
+        std::optional<ramses::Appearance*> findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
+        std::optional<ramses::Camera*> findRamsesCameraInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
 
         static bool CheckLogicVersionFromFile(const rlogic_serialization::Version& version);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
         [[nodiscard]] bool updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking);
 
-        [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSource);
+        [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription);
     };
 }

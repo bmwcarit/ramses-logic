@@ -146,7 +146,6 @@ namespace rlogic
         ASSERT_NE(nullptr, inputs);
         EXPECT_EQ(4u, inputs->getChildCount());
 
-
         vec3f zeroes;
         vec3f ones;
 
@@ -506,7 +505,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesNode.bin"));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0], "Fatal error during loading from file! Serialized ramses logic object 'NodeBinding' points to a Ramses object (id: 1) , but no Ramses scene was provided to resolve the Ramses object!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized ramses logic object 'NodeBinding' points to a Ramses object (id: 1) , but no Ramses scene was provided to resolve the Ramses object!");
         }
     }
 
@@ -526,7 +525,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.loadFromFile("RamsesNodeDeleted.bin", &m_testScene));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0], "Fatal error during loading from file! Serialized ramses logic object NodeBinding points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized ramses logic object NodeBinding points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
         }
     }
 

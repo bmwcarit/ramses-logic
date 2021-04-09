@@ -39,7 +39,7 @@ namespace rlogic::Logger
     * Controls how verbose the logging is. \p verbosityLimit has the following semantics:
     * - if log message has message type with higher or equal priority as verbosityLimit, then it is logged
     * - log priority is as documented by #rlogic::ELogMessageType (Errors are more important than Warnings, etc)
-    * - the default value is #rlogic::ELogMessageType::INFO, meaning that log messages are processed if they
+    * - the default value is #rlogic::ELogMessageType::Info, meaning that log messages are processed if they
     * have INFO priority or higher.
     *
     * @param verbosityLimit least priority a log message must have in order to be processed

@@ -43,8 +43,6 @@ namespace rlogic
      *
      * Uniform types which are not supported are not available when queried over #rlogic::LogicNode::getInputs.
      *
-     * Warning: any references to #rlogic::Property objects are invalidated after a call to #setRamsesAppearance, even if the newly
-     * assigned ramses::Appearance has properties with the same name and type!
      */
     class RamsesAppearanceBinding : public RamsesBinding
     {

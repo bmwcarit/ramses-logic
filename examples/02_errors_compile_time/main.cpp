@@ -47,7 +47,7 @@ int main()
              * Note that this error has no stack trace, because there is no stack - the script failed compiling
              * Furthermore, the source code line indication is also "Lua style" - it starts at 1, not 0
              */
-            std::cout << error << std::endl;
+            std::cout << error.message << std::endl;
         }
     }
 

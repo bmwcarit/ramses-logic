@@ -108,7 +108,7 @@ namespace rlogic::internal
         Property linkSource(CreateProperty("", EPropertyType::Float, EPropertySemantics::ScriptOutput, true));
 
         // Set to different than default value
-        linkSource.m_impl->set<float>(0.5f);
+        linkSource.m_impl->setManually<float>(0.5f);
 
         // Simulate link behavior
         linkTarget.m_impl->setInternal(*linkSource.m_impl);
@@ -308,6 +308,16 @@ namespace rlogic::internal
         EXPECT_TRUE(outputProperty.m_impl->isOutput());
         EXPECT_FALSE(outputProperty.m_impl->isInput());
         EXPECT_EQ(internal::EPropertySemantics::ScriptOutput, outputProperty.m_impl->getPropertySemantics());
+    }
+
+    TEST_F(AProperty, CannotSetOutputManually)
+    {
+        Property outputProperty(CreateOutputProperty("Output", EPropertyType::Int32));
+
+        EXPECT_TRUE(outputProperty.m_impl->isOutput());
+        EXPECT_EQ(internal::EPropertySemantics::ScriptOutput, outputProperty.m_impl->getPropertySemantics());
+
+        EXPECT_FALSE(outputProperty.set<int32_t>(45));
     }
 
     TEST_F(AProperty, ReturnsNoValueWhenAccessingWithWrongType)
@@ -765,11 +775,11 @@ namespace rlogic::internal
         auto vec3iProperty  = CreateInputProperty("Property", EPropertyType::Vec3i);
         auto stringProperty = CreateInputProperty("Property", EPropertyType::String);
 
-        intProperty->set(42);
-        floatProperty->set(42.f);
-        vec2fProperty->set(vec2f{4.f, 2.f});
-        vec3iProperty->set(vec3i{4, 2, 3});
-        stringProperty->set(std::string("42"));
+        intProperty->setManually(42);
+        floatProperty->setManually(42.f);
+        vec2fProperty->setManually(vec2f{4.f, 2.f});
+        vec3iProperty->setManually(vec3i{4, 2, 3});
+        stringProperty->setManually(std::string("42"));
 
         intProperty->getLogicNode().setDirty(false);
         floatProperty->getLogicNode().setDirty(false);
@@ -777,11 +787,11 @@ namespace rlogic::internal
         vec3iProperty->getLogicNode().setDirty(false);
         stringProperty->getLogicNode().setDirty(false);
 
-        EXPECT_TRUE(intProperty->set(42));
-        EXPECT_TRUE(floatProperty->set(42.f));
-        EXPECT_TRUE(vec2fProperty->set(vec2f{4.f, 2.f}));
-        EXPECT_TRUE(vec3iProperty->set(vec3i{4, 2, 3}));
-        EXPECT_TRUE(stringProperty->set(std::string("42")));
+        EXPECT_TRUE(intProperty->setManually(42));
+        EXPECT_TRUE(floatProperty->setManually(42.f));
+        EXPECT_TRUE(vec2fProperty->setManually(vec2f{4.f, 2.f}));
+        EXPECT_TRUE(vec3iProperty->setManually(vec3i{4, 2, 3}));
+        EXPECT_TRUE(stringProperty->setManually(std::string("42")));
 
         EXPECT_FALSE(intProperty->getLogicNode().isDirty());
         EXPECT_FALSE(floatProperty->getLogicNode().isDirty());
@@ -798,17 +808,17 @@ namespace rlogic::internal
         auto vec3iProperty  = CreateInputProperty("Property", EPropertyType::Vec3i);
         auto stringProperty = CreateInputProperty("Property", EPropertyType::String);
 
-        intProperty->set(42);
-        floatProperty->set(42.f);
-        vec2fProperty->set(vec2f{4.f, 2.f});
-        vec3iProperty->set(vec3i{4, 2, 3});
-        stringProperty->set(std::string("42"));
+        intProperty->setManually(42);
+        floatProperty->setManually(42.f);
+        vec2fProperty->setManually(vec2f{4.f, 2.f});
+        vec3iProperty->setManually(vec3i{4, 2, 3});
+        stringProperty->setManually(std::string("42"));
 
-        EXPECT_TRUE(intProperty->set(43));
-        EXPECT_TRUE(floatProperty->set(43.f));
-        EXPECT_TRUE(vec2fProperty->set(vec2f{4.f, 3.f}));
-        EXPECT_TRUE(vec3iProperty->set(vec3i{4, 3, 3}));
-        EXPECT_TRUE(stringProperty->set(std::string("43")));
+        EXPECT_TRUE(intProperty->setManually(43));
+        EXPECT_TRUE(floatProperty->setManually(43.f));
+        EXPECT_TRUE(vec2fProperty->setManually(vec2f{4.f, 3.f}));
+        EXPECT_TRUE(vec3iProperty->setManually(vec3i{4, 3, 3}));
+        EXPECT_TRUE(stringProperty->setManually(std::string("43")));
 
         EXPECT_TRUE(intProperty->getLogicNode().isDirty());
         EXPECT_TRUE(floatProperty->getLogicNode().isDirty());

@@ -84,7 +84,10 @@ namespace rlogic::internal
         // "dirtyness" check)
 
         template <typename T> [[nodiscard]] std::optional<T> get() const;
-        template <typename T> bool set(T value);
+
+        template <typename T> bool setManually(T value);
+        template <typename T> bool setOutputFromScript(T value);
+        void setIsLinkedInput(bool isLinkedInput);
 
         // This version is used by links to avoid type expansion
         void setInternal(const PropertyImpl& other);
@@ -110,8 +113,10 @@ namespace rlogic::internal
         // TODO Violin/Sven consider solving this more elegantly
         LogicNodeImpl*                                  m_logicNode = nullptr;
         bool m_bindingInputHasNewValue = false;
+        bool m_isLinkedInput = false;
         EPropertySemantics                              m_semantics;
 
+        template <typename T> bool set(T value);
         flatbuffers::Offset<rlogic_serialization::Property> serialize_recursive(flatbuffers::FlatBufferBuilder& builder);
     };
 }

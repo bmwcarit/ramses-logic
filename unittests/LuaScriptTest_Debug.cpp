@@ -18,26 +18,53 @@ namespace rlogic
 {
     class ALuaScript_Debug : public ALuaScript
     {
-    };
+    protected:
+        std::string_view m_scriptWithInterfaceError = R"(
+            function interface()
+                IN.prop = nil
+            end
+            function run()
+            end
+        )";
 
-    TEST_F(ALuaScript_Debug, ProducesErrorWithStackTraceInRun)
-    {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        std::string_view m_scriptWithRuntimeError = R"(
             function interface()
             end
             function run()
                 IN.prop = nil
             end
-        )", "myscript");
+        )";
+    };
+
+    TEST_F(ALuaScript_Debug, ProducesErrorWithFullStackTrace_WhenErrorsInInterface)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_scriptWithInterfaceError, "errorscript");
+
+        ASSERT_EQ(nullptr, script);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
+                  "[errorscript] Error while loading script. Lua stack trace:\n"
+                  "lua: error: Field 'prop' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!\n"
+                  "stack traceback:\n"
+                  "\t[C]: in ?\n"
+                  "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");
+        // nullptr because no LogicNode was created
+        EXPECT_EQ(nullptr, m_logicEngine.getErrors()[0].node);
+    }
+
+    TEST_F(ALuaScript_Debug, ProducesErrorWithFullStackTrace_WhenRuntimeErrors)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_scriptWithRuntimeError, "errorscript");
 
         ASSERT_NE(nullptr, script);
         m_logicEngine.update();
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0],
-                  "lua: error: Tried to access undefined struct property 'prop'\n"
-                  "stack traceback:\n"
-                  "\t[C]: in ?\n"
-                  "\t[string \"myscript\"]:5: in function <[string \"myscript\"]:4>");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
+            "lua: error: Tried to access undefined struct property 'prop'\n"
+            "stack traceback:\n"
+            "\t[C]: in ?\n"
+            "\t[string \"errorscript\"]:5: in function <[string \"errorscript\"]:4>");
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
     }
 
     TEST_F(ALuaScript_Debug, ErrorMessageContainsFilenameAndScriptnameWithSemicolonWhenBothAvailable)
@@ -46,45 +73,37 @@ namespace rlogic
 
         std::ofstream ofs;
         ofs.open("script.lua", std::ofstream::out);
-        ofs << R"(
-            function interface()
-                IN.prop = nil
-            end
-            function run()
-            end
-        )";
+        ofs << m_scriptWithInterfaceError;
         ofs.close();
 
-        auto script = m_logicEngine.createLuaScriptFromFile("script.lua", "TheScript");
+        auto script = m_logicEngine.createLuaScriptFromFile("script.lua", "errorscript");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("\"script.lua:TheScript\""));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("\t[string \"script.lua:errorscript\"]:3: in function <[string \"script.lua:errorscript\"]:2>"));
     }
 
-    TEST_F(ALuaScript_Debug, ErrorMessageContainsScriptnameOnly_WhenNotLoadedFromFile)
+    TEST_F(ALuaScript_Debug, ErrorStackTraceContainsScriptName_WhenScriptWasNotLoadedFromFile)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
-            function interface()
-                IN.prop = nil
-            end
-            function run()
-            end
-        )", "TheScript");
+        // Script loaded from string, not file
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_scriptWithInterfaceError, "errorscript");
 
+        // Error message contains script name in the stack (file not known)
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0],
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
+            "[errorscript] Error while loading script. Lua stack trace:\n"
             "lua: error: Field 'prop' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!\n"
             "stack traceback:\n"
             "\t[C]: in ?\n"
-            "\t[string \"TheScript\"]:3: in function <[string \"TheScript\"]:2>");
+            "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");
     }
 
-    TEST_F(ALuaScript_Debug, OverridesLuaPrintFunction)
+    // Logic engine always overrides the print function internally - test that it doesn't cause crashes
+    TEST_F(ALuaScript_Debug, DefaultOverrideOfLuaPrintFunctionDoesNotCrash)
     {
         LogicEngine logicEngine;
 
-        auto script = logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
             function interface()
             end
             function run()
@@ -94,7 +113,6 @@ namespace rlogic
 
         ASSERT_NE(nullptr, script);
 
-        // This is hard to test, but it should at leas not crash
         EXPECT_TRUE(logicEngine.update());
     }
 
@@ -104,7 +122,7 @@ namespace rlogic
 
         std::vector<std::string> messages;
 
-        auto script = logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
             function interface()
             end
             function run()
@@ -134,7 +152,7 @@ namespace rlogic
 
         std::vector<std::string> messages;
 
-        auto script = logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
             function interface()
             end
             function run()
@@ -146,6 +164,7 @@ namespace rlogic
         EXPECT_FALSE(logicEngine.update());
         const auto& errors = logicEngine.getErrors();
         EXPECT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0], ::testing::HasSubstr("Called 'print' with wrong argument type 'number'. Only string is allowed"));
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Called 'print' with wrong argument type 'number'. Only string is allowed"));
+        EXPECT_EQ(script, errors[0].node);
     }
 }

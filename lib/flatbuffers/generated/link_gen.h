@@ -15,31 +15,34 @@ enum class ELogicNodeType : uint8_t {
   Script = 0,
   RamsesNodeBinding = 1,
   RamsesAppearanceBinding = 2,
+  RamsesCameraBinding = 3,
   MIN = Script,
-  MAX = RamsesAppearanceBinding
+  MAX = RamsesCameraBinding
 };
 
-inline const ELogicNodeType (&EnumValuesELogicNodeType())[3] {
+inline const ELogicNodeType (&EnumValuesELogicNodeType())[4] {
   static const ELogicNodeType values[] = {
     ELogicNodeType::Script,
     ELogicNodeType::RamsesNodeBinding,
-    ELogicNodeType::RamsesAppearanceBinding
+    ELogicNodeType::RamsesAppearanceBinding,
+    ELogicNodeType::RamsesCameraBinding
   };
   return values;
 }
 
 inline const char * const *EnumNamesELogicNodeType() {
-  static const char * const names[4] = {
+  static const char * const names[5] = {
     "Script",
     "RamsesNodeBinding",
     "RamsesAppearanceBinding",
+    "RamsesCameraBinding",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameELogicNodeType(ELogicNodeType e) {
-  if (flatbuffers::IsOutRange(e, ELogicNodeType::Script, ELogicNodeType::RamsesAppearanceBinding)) return "";
+  if (flatbuffers::IsOutRange(e, ELogicNodeType::Script, ELogicNodeType::RamsesCameraBinding)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesELogicNodeType()[index];
 }

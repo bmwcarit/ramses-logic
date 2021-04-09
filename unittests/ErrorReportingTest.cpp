@@ -11,6 +11,7 @@
 
 #include "internals/ErrorReporting.h"
 #include "ramses-logic/Logger.h"
+#include "LogicNodeDummy.h"
 
 namespace rlogic::internal
 {
@@ -23,7 +24,7 @@ namespace rlogic::internal
             Logger::SetDefaultLogging(false);
 
             Logger::SetLogHandler([this](ELogMessageType type, std::string_view message) {
-                EXPECT_EQ(ELogMessageType::ERROR, type);
+                EXPECT_EQ(ELogMessageType::Error, type);
                 m_loggedErrors.emplace_back(std::string(message));
                 });
         }
@@ -49,21 +50,40 @@ namespace rlogic::internal
         EXPECT_EQ(0u, m_loggedErrors.size());
     }
 
+    TEST_F(AErrorReporting, StoresSourceLogicNodeWhenProvided)
+    {
+        auto dummyNode1 = LogicNodeDummy::Create("");
+        auto dummyNode2 = LogicNodeDummy::Create("");
+
+        m_errorReporting.add("error 1", *dummyNode1);
+        m_errorReporting.add("error 2", *dummyNode2);
+
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 2u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "error 1");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].node, dummyNode1.get());
+        EXPECT_EQ(m_errorReporting.getErrors()[1].message, "error 2");
+        EXPECT_EQ(m_errorReporting.getErrors()[1].node, dummyNode2.get());
+    }
+
     TEST_F(AErrorReporting, StoresErrorsInTheOrderAdded)
     {
         m_errorReporting.add("error 1");
         m_errorReporting.add("error 2");
 
-        EXPECT_THAT(m_errorReporting.getErrors(), ::testing::ElementsAre("error 1", "error 2"));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 2u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "error 1");
+        EXPECT_EQ(m_errorReporting.getErrors()[1].message, "error 2");
     }
-
 
     TEST_F(AErrorReporting, LogsErrorsInTheOrderAdded)
     {
         m_errorReporting.add("error 1");
         m_errorReporting.add("error 2");
 
-        EXPECT_THAT(m_loggedErrors, ::testing::ElementsAre("error 1", "error 2"));
+        EXPECT_EQ(m_loggedErrors.size(), 2u);
+        EXPECT_EQ(m_loggedErrors[0], "error 1");
+        EXPECT_EQ(m_loggedErrors[1], "error 2");
+
     }
 
     TEST_F(AErrorReporting, ClearsErrors)

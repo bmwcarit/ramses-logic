@@ -34,7 +34,7 @@ namespace rlogic
         ASSERT_EQ(nullptr, script);
 
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0], "Special global symbol 'IN' should not be overwritten with other types in interface() function!!");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in interface() function!!");
     }
 
     TEST_F(ALuaScript_Interface, ProducesErrorsIfARuntimeErrorOccursInInterface)
@@ -50,13 +50,15 @@ namespace rlogic
 
             function run()
             end
-        )");
+        )", "errorInInterface");
 
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0],
-                  "[string \"unknown\"]:3: attempt to perform arithmetic on local 'b' (a nil value)\nstack traceback:\n\t[string \"unknown\"]:3: in function 'mul'\n\t[string "
-                  "\"unknown\"]:7: in function <[string \"unknown\"]:6>");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
+                    "[errorInInterface] Error while loading script. Lua stack trace:\n"
+                    "[string \"errorInInterface\"]:3: attempt to perform arithmetic on local 'b' (a nil value)\nstack traceback:\n"
+                    "\t[string \"errorInInterface\"]:3: in function 'mul'\n"
+                    "\t[string \"errorInInterface\"]:7: in function <[string \"errorInInterface\"]:6>");
     }
 
     TEST_F(ALuaScript_Interface, ProducesErrorIfTryingToAccessUnexistingPropertyInInterface)
@@ -73,7 +75,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, script);
 
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Trying to access not available property this_does_not_exist in interface!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Trying to access not available property this_does_not_exist in interface!"));
     }
 
     TEST_F(ALuaScript_Interface, ProducesErrorWhenTryingToCreateInterfacePropertiesWithNonStringIndexAtInterfaceTime)
@@ -100,7 +102,7 @@ namespace rlogic
             EXPECT_EQ(nullptr, script);
 
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
         }
     }
 
@@ -128,7 +130,7 @@ namespace rlogic
             EXPECT_EQ(nullptr, script);
 
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
         }
     }
 
@@ -185,7 +187,7 @@ namespace rlogic
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr(singleCase.expectedErrorMessage));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
         }
     }
 
@@ -223,7 +225,7 @@ namespace rlogic
             EXPECT_EQ(nullptr, script);
 
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("Property 'prop' already exists! Can't declare the same property twice!"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Property 'prop' already exists! Can't declare the same property twice!"));
         }
     }
 

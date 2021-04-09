@@ -118,9 +118,11 @@ def main():
         r'__init__\.py$',
         # Excluded on purpose - add new lines reasonibly here!
         r'^ci/scripts/config/ubsan_suppressions$',   # config file, can't add license
-        r'\.md$',               # .md files don't need a license
-        r'\.rst$',              # TODO Violin check if possible to add license
-        r'^android/aar/AndroidManifest\.xml',
+        r'\.md$',                           # .md files don't need a license
+        r'\.rst$',                          # TODO Violin check if possible to add license
+        r'.*/AndroidManifest\.xml$',        # Android manifests are difficult to modify with a license header
+        r'^android/gradle\.properties$',    # Gradle config file, no license needed
+        r'^android/gradlew$',               # Gradle wrapper script, has own Apache 2.0 header (according to Gradle plugin license), exclude check here
     }
 
     files_license_header = common_modules.common.get_all_files_with_filter(root_path, root_path, {r'.*'}, blacklist_license)

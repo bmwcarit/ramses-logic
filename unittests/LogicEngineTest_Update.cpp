@@ -14,6 +14,7 @@
 
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 
 #include "ramses-logic/Property.h"
 
@@ -21,6 +22,7 @@
 #include "ramses-client-api/Effect.h"
 #include "ramses-client-api/UniformInput.h"
 #include "ramses-client-api/Appearance.h"
+#include "ramses-client-api/PerspectiveCamera.h"
 #include "ramses-client-api/Node.h"
 
 #include "impl/LogicNodeImpl.h"
@@ -60,6 +62,38 @@ namespace rlogic
         EXPECT_FALSE(*nodeInput->get<bool>());
         EXPECT_TRUE(logicEngine.update());
         EXPECT_TRUE(*nodeInput->get<bool>());
+    }
+
+    TEST_F(ALogicEngine_Update, UpdatesRamsesCameraBindingValuesOnUpdate)
+    {
+        RamsesTestSetup testSetup;
+        ramses::Scene* scene = testSetup.createScene();
+
+        LogicEngine logicEngine;
+        auto        luaScript = logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.param = INT
+                OUT.param = INT
+            end
+            function run()
+                OUT.param = IN.param
+            end
+        )", "Script");
+
+        auto ramsesCameraBinding = logicEngine.createRamsesCameraBinding("CameraBinding");
+        ramsesCameraBinding->setRamsesCamera(scene->createPerspectiveCamera());
+
+        auto scriptInput = luaScript->getInputs()->getChild("param");
+        auto scriptOutput = luaScript->getOutputs()->getChild("param");
+        auto cameraInput = ramsesCameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
+        scriptInput->set(34);
+        cameraInput->set(21);
+
+        logicEngine.link(*scriptOutput, *cameraInput);
+
+        EXPECT_EQ(21, *cameraInput->get<int32_t>());
+        EXPECT_TRUE(logicEngine.update());
+        EXPECT_EQ(34, *cameraInput->get<int32_t>());
     }
 
     TEST_F(ALogicEngine_Update, UpdatesARamsesAppearanceBinding)
@@ -130,7 +164,8 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
         auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("This will die"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("This will die"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].node, sourceScript);
     }
 
     TEST(LogicNodeConnector, PropagatesValuesOnlyToConnectedLogicNodes)
@@ -140,12 +175,15 @@ namespace rlogic
             function interface()
                 IN.inFloat = FLOAT
                 IN.inVec3  = VEC3F
+                IN.inInt   = INT
                 OUT.outFloat = FLOAT
                 OUT.outVec3  = VEC3F
+                OUT.outInt   = INT
             end
             function run()
                 OUT.outFloat = IN.inFloat
                 OUT.outVec3 = IN.inVec3
+                OUT.outInt = IN.inInt
             end
         )";
 
@@ -171,6 +209,7 @@ namespace rlogic
         auto script            = logicEngine.createLuaScriptFromSource(scriptSource, "Script");
         auto nodeBinding       = logicEngine.createRamsesNodeBinding("NodeBinding");
         auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
+        auto cameraBinding = logicEngine.createRamsesCameraBinding("CameraBinding");
 
         ramses::RamsesFramework ramsesFramework;
         auto                    ramsesClient = ramsesFramework.createClient("client");
@@ -183,6 +222,9 @@ namespace rlogic
         auto ramsesAppearance = ramsesScene->createAppearance(*ramsesEffect);
         appearanceBinding->setRamsesAppearance(ramsesAppearance);
 
+        auto ramsesCamera = ramsesScene->createPerspectiveCamera();
+        cameraBinding->setRamsesCamera(ramsesCamera);
+
         auto ramsesNode = ramsesScene->createNode();
         nodeBinding->setRamsesNode(ramsesNode);
 
@@ -190,6 +232,8 @@ namespace rlogic
         nodeBindingTranslation->set(vec3f{1.f, 2.f, 3.f});
         auto appearanceBindingFloatUniform = appearanceBinding->getInputs()->getChild("floatUniform");
         appearanceBindingFloatUniform->set(42.f);
+        auto cameraBindingViewportOffsetX = cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
+        cameraBindingViewportOffsetX->set(43);
 
         logicEngine.update();
 
@@ -199,6 +243,7 @@ namespace rlogic
         ramsesAppearance->getInputValueFloat(floatInput, floatUniformValue);
 
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
+        EXPECT_EQ(43, ramsesCamera->getViewportX());
         {
             std::array<float, 3> values = {0.0f, 0.0f, 0.0f};
             ramsesNode->getTranslation(values[0], values[1], values[2]);
@@ -206,19 +251,23 @@ namespace rlogic
         }
 
         auto nodeBindingScaling = nodeBinding->getInputs()->getChild("scaling");
+        auto cameraBindingVpY   = cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetY");
         auto scriptOutputVec3   = script->getOutputs()->getChild("outVec3");
         auto scriptOutputFloat  = script->getOutputs()->getChild("outFloat");
+        auto scriptOutputInt    = script->getOutputs()->getChild("outInt");
         auto scriptInputVec3    = script->getInputs()->getChild("inVec3");
         auto scriptInputFloat   = script->getInputs()->getChild("inFloat");
+        auto scriptInputInt     = script->getInputs()->getChild("inInt");
         auto appearanceInput    = appearanceBinding->getInputs()->getChild("floatUniform");
 
         logicEngine.link(*scriptOutputVec3, *nodeBindingScaling);
         scriptInputVec3->set(vec3f{3.f, 2.f, 1.f});
         scriptInputFloat->set(42.f);
+        scriptInputInt->set(43);
 
         logicEngine.update();
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
-
+        EXPECT_EQ(43, ramsesCamera->getViewportX());
         {
             std::array<float, 3> values = {0.0f, 0.0f, 0.0f};
             ramsesNode->getTranslation(values[0], values[1], values[2]);
@@ -245,11 +294,14 @@ namespace rlogic
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
 
         logicEngine.link(*scriptOutputFloat, *appearanceInput);
+        logicEngine.link(*scriptOutputInt, *cameraBindingVpY);
 
         logicEngine.update();
 
         ramsesAppearance->getInputValueFloat(floatUniform, floatUniformValue);
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
+
+        EXPECT_EQ(43, ramsesCamera->getViewportY());
 
         logicEngine.unlink(*scriptOutputVec3, *nodeBindingScaling);
     }
@@ -309,23 +361,23 @@ namespace rlogic
 
         targetInput->set(42.f);
 
+        // targetScript is linked input and cannot be set manually so it is not dirty
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
 
         logicEngine.update();
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetScript->m_impl.get().isDirty());
 
-        // Only targetScript is updated, because only the input of the target script has changed
-        ASSERT_EQ(1u, messages.size());
-        EXPECT_EQ("TargetScript", messages[0].first);
+        // Nothing is updated, because targetScript is linked input and cannot be set manually
+        ASSERT_EQ(0u, messages.size());
 
         sourceInput->set(24.f);
         messages.clear();
         logicEngine.update();
 
-        // Both scripts are updated, because the input of the first script is changed.
+        // Both scripts are updated, because the input of the first script is changed and changes target through link.
         ASSERT_EQ(2u, messages.size());
         EXPECT_EQ("SourceScript", messages[0].first);
         EXPECT_EQ("TargetScript", messages[1].first);

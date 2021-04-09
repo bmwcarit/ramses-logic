@@ -13,6 +13,7 @@
 
 #include "internals/SerializationHelper.h"
 #include "internals/TypeUtils.h"
+#include "LoggerImpl.h"
 
 #include "generated/property_gen.h"
 
@@ -333,9 +334,6 @@ namespace rlogic::internal
     {
         if (PropertyTypeToEnum<T>::TYPE == m_type)
         {
-            // TODO Violin Treat setting output values as an error here - it makes no sense semantics-wise to set the value of an
-            // output manually
-
             // Check if value changed before doing something
             if (std::get<T>(m_value) != value)
             {
@@ -399,6 +397,54 @@ namespace rlogic::internal
             m_bindingInputHasNewValue = true;
             m_logicNode->setDirty(true);
         }
+    }
+
+    template <typename T> bool  PropertyImpl::setManually(T value)
+    {
+        if (m_semantics == EPropertySemantics::ScriptOutput)
+        {
+            LOG_ERROR(fmt::format("Cannot set property '{}' which is an output.", m_name));
+            return false;
+        }
+        if (m_isLinkedInput)
+        {
+            LOG_ERROR(fmt::format("Property '{}' is currently linked. Unlink it first before setting its value!", m_name));
+            return false;
+        }
+        return set<T>(value);
+    }
+
+    template bool PropertyImpl::setManually<float>(float /*value*/);
+    template bool PropertyImpl::setManually<vec2f>(vec2f /*value*/);
+    template bool PropertyImpl::setManually<vec3f>(vec3f /*value*/);
+    template bool PropertyImpl::setManually<vec4f>(vec4f /*value*/);
+    template bool PropertyImpl::setManually<int32_t>(int32_t /*value*/);
+    template bool PropertyImpl::setManually<vec2i>(vec2i /*value*/);
+    template bool PropertyImpl::setManually<vec3i>(vec3i /*value*/);
+    template bool PropertyImpl::setManually<vec4i>(vec4i /*value*/);
+    template bool PropertyImpl::setManually<std::string>(std::string /*value*/);
+    template bool PropertyImpl::setManually<bool>(bool /*value*/);
+
+    template <typename T> bool  PropertyImpl::setOutputFromScript(T value)
+    {
+        assert(m_semantics == EPropertySemantics::ScriptOutput && "Property has to be a ScriptOutput");
+        return set<T>(value);
+    }
+
+    template bool PropertyImpl::setOutputFromScript<float>(float /*value*/);
+    template bool PropertyImpl::setOutputFromScript<vec2f>(vec2f /*value*/);
+    template bool PropertyImpl::setOutputFromScript<vec3f>(vec3f /*value*/);
+    template bool PropertyImpl::setOutputFromScript<vec4f>(vec4f /*value*/);
+    template bool PropertyImpl::setOutputFromScript<int32_t>(int32_t /*value*/);
+    template bool PropertyImpl::setOutputFromScript<vec2i>(vec2i /*value*/);
+    template bool PropertyImpl::setOutputFromScript<vec3i>(vec3i /*value*/);
+    template bool PropertyImpl::setOutputFromScript<vec4i>(vec4i /*value*/);
+    template bool PropertyImpl::setOutputFromScript<std::string>(std::string /*value*/);
+    template bool PropertyImpl::setOutputFromScript<bool>(bool /*value*/);
+
+    void PropertyImpl::setIsLinkedInput(bool isLinkedInput)
+    {
+        m_isLinkedInput = isLinkedInput;
     }
 
     void PropertyImpl::clearChildren()

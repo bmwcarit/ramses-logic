@@ -223,14 +223,14 @@ namespace rlogic::internal
     {
         PropertyImpl* structProperty = m_nodeBNested.getInputs()->getChild("inputStruct")->m_impl.get();
         EXPECT_FALSE(m_dependencies.unlink(*m_nestedOutputA, *structProperty, m_errorReporting));
-        EXPECT_EQ("Can't unlink properties of complex types directly!", m_errorReporting.getErrors()[0]);
+        EXPECT_EQ("Can't unlink properties of complex types directly!", m_errorReporting.getErrors()[0].message);
     }
 
     TEST_F(ALogicNodeDependencies_NestedLinks, ReportsErrorWhenUnlinkingArrayInputs_BasedOnTheirType)
     {
         PropertyImpl* arrayProperty = m_nodeBNested.getInputs()->getChild("inputArray")->m_impl.get();
         EXPECT_FALSE(m_dependencies.unlink(*m_nestedOutputA, *arrayProperty, m_errorReporting));
-        EXPECT_EQ("Can't unlink properties of complex types directly!", m_errorReporting.getErrors()[0]);
+        EXPECT_EQ("Can't unlink properties of complex types directly!", m_errorReporting.getErrors()[0].message);
     }
 
     TEST_F(ALogicNodeDependencies_NestedLinks, ReportsErrorWhenUnlinkingStructs_WithLinkedChildren)
@@ -242,7 +242,7 @@ namespace rlogic::internal
         PropertyImpl* outputParentStruct = m_nodeANested.getOutputs()->getChild("outputStruct")->m_impl.get();
         PropertyImpl* inputParentStruct = m_nodeBNested.getInputs()->getChild("inputStruct")->m_impl.get();
         EXPECT_FALSE(m_dependencies.unlink(*outputParentStruct, *inputParentStruct, m_errorReporting));
-        EXPECT_EQ("Can't unlink properties of complex types directly!", m_errorReporting.getErrors()[0]);
+        EXPECT_EQ("Can't unlink properties of complex types directly!", m_errorReporting.getErrors()[0].message);
     }
 
     TEST_F(ALogicNodeDependencies_NestedLinks, ConnectingTwoNodes_CreatesALink)

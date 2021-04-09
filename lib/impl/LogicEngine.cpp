@@ -10,11 +10,9 @@
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 
 #include "impl/LogicEngineImpl.h"
-#include "impl/LuaScriptImpl.h"
-#include "impl/RamsesNodeBindingImpl.h"
-#include "impl/RamsesAppearanceBindingImpl.h"
 
 #include <string>
 
@@ -34,17 +32,22 @@ namespace rlogic
 
     Collection<LuaScript> LogicEngine::scripts() const
     {
-        return Collection<LuaScript>(m_impl->getScripts());
+        return Collection<LuaScript>(m_impl->getApiObjects().getScripts());
     }
 
     Collection<RamsesNodeBinding> LogicEngine::ramsesNodeBindings() const
     {
-        return Collection<RamsesNodeBinding>(m_impl->getNodeBindings());
+        return Collection<RamsesNodeBinding>(m_impl->getApiObjects().getNodeBindings());
     }
 
     Collection<RamsesAppearanceBinding> LogicEngine::ramsesAppearanceBindings() const
     {
-        return Collection<RamsesAppearanceBinding>(m_impl->getAppearanceBindings());
+        return Collection<RamsesAppearanceBinding>(m_impl->getApiObjects().getAppearanceBindings());
+    }
+
+    Collection<RamsesCameraBinding> LogicEngine::ramsesCameraBindings() const
+    {
+        return Collection<RamsesCameraBinding>(m_impl->getApiObjects().getCameraBindings());
     }
 
     LuaScript* LogicEngine::findScript(std::string_view name) const
@@ -92,6 +95,21 @@ namespace rlogic
         return *bindingIter;
     }
 
+    RamsesCameraBinding* LogicEngine::findCameraBinding(std::string_view name) const
+    {
+        auto bindingIter = std::find_if(ramsesCameraBindings().begin(), ramsesCameraBindings().end(),
+            [name](const RamsesCameraBinding* binding)
+        {
+            return binding->getName() == name;
+        }
+        );
+        if (bindingIter == ramsesCameraBindings().end())
+        {
+            return nullptr;
+        }
+        return *bindingIter;
+    }
+
 
     LuaScript* LogicEngine::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
     {
@@ -113,7 +131,12 @@ namespace rlogic
         return m_impl->createRamsesAppearanceBinding(name);
     }
 
-    const std::vector<std::string>& LogicEngine::getErrors() const
+    RamsesCameraBinding* LogicEngine::createRamsesCameraBinding(std::string_view name)
+    {
+        return m_impl->createRamsesCameraBinding(name);
+    }
+
+    const std::vector<ErrorData>& LogicEngine::getErrors() const
     {
         return m_impl->getErrors();
     }

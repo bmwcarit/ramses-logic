@@ -139,7 +139,7 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScriptFromFile("script.lua");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0], ::testing::HasSubstr("\"script.lua\""));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("\"script.lua\""));
     }
 
     TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_Arrays)
@@ -496,7 +496,7 @@ namespace rlogic::internal
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, errors.getErrors().size());
-            EXPECT_THAT(errors.getErrors()[0], ::testing::HasSubstr("'=' expected near '<eof>'"));
+            EXPECT_THAT(errors.getErrors()[0].message, ::testing::HasSubstr("'=' expected near '<eof>'"));
         }
     }
 
@@ -534,7 +534,7 @@ namespace rlogic::internal
 
             EXPECT_EQ(nullptr, script);
             ASSERT_EQ(1u, errors.getErrors().size());
-            EXPECT_EQ("Error during execution of main function of deserialized script", errors.getErrors()[0]);
+            EXPECT_EQ("Error during execution of main function of deserialized script", errors.getErrors()[0].message);
         }
     }
 

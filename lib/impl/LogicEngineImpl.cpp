@@ -11,6 +11,8 @@
 #include "impl/PropertyImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
+#include "impl/RamsesCameraBindingImpl.h"
+
 #include "impl/LoggerImpl.h"
 #include "internals/FileUtils.h"
 #include "internals/TypeUtils.h"
@@ -20,6 +22,7 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/LogicNode.h"
 
 #include "ramses-logic-build-config.h"
@@ -31,6 +34,7 @@
 #include "ramses-client-api/Scene.h"
 #include "ramses-client-api/Node.h"
 #include "ramses-client-api/Appearance.h"
+#include "ramses-client-api/Camera.h"
 #include "ramses-utils.h"
 
 #include <string>
@@ -55,135 +59,42 @@ namespace rlogic::internal
         }
 
         std::string source(std::istreambuf_iterator<char>(iStream), std::istreambuf_iterator<char>{});
-        return createLuaScriptInternal(source, filename, scriptName);
+        return m_apiObjects.createLuaScript(m_luaState, source, filename, scriptName, m_errors);
     }
 
     LuaScript* LogicEngineImpl::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
     {
         m_errors.clear();
-        return createLuaScriptInternal(source, "", scriptName);
-    }
-
-    LuaScript* LogicEngineImpl::createLuaScriptInternal(std::string_view source, std::string_view filename, std::string_view scriptName)
-    {
-        auto scriptImpl = LuaScriptImpl::Create(m_luaState, source, scriptName, filename, m_errors);
-        if (scriptImpl)
-        {
-            m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(scriptImpl)));
-            auto script = m_scripts.back().get();
-            m_logicNodeDependencies.addNode(script->m_impl);
-            return script;
-        }
-
-        return nullptr;
+        return m_apiObjects.createLuaScript(m_luaState, source, "", scriptName, m_errors);
     }
 
     RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(std::string_view name)
     {
         m_errors.clear();
-        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(RamsesNodeBindingImpl::Create(name)));
-        auto ramsesBinding = m_ramsesNodeBindings.back().get();
-        m_logicNodeDependencies.addNode(ramsesBinding->m_impl);
-        return ramsesBinding;
+        return m_apiObjects.createRamsesNodeBinding(name);
     }
 
     RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(std::string_view name)
     {
         m_errors.clear();
-        m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(RamsesAppearanceBindingImpl::Create(name)));
-        auto ramsesBinding = m_ramsesAppearanceBindings.back().get();
-        m_logicNodeDependencies.addNode(ramsesBinding->m_impl);
-        return ramsesBinding;
+        return m_apiObjects.createRamsesAppearanceBinding(name);
+    }
+
+    RamsesCameraBinding* LogicEngineImpl::createRamsesCameraBinding(std::string_view name)
+    {
+        m_errors.clear();
+        return m_apiObjects.createRamsesCameraBinding(name);
     }
 
     bool LogicEngineImpl::destroy(LogicNode& logicNode)
     {
         m_errors.clear();
-
-        {
-            auto luaScript = dynamic_cast<LuaScript*>(&logicNode);
-            if (nullptr != luaScript)
-            {
-                return destroyInternal(*luaScript);
-            }
-        }
-
-        {
-            auto ramsesNodeBinding = dynamic_cast<RamsesNodeBinding*>(&logicNode);
-            if (nullptr != ramsesNodeBinding)
-            {
-                return destroyInternal(*ramsesNodeBinding);
-            }
-        }
-
-        {
-            auto ramsesAppearanceBinding = dynamic_cast<RamsesAppearanceBinding*>(&logicNode);
-            if (nullptr != ramsesAppearanceBinding)
-            {
-                return destroyInternal(*ramsesAppearanceBinding);
-            }
-        }
-
-        m_errors.add(fmt::format("Tried to destroy object '{}' with unknown type", logicNode.getName()));
-        return false;
-    }
-
-    bool LogicEngineImpl::destroyInternal(LuaScript& luaScript)
-    {
-        auto scriptIter = find_if(m_scripts.begin(), m_scripts.end(), [&](const std::unique_ptr<LuaScript>& script) {
-            return script.get() == &luaScript;
-        });
-        if (scriptIter == m_scripts.end())
-        {
-            m_errors.add("Can't find script in logic engine!");
-            return false;
-        }
-
-        m_logicNodeDependencies.removeNode(luaScript.m_impl);
-        m_scripts.erase(scriptIter);
-        return true;
-    }
-
-    bool LogicEngineImpl::destroyInternal(RamsesNodeBinding& ramsesNodeBinding)
-    {
-        auto nodeIter = find_if(m_ramsesNodeBindings.begin(), m_ramsesNodeBindings.end(), [&](const std::unique_ptr<RamsesNodeBinding>& nodeBinding)
-            {
-                return nodeBinding.get() == &ramsesNodeBinding;
-            });
-
-        if (nodeIter == m_ramsesNodeBindings.end())
-        {
-            m_errors.add("Can't find RamsesNodeBinding in logic engine!");
-            return false;
-        }
-
-        m_logicNodeDependencies.removeNode(ramsesNodeBinding.m_impl);
-        m_ramsesNodeBindings.erase(nodeIter);
-
-        return true;
-    }
-
-    bool LogicEngineImpl::destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding)
-    {
-        auto appearanceIter = find_if(m_ramsesAppearanceBindings.begin(), m_ramsesAppearanceBindings.end(), [&](const std::unique_ptr<RamsesAppearanceBinding>& appearanceBinding) {
-            return appearanceBinding.get() == &ramsesAppearanceBinding;
-            });
-
-        if (appearanceIter == m_ramsesAppearanceBindings.end())
-        {
-            m_errors.add("Can't find RamsesAppearanceBinding in logic engine!");
-            return false;
-        }
-
-        m_logicNodeDependencies.removeNode(ramsesAppearanceBinding.m_impl);
-        m_ramsesAppearanceBindings.erase(appearanceIter);
-
-        return true;
+        return m_apiObjects.destroy(logicNode, m_errors);
     }
 
     bool LogicEngineImpl::isLinked(const LogicNode& logicNode) const
     {
-        return m_logicNodeDependencies.isLinked(logicNode.m_impl);
+        return m_apiObjects.getLogicNodeDependencies().isLinked(logicNode.m_impl);
     }
 
     void LogicEngineImpl::updateLinksRecursive(Property& inputProperty)
@@ -200,7 +111,7 @@ namespace rlogic::internal
             }
             else
             {
-                const PropertyImpl* output = m_logicNodeDependencies.getLinkedOutput(*child.m_impl);
+                const PropertyImpl* output = m_apiObjects.getLogicNodeDependencies().getLinkedOutput(*child.m_impl);
                 if (nullptr != output)
                 {
                     child.m_impl->setInternal(*output);
@@ -214,7 +125,7 @@ namespace rlogic::internal
         m_errors.clear();
         LOG_DEBUG("Begin update");
 
-        const std::optional<NodeVector> sortedNodes = m_logicNodeDependencies.getTopologicallySortedNodes();
+        const std::optional<NodeVector> sortedNodes = m_apiObjects.getLogicNodeDependencies().getTopologicallySortedNodes();
         if (!sortedNodes)
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!");
@@ -243,7 +154,7 @@ namespace rlogic::internal
                 const auto& errors = node.getErrors();
                 for (const auto& error : errors)
                 {
-                    m_errors.add(error);
+                    m_errors.add(error, *m_apiObjects.getApiObject(node));
                 }
                 return false;
             }
@@ -256,7 +167,7 @@ namespace rlogic::internal
         return true;
     }
 
-    const std::vector<std::string>& LogicEngineImpl::getErrors() const
+    const std::vector<ErrorData>& LogicEngineImpl::getErrors() const
     {
         return m_errors.getErrors();
     }
@@ -295,9 +206,10 @@ namespace rlogic::internal
         return loadFromByteData((*maybeBytesFromFile).data(), fileSize, scene, enableMemoryVerification, fmt::format("file '{}' (size: {})", filename, fileSize));
     }
 
+
     // TODO Violin consider handling errors gracefully, e.g. don't change state when error occurs
     // Idea: collect data, and only move() in the end when everything was loaded correctly
-    bool LogicEngineImpl::loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSource)
+    bool LogicEngineImpl::loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription)
     {
         m_errors.clear();
 
@@ -308,21 +220,24 @@ namespace rlogic::internal
 
             if (!bufferOK)
             {
-                m_errors.add(fmt::format("{} contains corrupted data!", dataSource));
+                m_errors.add(fmt::format("{} contains corrupted data!", dataSourceDescription));
                 return false;
             }
         }
 
-        m_scripts.clear();
-        m_ramsesNodeBindings.clear();
-        m_ramsesAppearanceBindings.clear();
-        m_logicNodeDependencies = {};
+        // Fill containers with data and check for errors before replacing existing data
+        // TODO Violin also use fresh Lua environment, so that we don't pollute current one when loading failed
+        ScriptsContainer scripts;
+        NodeBindingsContainer ramsesNodeBindings;
+        AppearanceBindingsContainer ramsesAppearanceBindings;
+        CameraBindingsContainer ramsesCameraBindings;
+        LogicNodeDependencies logicNodeDependencies;
 
         const auto logicEngine = rlogic_serialization::GetLogicEngine(byteData);
 
         if (nullptr == logicEngine || nullptr == logicEngine->ramsesVersion() || nullptr == logicEngine->rlogicVersion())
         {
-            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSource));
+            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSourceDescription));
             return false;
         }
 
@@ -330,7 +245,7 @@ namespace rlogic::internal
         if (!CheckRamsesVersionFromFile(ramsesVersion))
         {
             m_errors.add(fmt::format("Version mismatch while loading {}! Expected Ramses version {}.x.x but found {}",
-                dataSource, ramses::GetRamsesVersion().major,
+                dataSourceDescription, ramses::GetRamsesVersion().major,
                 ramsesVersion.v_string()->string_view()));
             return false;
         }
@@ -339,7 +254,7 @@ namespace rlogic::internal
         if (!CheckLogicVersionFromFile(rlogicVersion))
         {
             m_errors.add(fmt::format("Version mismatch while loading {}! Expected version {}.{}.x but found {}",
-                dataSource, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
+                dataSourceDescription, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
                 rlogicVersion.v_string()->string_view()));
             return false;
         }
@@ -347,13 +262,14 @@ namespace rlogic::internal
         assert(nullptr != logicEngine->luascripts());
         assert(nullptr != logicEngine->ramsesnodebindings());
         assert(nullptr != logicEngine->ramsesappearancebindings());
+        assert(nullptr != logicEngine->ramsescamerabindings());
 
         const auto luascripts = logicEngine->luascripts();
         assert(nullptr != luascripts);
 
         if (luascripts->size() != 0)
         {
-            m_scripts.reserve(luascripts->size());
+            scripts.reserve(luascripts->size());
         }
 
         for (auto script : *luascripts)
@@ -363,8 +279,8 @@ namespace rlogic::internal
             auto newScript = LuaScriptImpl::Create(m_luaState, script, m_errors);
             if (nullptr != newScript)
             {
-                m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(newScript)));
-                m_logicNodeDependencies.addNode(m_scripts.back()->m_impl);
+                scripts.emplace_back(std::make_unique<LuaScript>(std::move(newScript)));
+                logicNodeDependencies.addNode(scripts.back()->m_impl);
             }
         }
 
@@ -373,7 +289,7 @@ namespace rlogic::internal
 
         if (ramsesnodebindings->size() != 0)
         {
-            m_ramsesNodeBindings.reserve(ramsesnodebindings->size());
+            ramsesNodeBindings.reserve(ramsesnodebindings->size());
         }
 
         for (auto rNodeBinding : *ramsesnodebindings)
@@ -384,7 +300,7 @@ namespace rlogic::internal
 
             if (objectId.isValid())
             {
-                auto optional_ramsesNode = findRamsesNodeInScene(rNodeBinding->logicnode(), scene, objectId);
+                auto optional_ramsesNode = findRamsesNodeInScene(rNodeBinding->logicnode()->name()->string_view(), scene, objectId);
                 if (!optional_ramsesNode)
                 {
                     return false;
@@ -393,15 +309,15 @@ namespace rlogic::internal
             }
             auto newBindingImpl = RamsesNodeBindingImpl::Create(*rNodeBinding, ramsesNode);
             assert(nullptr != newBindingImpl);
-            m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::move(newBindingImpl)));
-            m_logicNodeDependencies.addNode(m_ramsesNodeBindings.back()->m_impl);
+            ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::move(newBindingImpl)));
+            logicNodeDependencies.addNode(ramsesNodeBindings.back()->m_impl);
         }
 
         const auto ramsesappearancebindings = logicEngine->ramsesappearancebindings();
 
         if (ramsesappearancebindings->size() != 0)
         {
-            m_ramsesAppearanceBindings.reserve(ramsesappearancebindings->size());
+            ramsesAppearanceBindings.reserve(ramsesappearancebindings->size());
         }
 
         for (auto rAppearanceBinding : *ramsesappearancebindings)
@@ -413,7 +329,7 @@ namespace rlogic::internal
 
             if (objectId.isValid())
             {
-                auto optional_ramsesAppearance = findRamsesAppearanceInScene(rAppearanceBinding->logicnode(), scene, objectId);
+                auto optional_ramsesAppearance = findRamsesAppearanceInScene(rAppearanceBinding->logicnode()->name()->string_view(), scene, objectId);
                 if(!optional_ramsesAppearance)
                 {
                     return false;
@@ -427,8 +343,42 @@ namespace rlogic::internal
                 return false;
             }
 
-            m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::move(newBinding)));
-            m_logicNodeDependencies.addNode(m_ramsesAppearanceBindings.back()->m_impl);
+            ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::move(newBinding)));
+            logicNodeDependencies.addNode(ramsesAppearanceBindings.back()->m_impl);
+        }
+
+        const auto ramsescamerabindings = logicEngine->ramsescamerabindings();
+
+        if (ramsescamerabindings->size() != 0)
+        {
+            ramsesCameraBindings.reserve(ramsescamerabindings->size());
+        }
+
+        for (auto rCameraBinding : *ramsescamerabindings)
+        {
+            assert(nullptr != rCameraBinding);
+
+            ramses::Camera*     ramsesCamera = nullptr;
+            ramses::sceneObjectId_t objectId(rCameraBinding->ramsesCamera());
+
+            if (objectId.isValid())
+            {
+                auto optional_ramsesCamera = findRamsesCameraInScene(rCameraBinding->logicnode()->name()->string_view(), scene, objectId);
+                if (!optional_ramsesCamera)
+                {
+                    return false;
+                }
+                ramsesCamera = *optional_ramsesCamera;
+            }
+
+            auto newBinding = RamsesCameraBindingImpl::Create(*rCameraBinding, ramsesCamera);
+            if (nullptr == newBinding)
+            {
+                return false;
+            }
+
+            ramsesCameraBindings.emplace_back(std::make_unique<RamsesCameraBinding>(std::move(newBinding)));
+            logicNodeDependencies.addNode(ramsesCameraBindings.back()->m_impl);
         }
 
         assert(logicEngine->links());
@@ -443,11 +393,12 @@ namespace rlogic::internal
             switch (rLink->sourceLogicNodeType())
             {
             case rlogic_serialization::ELogicNodeType::Script:
-                assert(rLink->sourceLogicNodeId() < m_scripts.size());
-                srcLogicNode = m_scripts[rLink->sourceLogicNodeId()].get();
+                assert(rLink->sourceLogicNodeId() < scripts.size());
+                srcLogicNode = scripts[rLink->sourceLogicNodeId()].get();
                 break;
             case rlogic_serialization::ELogicNodeType::RamsesNodeBinding:
             case rlogic_serialization::ELogicNodeType::RamsesAppearanceBinding:
+            case rlogic_serialization::ELogicNodeType::RamsesCameraBinding:
                 assert(false && "Bindings can't be the source node of a link!");
             }
             assert(srcLogicNode != nullptr);
@@ -456,16 +407,20 @@ namespace rlogic::internal
             switch (rLink->targetLogicNodeType())
             {
             case rlogic_serialization::ELogicNodeType::Script:
-                assert(rLink->targetLogicNodeId() < m_scripts.size());
-                tgtLogicNode = m_scripts[rLink->targetLogicNodeId()].get();
+                assert(rLink->targetLogicNodeId() < scripts.size());
+                tgtLogicNode = scripts[rLink->targetLogicNodeId()].get();
                 break;
             case rlogic_serialization::ELogicNodeType::RamsesNodeBinding:
-                assert(rLink->targetLogicNodeId() < m_ramsesNodeBindings.size());
-                tgtLogicNode = m_ramsesNodeBindings[rLink->targetLogicNodeId()].get();
+                assert(rLink->targetLogicNodeId() < ramsesNodeBindings.size());
+                tgtLogicNode = ramsesNodeBindings[rLink->targetLogicNodeId()].get();
                 break;
             case rlogic_serialization::ELogicNodeType::RamsesAppearanceBinding:
-                assert(rLink->targetLogicNodeId() < m_ramsesAppearanceBindings.size());
-                tgtLogicNode = m_ramsesAppearanceBindings[rLink->targetLogicNodeId()].get();
+                assert(rLink->targetLogicNodeId() < ramsesAppearanceBindings.size());
+                tgtLogicNode = ramsesAppearanceBindings[rLink->targetLogicNodeId()].get();
+                break;
+            case rlogic_serialization::ELogicNodeType::RamsesCameraBinding:
+                assert(rLink->targetLogicNodeId() < ramsesCameraBindings.size());
+                tgtLogicNode = ramsesCameraBindings[rLink->targetLogicNodeId()].get();
                 break;
             }
             assert(tgtLogicNode != nullptr);
@@ -491,14 +446,12 @@ namespace rlogic::internal
                 assert(targetProperty != nullptr);
             }
 
-            // TODO Violin/Sven/Tobias discuss how we can simulate failures here, and on other places like this
-            // where an error can only be triggered with binary file changes or incompatible versions
-            const bool success = link(*sourceProperty, *targetProperty);
+            const bool success = logicNodeDependencies.link(*sourceProperty->m_impl, *targetProperty->m_impl, m_errors);
             if (!success)
             {
                 m_errors.add(
                     fmt::format("Fatal error during loading from {}! Could not link property '{}' (from LogicNode {}) to property '{}' (from LogicNode {})!",
-                        dataSource,
+                        dataSourceDescription,
                         sourceProperty->getName(),
                         srcLogicNode->getName(),
                         targetProperty->getName(),
@@ -508,16 +461,18 @@ namespace rlogic::internal
             }
         }
 
+        m_apiObjects = ApiObjects(std::move(scripts), std::move(ramsesNodeBindings), std::move(ramsesAppearanceBindings), std::move(ramsesCameraBindings), std::move(logicNodeDependencies));
+
         return true;
     }
 
-    ramses::SceneObject* LogicEngineImpl::findRamsesSceneObjectInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
+    ramses::SceneObject* LogicEngineImpl::findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
     {
         if (nullptr == scene)
         {
             m_errors.add(
                 fmt::format("Fatal error during loading from file! Serialized ramses logic object '{}' points to a Ramses object (id: {}) , but no Ramses scene was provided to resolve the Ramses object!",
-                            logicNode->name()->string_view().data(),
+                            logicNodeName,
                             objectId.getValue()
                     ));
             return nullptr;
@@ -529,7 +484,7 @@ namespace rlogic::internal
         {
             m_errors.add(
                 fmt::format("Fatal error during loading from file! Serialized ramses logic object {} points to a Ramses object (id: {}) which couldn't be found in the provided scene!",
-                            logicNode->name()->string_view().data(),
+                            logicNodeName,
                             objectId.getValue()));
             return nullptr;
         }
@@ -537,62 +492,14 @@ namespace rlogic::internal
         return sceneObject;
     }
 
-    bool LogicEngineImpl::allBindingsReferToSameRamsesScene()
+    std::optional<ramses::Node*> LogicEngineImpl::findRamsesNodeInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
     {
-        // Optional because it's OK that no Ramses object is referenced at all (and thus no ramses scene)
-        std::optional<ramses::sceneId_t> sceneId;
-
-        for (const auto& binding : m_ramsesNodeBindings)
-        {
-            const ramses::Node* node = binding->m_nodeBinding->getRamsesNode();
-            if (node)
-            {
-                const ramses::sceneId_t nodeSceneId = node->getSceneId();
-                if (!sceneId)
-                {
-                    sceneId = nodeSceneId;
-                }
-
-                if (*sceneId != nodeSceneId)
-                {
-                    m_errors.add(fmt::format("Ramses node '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                        node->getName(), nodeSceneId.getValue(), sceneId->getValue()));
-                    return false;
-                }
-            }
-        }
-
-        for (const auto& binding : m_ramsesAppearanceBindings)
-        {
-            const ramses::Appearance* appearance = binding->m_appearanceBinding->getRamsesAppearance();
-            if (appearance)
-            {
-                const ramses::sceneId_t appearanceSceneId = appearance->getSceneId();
-                if (!sceneId)
-                {
-                    sceneId = appearanceSceneId;
-                }
-
-                if (*sceneId != appearanceSceneId)
-                {
-                    m_errors.add(fmt::format("Ramses appearance '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                        appearance->getName(), appearanceSceneId.getValue(), sceneId->getValue()));
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    std::optional<ramses::Node*> LogicEngineImpl::findRamsesNodeInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
-    {
-        ramses::SceneObject*    sceneObject = findRamsesSceneObjectInScene(logicNode, scene, objectId);
+        ramses::SceneObject*    sceneObject = findRamsesSceneObjectInScene(logicNodeName, scene, objectId);
         ramses::Node* ramsesNode = nullptr;
 
         if (nullptr == sceneObject)
         {
-            // Very hard to test. Shall we change it to an assert?
+            // TODO Violin unit test this and remove code duplication
             return std::nullopt;
         }
 
@@ -600,22 +507,22 @@ namespace rlogic::internal
 
         if (nullptr == ramsesNode)
         {
-            // Can't be unit tested directly unfortunately because there is no way to force ramses to recreate an object with the same ID
-            // But in order to be safe, we have to check that the cast to Node worked here
+            // TODO Violin unit test this and remove code duplication
             m_errors.add("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!");
+            return std::nullopt;
         }
 
         return std::make_optional(ramsesNode);
     }
 
-    std::optional<ramses::Appearance*> LogicEngineImpl::findRamsesAppearanceInScene(const rlogic_serialization::LogicNode* logicNode, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
+    std::optional<ramses::Appearance*> LogicEngineImpl::findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
     {
-        ramses::SceneObject* sceneObject = findRamsesSceneObjectInScene(logicNode, scene, objectId);
+        ramses::SceneObject* sceneObject = findRamsesSceneObjectInScene(logicNodeName, scene, objectId);
         ramses::Appearance* ramsesAppearance  = nullptr;
 
         if (nullptr == sceneObject)
         {
-            // Very hard to test. Shall we change it to an assert?
+            // TODO Violin unit test this and remove code duplication
             return std::nullopt;
         }
 
@@ -623,12 +530,35 @@ namespace rlogic::internal
 
         if (nullptr == ramsesAppearance)
         {
-            // Can't be unit tested directly unfortunately because there is no way to force ramses to recreate an object with the same ID
-            // But in order to be safe, we have to check that the cast to Node worked here
+            // TODO Violin unit test this and remove code duplication
             m_errors.add("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!");
+            return std::nullopt;
         }
 
         return std::make_optional(ramsesAppearance);
+    }
+
+    std::optional<ramses::Camera*> LogicEngineImpl::findRamsesCameraInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId)
+    {
+        ramses::SceneObject* sceneObject = findRamsesSceneObjectInScene(logicNodeName, scene, objectId);
+        ramses::Camera* ramsesCamera = nullptr;
+
+        if (nullptr == sceneObject)
+        {
+            // TODO Violin unit test this and remove code duplication
+            return std::nullopt;
+        }
+
+        ramsesCamera = ramses::RamsesUtils::TryConvert<ramses::Camera>(*sceneObject);
+
+        if (nullptr == ramsesCamera)
+        {
+            // TODO Violin unit test this and remove code duplication
+            m_errors.add("Fatal error during loading from file! Camera binding points to a Ramses scene object which is not of type 'Camera'!");
+            return std::nullopt;
+        }
+
+        return std::make_optional(ramsesCamera);
     }
 
     // TODO Violin this needs more testing (both internal and user-side). Concretely, ensure that:
@@ -646,7 +576,7 @@ namespace rlogic::internal
         // different containers below which all call a method on LogicNode
 
         // Scripts dirty?
-        for (const auto& script : m_scripts)
+        for (const auto& script : m_apiObjects.getScripts())
         {
             if (script->m_impl.get().isDirty())
             {
@@ -664,7 +594,7 @@ namespace rlogic::internal
 
     bool LogicEngineImpl::bindingsDirty() const
     {
-        for (const auto& nodeBinding : m_ramsesNodeBindings)
+        for (const auto& nodeBinding : m_apiObjects.getNodeBindings())
         {
             if (nodeBinding->m_impl.get().isDirty())
             {
@@ -672,9 +602,17 @@ namespace rlogic::internal
             }
         }
 
-        for (const auto& appBinding : m_ramsesAppearanceBindings)
+        for (const auto& appBinding : m_apiObjects.getAppearanceBindings())
         {
             if (appBinding->m_impl.get().isDirty())
+            {
+                return true;
+            }
+        }
+
+        for (const auto& camBinding : m_apiObjects.getCameraBindings())
+        {
+            if (camBinding->m_impl.get().isDirty())
             {
                 return true;
             }
@@ -687,7 +625,7 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
-        if (!allBindingsReferToSameRamsesScene())
+        if (!m_apiObjects.checkBindingsReferToSameRamsesScene(m_errors))
         {
             m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!");
             return false;
@@ -698,30 +636,44 @@ namespace rlogic::internal
             LOG_WARN("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!");
         }
 
+        const ScriptsContainer& scripts = m_apiObjects.getScripts();
+
         flatbuffers::FlatBufferBuilder builder;
 
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> luascripts;
-        luascripts.reserve(m_scripts.size());
+        luascripts.reserve(scripts.size());
 
-        std::transform(m_scripts.begin(), m_scripts.end(), std::back_inserter(luascripts), [&builder](const std::vector<std::unique_ptr<LuaScript>>::value_type& it) {
+        std::transform(scripts.begin(), scripts.end(), std::back_inserter(luascripts), [&builder](const std::vector<std::unique_ptr<LuaScript>>::value_type& it) {
             return it->m_script->serialize(builder);
         });
 
+        const NodeBindingsContainer& nodeBindings = m_apiObjects.getNodeBindings();
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> ramsesnodebindings;
-        ramsesnodebindings.reserve(m_ramsesNodeBindings.size());
+        ramsesnodebindings.reserve(nodeBindings.size());
 
-        std::transform(m_ramsesNodeBindings.begin(),
-                       m_ramsesNodeBindings.end(),
+        std::transform(nodeBindings.begin(),
+                       nodeBindings.end(),
                        std::back_inserter(ramsesnodebindings),
                        [&builder](const std::vector<std::unique_ptr<RamsesNodeBinding>>::value_type& it) { return it->m_nodeBinding->serialize(builder); });
 
+        const AppearanceBindingsContainer& appearanceBindings = m_apiObjects.getAppearanceBindings();
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> ramsesappearancebindings;
-        ramsesappearancebindings.reserve(m_ramsesAppearanceBindings.size());
+        ramsesappearancebindings.reserve(appearanceBindings.size());
 
-        std::transform(m_ramsesAppearanceBindings.begin(),
-                       m_ramsesAppearanceBindings.end(),
+        std::transform(appearanceBindings.begin(),
+                       appearanceBindings.end(),
                        std::back_inserter(ramsesappearancebindings),
                        [&builder](const std::vector<std::unique_ptr<RamsesAppearanceBinding>>::value_type& it) { return it->m_appearanceBinding->serialize(builder);
+        });
+
+        const CameraBindingsContainer& cameraBindings = m_apiObjects.getCameraBindings();
+        std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> ramsescamerabindings;
+        ramsescamerabindings.reserve(cameraBindings.size());
+
+        std::transform(cameraBindings.begin(),
+                       cameraBindings.end(),
+                       std::back_inserter(ramsescamerabindings),
+                       [&builder](const std::vector<std::unique_ptr<RamsesCameraBinding>>::value_type& it) { return it->m_cameraBinding->serialize(builder);
         });
 
         // TODO Violin this code needs some redesign... Re-visit once we catch all errors and rewrite it
@@ -764,40 +716,48 @@ namespace rlogic::internal
         };
 
         // TODO Violin consider moving this code to LogicNodeImpl after links fully implemented
-        for (uint32_t scriptIndex = 0; scriptIndex < m_scripts.size(); ++scriptIndex)
+        for (uint32_t scriptIndex = 0; scriptIndex < scripts.size(); ++scriptIndex)
         {
-            const PropertyImpl* inputs = m_scripts[scriptIndex]->getInputs()->m_impl.get();
+            const PropertyImpl* inputs = scripts[scriptIndex]->getInputs()->m_impl.get();
             propertyLocation[inputs]  = PropertyLocation{rlogic_serialization::ELogicNodeType::Script, scriptIndex, {}};
             collectPropertyChildrenMetadata(*inputs);
 
-            const PropertyImpl* outputs = m_scripts[scriptIndex]->getOutputs()->m_impl.get();
+            const PropertyImpl* outputs = scripts[scriptIndex]->getOutputs()->m_impl.get();
             propertyLocation[outputs] = PropertyLocation{rlogic_serialization::ELogicNodeType::Script, scriptIndex, {}};
             collectPropertyChildrenMetadata(*outputs);
 
         }
 
-        for (uint32_t nbIndex = 0; nbIndex < m_ramsesNodeBindings.size(); ++nbIndex)
+        for (uint32_t nbIndex = 0; nbIndex < nodeBindings.size(); ++nbIndex)
         {
-            const PropertyImpl* inputs = m_ramsesNodeBindings[nbIndex]->getInputs()->m_impl.get();
+            const PropertyImpl* inputs = nodeBindings[nbIndex]->getInputs()->m_impl.get();
             propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::RamsesNodeBinding, nbIndex, {} };
             collectPropertyChildrenMetadata(*inputs);
         }
 
-        for (uint32_t abIndex = 0; abIndex < m_ramsesAppearanceBindings.size(); ++abIndex)
+        for (uint32_t abIndex = 0; abIndex < appearanceBindings.size(); ++abIndex)
         {
-            const PropertyImpl* inputs = m_ramsesAppearanceBindings[abIndex]->getInputs()->m_impl.get();
+            const PropertyImpl* inputs = appearanceBindings[abIndex]->getInputs()->m_impl.get();
             propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::RamsesAppearanceBinding, abIndex, {} };
             collectPropertyChildrenMetadata(*inputs);
         }
 
+        for (uint32_t cbIndex = 0; cbIndex < cameraBindings.size(); ++cbIndex)
+        {
+            const PropertyImpl* inputs = cameraBindings[cbIndex]->getInputs()->m_impl.get();
+            propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::RamsesCameraBinding, cbIndex, {} };
+            collectPropertyChildrenMetadata(*inputs);
+        }
+        LogicNodeDependencies& nodeDependencies = m_apiObjects.getLogicNodeDependencies();
+
         // Refuse save() if logic graph has loops
-        if (!m_logicNodeDependencies.getTopologicallySortedNodes())
+        if (!nodeDependencies.getTopologicallySortedNodes())
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!");
             return false;
         }
 
-        const LinksMap& allLinks = m_logicNodeDependencies.getLinks();
+        const LinksMap& allLinks = nodeDependencies.getLinks();
 
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
         links.reserve(allLinks.size());
@@ -838,6 +798,7 @@ namespace rlogic::internal
             builder.CreateVector(luascripts),
             builder.CreateVector(ramsesnodebindings),
             builder.CreateVector(ramsesappearancebindings),
+            builder.CreateVector(ramsescamerabindings),
             builder.CreateVector(links)
         );
 
@@ -852,37 +813,27 @@ namespace rlogic::internal
         return true;
     }
 
-    ScriptsContainer& LogicEngineImpl::getScripts()
-    {
-        return m_scripts;
-    }
-
-    NodeBindingsContainer& LogicEngineImpl::getNodeBindings()
-    {
-        return m_ramsesNodeBindings;
-    }
-
-    AppearanceBindingsContainer& LogicEngineImpl::getAppearanceBindings()
-    {
-        return m_ramsesAppearanceBindings;
-    }
-
     bool LogicEngineImpl::link(const Property& sourceProperty, const Property& targetProperty)
     {
         m_errors.clear();
 
-        return m_logicNodeDependencies.link(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
+        return m_apiObjects.getLogicNodeDependencies().link(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
     }
 
     bool LogicEngineImpl::unlink(const Property& sourceProperty, const Property& targetProperty)
     {
         m_errors.clear();
 
-        return m_logicNodeDependencies.unlink(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
+        return m_apiObjects.getLogicNodeDependencies().unlink(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
     }
 
-    const LogicNodeDependencies& LogicEngineImpl::getLogicNodeDependencies() const
+    ApiObjects& LogicEngineImpl::getApiObjects()
     {
-        return m_logicNodeDependencies;
+        return m_apiObjects;
+    }
+
+    const ApiObjects& LogicEngineImpl::getApiObjects() const
+    {
+        return m_apiObjects;
     }
 }

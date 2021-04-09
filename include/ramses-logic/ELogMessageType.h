@@ -18,9 +18,12 @@ namespace rlogic
      */
     enum class ELogMessageType : int
     {
-        ERROR = 2,
-        WARNING = 3,
-        INFO = 4,
-        DEBUG = 5,
+        Off = 0,
+        Fatal = 1,
+        Error = 2,
+        Warn = 3,
+        Info = 4,
+        Debug = 5,
+        Trace = 6
     };
 }

@@ -158,11 +158,11 @@ namespace rlogic
             m_scene = m_ramsesTestSetup.createScene(m_ramsesSceneIdWhichIsAlwaysTheSame);
         }
 
-        void expectErrorWhenLoadingFile(std::string_view fileName, std::string_view errorMessage)
+        void expectErrorWhenLoadingFile(std::string_view fileName, std::string_view message)
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile(fileName, m_scene));
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_EQ(std::string(errorMessage), m_logicEngine.getErrors()[0]);
+            EXPECT_EQ(std::string(message), m_logicEngine.getErrors()[0].message);
         }
 
         static float GetUniformValueFloat(ramses::Appearance& appearance, const char* uniformName)
@@ -687,21 +687,10 @@ namespace rlogic
 
     TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceDoesNotHaveSameAmountOfInputsThanSerializedAppearanceBinding)
     {
-        {
-            ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_allTypes, m_fragShader_trivial));
-            auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
-            auto inputs = appearanceBinding.getInputs();
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_allTypes, m_fragShader_trivial));
+        auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
 
-            inputs->getChild("floatUniform")->set(42.42f);
-            inputs->getChild("intUniform")->set(42);
-            inputs->getChild("vec2Uniform")->set<vec2f>({4.f, 2.f});
-            inputs->getChild("vec3Uniform")->set<vec3f>({4.f, 2.f, 4.f});
-            inputs->getChild("vec4Uniform")->set<vec4f>({4.f, 2.f, 4.f, 2.f});
-            inputs->getChild("ivec2Uniform")->set<vec2i>({4, 2});
-            inputs->getChild("ivec3Uniform")->set<vec3i>({4, 2, 4});
-            inputs->getChild("ivec4Uniform")->set<vec4i>({ 4, 2, 4, 2 });
-            ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
-        }
+        ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
 
         // Simulate that a difference appearance with the same ID was created, but with different inputs
         recreateRamsesScene();
@@ -709,22 +698,20 @@ namespace rlogic
 
         expectErrorWhenLoadingFile("logic.bin",
             "Fatal error while loading from file: ramses appearance binding input (Name: intUniform) was not found in appearance 'test appearance'!)");
-        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
+
+        // Did not overwrite existing objects (because loading from file failed)
+        EXPECT_EQ(&appearanceBinding, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceInputsHasDifferentNamesThanSerializedAppearanceBinding)
     {
-        {
-            ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
-            auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
+        auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
 
-            auto inputs = appearanceBinding.getInputs();
+        ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
 
-            inputs->getChild("floatUniform")->set(42.42f);
-            ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
-        }
-
-        // Simulate that a difference appearance with the same ID was created, but with different in names
+        // Simulate that a difference appearance with the same ID was created, but with different name
+        // This test abuses the fact that IDs start counting from 1 for each new ramses scene
         recreateRamsesScene();
 
         const std::string_view m_vertShader_simple_with_renamed_uniform = R"(
@@ -741,21 +728,20 @@ namespace rlogic
 
         expectErrorWhenLoadingFile("logic.bin",
             "Fatal error while loading from file: ramses appearance binding input (Name: floatUniform) was not found in appearance 'test appearance'!)");
-        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
+
+        // Did not overwrite existing objects (because loading from file failed)
+        EXPECT_EQ(&appearanceBinding, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceInputsHasDifferentTypeThanSerializedAppearanceBinding)
     {
-        {
-            ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
-            auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
-            auto inputs = appearanceBinding.getInputs();
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
+        auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding", &appearance);
 
-            inputs->getChild("floatUniform")->set(42.42f);
-            ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
-        }
+        ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
 
         // Simulate that a difference appearance with the same ID was created, but with different types for the same inputs
+        // This test abuses the fact that IDs start counting from 1 for each new ramses scene
         recreateRamsesScene();
 
         const std::string_view m_vertShader_simple_with_different_type = R"(
@@ -772,7 +758,9 @@ namespace rlogic
 
         expectErrorWhenLoadingFile("logic.bin",
             "Fatal error while loading from file: ramses appearance binding input (Name: floatUniform) is expected to be of type FLOAT, but instead it is VEC2F!)");
-        EXPECT_EQ(nullptr, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
+
+        // Did not overwrite existing objects (because loading from file failed)
+        EXPECT_EQ(&appearanceBinding, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, DoesNotReapplyAppearanceUniformValuesToRamses_WhenLoadingFromFileAndCallingUpdate_UntilSetToANewValue)

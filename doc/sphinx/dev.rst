@@ -58,6 +58,24 @@ reside in which part of the source tree:
     /cmake, /external and the root CMakeLists.txt file.
 
 -----------------------------------------------------
+I want to understand the code, where do I start?
+-----------------------------------------------------
+
+A good place to start learning the ``Logic Engine`` is to be a user of it first. Have a look at the
+:ref:`examples <List of all examples>`. Check out the :ref:`API classes <Class Index>` and follow
+some of the methods through their implementation. Interested in the behavior of some of the classes?
+Take a look at its unit test in the /unittests folder.
+
+Since the ``Logic Engine`` makes heavy use of ``Lua`` through the (amazing!) `Sol library <https://github.com/ThePhD/sol2>`_ you
+will sooner or later stumble upon sol::* symbols when digging through the code. We suggest to study the concepts of Sol beforehand through its (well designed) documentation
+and tutorials, before trying to make sense of the ``Logic Engine`` customization points.
+
+Have a good grasp of Sol and Lua? We suggest diving into the ``Logic Engine`` by first looking into the implementation of the
+``LuaScript`` class (the actual code is in ``LuaScriptImpl`` - a standard practice of the Pimpl pattern used for the entire API).
+Looking and debugging through the unit tests of LuaScript(Impl) is also a good way to understand the inner workings of the class.
+Other classes (bindings for example) share similar concepts and will be easy to understand.
+
+-----------------------------------------------------
 Design decision log
 -----------------------------------------------------
 
@@ -103,6 +121,12 @@ inverse-chronological order (latest decisions come on top).
     this we put each script in its own ``Lua`` environment, but allow scripts to pass data to
     each other by explicitly linking one script's output(s) to another script's input. This can
     be done during asset design time or during runtime.
+* Pimpl, no Pimpl, or Header-Only?
+    Header-Only implementation was almost immediately out of question due to the expected size and feature
+    scope of the ``Logic Engine`` - which includes animations, scripts, serialization, among other things.
+    Between Pimpl and no Pimpl, we decided to lean on our experience from developing Ramses, where having a Pimpl
+    abstraction proved very useful when guaranteeing a stable API and under-the-hood bugfixing and performance
+    improvements.
 * What is the interface of scripts to the ``RAMSES Logic`` runtime?
     Based on the latter decision, we had to define how ``Lua`` scripts interact with the C++ side of
     the runtime. After lengthy discussions and considering various different options, we settled on

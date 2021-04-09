@@ -52,7 +52,7 @@ int main()
          * The stack trace is coming from the Lua VM and has limited information on the error. See the
          * docs at https://ramses-logic.readthedocs.io/en/latest/api.html#additional-lua-syntax-specifics for more information
          */
-        std::cout << error << std::endl;
+        std::cout << "Script '" << error.node->getName() << "' caused a runtime error:\n" << error.message << std::endl;
     }
 
     logicEngine.destroy(*script);

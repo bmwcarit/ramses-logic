@@ -15,6 +15,7 @@
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 
 namespace rlogic
 {

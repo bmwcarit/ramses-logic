@@ -11,6 +11,7 @@
 #include "luascript_gen.h"
 #include "property_gen.h"
 #include "ramsesappearancebinding_gen.h"
+#include "ramsescamerabinding_gen.h"
 #include "ramsesnodebinding_gen.h"
 
 namespace rlogic_serialization {
@@ -124,7 +125,8 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_LUASCRIPTS = 8,
     VT_RAMSESNODEBINDINGS = 10,
     VT_RAMSESAPPEARANCEBINDINGS = 12,
-    VT_LINKS = 14
+    VT_RAMSESCAMERABINDINGS = 14,
+    VT_LINKS = 16
   };
   const rlogic_serialization::Version *ramsesVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RAMSESVERSION);
@@ -140,6 +142,9 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *ramsesappearancebindings() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *>(VT_RAMSESAPPEARANCEBINDINGS);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *ramsescamerabindings() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *>(VT_RAMSESCAMERABINDINGS);
   }
   const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *links() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *>(VT_LINKS);
@@ -159,6 +164,9 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_RAMSESAPPEARANCEBINDINGS) &&
            verifier.VerifyVector(ramsesappearancebindings()) &&
            verifier.VerifyVectorOfTables(ramsesappearancebindings()) &&
+           VerifyOffset(verifier, VT_RAMSESCAMERABINDINGS) &&
+           verifier.VerifyVector(ramsescamerabindings()) &&
+           verifier.VerifyVectorOfTables(ramsescamerabindings()) &&
            VerifyOffset(verifier, VT_LINKS) &&
            verifier.VerifyVector(links()) &&
            verifier.VerifyVectorOfTables(links()) &&
@@ -185,6 +193,9 @@ struct LogicEngineBuilder {
   void add_ramsesappearancebindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>> ramsesappearancebindings) {
     fbb_.AddOffset(LogicEngine::VT_RAMSESAPPEARANCEBINDINGS, ramsesappearancebindings);
   }
+  void add_ramsescamerabindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>> ramsescamerabindings) {
+    fbb_.AddOffset(LogicEngine::VT_RAMSESCAMERABINDINGS, ramsescamerabindings);
+  }
   void add_links(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links) {
     fbb_.AddOffset(LogicEngine::VT_LINKS, links);
   }
@@ -207,9 +218,11 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>> luascripts = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>> ramsesnodebindings = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>> ramsesappearancebindings = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>> ramsescamerabindings = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links = 0) {
   LogicEngineBuilder builder_(_fbb);
   builder_.add_links(links);
+  builder_.add_ramsescamerabindings(ramsescamerabindings);
   builder_.add_ramsesappearancebindings(ramsesappearancebindings);
   builder_.add_ramsesnodebindings(ramsesnodebindings);
   builder_.add_luascripts(luascripts);
@@ -230,10 +243,12 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngineDirect(
     const std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luascripts = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *ramsesnodebindings = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *ramsesappearancebindings = nullptr,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *ramsescamerabindings = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::Link>> *links = nullptr) {
   auto luascripts__ = luascripts ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaScript>>(*luascripts) : 0;
   auto ramsesnodebindings__ = ramsesnodebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>(*ramsesnodebindings) : 0;
   auto ramsesappearancebindings__ = ramsesappearancebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>(*ramsesappearancebindings) : 0;
+  auto ramsescamerabindings__ = ramsescamerabindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>(*ramsescamerabindings) : 0;
   auto links__ = links ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Link>>(*links) : 0;
   return rlogic_serialization::CreateLogicEngine(
       _fbb,
@@ -242,6 +257,7 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngineDirect(
       luascripts__,
       ramsesnodebindings__,
       ramsesappearancebindings__,
+      ramsescamerabindings__,
       links__);
 }
 

@@ -56,8 +56,6 @@ namespace rlogic::internal
         inputsImpl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
 
         // Set default values equivalent to those of Ramses
-        // This is important because the binding decides whether to set the value to ramses based on
-        // its current value vs. new value (the whole dirty handling mechanism works based on this logic)
         inputsImpl->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->setInternal<bool>(true);
         inputsImpl->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->setInternal<vec3f>({ 1.f, 1.f, 1.f });
 

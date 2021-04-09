@@ -51,6 +51,31 @@ namespace rlogic
             return *scene.createAppearance(*scene.createEffect(effectDesc), "test appearance");
         }
 
+        static ramses::Appearance& CreateTrivialTestAppearance(ramses::Scene& scene)
+        {
+            std::string_view vertShader = R"(
+                #version 100
+
+                uniform highp float floatUniform;
+                attribute vec3 a_position;
+
+                void main()
+                {
+                    gl_Position = floatUniform * vec4(a_position, 1.0);
+                })";
+
+            std::string_view fragShader = R"(
+                #version 100
+
+                void main(void)
+                {
+                    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                })";
+
+            return CreateTestAppearance(scene, vertShader, fragShader);
+        }
+
+
     private:
         std::unique_ptr<ramses::RamsesFramework> m_ramsesFramework;
         ramses::RamsesClient* m_ramsesClient;

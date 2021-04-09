@@ -15,17 +15,23 @@
 
 #include <iostream>
 
+#define LOG_FATAL(...) \
+internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Fatal, __VA_ARGS__)
+
 #define LOG_ERROR(...) \
-internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::ERROR, __VA_ARGS__)
+internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Error, __VA_ARGS__)
 
 #define LOG_WARN(...) \
-internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::WARNING, __VA_ARGS__)
+internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Warn, __VA_ARGS__)
 
 #define LOG_INFO(...) \
-internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::INFO, __VA_ARGS__)
+internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Info, __VA_ARGS__)
 
 #define LOG_DEBUG(...) \
-internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::DEBUG, __VA_ARGS__)
+internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Debug, __VA_ARGS__)
+
+#define LOG_TRACE(...) \
+internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Trace, __VA_ARGS__)
 
 namespace rlogic::internal
 {
@@ -33,14 +39,21 @@ namespace rlogic::internal
     {
         switch (type)
         {
-        case ELogMessageType::INFO:
-            return "INFO ";
-        case ELogMessageType::ERROR:
+        case ELogMessageType::Off:
+            assert(false && "Should never call this!");
+            return "";
+        case ELogMessageType::Fatal:
+            return "FATAL ";
+        case ELogMessageType::Error:
             return "ERROR";
-        case ELogMessageType::WARNING:
+        case ELogMessageType::Warn:
             return "WARN ";
-        case ELogMessageType::DEBUG:
+        case ELogMessageType::Info:
+            return "INFO ";
+        case ELogMessageType::Debug:
             return "DEBUG";
+        case ELogMessageType::Trace:
+            return "TRACE";
         }
         assert(false);
         return "INFO ";
@@ -76,7 +89,7 @@ namespace rlogic::internal
         Logger::LogHandlerFunc m_logHandler;
         bool                   m_defaultLogging = true;
 
-        ELogMessageType m_logVerbosityLimit = ELogMessageType::INFO;
+        ELogMessageType m_logVerbosityLimit = ELogMessageType::Info;
 
     };
 

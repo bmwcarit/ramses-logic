@@ -73,22 +73,22 @@ namespace rlogic::internal
                 SetStruct(property, structPropertyHandler);
                 break;
             case EPropertyType::Vec2f:
-                property.set<vec2f>(*structPropertyHandler.getPropertyImpl().get<vec2f>());
+                property.m_impl->setOutputFromScript<vec2f>(*structPropertyHandler.getPropertyImpl().get<vec2f>());
                 break;
             case EPropertyType::Vec3f:
-                property.set<vec3f>(*structPropertyHandler.getPropertyImpl().get<vec3f>());
+                property.m_impl->setOutputFromScript<vec3f>(*structPropertyHandler.getPropertyImpl().get<vec3f>());
                 break;
             case EPropertyType::Vec4f:
-                property.set<vec4f>(*structPropertyHandler.getPropertyImpl().get<vec4f>());
+                property.m_impl->setOutputFromScript<vec4f>(*structPropertyHandler.getPropertyImpl().get<vec4f>());
                 break;
             case EPropertyType::Vec2i:
-                property.set<vec2i>(*structPropertyHandler.getPropertyImpl().get<vec2i>());
+                property.m_impl->setOutputFromScript<vec2i>(*structPropertyHandler.getPropertyImpl().get<vec2i>());
                 break;
             case EPropertyType::Vec3i:
-                property.set<vec3i>(*structPropertyHandler.getPropertyImpl().get<vec3i>());
+                property.m_impl->setOutputFromScript<vec3i>(*structPropertyHandler.getPropertyImpl().get<vec3i>());
                 break;
             case EPropertyType::Vec4i:
-                property.set<vec4i>(*structPropertyHandler.getPropertyImpl().get<vec4i>());
+                property.m_impl->setOutputFromScript<vec4i>(*structPropertyHandler.getPropertyImpl().get<vec4i>());
                 break;
             case EPropertyType::String:
             case EPropertyType::Bool:
@@ -113,14 +113,14 @@ namespace rlogic::internal
         switch (property.getType())
         {
         case EPropertyType::Float:
-            property.set(number.as<float>());
+            property.m_impl->setOutputFromScript(number.as<float>());
             break;
         case EPropertyType::Int32:
         {
             std::optional<int32_t> maybeInt32 = ExtractSpecificType<int32_t>(number);
             if (maybeInt32)
             {
-                property.set(*maybeInt32);
+                property.m_impl->setOutputFromScript(*maybeInt32);
             }
             else
             {
@@ -186,22 +186,22 @@ namespace rlogic::internal
             switch (propType)
             {
             case EPropertyType::Vec2f:
-                property.set<vec2f>(ExtractArray<float, 2>(table));
+                property.m_impl->setOutputFromScript<vec2f>(ExtractArray<float, 2>(table));
                 break;
             case EPropertyType::Vec3f:
-                property.set<vec3f>(ExtractArray<float, 3>(table));
+                property.m_impl->setOutputFromScript<vec3f>(ExtractArray<float, 3>(table));
                 break;
             case EPropertyType::Vec4f:
-                property.set<vec4f>(ExtractArray<float, 4>(table));
+                property.m_impl->setOutputFromScript<vec4f>(ExtractArray<float, 4>(table));
                 break;
             case EPropertyType::Vec2i:
-                property.set<vec2i>(ExtractArray<int32_t, 2>(table));
+                property.m_impl->setOutputFromScript<vec2i>(ExtractArray<int32_t, 2>(table));
                 break;
             case EPropertyType::Vec3i:
-                property.set<vec3i>(ExtractArray<int32_t, 3>(table));
+                property.m_impl->setOutputFromScript<vec3i>(ExtractArray<int32_t, 3>(table));
                 break;
             case EPropertyType::Vec4i:
-                property.set<vec4i>(ExtractArray<int32_t, 4>(table));
+                property.m_impl->setOutputFromScript<vec4i>(ExtractArray<int32_t, 4>(table));
                 break;
                 // TODO Violin/Sven/Tobias this kind of a bad design, and the reason for it lies
                 // with the fact that we handle 3 different things in the same base class - "Property"
@@ -226,7 +226,7 @@ namespace rlogic::internal
     {
         if(property.getType() == EPropertyType::String)
         {
-            property.set(std::string(string));
+            property.m_impl->setOutputFromScript(std::string(string));
         }
         else
         {
@@ -238,7 +238,7 @@ namespace rlogic::internal
     {
         if (property.getType() == EPropertyType::Bool)
         {
-            property.set(boolean);
+            property.m_impl->setOutputFromScript(boolean);
         }
         else
         {
@@ -293,34 +293,34 @@ namespace rlogic::internal
             switch (expectedElementType)
             {
             case EPropertyType::Bool:
-                child->set(*rhsChild->get<bool>());
+                child->m_impl->setOutputFromScript(*rhsChild->get<bool>());
                 break;
             case EPropertyType::Float:
-                child->set(*rhsChild->get<float>());
+                child->m_impl->setOutputFromScript(*rhsChild->get<float>());
                 break;
             case EPropertyType::Int32:
-                child->set(*rhsChild->get<int32_t>());
+                child->m_impl->setOutputFromScript(*rhsChild->get<int32_t>());
                 break;
             case EPropertyType::String:
-                child->set(*rhsChild->get<std::string>());
+                child->m_impl->setOutputFromScript(*rhsChild->get<std::string>());
                 break;
             case EPropertyType::Vec2f:
-                child->set<vec2f>(*rhsChild->get<vec2f>());
+                child->m_impl->setOutputFromScript<vec2f>(*rhsChild->get<vec2f>());
                 break;
             case EPropertyType::Vec3f:
-                child->set<vec3f>(*rhsChild->get<vec3f>());
+                child->m_impl->setOutputFromScript<vec3f>(*rhsChild->get<vec3f>());
                 break;
             case EPropertyType::Vec4f:
-                child->set<vec4f>(*rhsChild->get<vec4f>());
+                child->m_impl->setOutputFromScript<vec4f>(*rhsChild->get<vec4f>());
                 break;
             case EPropertyType::Vec2i:
-                child->set<vec2i>(*rhsChild->get<vec2i>());
+                child->m_impl->setOutputFromScript<vec2i>(*rhsChild->get<vec2i>());
                 break;
             case EPropertyType::Vec3i:
-                child->set<vec3i>(*rhsChild->get<vec3i>());
+                child->m_impl->setOutputFromScript<vec3i>(*rhsChild->get<vec3i>());
                 break;
             case EPropertyType::Vec4i:
-                child->set<vec4i>(*rhsChild->get<vec4i>());
+                child->m_impl->setOutputFromScript<vec4i>(*rhsChild->get<vec4i>());
                 break;
             case EPropertyType::Array:
                 assert(false && "Array children can never be of type array themselves, that's handled during array declaration");

@@ -53,17 +53,14 @@ namespace rlogic
      * The RamsesNodeBinding is updated every time when rlogic::LogicEngine::update() is executed. The
      * RamsesNodeBinding propagates the values of its inputs to the Ramses node properties accordingly.
      *
-     * \rst
-    .. warning::
+    * \rst
+    .. note::
 
         In case no values were set (because the user neither set a value explicitly
         nor linked the input of rlogic::RamsesNodeBinding to another LogicNode output) the Ramses values
-        are not touched. This is because the default values in Ramses are different than the default
-        property values in the Logic Engine. For example, Ramses nodes have scaling as {1, 1, 1} by
-        default, while Ramses Logic initializes vec3f properties to {0, 0, 0}. It is possible
-        to set values directly to ramses::Node which will not be overwritten by rlogic::RamsesNodeBinding
-        if you never explicitly assigned a value to the rlogic::RamsesNodeBinding inputs. You can also mix-and-match
-        this behavior - assign some properties and others not.
+        are not touched. It is possible to set values directly to ramses::Node which will not be overwritten
+        by rlogic::RamsesNodeBinding if you never explicitly assigned a value to the rlogic::RamsesNodeBinding inputs.
+        You can also mix-and-match this behavior - assign some properties and others not.
 
      \endrst
      *
@@ -83,6 +80,9 @@ namespace rlogic
         * The Ramses Node is not modified until the next call to rlogic::LogicEngine::update().
         * After a Ramses Node is unbound, its properties are no longer overwritten by rlogic::RamsesNodeBinding, but their value
         * is also not restored to what it was before it was bound to - it keeps its current state.
+        * Bear in mind that after a call to #setRamsesNode, pointers to properties of
+        * this #RamsesNodeBinding from before the call will be invalid and must be re-queried, even if some or all of
+        * the new node's properties have the same name or type or even if you assign a pointer to the same node again!
         *
         * @param node the Ramses node to bind
         * @return true if successful, false otherwise

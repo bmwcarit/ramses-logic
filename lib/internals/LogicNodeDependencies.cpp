@@ -115,22 +115,23 @@ namespace rlogic::internal
         }
 
         auto& targetNode = input.getLogicNode();
-        auto& sourceNode = output.getLogicNode();
+        auto& node = output.getLogicNode();
 
         if (!m_logicNodeConnector.link(output, input))
         {
             errorReporting.add(fmt::format("The property '{}' of LogicNode '{}' is already linked to the property '{}' of LogicNode '{}'",
                 output.getName(),
-                sourceNode.getName(),
+                node.getName(),
                 input.getName(),
                 targetNode.getName()
             ));
             return false;
         }
+        input.setIsLinkedInput(true);
 
         // TODO Violin below code sets two different things to dirty. Try to not have redundant dirty
         // flags and consolidate dirtiness to one place
-        const bool isNewEdge = m_logicNodeDAG.addEdge(sourceNode, targetNode);
+        const bool isNewEdge = m_logicNodeDAG.addEdge(node, targetNode);
         if (isNewEdge)
         {
             m_nodeTopologyChanged = true;
@@ -154,10 +155,11 @@ namespace rlogic::internal
             return false;
         }
 
-        auto& sourceNode = output.getLogicNode();
+        auto& node = output.getLogicNode();
         auto& targetNode = input.getLogicNode();
+        input.setIsLinkedInput(false);
 
-        m_logicNodeDAG.removeEdge(sourceNode, targetNode);
+        m_logicNodeDAG.removeEdge(node, targetNode);
 
         return true;
     }

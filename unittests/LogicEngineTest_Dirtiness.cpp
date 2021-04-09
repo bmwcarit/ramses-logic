@@ -70,11 +70,18 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.m_impl->isDirty());
     }
 
+    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingCameraBinding)
+    {
+        m_logicEngine.createRamsesCameraBinding("");
+        EXPECT_TRUE(m_logicEngine.m_impl->isDirty());
+    }
+
     TEST_F(ALogicEngine_Dirtiness, NotDirty_AfterCreatingObjectsAndCallingUpdate)
     {
         m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
         m_logicEngine.createRamsesNodeBinding("");
         m_logicEngine.createRamsesAppearanceBinding("");
+        m_logicEngine.createRamsesCameraBinding("");
         m_logicEngine.update();
         EXPECT_FALSE(m_logicEngine.m_impl->isDirty());
     }
@@ -216,6 +223,7 @@ namespace rlogic
     {
         m_logicEngine.createRamsesNodeBinding("");
         m_logicEngine.createRamsesAppearanceBinding("");
+        m_logicEngine.createRamsesCameraBinding("");
         m_logicEngine.update();
         EXPECT_FALSE(m_logicEngine.m_impl->bindingsDirty());
     }

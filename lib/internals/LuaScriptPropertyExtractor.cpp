@@ -12,26 +12,36 @@
 #include "impl/PropertyImpl.h"
 #include "internals/SolState.h"
 #include "internals/ArrayTypeInfo.h"
+#include "internals/LuaTypeConversions.h"
+#include "internals/TypeUtils.h"
 
 #include "fmt/format.h"
 #include <algorithm>
 
 namespace rlogic::internal
 {
-    LuaScriptPropertyExtractor::LuaScriptPropertyExtractor(SolState& state, PropertyImpl& propertyDescription)
-        : LuaScriptHandler(state)
-        , m_propertyDescription(propertyDescription)
+    LuaScriptPropertyExtractor::LuaScriptPropertyExtractor(PropertyImpl& propertyDescription)
+        : m_propertyDescription(propertyDescription)
     {
     }
 
-    void LuaScriptPropertyExtractor::NewIndex(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& rhs)
+    void LuaScriptPropertyExtractor::newIndex(const sol::object& index, const sol::object& rhs)
     {
-        data.addStructProperty(index, rhs, data.m_propertyDescription);
+        addStructProperty(index, rhs, m_propertyDescription);
     }
 
-    sol::object LuaScriptPropertyExtractor::Index(LuaScriptPropertyExtractor& data, const sol::object& index, const sol::object& /*rhs*/)
+    sol::object LuaScriptPropertyExtractor::index(sol::this_state state, const sol::object& index)
     {
-        return data.getProperty(index);
+        const auto childName = LuaTypeConversions::GetIndexAsString(index);
+        const auto child = m_propertyDescription.getChild(childName);
+
+        if (nullptr != child)
+        {
+            return sol::object(state, sol::in_place_type<LuaScriptPropertyExtractor>, *child->m_impl);
+        }
+
+        sol_helper::throwSolException("Trying to access not available property {} in interface!", childName);
+        return sol::nil;
     }
 
     sol::object LuaScriptPropertyExtractor::CreateArray(sol::this_state state, std::optional<size_t> size, std::optional<sol::object> arrayType)
@@ -54,23 +64,9 @@ namespace rlogic::internal
         return sol::object(state, sol::in_place_type<ArrayTypeInfo>, ArrayTypeInfo{*size, *arrayType});
     }
 
-    sol::object LuaScriptPropertyExtractor::getProperty(const sol::object& index)
-    {
-        const auto childName = GetIndexAsString(index);
-        const auto child = m_propertyDescription.getChild(childName);
-
-        if (nullptr != child)
-        {
-            return m_state.createUserObject(LuaScriptPropertyExtractor(m_state, *child->m_impl));
-        }
-
-        sol_helper::throwSolException("Trying to access not available property {} in interface!", childName);
-        return sol::nil;
-    }
-
     void LuaScriptPropertyExtractor::addStructProperty(const sol::object& propertyName, const sol::object& propertyValue, PropertyImpl& parentStruct)
     {
-        const std::string_view name = GetIndexAsString(propertyName);
+        const std::string_view name = LuaTypeConversions::GetIndexAsString(propertyName);
 
         if (nullptr != parentStruct.getChild(name))
         {
@@ -81,16 +77,7 @@ namespace rlogic::internal
         if (solType == sol::type::number)
         {
             const auto type = propertyValue.as<EPropertyType>();
-            if (type == EPropertyType::Float ||
-                type == EPropertyType::Vec2f ||
-                type == EPropertyType::Vec3f ||
-                type == EPropertyType::Vec4f ||
-                type == EPropertyType::Int32 ||
-                type == EPropertyType::Vec2i ||
-                type == EPropertyType::Vec3i ||
-                type == EPropertyType::Vec4i ||
-                type == EPropertyType::String ||
-                type == EPropertyType::Bool)
+            if (TypeUtils::IsValidType(type) && TypeUtils::IsPrimitiveType(type))
             {
                 parentStruct.addChild(std::make_unique<PropertyImpl>(name, type, parentStruct.getPropertySemantics()));
             }
@@ -126,16 +113,7 @@ namespace rlogic::internal
                 if (solArrayType == sol::type::number)
                 {
                     const auto type = arrayType.as<EPropertyType>();
-                    if (type == EPropertyType::Float ||
-                        type == EPropertyType::Vec2f ||
-                        type == EPropertyType::Vec3f ||
-                        type == EPropertyType::Vec4f ||
-                        type == EPropertyType::Int32 ||
-                        type == EPropertyType::Vec2i ||
-                        type == EPropertyType::Vec3i ||
-                        type == EPropertyType::Vec4i ||
-                        type == EPropertyType::String ||
-                        type == EPropertyType::Bool)
+                    if (TypeUtils::IsValidType(type) && TypeUtils::IsPrimitiveType(type))
                     {
                         for (size_t i = 0; i < arrayTypeInfo.arraySize; ++i)
                         {
@@ -159,10 +137,10 @@ namespace rlogic::internal
                     // Create first array element as if it's a normal struct outside of array
                     // TODO Violin extract this code so that it's easier to read (currently not easily possible because of suboptimal class design)
                     auto firstStructInArray = std::make_unique<PropertyImpl>("", EPropertyType::Struct, parentStruct.getPropertySemantics());
-                    LuaScriptPropertyExtractor structExtractor(m_state, *firstStructInArray);
+                    LuaScriptPropertyExtractor structExtractor(*firstStructInArray);
                     for (const auto& tableEntry : complexTypeDescription)
                     {
-                        LuaScriptPropertyExtractor::NewIndex(structExtractor, tableEntry.first, tableEntry.second);
+                        structExtractor.newIndex(tableEntry.first, tableEntry.second);
                     }
 
                     // Add extracted struct as first child to array

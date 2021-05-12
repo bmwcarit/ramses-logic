@@ -9,6 +9,7 @@
 #include "internals/SolHelper.h"
 #include "internals/LuaScriptPropertyHandler.h"
 #include "internals/LuaScriptPropertySetter.h"
+#include "internals/LuaTypeConversions.h"
 #include "internals/TypeUtils.h"
 
 #include "impl/PropertyImpl.h"
@@ -18,7 +19,7 @@
 namespace rlogic::internal
 {
     LuaScriptPropertyHandler::LuaScriptPropertyHandler(SolState& state, PropertyImpl& propertyDescription)
-        : LuaScriptHandler(state)
+        : m_solState(state)
         , m_propertyDescription(propertyDescription)
     {
     }
@@ -35,13 +36,13 @@ namespace rlogic::internal
 
     Property* LuaScriptPropertyHandler::getStructProperty(const sol::object& propertyIndex)
     {
-        std::string_view childPropertyName = GetIndexAsString(propertyIndex);
+        std::string_view childPropertyName = LuaTypeConversions::GetIndexAsString(propertyIndex);
         return getStructProperty(childPropertyName);
     }
 
     Property* LuaScriptPropertyHandler::getArrayProperty(const sol::object& propertyIndex)
     {
-        const std::optional<size_t> maybeUInt = ExtractSpecificType<size_t>(propertyIndex);
+        const std::optional<size_t> maybeUInt = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
         if (!maybeUInt)
         {
             std::string indexInfo;
@@ -107,8 +108,8 @@ namespace rlogic::internal
             return convertPropertyToSolObject(*arrayProperty->m_impl);
         }
         // Not a struct and not an array -> assume it's an array-like type (vec2/3/4 etc.)
-        const size_t maxIndex   = GetMaxIndexForVectorType(propertyType);
-        std::optional<size_t> maybeUInt = ExtractSpecificType<size_t>(propertyIndex);
+        const size_t maxIndex = LuaTypeConversions::GetMaxIndexForVectorType(propertyType);
+        std::optional<size_t> maybeUInt = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
         if (!maybeUInt)
         {
             sol_helper::throwSolException("Only non-negative integers supported as array index type! Received value: {}", propertyIndex.as<float>());
@@ -126,17 +127,17 @@ namespace rlogic::internal
         switch (propertyType)
         {
         case EPropertyType::Vec2f:
-            return m_state.createUserObject((*m_propertyDescription.get<vec2f>()).at(indexAsUInt));
+            return m_solState.createUserObject((*m_propertyDescription.get<vec2f>()).at(indexAsUInt));
         case EPropertyType::Vec3f:
-            return m_state.createUserObject((*m_propertyDescription.get<vec3f>()).at(indexAsUInt));
+            return m_solState.createUserObject((*m_propertyDescription.get<vec3f>()).at(indexAsUInt));
         case EPropertyType::Vec4f:
-            return m_state.createUserObject((*m_propertyDescription.get<vec4f>()).at(indexAsUInt));
+            return m_solState.createUserObject((*m_propertyDescription.get<vec4f>()).at(indexAsUInt));
         case EPropertyType::Vec2i:
-            return m_state.createUserObject((*m_propertyDescription.get<vec2i>()).at(indexAsUInt));
+            return m_solState.createUserObject((*m_propertyDescription.get<vec2i>()).at(indexAsUInt));
         case EPropertyType::Vec3i:
-            return m_state.createUserObject((*m_propertyDescription.get<vec3i>()).at(indexAsUInt));
+            return m_solState.createUserObject((*m_propertyDescription.get<vec3i>()).at(indexAsUInt));
         case EPropertyType::Vec4i:
-            return m_state.createUserObject((*m_propertyDescription.get<vec4i>()).at(indexAsUInt));
+            return m_solState.createUserObject((*m_propertyDescription.get<vec4i>()).at(indexAsUInt));
         // TODO Violin/Sven/Tobias this kind of a bad design, and the reason for it lies
         // with the fact that we handle 3 different things in the same base class - "Property"
         // Discuss whether we want this pattern, or maybe there are some other ideas how to deal
@@ -181,7 +182,7 @@ namespace rlogic::internal
         case EPropertyType::Struct:
             // TODO Violin/Sven this is probably a performance hit, we create a new lua table every
             // time a property is resolved
-            return m_state.createUserObject(LuaScriptPropertyHandler(m_state, propertyToConvert));
+            return m_solState.createUserObject(LuaScriptPropertyHandler(m_solState, propertyToConvert));
         }
 
         assert(false && "Missing type implementation!");
@@ -219,6 +220,11 @@ namespace rlogic::internal
             assert(false && "Unreachable code!");
             return 0u;
         }
+    }
+
+    SolState& LuaScriptPropertyHandler::getSolState()
+    {
+        return m_solState;
     }
 
 }

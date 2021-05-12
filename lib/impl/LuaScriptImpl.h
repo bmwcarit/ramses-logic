@@ -38,8 +38,10 @@ namespace rlogic::internal
     class LuaScriptImpl : public LogicNodeImpl
     {
     public:
-        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting);
-        static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, const rlogic_serialization::LuaScript* luaScript, ErrorReporting& errorReporting);
+        // TODO Violin replace Create static method with constructor by handling errors outside and only passing in valid data
+        [[nodiscard]] static std::unique_ptr<LuaScriptImpl> Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting);
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LuaScript> Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder);
+        [[nodiscard]] static std::unique_ptr<LuaScriptImpl> Deserialize(SolState& solState, const rlogic_serialization::LuaScript& luaScript);
 
         // Move-able (noexcept); Not copy-able
         ~LuaScriptImpl() noexcept override = default;
@@ -50,9 +52,7 @@ namespace rlogic::internal
 
         [[nodiscard]] std::string_view getFilename() const;
 
-        bool update() override;
-
-        flatbuffers::Offset<rlogic_serialization::LuaScript> serialize(flatbuffers::FlatBufferBuilder& builder) const;
+        std::optional<LogicNodeRuntimeError> update() override;
 
         void luaPrint(sol::variadic_args args);
         void overrideLuaPrint(LuaPrintFunction luaPrintFunction);

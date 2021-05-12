@@ -6,20 +6,14 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "internals/LuaScriptHandler.h"
-#include "internals/SolState.h"
+#include "internals/LuaTypeConversions.h"
 #include "internals/SolHelper.h"
 
 #include <cmath>
 
 namespace rlogic::internal
 {
-    LuaScriptHandler::LuaScriptHandler(SolState& state)
-        : m_state(state)
-    {
-    }
-
-    std::string_view LuaScriptHandler::GetIndexAsString(const sol::object& index)
+    std::string_view LuaTypeConversions::GetIndexAsString(const sol::object& index)
     {
         if (!index.valid() || index.get_type() != sol::type::string)
         {
@@ -28,7 +22,7 @@ namespace rlogic::internal
         return index.as<std::string_view>();
     }
 
-    size_t LuaScriptHandler::GetMaxIndexForVectorType(rlogic::EPropertyType type)
+    size_t LuaTypeConversions::GetMaxIndexForVectorType(rlogic::EPropertyType type)
     {
         switch (type)
         {
@@ -58,61 +52,92 @@ namespace rlogic::internal
         return 0;
     }
 
-    template <> std::optional<float> LuaScriptHandler::ExtractSpecificType<float>(const sol::object& solObject)
+    template <> std::optional<float> LuaTypeConversions::ExtractSpecificType<float>(const sol::object& solObject)
     {
         if (!solObject.valid() || solObject.get_type() != sol::type::number)
         {
             return std::nullopt;
         }
 
-        return std::make_optional(solObject.as<float>());
+        // Extract Lua number (==double)
+        const double asDouble = solObject.as<double>();
+
+        // Integral part out of range of float type
+        if (asDouble > std::numeric_limits<float>::max() || asDouble < std::numeric_limits<float>::lowest())
+        {
+            return std::nullopt;
+        }
+
+        return static_cast<float>(asDouble);
     }
 
     template <>
-    std::optional<int32_t> LuaScriptHandler::ExtractSpecificType<int32_t>(const sol::object& solObject)
+    std::optional<int32_t> LuaTypeConversions::ExtractSpecificType<int32_t>(const sol::object& solObject)
     {
         if (!solObject.valid() || solObject.get_type() != sol::type::number)
         {
             return std::nullopt;
         }
 
-        const float floatVal = solObject.as<float>();
-        // Check that float is round-able to an integer, with type-specific tolerance
-        if (std::fmod(floatVal, 1) > std::numeric_limits<float>::epsilon())
+        // Get Lua number as double (internal format of Lua)
+        const double asDouble = solObject.as<double>();
+        // Rounds to closest signed integer
+        const double rounded = std::round(asDouble);
+
+        // fractional part too large -> rounding error
+        if (std::abs(asDouble - rounded) > std::numeric_limits<double>::epsilon())
         {
             return std::nullopt;
         }
 
-        return std::make_optional(static_cast<int32_t>(floatVal));
+        // Integral part out of range
+        if (rounded > std::numeric_limits<int32_t>::max() || rounded < std::numeric_limits<int32_t>::lowest())
+        {
+            return std::nullopt;
+        }
+
+        // Static cast is well defined now
+        return static_cast<int32_t>(rounded);
     }
 
     template <>
-    std::optional<size_t> LuaScriptHandler::ExtractSpecificType<size_t>(const sol::object& solObject)
+    std::optional<size_t> LuaTypeConversions::ExtractSpecificType<size_t>(const sol::object& solObject)
     {
         if (!solObject.valid() || solObject.get_type() != sol::type::number)
         {
             return std::nullopt;
         }
 
-        const float floatVal = solObject.as<float>();
+        // Get Lua number as double (internal format of Lua)
+        const double asDouble = solObject.as<double>();
 
-        // Check that float value is not negative, with some tolerance
-        if (floatVal < -std::numeric_limits<float>::epsilon())
+        // Check that number is >= 0, with some tolerance
+        if (asDouble < -std::numeric_limits<double>::epsilon())
         {
             return std::nullopt;
         }
 
-        // Check that float is round-able to an integer, with some tolerance
-        if (std::fmod(floatVal, 1) > std::numeric_limits<float>::epsilon())
+        // Rounds to closest signed integer
+        const double rounded = std::round(asDouble);
+
+        // Integral part too large
+        if (rounded > double(std::numeric_limits<size_t>::max()))
         {
             return std::nullopt;
         }
 
-        return std::make_optional(static_cast<size_t>(floatVal));
+        // fractional part too large -> rounding error
+        if (std::abs(asDouble - rounded) > std::numeric_limits<double>::epsilon())
+        {
+            return std::nullopt;
+        }
+
+        // Static cast is well defined now
+        return static_cast<size_t>(rounded);
     }
 
 
-    template <typename T, size_t size> std::array<T, size> LuaScriptHandler::ExtractArray(const sol::table& solTable)
+    template <typename T, size_t size> std::array<T, size> LuaTypeConversions::ExtractArray(const sol::table& solTable)
     {
         // table.size() does return 0, but iterating over the table does work
         // therefore we have to count ourselves.
@@ -143,16 +168,11 @@ namespace rlogic::internal
         return data;
     }
 
-    SolState& LuaScriptHandler::getState()
-    {
-        return m_state;
-    }
-
     // Explicitly instantiate types we use
-    template std::array<int32_t, 2> LuaScriptHandler::ExtractArray<int32_t, 2>(const sol::table& solTable);
-    template std::array<int32_t, 3> LuaScriptHandler::ExtractArray<int32_t, 3>(const sol::table& solTable);
-    template std::array<int32_t, 4> LuaScriptHandler::ExtractArray<int32_t, 4>(const sol::table& solTable);
-    template std::array<float, 2>   LuaScriptHandler::ExtractArray<float, 2>(const sol::table& solTable);
-    template std::array<float, 3>   LuaScriptHandler::ExtractArray<float, 3>(const sol::table& solTable);
-    template std::array<float, 4>   LuaScriptHandler::ExtractArray<float, 4>(const sol::table& solTable);
+    template std::array<int32_t, 2> LuaTypeConversions::ExtractArray<int32_t, 2>(const sol::table& solTable);
+    template std::array<int32_t, 3> LuaTypeConversions::ExtractArray<int32_t, 3>(const sol::table& solTable);
+    template std::array<int32_t, 4> LuaTypeConversions::ExtractArray<int32_t, 4>(const sol::table& solTable);
+    template std::array<float, 2>   LuaTypeConversions::ExtractArray<float, 2>(const sol::table& solTable);
+    template std::array<float, 3>   LuaTypeConversions::ExtractArray<float, 3>(const sol::table& solTable);
+    template std::array<float, 4>   LuaTypeConversions::ExtractArray<float, 4>(const sol::table& solTable);
 }

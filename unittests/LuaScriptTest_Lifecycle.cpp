@@ -52,7 +52,161 @@ namespace rlogic::internal
         EXPECT_EQ("", script->getFilename());
     }
 
-    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NoOutputs)
+    TEST_F(ALuaScript_Lifecycle, ProducesErrorWhenLoadedFileWithRuntimeErrorsInTheInterfaceFunction)
+    {
+        std::ofstream ofs;
+        ofs.open("script.lua", std::ofstream::out);
+        ofs << R"(
+            function interface()
+                error("This will cause errors when creating the script")
+            end
+            function run()
+            end
+        )";
+        ofs.close();
+
+        const auto script = m_logicEngine.createLuaScriptFromFile("script.lua");
+        EXPECT_EQ(nullptr, script);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
+                "[script.lua] Error while loading script. Lua stack trace:\n"
+                "[string \"script.lua\"]:3: This will cause errors when creating the script\n"
+                "stack traceback:\n"
+                    "\t[C]: in function 'error'\n"
+                    "\t[string \"script.lua\"]:3: in function <[string \"script.lua\"]:2>");
+    }
+
+    // Serialization unit tests only. For higher-order tests, check ALuaScript_LifecycleWithFiles
+    class ALuaScript_SerializationLifecycle : public ::testing::Test
+    {
+    protected:
+        std::unique_ptr<LuaScriptImpl> createTestScript(std::string_view source, std::string_view scriptName = "", std::string_view filename = "")
+        {
+            return LuaScriptImpl::Create(m_solState, source, scriptName, filename, m_errorReporting);
+        }
+
+        std::string_view m_minimalScript = R"(
+            function interface()
+            end
+
+            function run()
+            end
+        )";
+
+        SolState m_solState;
+        ErrorReporting m_errorReporting;
+        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+    };
+
+    TEST_F(ALuaScript_Lifecycle, KeepsGlobalScopeSymbolsDuringInterfaceAndRunMethods)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+            -- 'Local' symbols in the global space are global too
+            local global1 = "global1"
+            global2 = "global2"
+
+            function getGlobalString()
+                return global1 .. global2
+            end
+
+            function interface()
+                -- global symbols are available in interface
+                if global1 == "global1" and global2 == "global2" then
+                    OUT.result = STRING
+                else
+                    error("Expected global symbols were not found!")
+                end
+            end
+
+            function run()
+                -- global symbols are available here too
+                if global1 == "global1" and global2 == "global2" then
+                    OUT.result = getGlobalString()
+                else
+                    error("Expected global symbols were not found!")
+                end
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(script->getOutputs()->getChild("result")->get<std::string>(), "global1global2");
+    }
+
+    // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
+    TEST_F(ALuaScript_SerializationLifecycle, RemembersBaseClassData)
+    {
+        // Serialize
+        {
+            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "name", "filename");
+            (void)LuaScriptImpl::Serialize(*script, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::LuaScript& serializedScript = *rlogic_serialization::GetLuaScript(m_flatBufferBuilder.GetBufferPointer());
+
+        ASSERT_TRUE(serializedScript.logicnode());
+        ASSERT_TRUE(serializedScript.logicnode()->name());
+        EXPECT_EQ(serializedScript.logicnode()->name()->string_view(), "name");
+
+        ASSERT_TRUE(serializedScript.logicnode()->inputs());
+        EXPECT_EQ(serializedScript.logicnode()->inputs()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
+        ASSERT_TRUE(serializedScript.logicnode()->inputs()->children());
+        EXPECT_EQ(serializedScript.logicnode()->inputs()->children()->size(), 0u);
+
+        ASSERT_TRUE(serializedScript.logicnode()->outputs());
+        EXPECT_EQ(serializedScript.logicnode()->outputs()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
+        ASSERT_TRUE(serializedScript.logicnode()->outputs()->children());
+        EXPECT_EQ(serializedScript.logicnode()->outputs()->children()->size(), 0u);
+
+        // Deserialize
+        {
+            std::unique_ptr<LuaScriptImpl> deserializedScript = LuaScriptImpl::Deserialize(m_solState, serializedScript);
+
+            ASSERT_TRUE(deserializedScript);
+            EXPECT_TRUE(m_errorReporting.getErrors().empty());
+
+            EXPECT_EQ(deserializedScript->getName(), "name");
+        }
+    }
+
+    TEST_F(ALuaScript_SerializationLifecycle, RemembersFilename)
+    {
+        {
+            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "", "filename");
+            (void)LuaScriptImpl::Serialize(*script, m_flatBufferBuilder);
+        }
+
+        const rlogic_serialization::LuaScript& serializedScript = *rlogic_serialization::GetLuaScript(m_flatBufferBuilder.GetBufferPointer());
+        ASSERT_TRUE(serializedScript.filename());
+        EXPECT_EQ(serializedScript.filename()->string_view(), "filename");
+
+        {
+            std::unique_ptr<LuaScriptImpl> deserializedScript = LuaScriptImpl::Deserialize(m_solState, serializedScript);
+            EXPECT_EQ(deserializedScript->getFilename(), "filename");
+        }
+    }
+
+    TEST_F(ALuaScript_SerializationLifecycle, SerializesLuaSourceCode)
+    {
+        {
+            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "", "");
+            (void)LuaScriptImpl::Serialize(*script, m_flatBufferBuilder);
+        }
+
+        const rlogic_serialization::LuaScript& serializedScript = *rlogic_serialization::GetLuaScript(m_flatBufferBuilder.GetBufferPointer());
+        ASSERT_TRUE(serializedScript.source());
+        EXPECT_EQ(serializedScript.source()->string_view(), m_minimalScript);
+
+        // Can't test source code after deserialization -> it's discarded after loading. There are tests in LogicEngine which test that
+        // the script has the same functionality after loading
+    }
+
+    class ALuaScript_LifecycleWithFiles : public ALuaScript_Lifecycle
+    {
+    };
+
+    TEST_F(ALuaScript_LifecycleWithFiles, NoOutputs)
     {
         {
             LogicEngine tempLogicEngine;
@@ -92,57 +246,7 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_FromEmptySourceFile)
-    {
-        std::ofstream ofs;
-        ofs.open("script.lua", std::ofstream::out);
-        ofs << R"(
-            function interface()
-            end
-            function run()
-            end
-        )";
-        ofs.close();
-
-        {
-            LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromFile("script.lua", "MyScript");
-
-            ASSERT_NE(nullptr, script);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
-        }
-        {
-            EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
-            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
-
-            ASSERT_NE(nullptr, loadedScript);
-            EXPECT_EQ("MyScript", loadedScript->getName());
-            EXPECT_EQ("script.lua", loadedScript->getFilename());
-
-            EXPECT_TRUE(m_logicEngine.update());
-        }
-    }
-
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorWhenLoadedFromFaultyFile)
-    {
-        std::ofstream ofs;
-        ofs.open("script.lua", std::ofstream::out);
-        ofs << R"(
-            function interface()
-                IN.prop = nil
-            end
-            function run()
-            end
-        )";
-        ofs.close();
-
-        const auto script = m_logicEngine.createLuaScriptFromFile("script.lua");
-        EXPECT_EQ(nullptr, script);
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("\"script.lua\""));
-    }
-
-    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_Arrays)
+    TEST_F(ALuaScript_LifecycleWithFiles, Arrays)
     {
         {
             LogicEngine tempLogicEngine;
@@ -187,7 +291,7 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NestedArray)
+    TEST_F(ALuaScript_LifecycleWithFiles, NestedArray)
     {
         {
             LogicEngine tempLogicEngine;
@@ -230,7 +334,7 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_NestedProperties)
+    TEST_F(ALuaScript_LifecycleWithFiles, NestedProperties)
     {
         {
             LogicEngine tempLogicEngine;
@@ -300,7 +404,7 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaScript_Lifecycle, CanBeSerializedAndDeserialized_ArrayOfStructs)
+    TEST_F(ALuaScript_LifecycleWithFiles, ArrayOfStructs)
     {
         {
             LogicEngine tempLogicEngine;
@@ -351,7 +455,7 @@ namespace rlogic::internal
 
     // This is a confidence test which tests all property types, both as inputs and outputs, and as arrays
     // The combination of arrays with different sizes, types, and their values, yields a lot of possible error cases, hence this test
-    TEST_F(ALuaScript_Lifecycle, CanSaveAndLoadAllPropertyTypesToFile_confidenceTest)
+    TEST_F(ALuaScript_LifecycleWithFiles, AllPropertyTypes_confidenceTest)
     {
         const std::vector<EPropertyType> allPrimitiveTypes =
         {
@@ -436,7 +540,7 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaScript_Lifecycle, OverwritesCurrentData_WhenLoadedASecondTimeFromTheSameFile)
+    TEST_F(ALuaScript_LifecycleWithFiles, OverwritesCurrentData_WhenLoadedASecondTimeFromTheSameFile)
     {
         {
             LogicEngine tempLogicEngine;
@@ -461,106 +565,5 @@ namespace rlogic::internal
         EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
         loadedScript = *m_logicEngine.scripts().begin();
         EXPECT_EQ(42, *loadedScript->getInputs()->getChild("data")->get<int32_t>());
-    }
-
-    // TODO Violin this test does not make sense - should be deleted, and check if there is related code which can be improved
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithScriptWithCompileTimeError)
-    {
-        flatbuffers::FlatBufferBuilder builder;
-        {
-            auto                   source = R"(
-                this.goes.boom
-            )";
-            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EPropertySemantics::ScriptInput);
-            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EPropertySemantics::ScriptOutput);
-
-            auto script = rlogic_serialization::CreateLuaScript(
-                builder,
-                rlogic_serialization::CreateLogicNode(
-                    builder,
-                    builder.CreateString("ScriptName"),
-                    input.serialize(builder),
-                    output.serialize(builder)
-                ),
-                builder.CreateString("Filename"),
-                builder.CreateString(source),
-                0
-            );
-
-            builder.Finish(script);
-        }
-        {
-            ErrorReporting errors;
-            internal::SolState       state;
-            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
-
-            EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.getErrors().size());
-            EXPECT_THAT(errors.getErrors()[0].message, ::testing::HasSubstr("'=' expected near '<eof>'"));
-        }
-    }
-
-    // TODO Violin this test does not make sense - should be deleted, and check if there is related code which can be improved
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorIfDeserializedWithScriptWithRuntimeError)
-    {
-        flatbuffers::FlatBufferBuilder builder;
-        {
-            auto                   source = R"(
-                function add(a,b)
-                    return a+b
-                end
-                add(2)
-            )";
-            internal::PropertyImpl input("Input", EPropertyType::Int32, internal::EPropertySemantics::ScriptInput);
-            internal::PropertyImpl output("Output", EPropertyType::Int32, internal::EPropertySemantics::ScriptOutput);
-
-            auto script = rlogic_serialization::CreateLuaScript(builder,
-                rlogic_serialization::CreateLogicNode(
-                    builder,
-                    builder.CreateString("ScriptName"),
-                    input.serialize(builder),
-                    output.serialize(builder)
-                ),
-                builder.CreateString("Filename"),
-                builder.CreateString(source),
-                0);
-
-            builder.Finish(script);
-        }
-        {
-            ErrorReporting errors;
-            internal::SolState       state;
-            auto                     script = internal::LuaScriptImpl::Create(state, rlogic_serialization::GetLuaScript(builder.GetBufferPointer()), errors);
-
-            EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, errors.getErrors().size());
-            EXPECT_EQ("Error during execution of main function of deserialized script", errors.getErrors()[0].message);
-        }
-    }
-
-    TEST_F(ALuaScript_Lifecycle, KeepsGlobalScopeSymbolsDuringInterfaceAndRunMethods)
-    {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
-            local test = "test"
-            test2 = "string"
-
-            function my_concat(str1, str2)
-                return str1 .. str2
-            end
-
-            function interface()
-                if test == "test" then
-                    OUT.test = STRING
-                end
-            end
-
-            function run()
-                OUT.test = my_concat(test, test2)
-            end
-        )");
-
-        ASSERT_NE(nullptr, script);
-        EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(script->getOutputs()->getChild("test")->get<std::string>(), "teststring");
     }
 }

@@ -213,12 +213,16 @@ namespace rlogic
          * After linking, calls to #update will propagate the value of \p sourceProperty to
          * the \p targetProperty. Creating links influences the order in which scripts
          * are executed - if node A provides data to node B, then node A will be executed
-         * before node B.
+         * before node B. A single output property (\p sourceProperty) can be linked to any number of input
+         * properties (\p targetProperty), but any input property can have at most one link to an output property
+         * (links are directional and support a 1-to-N relationships).
          *
          * The #link() method will fail when:
          * - \p sourceProperty and \p targetProperty belong to the same #rlogic::LogicNode
          * - \p sourceProperty is not an output (see #rlogic::LogicNode::getOutputs())
          * - \p targetProperty is not an input (see #rlogic::LogicNode::getInputs())
+         * - either \p sourceProperty or \p targetProperty is not a primitive property (you have to link sub-properties
+         *   of structs and arrays individually)
          *
          * Creating link loops will cause the next call to #update() to fail with an error. Loops
          * are directional, it is OK to have A->B, A->C and B->C, but is not OK to have

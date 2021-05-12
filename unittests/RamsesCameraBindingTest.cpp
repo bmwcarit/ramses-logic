@@ -16,6 +16,7 @@
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/PropertyImpl.h"
 #include "internals/RamsesHelper.h"
+#include "generated/ramsescamerabinding_gen.h"
 
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/Property.h"
@@ -130,7 +131,6 @@ namespace rlogic
             }
         }
 
-        WithTempDirectory tempFolder;
         RamsesTestSetup m_ramsesTestSetup;
         ramses::Scene& m_testScene;
         LogicEngine m_logicEngine;
@@ -162,11 +162,10 @@ namespace rlogic
         EXPECT_EQ(nullptr, cameraBinding.getOutputs());
     }
 
-    TEST_F(ARamsesCameraBinding, ProducesNoErrorsDuringUpdate_IfNoRamsesAppearanceIsAssigned)
+    TEST_F(ARamsesCameraBinding, ProducesNoErrorsDuringUpdate_IfNoRamsesCameraIsAssigned)
     {
         auto& cameraBinding = createCameraBindingForTest("");
-        EXPECT_TRUE(cameraBinding.m_impl.get().update());
-        EXPECT_TRUE(cameraBinding.m_impl.get().getErrors().empty());
+        EXPECT_EQ(std::nullopt, cameraBinding.m_impl.get().update());
     }
 
     TEST_F(ARamsesCameraBinding, ReturnsPointerToRamsesCamera)
@@ -357,6 +356,139 @@ namespace rlogic
         ExpectPropertyTypeAndChildCount(frustumProperties->getChild("rightPlane"), EPropertyType::Float, 0);
         ExpectPropertyTypeAndChildCount(frustumProperties->getChild("bottomPlane"), EPropertyType::Float, 0);
         ExpectPropertyTypeAndChildCount(frustumProperties->getChild("topPlane"), EPropertyType::Float, 0);
+    }
+
+    TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenOrthoCameraAssigned)
+    {
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
+        cameraBinding.setRamsesCamera(&orthoCam);
+        m_logicEngine.update();
+
+        //Expect default values on the camera, because nothing was set so far
+        ExpectDefaultViewportValues(orthoCam);
+        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
+    }
+
+    TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenPerspectiveCameraAssigned)
+    {
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        ramses::PerspectiveCamera& perspCam = createPerspectiveCameraForTest();
+        cameraBinding.setRamsesCamera(&perspCam);
+        m_logicEngine.update();
+
+        //Expect default values on the camera, because nothing was set so far
+        ExpectDefaultViewportValues(perspCam);
+        ExpectDefaultPerspectiveCameraFrustumValues(perspCam);
+    }
+
+    TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingZeroToViewportSize)
+    {
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        ramses::OrthographicCamera& camera = createOrthoCameraForTest();
+        cameraBinding.setRamsesCamera(&camera);
+        const auto inputs = cameraBinding.getInputs();
+        auto vpProperties = inputs->getChild("viewPortProperties");
+        // Setting illegal viewport values: width and height cannot be 0 so an error will be produced on ramses camera
+        vpProperties->getChild("viewPortWidth")->set<int32_t>(0);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera viewport size must be positive! (width: 0; height: 16)");
+
+        // Fix width, break height -> still generates error
+        vpProperties->getChild("viewPortWidth")->set<int32_t>(8);
+        vpProperties->getChild("viewPortHeight")->set<int32_t>(0);
+
+        // Expect default values on the camera, because setting values failed
+        ExpectDefaultViewportValues(camera);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera viewport size must be positive! (width: 8; height: 0)");
+
+        // Fix height and update recovers the errors
+        vpProperties->getChild("viewPortHeight")->set<int32_t>(32);
+        EXPECT_TRUE(m_logicEngine.update());
+
+        EXPECT_EQ(camera.getViewportWidth(), 8u);
+        EXPECT_EQ(camera.getViewportHeight(), 32u);
+    }
+
+    TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingNegativeViewportSize)
+    {
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        ramses::OrthographicCamera& camera = createOrthoCameraForTest();
+        cameraBinding.setRamsesCamera(&camera);
+        const auto inputs = cameraBinding.getInputs();
+        auto vpProperties = inputs->getChild("viewPortProperties");
+        // Setting illegal viewport values: width and height cannot be 0 so an error will be produced on ramses camera
+        vpProperties->getChild("viewPortWidth")->set<int32_t>(-1);
+        vpProperties->getChild("viewPortHeight")->set<int32_t>(-1);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera viewport size must be positive! (width: -1; height: -1)");
+
+        // Setting positive values recovers from the error
+        vpProperties->getChild("viewPortWidth")->set<int32_t>(10);
+        vpProperties->getChild("viewPortHeight")->set<int32_t>(12);
+        EXPECT_TRUE(m_logicEngine.update());
+
+        EXPECT_EQ(camera.getViewportWidth(), 10u);
+        EXPECT_EQ(camera.getViewportHeight(), 12u);
+    }
+
+    TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingInvalidFrustumValuesOnOrthoCamera)
+    {
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
+        cameraBinding.setRamsesCamera(&orthoCam);
+
+        auto frustumProperties = cameraBinding.getInputs()->getChild("frustumProperties");
+        // Setting illegal frustum values: left plane cannot be smaller than right plane so an error will be produced on ramses camera
+        frustumProperties->getChild("leftPlane")->set<float>(2.f);
+        frustumProperties->getChild("rightPlane")->set<float>(1.f);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera::setFrustum failed - check validity of given frustum planes");
+
+        //Still expect default values on the camera, because setting values failed
+        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
+
+        // Recovers from the error once values are ok
+        frustumProperties->getChild("rightPlane")->set<float>(3.f);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingInvalidFrustumValuesOnPerspectiveCamera)
+    {
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
+        cameraBinding.setRamsesCamera(&perspectiveCam);
+
+        auto frustumProperties = cameraBinding.getInputs()->getChild("frustumProperties");
+        // Setting illegal frustum values: fov and aspect ratio cannot be 0 so an error will be produced on ramses camera
+        frustumProperties->getChild("fieldOfView")->set<float>(0.f);
+        frustumProperties->getChild("aspectRatio")->set<float>(0.f);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "PerspectiveCamera::setFrustum failed - check validity of given frustum planes");
+
+        // Fixing just the FOV does not fix the issue, need to also fix aspect ratio
+        frustumProperties->getChild("fieldOfView")->set<float>(15.f);
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "PerspectiveCamera::setFrustum failed - check validity of given frustum planes");
+
+        //Still expect default values on the camera, because setting values failed
+        ExpectDefaultViewportValues(perspectiveCam);
+        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+
+        frustumProperties->getChild("aspectRatio")->set<float>(1.f);
+        EXPECT_TRUE(m_logicEngine.update());
     }
 
     TEST_F(ARamsesCameraBinding, InitializesInputPropertiesOfPerpespectiveCameraToMatchRamsesDefaultValues)
@@ -781,11 +913,92 @@ namespace rlogic
 
         inputs->getChild("viewPortProperties")->getChild("viewPortOffsetX")->set<int32_t>(vpOffsetXvalue2);
         cameraBinding.setRamsesCamera(nullptr);
-        EXPECT_TRUE(cameraBinding.m_cameraBinding->update());
+        EXPECT_EQ(std::nullopt, cameraBinding.m_cameraBinding->update());
         EXPECT_EQ(perspectiveCam.getViewportX(), vpOffsetXvalue1);
     }
 
-    TEST_F(ARamsesCameraBinding, ContainsItsDataAfterDeserialization)
+
+
+    //don't repeat internal:: everywhere
+    using internal::RamsesCameraBindingImpl;
+
+    // This fixture only contains serialization unit tests, for higher order tests see `ARamsesCameraBinding_SerializationWithFile`
+    class ARamsesCameraBinding_SerializationLifecycle : public ::testing::Test
+    {
+    protected:
+        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+    };
+
+    // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, RemembersBaseClassData)
+    {
+        // Serialize
+        {
+            RamsesCameraBindingImpl binding("name");
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesCameraBinding& serializedBinding = *rlogic_serialization::GetRamsesCameraBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        ASSERT_TRUE(serializedBinding.logicnode());
+        ASSERT_TRUE(serializedBinding.logicnode()->name());
+        EXPECT_EQ(serializedBinding.logicnode()->name()->string_view(), "name");
+
+        ASSERT_TRUE(serializedBinding.logicnode()->inputs());
+        EXPECT_EQ(serializedBinding.logicnode()->inputs()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
+        ASSERT_TRUE(serializedBinding.logicnode()->inputs()->children());
+        EXPECT_EQ(serializedBinding.logicnode()->inputs()->children()->size(), 0u);
+
+        EXPECT_FALSE(serializedBinding.logicnode()->outputs());
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(serializedBinding, nullptr);
+
+            ASSERT_TRUE(deserializedBinding);
+            EXPECT_EQ(deserializedBinding->getName(), "name");
+            EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
+            EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
+            EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 0u);
+        }
+    }
+
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, RemembersRamsesCameraId)
+    {
+        RamsesTestSetup ramses;
+        ramses::Camera* testCamera = ramses.createScene()->createOrthographicCamera();
+
+        // Serialize
+        {
+            RamsesCameraBindingImpl binding("");
+            binding.setRamsesCamera(testCamera);
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesCameraBinding& serializedBinding = *rlogic_serialization::GetRamsesCameraBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        EXPECT_EQ(serializedBinding.ramsesCamera(), testCamera->getSceneObjectId().getValue());
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(serializedBinding, testCamera);
+
+            ASSERT_TRUE(deserializedBinding);
+            EXPECT_EQ(deserializedBinding->getRamsesCamera(), testCamera);
+        }
+    }
+
+    class ARamsesCameraBinding_SerializationWithFile : public ARamsesCameraBinding
+    {
+    protected:
+        WithTempDirectory tempFolder;
+    };
+
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, ContainsItsDataAfterLoading)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         const int32_t newVpOffsetX = 10;
@@ -863,7 +1076,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesCameraBinding, KeepsItsPropertiesAfterDeserialization_WhenNoRamsesLinksAndSceneProvided)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, KeepsItsProperties_WhenNoRamsesLinksAndSceneProvided)
     {
         {
             createCameraBindingForTest("CameraBinding");
@@ -880,7 +1093,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesCameraBinding, RestoresLinkToRamsesCameraAfterLoadingFromFile)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, RestoresLinkToRamsesCamera)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
@@ -895,7 +1108,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesCameraBinding, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesCamera_ButNoSceneWasProvided)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, ProducesError_WhenHavingLinkToRamsesCamera_ButNoSceneWasProvided)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
@@ -907,11 +1120,11 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.loadFromFile("camerabinding.bin"));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized ramses logic object 'CameraBinding' points to a Ramses object (id: 1) , but no Ramses scene was provided to resolve the Ramses object!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'CameraBinding' points to a Ramses object (id: 1), but no Ramses scene was provided to resolve the Ramses object!");
         }
     }
 
-    TEST_F(ARamsesCameraBinding, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesCamera_WhichWasDeleted)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, ProducesError_WhenHavingLinkToRamsesCamera_WhichWasDeleted)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
@@ -926,11 +1139,11 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized ramses logic object CameraBinding points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'CameraBinding' points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
         }
     }
 
-    TEST_F(ARamsesCameraBinding, DoesNotModifyRamsesCameraPropertiesAfterLoadingFromFile_WhenNoValuesWereExplicitlySetBeforeSaving)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, DoesNotModifyRamsesCameraProperties_WhenNoValuesWereExplicitlySetBeforeSaving)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
@@ -948,7 +1161,7 @@ namespace rlogic
 
     // Tests that the camera properties don't overwrite ramses' values after loading from file, until
     // set() is called again explicitly after loadFromFile()
-    TEST_F(ARamsesCameraBinding, ReappliesAllPropertiesOfOneStructToRamsesCameraAfterLoading_WhenExplicitlySetAgain)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, ReappliesAllPropertiesOfOneStructToRamsesCamera_WhenExplicitlySetAgain)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
@@ -1003,7 +1216,7 @@ namespace rlogic
     // - saving and loading files
     // The general expectation is that after loading + update(), the logic scene would overwrite only ramses
     // properties wrapped by a LogicBinding which is linked to a script
-    TEST_F(ARamsesCameraBinding, SetsOnlyRamsesCameraPropertiesForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, SetsOnlyRamsesCameraPropertiesForWhichTheBindingInputIsLinked_WhenCallingUpdateAfterLoading)
     {
         ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
 
@@ -1077,7 +1290,12 @@ namespace rlogic
     // There are smaller tests which test only properties and their data propagation rules (see property unit tests)
     // There are also "dirtiness" tests which test when a camera is being re-updated (see logic engine dirtiness tests)
     // These tests test everything in combination
-    TEST_F(ARamsesCameraBinding, DataFlow_WithExplicitSet)
+
+    class ARamsesCameraBinding_DataFlow : public ARamsesCameraBinding
+    {
+    };
+
+    TEST_F(ARamsesCameraBinding_DataFlow, WithExplicitSet)
     {
         RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
 
@@ -1168,7 +1386,7 @@ namespace rlogic
         EXPECT_EQ(perspectiveCam.getFarPlane(), 7.6f);
     }
 
-    TEST_F(ARamsesCameraBinding, DataFlow_WithLinks)
+    TEST_F(ARamsesCameraBinding_DataFlow, WithLinks)
     {
         const std::string_view scriptSrc = R"(
             function interface()
@@ -1225,95 +1443,5 @@ namespace rlogic
         EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
         EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
         ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
-    }
-
-    TEST_F(ARamsesCameraBinding, SettingInvalidValuesOnPerspectiveCameraErrorsGetReportedCorrectly)
-    {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-        m_logicEngine.update();
-
-        //Expect default values on the camera, because nothing was set so far
-        ExpectDefaultViewportValues(perspectiveCam);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
-
-        const auto inputs = cameraBinding.getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
-        // Setting illegal viewport values: width and height cannot be 0 so an error will be produced on ramses camera
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(0);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(0);
-
-        m_logicEngine.update();
-
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera::setViewport failed - width and height must not be 0!");
-
-        // Reset viewport to valid values so not the same error gets thrown again later
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(16);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(16);
-
-        // Still expect default values on the camera, because setting values failed
-        ExpectDefaultViewportValues(perspectiveCam);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
-
-        auto frustumProperties = inputs->getChild("frustumProperties");
-        // Setting illegal frustum values: fov and aspect ratio cannot be 0 so an error will be produced on ramses camera
-        frustumProperties->getChild("fieldOfView")->set<float>(0.f);
-        frustumProperties->getChild("aspectRatio")->set<float>(0.f);
-
-        m_logicEngine.update();
-
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 2u);
-        EXPECT_EQ(m_logicEngine.getErrors()[1].message, "PerspectiveCamera::setFrustum failed - check validity of given frustum planes");
-
-        //Still expect default values on the camera, because setting values failed
-        ExpectDefaultViewportValues(perspectiveCam);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
-    }
-
-    TEST_F(ARamsesCameraBinding, SettingInvalidValuesOnOrthoCameraErrorsGetReportedCorrectly)
-    {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&orthoCam);
-        m_logicEngine.update();
-
-        //Expect default values on the camera, because nothing was set so far
-        ExpectDefaultViewportValues(orthoCam);
-        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
-
-        const auto inputs = cameraBinding.getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
-        // Setting illegal viewport values: width and height cannot be 0 so an error will be produced on ramses camera
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(0);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(0);
-
-        m_logicEngine.update();
-
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera::setViewport failed - width and height must not be 0!");
-
-        // Reset viewport to valid values so not the same error gets thrown again later
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(16);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(16);
-
-        // Still expect default values on the camera, because setting values failed
-        ExpectDefaultViewportValues(orthoCam);
-        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
-
-        auto frustumProperties = inputs->getChild("frustumProperties");
-        // Setting illegal frustum values: left plane cannot be smaller than right plane so an error will be produced on ramses camera
-        frustumProperties->getChild("leftPlane")->set<float>(2.f);
-        frustumProperties->getChild("rightPlane")->set<float>(1.f);
-
-        m_logicEngine.update();
-
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 2u);
-        EXPECT_EQ(m_logicEngine.getErrors()[1].message, "Camera::setFrustum failed - check validity of given frustum planes");
-
-        //Still expect default values on the camera, because setting values failed
-        ExpectDefaultViewportValues(orthoCam);
-        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
     }
 }

@@ -14,6 +14,11 @@
 #include <memory>
 #include <string_view>
 
+namespace ramses
+{
+    class Scene;
+}
+
 namespace rlogic
 {
     class LogicNode;
@@ -23,9 +28,20 @@ namespace rlogic
     class RamsesCameraBinding;
 }
 
+namespace rlogic_serialization
+{
+    struct LogicEngine;
+}
+
+namespace flatbuffers
+{
+    class FlatBufferBuilder;
+}
+
 namespace rlogic::internal
 {
     class SolState;
+    class IRamsesObjectResolver;
 
     using ScriptsContainer = std::vector<std::unique_ptr<LuaScript>>;
     using NodeBindingsContainer = std::vector<std::unique_ptr<RamsesNodeBinding>>;
@@ -35,10 +51,8 @@ namespace rlogic::internal
     class ApiObjects
     {
     public:
-        // Moveable, non-copyable, can be constructed from deserialized data
+        // Move-able and non-copyable
         ApiObjects() = default;
-        ApiObjects(ScriptsContainer scripts, NodeBindingsContainer ramsesNodeBindings, AppearanceBindingsContainer ramsesAppearanceBindings,
-            CameraBindingsContainer ramsesCameraBindings, LogicNodeDependencies logicNodeDependencies);
         ~ApiObjects() noexcept = default;
         // TODO Violin try to find a way to make the class move-able without exceptions (and also the whole LogicEngine)
         // Currently not possible because MSVC2017 compiler forces copy on move: https://stackoverflow.com/questions/47604029/move-constructors-of-stl-containers-in-msvc-2017-are-not-marked-as-noexcept
@@ -47,7 +61,16 @@ namespace rlogic::internal
         ApiObjects(const ApiObjects& other) = delete;
         ApiObjects& operator=(const ApiObjects& other) = delete;
 
-        // Create/destroy API
+        // Serialization/Deserialization
+        static void Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder);
+        static std::optional<ApiObjects> Deserialize(
+            SolState& solState,
+            const rlogic_serialization::LogicEngine& logicEngineData,
+            const IRamsesObjectResolver& ramsesResolver,
+            const std::string& dataSourceDescription,
+            ErrorReporting& errorReporting);
+
+        // Create/destroy API objects
         LuaScript* createLuaScript(SolState& solState, std::string_view source, std::string_view filename, std::string_view scriptName, ErrorReporting& errorReporting);
         RamsesNodeBinding* createRamsesNodeBinding(std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name);

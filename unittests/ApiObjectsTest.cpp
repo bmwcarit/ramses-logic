@@ -8,10 +8,13 @@
 
 #include "gtest/gtest.h"
 
+#include "generated/logicengine_gen.h"
+
 #include "internals/ApiObjects.h"
 #include "internals/SolState.h"
 #include "internals/ErrorReporting.h"
 
+#include "impl/PropertyImpl.h"
 #include "impl/LuaScriptImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
@@ -23,6 +26,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-client-api/PerspectiveCamera.h"
 #include "RamsesTestUtils.h"
+#include "RamsesObjectResolverMock.h"
 
 namespace rlogic::internal
 {
@@ -334,40 +338,242 @@ namespace rlogic::internal
         EXPECT_EQ(script, m_apiObjects.getApiObject(script->m_impl));
     }
 
-    TEST_F(AnApiObjects_ImplMapping, ConstructsMappingWhenCreatedFromDeserializedData)
+    class AnApiObjects_Serialization : public AnApiObjects
     {
-        SolState solState;
+    };
 
-        ScriptsContainer scripts;
-        NodeBindingsContainer ramsesNodeBindings;
-        AppearanceBindingsContainer ramsesAppearanceBindings;
-        CameraBindingsContainer ramsesCameraBindings;
+    TEST_F(AnApiObjects_Serialization, AlwaysCreatesEmptyFlatbuffersContainers_WhenNoObjectsPresent)
+    {
+        // Create without API objects -> serialize
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            SolState tempState;
+            ApiObjects toSerialize;
+            ApiObjects::Serialize(toSerialize, builder);
+        }
 
-        scripts.emplace_back(std::make_unique<LuaScript>(LuaScriptImpl::Create(solState, m_valid_empty_script, "script", "", m_errorReporting)));
-        ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(RamsesNodeBindingImpl::Create("node")));
-        ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(RamsesAppearanceBindingImpl::Create("appearance")));
-        ramsesCameraBindings.emplace_back(std::make_unique<RamsesCameraBinding>(RamsesCameraBindingImpl::Create("camera")));
+        const rlogic_serialization::LogicEngine& serializedLogicEngine = *rlogic_serialization::GetLogicEngine(builder.GetBufferPointer());
 
-        LogicNodeDependencies logicNodeDependencies;
-        logicNodeDependencies.addNode(scripts.back()->m_impl);
-        logicNodeDependencies.addNode(ramsesNodeBindings.back()->m_impl);
-        logicNodeDependencies.addNode(ramsesAppearanceBindings.back()->m_impl);
-        logicNodeDependencies.addNode(ramsesCameraBindings.back()->m_impl);
+        // Has all containers, size = 0 because no content
+        ASSERT_NE(nullptr, serializedLogicEngine.luascripts());
+        ASSERT_EQ(0u, serializedLogicEngine.luascripts()->size());
 
-        ApiObjects apiObjects(std::move(scripts), std::move(ramsesNodeBindings), std::move(ramsesAppearanceBindings), std::move(ramsesCameraBindings), std::move(logicNodeDependencies));
+        ASSERT_NE(nullptr, serializedLogicEngine.ramsesnodebindings());
+        ASSERT_EQ(0u, serializedLogicEngine.ramsesnodebindings()->size());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.ramsesappearancebindings());
+        ASSERT_EQ(0u, serializedLogicEngine.ramsesappearancebindings()->size());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.ramsescamerabindings());
+        ASSERT_EQ(0u, serializedLogicEngine.ramsescamerabindings()->size());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.links());
+        ASSERT_EQ(0u, serializedLogicEngine.links()->size());
+    }
+
+    TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainer_ForScripts)
+    {
+        // Create test flatbuffer with only a script
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            SolState tempState;
+            ApiObjects toSerialize;
+            toSerialize.createLuaScript(tempState, m_valid_empty_script, "", "script", m_errorReporting);
+            ApiObjects::Serialize(toSerialize, builder);
+        }
+
+        const rlogic_serialization::LogicEngine& serializedLogicEngine = *rlogic_serialization::GetLogicEngine(builder.GetBufferPointer());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.luascripts());
+        ASSERT_EQ(1u, serializedLogicEngine.luascripts()->size());
+        const rlogic_serialization::LuaScript& serializedScript = *serializedLogicEngine.luascripts()->Get(0);
+        EXPECT_EQ(std::string(m_valid_empty_script), serializedScript.source()->str());
+        EXPECT_EQ("script", serializedScript.logicnode()->name()->str());
+    }
+
+    TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainers_ForBindings)
+    {
+        // Create test flatbuffer with only a node binding
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            SolState tempState;
+            ApiObjects toSerialize;
+            toSerialize.createRamsesNodeBinding("node");
+            toSerialize.createRamsesAppearanceBinding("appearance");
+            toSerialize.createRamsesCameraBinding("camera");
+            ApiObjects::Serialize(toSerialize, builder);
+        }
+
+        const rlogic_serialization::LogicEngine& serializedLogicEngine = *rlogic_serialization::GetLogicEngine(builder.GetBufferPointer());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.ramsesnodebindings());
+        ASSERT_EQ(1u, serializedLogicEngine.ramsesnodebindings()->size());
+        const rlogic_serialization::RamsesNodeBinding& serializedNodeBinding = *serializedLogicEngine.ramsesnodebindings()->Get(0);
+        EXPECT_EQ("node", serializedNodeBinding.logicnode()->name()->str());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.ramsesappearancebindings());
+        ASSERT_EQ(1u, serializedLogicEngine.ramsesappearancebindings()->size());
+        const rlogic_serialization::RamsesAppearanceBinding& serializedAppBinding = *serializedLogicEngine.ramsesappearancebindings()->Get(0);
+        EXPECT_EQ("appearance", serializedAppBinding.logicnode()->name()->str());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.ramsescamerabindings());
+        ASSERT_EQ(1u, serializedLogicEngine.ramsescamerabindings()->size());
+        const rlogic_serialization::RamsesCameraBinding& serializedCameraBinding = *serializedLogicEngine.ramsescamerabindings()->Get(0);
+        EXPECT_EQ("camera", serializedCameraBinding.logicnode()->name()->str());
+    }
+
+    TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainers_ForLinks)
+    {
+        // Create test flatbuffer with a link between script and binding
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            SolState tempState;
+            ApiObjects toSerialize;
+
+            // Create unused script and node binding to enforce a non-zero index for the linked objects
+            toSerialize.createLuaScript(tempState, m_valid_empty_script, "", "script", m_errorReporting);
+            toSerialize.createRamsesNodeBinding("");
+
+            const std::string_view scriptWithOutput = R"(
+                function interface()
+                    OUT.nested = {
+                        unused = FLOAT,
+                        rotation = VEC3F
+                    }
+                end
+                function run()
+                end
+            )";
+
+            LuaScript* script = toSerialize.createLuaScript(tempState, scriptWithOutput, "", "", m_errorReporting);
+            RamsesNodeBinding* nodeBinding = toSerialize.createRamsesNodeBinding("");
+            ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
+                *script->getOutputs()->getChild("nested")->getChild("rotation")->m_impl,
+                *nodeBinding->getInputs()->getChild("rotation")->m_impl,
+                m_errorReporting));
+            ApiObjects::Serialize(toSerialize, builder);
+        }
+
+        const rlogic_serialization::LogicEngine& serializedLogicEngine = *rlogic_serialization::GetLogicEngine(builder.GetBufferPointer());
+
+        // Asserts both script and binding objects existence
+        ASSERT_EQ(2u, serializedLogicEngine.luascripts()->size());
+        ASSERT_EQ(2u, serializedLogicEngine.ramsesnodebindings()->size());
+
+        ASSERT_NE(nullptr, serializedLogicEngine.links());
+        ASSERT_EQ(1u, serializedLogicEngine.links()->size());
+        const rlogic_serialization::Link& link = *serializedLogicEngine.links()->Get(0);
+
+        EXPECT_EQ(rlogic_serialization::ELogicNodeType::Script, link.sourceLogicNodeType());
+        EXPECT_EQ(rlogic_serialization::ELogicNodeType::RamsesNodeBinding, link.targetLogicNodeType());
+        // "source" is a nested link - parent index is 1 (the second script)
+        EXPECT_EQ(1u, link.sourceLogicNodeId());
+        ASSERT_EQ(2u, link.sourcePropertyNestedIndex()->size());
+        ASSERT_EQ(0u, link.sourcePropertyNestedIndex()->Get(0)); // Index of "nested" wrt. parent "OUT" struct
+        ASSERT_EQ(1u, link.sourcePropertyNestedIndex()->Get(1)); // Index of "rotation" wrt. parent "nested" struct
+
+        EXPECT_EQ(1u, link.targetLogicNodeId());
+        ASSERT_EQ(1u, link.targetPropertyNestedIndex()->size());
+        ASSERT_EQ(static_cast<uint32_t>(ENodePropertyStaticIndex::Rotation), link.targetPropertyNestedIndex()->Get(0)); // Index of "rotation" wrt. parent "IN" struct
+    }
+
+    TEST_F(AnApiObjects_Serialization, ReConstructsImplMappingsWhenCreatedFromDeserializedData)
+    {
+        // Create dummy data and serialize
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            SolState tempState;
+            ApiObjects toSerialize;
+            toSerialize.createLuaScript(tempState, m_valid_empty_script, "", "script", m_errorReporting);
+            toSerialize.createRamsesNodeBinding("node");
+            toSerialize.createRamsesAppearanceBinding("appearance");
+            toSerialize.createRamsesCameraBinding("camera");
+
+            ApiObjects::Serialize(toSerialize, builder);
+        }
+
+        RamsesObjectResolverMock resolverMock;
+
+        auto& deSerializedLogicEngine = *rlogic_serialization::GetLogicEngine(builder.GetBufferPointer());
+
+        std::optional<ApiObjects> apiObjectsOptional = ApiObjects::Deserialize(m_state, deSerializedLogicEngine, resolverMock, "", m_errorReporting);
+
+        ASSERT_TRUE(apiObjectsOptional);
+
+        ApiObjects& apiObjects = *apiObjectsOptional;
 
         ASSERT_EQ(4u, apiObjects.getReverseImplMapping().size());
 
         LuaScript* script = apiObjects.getScripts()[0].get();
         EXPECT_EQ(script, apiObjects.getApiObject(script->m_impl));
+        EXPECT_EQ(script->getName(), "script");
 
         RamsesNodeBinding* nodeBinding = apiObjects.getNodeBindings()[0].get();
         EXPECT_EQ(nodeBinding, apiObjects.getApiObject(nodeBinding->m_impl));
+        EXPECT_EQ(nodeBinding->getName(), "node");
 
         RamsesAppearanceBinding* appBinding = apiObjects.getAppearanceBindings()[0].get();
         EXPECT_EQ(appBinding, apiObjects.getApiObject(appBinding->m_impl));
+        EXPECT_EQ(appBinding->getName(), "appearance");
 
         RamsesCameraBinding* camBinding = apiObjects.getCameraBindings()[0].get();
         EXPECT_EQ(camBinding, apiObjects.getApiObject(camBinding->m_impl));
+        EXPECT_EQ(camBinding->getName(), "camera");
+    }
+
+    TEST_F(AnApiObjects_Serialization, ReConstructsLinksWhenCreatedFromDeserializedData)
+    {
+        // Create dummy data and serialize
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            SolState tempState;
+            ApiObjects toSerialize;
+
+            const std::string_view scriptForLinks = R"(
+                function interface()
+                    IN.integer = INT
+                    OUT.nested = {
+                        unused = FLOAT,
+                        integer = INT
+                    }
+                end
+                function run()
+                end
+            )";
+
+            LuaScript* script1 = toSerialize.createLuaScript(tempState, scriptForLinks, "", "", m_errorReporting);
+            LuaScript* script2 = toSerialize.createLuaScript(tempState, scriptForLinks, "", "", m_errorReporting);
+            ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
+                *script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl,
+                *script2->getInputs()->getChild("integer")->m_impl,
+                m_errorReporting));
+
+            ApiObjects::Serialize(toSerialize, builder);
+        }
+
+        RamsesObjectResolverMock resolverMock;
+
+        auto& serializedLogicEngine = *rlogic_serialization::GetLogicEngine(builder.GetBufferPointer());
+
+        std::optional<ApiObjects> apiObjectsOptional = ApiObjects::Deserialize(m_state, serializedLogicEngine, resolverMock, "", m_errorReporting);
+
+        ASSERT_TRUE(apiObjectsOptional);
+
+        ApiObjects& apiObjects = *apiObjectsOptional;
+
+        LuaScript* script1 = apiObjects.getScripts()[0].get();
+        ASSERT_TRUE(script1);
+
+        LuaScript* script2 = apiObjects.getScripts()[1].get();
+        ASSERT_TRUE(script2);
+
+        const PropertyImpl* linkedOutput = apiObjects.getLogicNodeDependencies().getLinkedOutput(*script2->getInputs()->getChild("integer")->m_impl);
+        EXPECT_EQ(script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl.get(), linkedOutput);
+
+        // Test some more internal data (because of the fragile state of link's deserialization). Consider removing if we refactor the code
+        const LinksMap& linkMap = apiObjects.getLogicNodeDependencies().getLinks();
+        ASSERT_EQ(1u, linkMap.size());
+        EXPECT_EQ(linkMap.begin()->second, script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl.get());
+        EXPECT_EQ(linkMap.begin()->first, script2->getInputs()->getChild("integer")->m_impl.get());
     }
 }

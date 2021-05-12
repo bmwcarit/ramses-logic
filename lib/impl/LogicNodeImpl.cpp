@@ -19,15 +19,29 @@ namespace rlogic::internal
     {
     }
 
+    flatbuffers::Offset<rlogic_serialization::LogicNode> LogicNodeImpl::Serialize(const LogicNodeImpl& logicNode, flatbuffers::FlatBufferBuilder& builder)
+    {
+        // Inputs can never be null, only outputs
+        assert(logicNode.m_inputs);
+
+        return rlogic_serialization::CreateLogicNode(
+            builder,
+            builder.CreateString(logicNode.m_name),
+            PropertyImpl::Serialize(*logicNode.m_inputs->m_impl, builder),
+            nullptr != logicNode.m_outputs ? PropertyImpl::Serialize(*logicNode.m_outputs->m_impl, builder) : 0
+        );
+    }
+
+    // This is the deserialization code of LogicNodeImpl (properties were already loaded in sub-classes)
     LogicNodeImpl::LogicNodeImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs)
         : m_name(name)
     {
-        // TODO Violin have another look over the code below
-        if (inputs)
-        {
-            m_inputs = std::make_unique<Property>(std::move(inputs));
-            m_inputs->m_impl->setLogicNode(*this);
-        }
+        // We don't have LogicNodes currently without any inputs
+        assert(inputs);
+
+        m_inputs = std::make_unique<Property>(std::move(inputs));
+        m_inputs->m_impl->setLogicNode(*this);
+
         if (outputs)
         {
             m_outputs = std::make_unique<Property>(std::move(outputs));
@@ -55,31 +69,6 @@ namespace rlogic::internal
     Property* LogicNodeImpl::getOutputs()
     {
         return m_outputs.get();
-    }
-
-    void LogicNodeImpl::addError(std::string_view error)
-    {
-        m_errors.emplace_back(error);
-    }
-
-    const std::vector<std::string>& LogicNodeImpl::getErrors() const
-    {
-        return m_errors;
-    }
-
-    void LogicNodeImpl::clearErrors()
-    {
-        m_errors.clear();
-    }
-
-    flatbuffers::Offset<rlogic_serialization::LogicNode> LogicNodeImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
-    {
-        return rlogic_serialization::CreateLogicNode(
-            builder,
-            builder.CreateString(m_name),
-            nullptr != m_inputs ? m_inputs->m_impl->serialize(builder) : 0,
-            nullptr != m_outputs ? m_outputs->m_impl->serialize(builder) : 0
-        );
     }
 
     std::string_view LogicNodeImpl::getName() const

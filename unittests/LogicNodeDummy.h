@@ -46,9 +46,9 @@ namespace rlogic
             }
         }
 
-        bool update() override
+        std::optional<internal::LogicNodeRuntimeError> update() override
         {
-            return true;
+            return std::nullopt;
         }
 
     private:

@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(RLOGIC_VERSION_MAJOR 0)
 set(RLOGIC_VERSION_MINOR 6)
-set(RLOGIC_VERSION_PATCH 0)
+set(RLOGIC_VERSION_PATCH 1)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -148,6 +148,12 @@ target_link_libraries(ramses-logic-obj
         fmt::fmt
         ${ramses-logic_RAMSES_TARGET}
 )
+
+# Link required Android dependencies if found
+find_package(AndroidSDK)
+if(AndroidSDK_FOUND)
+    target_link_libraries(ramses-logic-obj PUBLIC ${AndroidSDK_LIBRARIES})
+endif()
 
 # Add dependency to flatbuffer generation target, unless the target is disabled
 if(TARGET FlatbufGen)

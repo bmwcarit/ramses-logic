@@ -40,21 +40,22 @@ namespace rlogic::internal
     class RamsesAppearanceBindingImpl : public RamsesBindingImpl
     {
     public:
-        [[nodiscard]] static std::unique_ptr<RamsesAppearanceBindingImpl> Create(std::string_view name);
-        [[nodiscard]] static std::unique_ptr<RamsesAppearanceBindingImpl> Create(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, ErrorReporting& errorReporting);
+        explicit RamsesAppearanceBindingImpl(std::string_view name);
+        // Special constructor used when deserialized with appearance reference and inputs have pre-populated values
+        // TODO Violin we can remove this, Bindings don't need to deserialize their values after recent rework!
+        RamsesAppearanceBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Appearance& appearance);
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> Serialize(const RamsesAppearanceBindingImpl& binding, flatbuffers::FlatBufferBuilder& builder);
+        [[nodiscard]] static std::unique_ptr<RamsesAppearanceBindingImpl> Deserialize(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, ErrorReporting& errorReporting);
 
         void setRamsesAppearance(ramses::Appearance* appearance);
         [[nodiscard]] ramses::Appearance* getRamsesAppearance() const;
 
-        bool update() override;
+        std::optional<LogicNodeRuntimeError> update() override;
 
-        flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> serialize(flatbuffers::FlatBufferBuilder& builder) const;
     private:
-        explicit RamsesAppearanceBindingImpl(std::string_view name);
-        RamsesAppearanceBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Appearance& appearance);
 
         ramses::Appearance* m_appearance;
-        // TODO find a solution to directly store ramses::UniformInput inside containers
+        // TODO Violin find a solution to directly store ramses::UniformInput inside containers
         // If this is done, think about using a standard vector for storing ramses::UniformInputs
         std::unordered_map<const PropertyImpl*, std::unique_ptr<ramses::UniformInput>> m_propertyToUniformInput;
 

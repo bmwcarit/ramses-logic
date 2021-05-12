@@ -25,6 +25,7 @@ from check_tabbing_and_spacing import check_no_spacing_line_end
 from check_tabbing_and_spacing import check_tabs_no_spaces
 from check_enum_style import check_enum_style
 from check_last_line_newline import check_last_line_newline
+from check_deprecated import check_deprecated
 
 
 def main():
@@ -91,6 +92,7 @@ def main():
         check_tabbing_and_spacing(f, file_lines)
         check_enum_style(f, clean_file_contents)
         check_last_line_newline(f, file_contents)
+        check_deprecated(f, file_contents, clean_file_contents, file_lines, clean_file_lines)
         # TODO figure out a better way to check API symbols are properly exported
         # check_api_export_symbols(f, clean_file_contents)
 

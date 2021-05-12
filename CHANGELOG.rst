@@ -3,6 +3,20 @@ master
 ======
 
 ======
+v0.6.1
+======
+
+**Features**
+
+* All numeric errors are hard-checked, except rounding of double to float. Added a section in the Lua user docs with details
+* Update ramses to 27.0.103
+
+**Bugfixes**
+
+* Fix conversion of very large numbers to int32 when crossing the Lua to C boundary (used to clamp them wrongly)
+* Correctly catch and report error when setting negative or zero camera viewport sizes to RamsesCameraBindings
+
+======
 v0.6.0
 ======
 

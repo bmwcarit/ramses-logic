@@ -16,6 +16,7 @@
 #include "impl/RamsesAppearanceBindingImpl.h"
 #include "impl/PropertyImpl.h"
 #include "internals/RamsesHelper.h"
+#include "generated/ramsesappearancebinding_gen.h"
 
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/Property.h"
@@ -71,8 +72,127 @@ namespace rlogic
     TEST_F(ARamsesAppearanceBinding, ProducesNoErrorsDuringUpdate_IfNoRamsesAppearanceIsAssigned)
     {
         auto& appearanceBinding = createAppearanceBindingForTest("AppearanceBinding");
-        EXPECT_TRUE(appearanceBinding.m_impl.get().update());
-        EXPECT_TRUE(appearanceBinding.m_impl.get().getErrors().empty());
+        EXPECT_EQ(std::nullopt, appearanceBinding.m_impl.get().update());
+    }
+
+    // This fixture only contains serialization unit tests, for higher order tests see `ARamsesAppearanceBinding_WithRamses_AndFiles`
+    class ARamsesAppearanceBinding_SerializationLifecycle : public ::testing::Test
+    {
+    protected:
+        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+        internal::ErrorReporting m_errorReporting;
+    };
+
+    using internal::RamsesAppearanceBindingImpl;
+
+    // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
+    TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, RemembersBaseClassData)
+    {
+        // Serialize
+        {
+            RamsesAppearanceBindingImpl binding("name");
+            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesAppearanceBinding& serializedBinding = *rlogic_serialization::GetRamsesAppearanceBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        ASSERT_TRUE(serializedBinding.logicnode());
+        ASSERT_TRUE(serializedBinding.logicnode()->name());
+        EXPECT_EQ(serializedBinding.logicnode()->name()->string_view(), "name");
+
+        ASSERT_TRUE(serializedBinding.logicnode()->inputs());
+        EXPECT_EQ(serializedBinding.logicnode()->inputs()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
+        ASSERT_TRUE(serializedBinding.logicnode()->inputs()->children());
+        EXPECT_EQ(serializedBinding.logicnode()->inputs()->children()->size(), 0u);
+
+        ASSERT_FALSE(serializedBinding.logicnode()->outputs());
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesAppearanceBindingImpl> deserializedBinding = RamsesAppearanceBindingImpl::Deserialize(serializedBinding, nullptr, m_errorReporting);
+
+            ASSERT_TRUE(deserializedBinding);
+            EXPECT_EQ(deserializedBinding->getName(), "name");
+            EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        }
+    }
+
+    TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, RemembersRamsesAppearanceId)
+    {
+        RamsesTestSetup ramses;
+        ramses::Appearance& testAppearance = RamsesTestSetup::CreateTrivialTestAppearance(*ramses.createScene());
+
+        // Serialize
+        {
+            RamsesAppearanceBindingImpl binding("name");
+            binding.setRamsesAppearance(&testAppearance);
+            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesAppearanceBinding& serializedBinding = *rlogic_serialization::GetRamsesAppearanceBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        EXPECT_EQ(serializedBinding.ramsesAppearance(), testAppearance.getSceneObjectId().getValue());
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesAppearanceBindingImpl> deserializedBinding = RamsesAppearanceBindingImpl::Deserialize(serializedBinding, &testAppearance, m_errorReporting);
+
+            ASSERT_TRUE(deserializedBinding);
+            EXPECT_EQ(deserializedBinding->getRamsesAppearance(), &testAppearance);
+            EXPECT_TRUE(m_errorReporting.getErrors().empty());
+
+            // Check that input was deserialized too
+            EXPECT_EQ(deserializedBinding->getInputs()->getChild("floatUniform")->getType(), EPropertyType::Float);
+        }
+    }
+
+    TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, ReportsErrorWhenDeserializedWithDifferentAppearanceThenDuringSerialization)
+    {
+        // Use different shaders than the "trivial ones" below to force different appearance inputs
+        std::string_view differentVertShader = R"(
+            #version 100
+
+            uniform highp float differentFloatUniform;
+            attribute vec3 a_position;
+
+            void main()
+            {
+                gl_Position = differentFloatUniform * vec4(a_position, 1.0);
+            })";
+
+        std::string_view fragShader = R"(
+            #version 100
+
+            void main(void)
+            {
+                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+            })";
+
+        RamsesTestSetup ramses;
+        ramses::Scene* scene = ramses.createScene();
+        ramses::Appearance& appearance = RamsesTestSetup::CreateTrivialTestAppearance(*scene);
+        ramses::Appearance& differentAppearance = RamsesTestSetup::CreateTestAppearance(*scene, differentVertShader, fragShader);
+
+        // Serialize
+        {
+            RamsesAppearanceBindingImpl binding("name");
+            binding.setRamsesAppearance(&appearance);
+            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesAppearanceBinding& serializedBinding = *rlogic_serialization::GetRamsesAppearanceBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        // Deserialize with different appearance -> expect errors
+        {
+            std::unique_ptr<RamsesAppearanceBindingImpl> deserializedBinding = RamsesAppearanceBindingImpl::Deserialize(serializedBinding, &differentAppearance, m_errorReporting);
+
+            EXPECT_FALSE(deserializedBinding);
+            EXPECT_EQ(1u, m_errorReporting.getErrors().size());
+            EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error while loading from file: ramses appearance binding input (Name: floatUniform) was not found in appearance 'test appearance'!)");
+        }
     }
 
     class ARamsesAppearanceBinding_WithRamses : public ARamsesAppearanceBinding
@@ -339,7 +459,7 @@ namespace rlogic
         EXPECT_TRUE(inputs->getChild("vec4Array")->getChild(0)->set<vec4f>({ .41f, .42f, .43f, .44f }));
         EXPECT_TRUE(inputs->getChild("vec4Array")->getChild(1)->set<vec4f>({ .45f, .46f, .47f, .48f }));
 
-        EXPECT_TRUE(appearanceBinding.m_impl.get().update());
+        EXPECT_EQ(std::nullopt, appearanceBinding.m_impl.get().update());
 
         ramses::UniformInput uniform;
         {
@@ -682,6 +802,23 @@ namespace rlogic
             }
 
             EXPECT_FLOAT_EQ(42.42f, *inputs->getChild("floatUniform1")->get<float>());
+        }
+    }
+
+    TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesError_WhenHavingLinkToAppearance_ButNoSceneWasProvided)
+    {
+        ramses::Appearance& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
+        {
+            LogicEngine tempEngineForSaving;
+            RamsesAppearanceBinding& binding = *tempEngineForSaving.createRamsesAppearanceBinding("AppBinding");
+            binding.setRamsesAppearance(&appearance);
+            EXPECT_TRUE(tempEngineForSaving.saveToFile("WithRamsesAppearance.bin"));
+        }
+        {
+            EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesAppearance.bin"));
+            auto errors = m_logicEngine.getErrors();
+            ASSERT_EQ(errors.size(), 1u);
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'AppBinding' points to a Ramses object (id: 2), but no Ramses scene was provided to resolve the Ramses object!");
         }
     }
 

@@ -29,35 +29,41 @@ namespace rlogic::internal
     {
     }
 
-    RamsesCameraBindingImpl::RamsesCameraBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Camera& camera)
-        : RamsesBindingImpl(name, std::move(inputs), nullptr)
-        , m_camera(&camera)
+    RamsesCameraBindingImpl::RamsesCameraBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> deserializedInputs, ramses::Camera* camera)
+        : RamsesBindingImpl(name, std::move(deserializedInputs), nullptr)
+        , m_camera(camera)
     {
     }
 
-    std::unique_ptr<RamsesCameraBindingImpl> RamsesCameraBindingImpl::Create(std::string_view name)
+    flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> RamsesCameraBindingImpl::Serialize(const RamsesCameraBindingImpl& cameraBinding, flatbuffers::FlatBufferBuilder& builder)
     {
-        // We can't use std::make_unique here, because the constructor is private
-        return std::unique_ptr<RamsesCameraBindingImpl>(new RamsesCameraBindingImpl(name));
+        ramses::sceneObjectId_t cameraId;
+        if (cameraBinding.m_camera != nullptr)
+        {
+            cameraId = cameraBinding.m_camera->getSceneObjectId();
+        }
+        auto ramsesCameraBinding = rlogic_serialization::CreateRamsesCameraBinding(
+            builder,
+            LogicNodeImpl::Serialize(cameraBinding, builder), // Call base class serialization method
+            cameraId.getValue());
+        builder.Finish(ramsesCameraBinding);
+
+        return ramsesCameraBinding;
     }
 
-    std::unique_ptr<RamsesCameraBindingImpl> RamsesCameraBindingImpl::Create(const rlogic_serialization::RamsesCameraBinding& cameraBinding, ramses::Camera* camera)
+    std::unique_ptr<RamsesCameraBindingImpl> RamsesCameraBindingImpl::Deserialize(const rlogic_serialization::RamsesCameraBinding& cameraBinding, ramses::Camera* camera)
     {
         assert(nullptr != cameraBinding.logicnode());
         assert(nullptr != cameraBinding.logicnode()->name());
         assert(nullptr != cameraBinding.logicnode()->inputs());
 
-        auto inputs = PropertyImpl::Create(*cameraBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
-
-        assert(nullptr != inputs);
-
-        const auto name = cameraBinding.logicnode()->name()->string_view();
-
-        return std::unique_ptr<RamsesCameraBindingImpl>(new RamsesCameraBindingImpl(name, std::move(inputs), *camera));
+        return std::make_unique<RamsesCameraBindingImpl>(
+            cameraBinding.logicnode()->name()->string_view(),
+            PropertyImpl::Deserialize(*cameraBinding.logicnode()->inputs(), EPropertySemantics::BindingInput),
+            camera);
     }
 
-
-    void RamsesCameraBindingImpl::CreateCameraProperties(ramses::ERamsesObjectType cameraType)
+    void RamsesCameraBindingImpl::createCameraProperties(ramses::ERamsesObjectType cameraType)
     {
         PropertyImpl& inputsImpl = *getInputs()->m_impl;
         // Attention! This order is important - it has to match the indices in ECameraViewportPropertyStaticIndex, EPerspectiveCameraFrustumPropertyStaticIndex
@@ -121,7 +127,7 @@ namespace rlogic::internal
         inputsImpl.addChild(std::move(frustumProperty));
     }
 
-    bool RamsesCameraBindingImpl::update()
+    std::optional<LogicNodeRuntimeError> RamsesCameraBindingImpl::update()
     {
         ramses::PerspectiveCamera* perspectiveCam = nullptr;
         if (m_camera != nullptr)
@@ -138,16 +144,21 @@ namespace rlogic::internal
                 || vpWidth.checkForBindingInputNewValueAndReset()
                 || vpHeight.checkForBindingInputNewValueAndReset())
             {
-                status = m_camera->setViewport(
-                    *vpOffsetX.get<int32_t>(),
-                    *vpOffsetY.get<int32_t>(),
-                    *vpWidth.get<int32_t>(),
-                    *vpHeight.get<int32_t>());
+                const int32_t vpX = *vpOffsetX.get<int32_t>();
+                const int32_t vpY = *vpOffsetY.get<int32_t>();
+                const int32_t vpW = *vpWidth.get<int32_t>();
+                const int32_t vpH = *vpHeight.get<int32_t>();
+
+                if (vpW <= 0 || vpH <= 0)
+                {
+                    return LogicNodeRuntimeError{ fmt::format("Camera viewport size must be positive! (width: {}; height: {})", vpW, vpH) };
+                }
+
+                status = m_camera->setViewport(vpX, vpY, vpW, vpH);
 
                 if (status != ramses::StatusOK)
                 {
-                    addError(m_camera->getStatusMessage(status));
-                    return false;
+                    return LogicNodeRuntimeError{m_camera->getStatusMessage(status)};
                 }
             }
 
@@ -172,8 +183,7 @@ namespace rlogic::internal
 
                     if (status != ramses::StatusOK)
                     {
-                        addError(m_camera->getStatusMessage(status));
-                        return false;
+                        return LogicNodeRuntimeError{ m_camera->getStatusMessage(status) };
                     }
                 }
             }
@@ -195,8 +205,7 @@ namespace rlogic::internal
 
                     if (status != ramses::StatusOK)
                     {
-                        addError(m_camera->getStatusMessage(status));
-                        return false;
+                        return LogicNodeRuntimeError{ m_camera->getStatusMessage(status) };
                     }
                 }
             }
@@ -207,7 +216,7 @@ namespace rlogic::internal
 
         }
 
-        return true;
+        return std::nullopt;
     }
 
     ramses::ERamsesObjectType RamsesCameraBindingImpl::getCameraType() const
@@ -228,28 +237,12 @@ namespace rlogic::internal
 
         if (nullptr != m_camera)
         {
-            CreateCameraProperties(camera->getType());
+            createCameraProperties(camera->getType());
         }
     }
 
     ramses::Camera* RamsesCameraBindingImpl::getRamsesCamera() const
     {
         return m_camera;
-    }
-
-    flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> RamsesCameraBindingImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
-    {
-        ramses::sceneObjectId_t cameraId;
-        if (m_camera != nullptr)
-        {
-            cameraId = m_camera->getSceneObjectId();
-        }
-        auto ramsesCameraBinding = rlogic_serialization::CreateRamsesCameraBinding(
-            builder,
-            LogicNodeImpl::serialize(builder),
-            cameraId.getValue());
-        builder.Finish(ramsesCameraBinding);
-
-        return ramsesCameraBinding;
     }
 }

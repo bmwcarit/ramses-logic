@@ -44,13 +44,17 @@ namespace rlogic::internal
     {
     public:
         // Move-able (noexcept); Not copy-able
+        explicit RamsesNodeBindingImpl(std::string_view name) noexcept;
         ~RamsesNodeBindingImpl() noexcept override = default;
         RamsesNodeBindingImpl(RamsesNodeBindingImpl&& other) noexcept = default;
         RamsesNodeBindingImpl& operator=(RamsesNodeBindingImpl&& other) noexcept = default;
         RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other)                = delete;
         RamsesNodeBindingImpl& operator=(const RamsesNodeBindingImpl& other) = delete;
-        [[nodiscard]] static std::unique_ptr<RamsesNodeBindingImpl> Create(std::string_view name);
-        [[nodiscard]] static std::unique_ptr<RamsesNodeBindingImpl> Create(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode);
+
+        // TODO Violin we can remove this, Bindings don't need to deserialize their values after recent rework!
+        RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept;
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> Serialize(const RamsesNodeBindingImpl& nodeBinding, flatbuffers::FlatBufferBuilder& builder);
+        [[nodiscard]] static std::unique_ptr<RamsesNodeBindingImpl> Deserialize(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode);
 
         bool setRamsesNode(ramses::Node* node);
         [[nodiscard]] ramses::Node* getRamsesNode() const;
@@ -58,13 +62,10 @@ namespace rlogic::internal
         bool setRotationConvention(ramses::ERotationConvention rotationConvention);
         [[nodiscard]] ramses::ERotationConvention getRotationConvention() const;
 
-        bool update() override;
+        std::optional<LogicNodeRuntimeError> update() override;
 
-        flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
     private:
-        explicit RamsesNodeBindingImpl(std::string_view name) noexcept;
-        RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept;
         ramses::Node* m_ramsesNode = nullptr;
         ramses::ERotationConvention m_rotationConvention = ramses::ERotationConvention::XYZ;
 

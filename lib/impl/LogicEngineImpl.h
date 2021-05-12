@@ -99,11 +99,6 @@ namespace rlogic::internal
 
         void updateLinksRecursive(Property& inputProperty);
 
-        ramses::SceneObject* findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
-        std::optional<ramses::Node*> findRamsesNodeInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
-        std::optional<ramses::Appearance*> findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
-        std::optional<ramses::Camera*> findRamsesCameraInScene(std::string_view logicNodeName, ramses::Scene* scene, ramses::sceneObjectId_t objectId);
-
         static bool CheckLogicVersionFromFile(const rlogic_serialization::Version& version);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 

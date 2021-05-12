@@ -12,6 +12,7 @@
 #include <memory>
 #include <string>
 #include <vector>
+#include <optional>
 
 #include "generated/logicnode_gen.h"
 
@@ -35,14 +36,13 @@ namespace rlogic::internal
 {
     class PropertyImpl;
 
+    struct LogicNodeRuntimeError { std::string message; };
+
     class LogicNodeImpl
     {
     public:
-        // Move-able (noexcept); Not copy-able
-        virtual ~LogicNodeImpl() noexcept;
-        LogicNodeImpl(LogicNodeImpl&& other) noexcept = default;
-        LogicNodeImpl& operator=(LogicNodeImpl&& other) noexcept = default;
-        LogicNodeImpl(const LogicNodeImpl& other)                = delete;
+        // Deleted methods must be public (other lifecycle methods are protected, this is a base class)
+        LogicNodeImpl(const LogicNodeImpl& other) = delete;
         LogicNodeImpl& operator=(const LogicNodeImpl& other) = delete;
 
         [[nodiscard]] Property*       getInputs();
@@ -51,10 +51,7 @@ namespace rlogic::internal
         [[nodiscard]] Property* getOutputs();
         [[nodiscard]] const Property* getOutputs() const;
 
-        virtual bool update() = 0;
-
-        [[nodiscard]] const std::vector<std::string>& getErrors() const;
-        void                            clearErrors();
+        virtual std::optional<LogicNodeRuntimeError> update() = 0;
 
         [[nodiscard]] std::string_view getName() const;
         void setName(std::string_view name);
@@ -63,18 +60,21 @@ namespace rlogic::internal
         [[nodiscard]] bool isDirty() const;
 
     protected:
+        // Move-able (noexcept); Not copy-able
         explicit LogicNodeImpl(std::string_view name) noexcept;
+        virtual ~LogicNodeImpl() noexcept;
+        LogicNodeImpl(LogicNodeImpl&& other) noexcept = default;
+        LogicNodeImpl& operator=(LogicNodeImpl && other) noexcept = default;
+
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LogicNode> Serialize(const LogicNodeImpl & logicNode, flatbuffers::FlatBufferBuilder & builder);
+        // The deserialization code must be a constructor because LogicNodeImpl is a base class
+        // TODO Violin put the code which deserializes property trees here as a static function, instead of each subclass having their own copy
         LogicNodeImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs);
-
-        void addError(std::string_view error);
-
-        flatbuffers::Offset<rlogic_serialization::LogicNode> serialize(flatbuffers::FlatBufferBuilder& builder) const;
 
     private:
         std::string               m_name;
         std::unique_ptr<Property> m_inputs;
         std::unique_ptr<Property> m_outputs;
-        std::vector<std::string>  m_errors;
         bool                      m_dirty = true;
 
     };

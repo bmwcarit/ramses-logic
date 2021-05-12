@@ -6,8 +6,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "gtest/gtest.h"
-#include "gmock/gmock-matchers.h"
+#include "gmock/gmock.h"
 
 #include "RamsesTestUtils.h"
 #include "WithTempDirectory.h"
@@ -21,6 +20,8 @@
 #include "impl/LogicEngineImpl.h"
 
 #include "ramses-client-api/Node.h"
+
+#include "generated/ramsesnodebinding_gen.h"
 
 namespace rlogic
 {
@@ -156,8 +157,7 @@ namespace rlogic
         ramsesNode->getRotation(zeroes[0], zeroes[1], zeroes[2], rotationConvention);
         EXPECT_THAT(zeroes, ::testing::ElementsAre(0.f, 0.f, 0.f));
 
-        //TODO Violin enable this once fix is merged in R27.0.5
-        //EXPECT_EQ(rotationConvention, ramses::ERotationConvention::XYZ);
+        EXPECT_EQ(rotationConvention, ramses::ERotationConvention::XYZ);
         ramsesNode->getTranslation(zeroes[0], zeroes[1], zeroes[2]);
         EXPECT_THAT(zeroes, ::testing::ElementsAre(0.f, 0.f, 0.f));
         ramsesNode->getScaling(ones[0], ones[1], ones[2]);
@@ -373,7 +373,7 @@ namespace rlogic
 
         inputs->getChild("rotation")->set<vec3f>(vec3f{ 5.1f, 5.2f, 5.3f });
         EXPECT_TRUE(nodeBinding.setRamsesNode(nullptr));
-        EXPECT_TRUE(nodeBinding.m_nodeBinding->update());
+        EXPECT_EQ(std::nullopt, nodeBinding.m_nodeBinding->update());
         ExpectValues(*ramsesNode, ENodePropertyStaticIndex::Rotation, vec3f{ 0.1f, 0.2f, 0.3f });
     }
 
@@ -415,13 +415,115 @@ namespace rlogic
 
     }
 
-    class ARamsesNodeBinding_WithSerialization : public ARamsesNodeBinding
+    //don't repeat internal:: everywhere
+    using internal::RamsesNodeBindingImpl;
+
+    // This fixture only contains serialization unit tests, for higher order tests see `ARamsesNodeBinding_SerializationWithFile`
+    class ARamsesNodeBinding_SerializationLifecycle : public ARamsesNodeBinding
+    {
+    protected:
+        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+    };
+
+    // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
+    TEST_F(ARamsesNodeBinding_SerializationLifecycle, RemembersBaseClassData)
+    {
+        // Serialize
+        {
+            RamsesNodeBindingImpl binding("name");
+            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesNodeBinding& serializedBinding = *rlogic_serialization::GetRamsesNodeBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        ASSERT_TRUE(serializedBinding.logicnode());
+        ASSERT_TRUE(serializedBinding.logicnode()->name());
+        EXPECT_EQ(serializedBinding.logicnode()->name()->string_view(), "name");
+
+        ASSERT_TRUE(serializedBinding.logicnode()->inputs());
+        EXPECT_EQ(serializedBinding.logicnode()->inputs()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
+        ASSERT_TRUE(serializedBinding.logicnode()->inputs()->children());
+        EXPECT_EQ(serializedBinding.logicnode()->inputs()->children()->size(), 4u);
+
+        EXPECT_FALSE(serializedBinding.logicnode()->outputs());
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesNodeBindingImpl> deserializedBinding = RamsesNodeBindingImpl::Deserialize(serializedBinding, nullptr);
+
+            ASSERT_TRUE(deserializedBinding);
+            EXPECT_EQ(deserializedBinding->getName(), "name");
+            EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
+            EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
+            EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 4u);
+        }
+    }
+
+
+    // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
+    TEST_F(ARamsesNodeBinding_SerializationLifecycle, RemembersRamsesNodeId)
+    {
+        RamsesTestSetup ramses;
+        ramses::Node* testNode = ramses.createScene()->createNode();
+
+        // Serialize
+        {
+            RamsesNodeBindingImpl binding("");
+            binding.setRamsesNode(testNode);
+            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesNodeBinding& serializedBinding = *rlogic_serialization::GetRamsesNodeBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        EXPECT_EQ(serializedBinding.ramsesNode(), testNode->getSceneObjectId().getValue());
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesNodeBindingImpl> deserializedBinding = RamsesNodeBindingImpl::Deserialize(serializedBinding, testNode);
+
+            ASSERT_TRUE(deserializedBinding);
+            EXPECT_EQ(deserializedBinding->getRamsesNode(), testNode);
+        }
+    }
+
+    // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
+    TEST_F(ARamsesNodeBinding_SerializationLifecycle, RemembersRotationConvention)
+    {
+        // Serialize
+        {
+            RamsesNodeBindingImpl binding("");
+            binding.setRotationConvention(ramses::ERotationConvention::YXZ);
+            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder);
+        }
+
+        // Inspect flatbuffers data
+        const rlogic_serialization::RamsesNodeBinding& serializedBinding = *rlogic_serialization::GetRamsesNodeBinding(m_flatBufferBuilder.GetBufferPointer());
+
+        EXPECT_EQ(serializedBinding.rotationConvention(), static_cast<int>(ramses::ERotationConvention::YXZ));
+
+        // Deserialize
+        {
+            std::unique_ptr<RamsesNodeBindingImpl> deserializedBinding = RamsesNodeBindingImpl::Deserialize(serializedBinding, nullptr);
+            EXPECT_EQ(deserializedBinding->getRotationConvention(), ramses::ERotationConvention::YXZ);
+        }
+    }
+
+    // TODO Violin needs more tests here:
+    // - deserialized with wrong object type which is not compatible to node
+    // - deserialized with properties but without node, or the other way around
+    // - rotation convention different than the one in ramses node
+
+
+    class ARamsesNodeBinding_SerializationWithFile : public ARamsesNodeBinding
     {
     protected:
         WithTempDirectory tempFolder;
     };
 
-    TEST_F(ARamsesNodeBinding_WithSerialization, ContainsItsDataAfterDeserialization)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, ContainsItsDataAfterDeserialization)
     {
         {
             LogicEngine tempEngineForSaving;
@@ -476,7 +578,7 @@ namespace rlogic
     }
 
 
-    TEST_F(ARamsesNodeBinding_WithSerialization, RestoresLinkToRamsesNodeAfterLoadingFromFile)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, RestoresLinkToRamsesNodeAfterLoadingFromFile)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -492,7 +594,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ARamsesNodeBinding_WithSerialization, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_ButNoSceneWasProvided)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_ButNoSceneWasProvided)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -505,11 +607,11 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesNode.bin"));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized ramses logic object 'NodeBinding' points to a Ramses object (id: 1) , but no Ramses scene was provided to resolve the Ramses object!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'NodeBinding' points to a Ramses object (id: 1), but no Ramses scene was provided to resolve the Ramses object!");
         }
     }
 
-    TEST_F(ARamsesNodeBinding_WithSerialization, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_WhichWasDeleted)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, ProducesErrorWhenDeserializingFromFile_WhenHavingLinkToRamsesNode_WhichWasDeleted)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -525,11 +627,11 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.loadFromFile("RamsesNodeDeleted.bin", &m_testScene));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized ramses logic object NodeBinding points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'NodeBinding' points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
         }
     }
 
-    TEST_F(ARamsesNodeBinding_WithSerialization, DoesNotModifyRamsesNodePropertiesAfterLoadingFromFile_WhenNoValuesWereExplicitlySetBeforeSaving)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, DoesNotModifyRamsesNodePropertiesAfterLoadingFromFile_WhenNoValuesWereExplicitlySetBeforeSaving)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -548,7 +650,7 @@ namespace rlogic
 
     // Tests that the node properties don't overwrite ramses' values after loading from file, until
     // set() is called again explicitly after loadFromFile()
-    TEST_F(ARamsesNodeBinding_WithSerialization, DoesNotReapplyPropertiesToRamsesAfterLoading_UntilExplicitlySetAgain)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, DoesNotReapplyPropertiesToRamsesAfterLoading_UntilExplicitlySetAgain)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
         {
@@ -597,7 +699,7 @@ namespace rlogic
     // - saving and loading files
     // The general expectation is that after loading + update(), the logic scene would overwrite only ramses
     // properties wrapped by a LogicBinding which is linked to a script
-    TEST_F(ARamsesNodeBinding_WithSerialization, SetsOnlyRamsesNodePropertiesForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
+    TEST_F(ARamsesNodeBinding_SerializationWithFile, SetsOnlyRamsesNodePropertiesForWhichTheBindingInputIsLinked_AfterLoadingFromFile_AndCallingUpdate)
     {
         ramses::Node* ramsesNode = createTestRamsesNode();
 

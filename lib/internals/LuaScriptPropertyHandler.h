@@ -12,7 +12,6 @@
 
 #include "impl/PropertyImpl.h"
 #include "internals/SolState.h"
-#include "internals/LuaScriptHandler.h"
 
 namespace rlogic
 {
@@ -22,7 +21,7 @@ namespace rlogic
 namespace rlogic::internal
 {
     // This class provides a Lua-like interface to the logic engine types
-    class LuaScriptPropertyHandler : public LuaScriptHandler
+    class LuaScriptPropertyHandler
     {
     public:
         LuaScriptPropertyHandler(SolState& state, PropertyImpl& propertyDescription);
@@ -37,7 +36,11 @@ namespace rlogic::internal
 
         [[nodiscard]] const PropertyImpl& getPropertyImpl() const;
 
+        // TODO Violin remove this exposure
+        SolState& getSolState();
+
     private:
+        SolState& m_solState;
         PropertyImpl& m_propertyDescription;
 
         void        setChildProperty(const sol::object& propertyIndex, const sol::object& rhs);
@@ -53,7 +56,7 @@ namespace rlogic::internal
         {
             auto value = property.get<T>();
             assert (value && "Lua type mismatch while converting object!");
-            return m_state.createUserObject(*value);
+            return m_solState.createUserObject(*value);
         }
     };
 }

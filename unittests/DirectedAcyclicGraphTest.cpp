@@ -6,13 +6,11 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "gtest/gtest.h"
+#include "gmock/gmock.h"
 
 #include "internals/DirectedAcyclicGraph.h"
 
 #include "LogicNodeDummy.h"
-
-#include "gmock/gmock-matchers.h"
 
 namespace rlogic::internal
 {

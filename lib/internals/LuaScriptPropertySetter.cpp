@@ -10,6 +10,7 @@
 #include "internals/LuaScriptPropertySetter.h"
 #include "internals/LuaScriptPropertyHandler.h"
 #include "internals/SolHelper.h"
+#include "internals/LuaTypeConversions.h"
 
 #include "ramses-logic/Property.h"
 
@@ -117,7 +118,7 @@ namespace rlogic::internal
             break;
         case EPropertyType::Int32:
         {
-            std::optional<int32_t> maybeInt32 = ExtractSpecificType<int32_t>(number);
+            std::optional<int32_t> maybeInt32 = LuaTypeConversions::ExtractSpecificType<int32_t>(number);
             if (maybeInt32)
             {
                 property.m_impl->setOutputFromScript(*maybeInt32);
@@ -186,22 +187,22 @@ namespace rlogic::internal
             switch (propType)
             {
             case EPropertyType::Vec2f:
-                property.m_impl->setOutputFromScript<vec2f>(ExtractArray<float, 2>(table));
+                property.m_impl->setOutputFromScript<vec2f>(LuaTypeConversions::ExtractArray<float, 2>(table));
                 break;
             case EPropertyType::Vec3f:
-                property.m_impl->setOutputFromScript<vec3f>(ExtractArray<float, 3>(table));
+                property.m_impl->setOutputFromScript<vec3f>(LuaTypeConversions::ExtractArray<float, 3>(table));
                 break;
             case EPropertyType::Vec4f:
-                property.m_impl->setOutputFromScript<vec4f>(ExtractArray<float, 4>(table));
+                property.m_impl->setOutputFromScript<vec4f>(LuaTypeConversions::ExtractArray<float, 4>(table));
                 break;
             case EPropertyType::Vec2i:
-                property.m_impl->setOutputFromScript<vec2i>(ExtractArray<int32_t, 2>(table));
+                property.m_impl->setOutputFromScript<vec2i>(LuaTypeConversions::ExtractArray<int32_t, 2>(table));
                 break;
             case EPropertyType::Vec3i:
-                property.m_impl->setOutputFromScript<vec3i>(ExtractArray<int32_t, 3>(table));
+                property.m_impl->setOutputFromScript<vec3i>(LuaTypeConversions::ExtractArray<int32_t, 3>(table));
                 break;
             case EPropertyType::Vec4i:
-                property.m_impl->setOutputFromScript<vec4i>(ExtractArray<int32_t, 4>(table));
+                property.m_impl->setOutputFromScript<vec4i>(LuaTypeConversions::ExtractArray<int32_t, 4>(table));
                 break;
                 // TODO Violin/Sven/Tobias this kind of a bad design, and the reason for it lies
                 // with the fact that we handle 3 different things in the same base class - "Property"
@@ -329,7 +330,7 @@ namespace rlogic::internal
             {
                 // TODO Violin this can be improved by refactoring the "handler" classes
                 // For now, use the "LuaScriptPropertyHandler" class to assign structs, to reduce code duplication
-                LuaScriptPropertyHandler childPropertyHandler(structPropertyHandler.getState(), *rhsChild->m_impl);
+                LuaScriptPropertyHandler childPropertyHandler(structPropertyHandler.getSolState(), *rhsChild->m_impl);
                 SetStruct(*child, childPropertyHandler);
                 break;
             }

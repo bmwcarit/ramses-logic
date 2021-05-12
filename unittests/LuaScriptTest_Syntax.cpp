@@ -64,7 +64,10 @@ namespace rlogic
         )", "scriptWithErrorInGlobalCode");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"scriptWithErrorInGlobalCode\"]:2: Expect this error!\nstack traceback:\n\t[C]: in function 'error'\n\t[string \"scriptWithErrorInGlobalCode\"]:2: in main chunk"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
+            "[string \"scriptWithErrorInGlobalCode\"]:2: Expect this error!\nstack traceback:\n"
+            "\t[C]: in function 'error'\n"
+            "\t[string \"scriptWithErrorInGlobalCode\"]:2: in main chunk"));
     }
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_DuringInterfaceDeclaration)
@@ -79,7 +82,10 @@ namespace rlogic
         )", "scriptWithErrorInInterface");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"scriptWithErrorInInterface\"]:3: Expect this error!\nstack traceback:\n\t[C]: in function 'error'\n\t[string \"scriptWithErrorInInterface\"]:3: in function <[string \"scriptWithErrorInInterface\"]:2>"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
+            "[string \"scriptWithErrorInInterface\"]:3: Expect this error!\nstack traceback:\n"
+            "\t[C]: in function 'error'\n"
+            "\t[string \"scriptWithErrorInInterface\"]:3: in function <[string \"scriptWithErrorInInterface\"]:2>"));
     }
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_DuringRun)
@@ -97,7 +103,11 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"scriptWithErrorInRun\"]:6: Expect this error!\nstack traceback:\n\t[C]: in function 'error'\n\t[string \"scriptWithErrorInRun\"]:6: in function <[string \"scriptWithErrorInRun\"]:5>"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
+            "[string \"scriptWithErrorInRun\"]:6: Expect this error!\n"
+            "stack traceback:\n"
+            "\t[C]: in function 'error'\n"
+            "\t[string \"scriptWithErrorInRun\"]:6: in function <[string \"scriptWithErrorInRun\"]:5>"));
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
     }
 

@@ -28,17 +28,11 @@ namespace rlogic::internal
     class AProperty : public ::testing::Test
     {
     public:
-        AProperty();
-
-        ErrorReporting       m_unusedErrorReporting;
-        SolState                       state;
-        std::unique_ptr<LuaScriptImpl> script;
         LogicNodeDummyImpl m_dummyNode{ "DummyNode" };
 
-        static std::unique_ptr < PropertyImpl> Deserialize(const void* buffer)
+        static std::unique_ptr<PropertyImpl> Deserialize(const void* buffer)
         {
-            const auto propertyFB = rlogic_serialization::GetProperty(buffer);
-            return PropertyImpl::Create(*propertyFB, EPropertySemantics::ScriptInput);
+            return PropertyImpl::Deserialize(*rlogic_serialization::GetProperty(buffer), EPropertySemantics::ScriptInput);
         }
 
         std::unique_ptr<PropertyImpl> CreateInputProperty(std::string_view name, EPropertyType type, bool assignDummyLogicNode = true)
@@ -63,12 +57,6 @@ namespace rlogic::internal
             return property;
         }
     };
-
-    AProperty::AProperty()
-        : script(LuaScriptImpl::Create(state, "", "", "", m_unusedErrorReporting))
-    {
-    }
-
 
     TEST_F(AProperty, HasANameAfterCreation)
     {
@@ -572,7 +560,7 @@ namespace rlogic::internal
         {
             auto rootImpl = CreateInputProperty("EmptyProperty", EPropertyType::Struct);
 
-            rootImpl->serialize(builder);
+            (void)PropertyImpl::Serialize(*rootImpl, builder);
         }
         {
             auto root = Deserialize(builder.GetBufferPointer());
@@ -624,7 +612,7 @@ namespace rlogic::internal
             propVec3i->set<vec3i>({3, 4, 5});
             propVec4i->set<vec4i>({6, 7, 8, 9});
 
-            rootImpl->serialize(builder);
+            (void)PropertyImpl::Serialize(*rootImpl, builder);
         }
         {
 
@@ -691,7 +679,7 @@ namespace rlogic::internal
             propertyRoot->addChild(std::move(c2));
             propertyRoot->addChild(std::move(c3));
 
-            propertyRoot->serialize(builder);
+            (void)PropertyImpl::Serialize(*propertyRoot, builder);
         }
         {
             auto root = Deserialize(builder.GetBufferPointer());
@@ -724,8 +712,7 @@ namespace rlogic::internal
             propertyNested1->addChild(std::move(propertyNested2));
             propertyRoot->addChild(std::move(propertyNested1));
 
-
-            propertyRoot->serialize(builder);
+            (void)PropertyImpl::Serialize(*propertyRoot, builder);
         }
         {
             auto root = Deserialize(builder.GetBufferPointer());

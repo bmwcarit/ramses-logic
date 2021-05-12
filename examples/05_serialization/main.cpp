@@ -68,14 +68,16 @@ int main()
      * In this simple example, we use find_if() to search for a specific script by its name.
      * We get an iterator which can be dereferenced to rlogic::LuaScript*
      */
-    rlogic::Collection<rlogic::LuaScript>::iterator triangleRotationScript = std::find_if(loadedScripts.begin(), loadedScripts.end(), [](rlogic::LuaScript* script) {return script->getName() == "simple rotation script"; });
+    rlogic::Collection<rlogic::LuaScript>::iterator triangleRotationScript = std::find_if(loadedScripts.begin(), loadedScripts.end(),
+        [](rlogic::LuaScript* script) {return script->getName() == "simple rotation script"; });
 
     /**
      * We can do the same to find a ramses node binding. We can use the binding to obtain a pointer to the ramses::Node further down.
      * This is an alternative to ramses::Scene::findObjectById()/findObjectByName() methods.
      * Note that this example uses fully qualified names and type traits for documentation sake. You can also just use 'auto'.
      */
-    rlogic::Collection<rlogic::RamsesNodeBinding>::const_iterator triangleNodeBinding = std::find_if(loadedNodeBindings.cbegin(), loadedNodeBindings.cend(), [](const rlogic::RamsesNodeBinding* binding) {return binding->getName() == "link to triangle node"; });
+    rlogic::Collection<rlogic::RamsesNodeBinding>::const_iterator triangleNodeBinding = std::find_if(loadedNodeBindings.cbegin(), loadedNodeBindings.cend(),
+        [](const rlogic::RamsesNodeBinding* binding) {return binding->getName() == "link to triangle node"; });
 
     /**
      * The LogicEngine iterators work just like any other STL forward iterator - can be compared, dereferenced, incremented etc.

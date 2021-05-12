@@ -10,9 +10,6 @@
 
 #include "internals/SolWrapper.h"
 
-#include <vector>
-#include <memory>
-#include <string>
 #include <string_view>
 
 namespace rlogic::internal
@@ -30,17 +27,17 @@ namespace rlogic::internal
         SolState& operator=(const SolState& other) = delete;
 
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
-        std::optional<sol::environment> createEnvironment(const sol::protected_function& rootScript);
+        sol::environment createEnvironment();
 
         template <typename T> sol::object createUserObject(const T& instance);
 
     private:
-        std::unique_ptr<sol::state>     m_sol;
+        sol::state m_solState;
 
     };
 
     template <typename T> inline sol::object SolState::createUserObject(const T& instance)
     {
-        return sol::object(*m_sol, sol::in_place_type<T>, instance);
+        return sol::object(m_solState, sol::in_place_type<T>, instance);
     }
 }

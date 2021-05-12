@@ -16,24 +16,11 @@
 
 namespace rlogic::internal
 {
-    class SolState;
-
-    class LuaScriptHandler
+    class LuaTypeConversions
     {
     public:
-        explicit LuaScriptHandler(SolState& state);
-
-        // TODO Violin this should not have to be exposed, otherwise this class doesn't make much sense
-        // Refactor these classes
-        SolState& getState();
-
-    protected:
-        SolState& m_state;
-
         static std::string_view GetIndexAsString (const sol::object& index);
 
-        // TODO Violin/Sven investigate sol macro "SOL_SAFE_NUMERICS " and "SOL_NO_CHECK_NUMBER_PRECISION
-        // Could be a more elegant solution than this
         template <typename T>
         static std::optional<T> ExtractSpecificType(const sol::object& solObject);
 
@@ -41,6 +28,8 @@ namespace rlogic::internal
 
         template <typename T, size_t size>
         static std::array<T, size> ExtractArray(const sol::table& solTable);
+
+        static_assert(std::is_same<LUA_NUMBER, double>::value, "This class assumes that Lua-internal numbers are double precision floats");
     };
 
 }

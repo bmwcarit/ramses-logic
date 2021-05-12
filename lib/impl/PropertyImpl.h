@@ -9,6 +9,7 @@
 #pragma once
 
 #include "ramses-logic/EPropertyType.h"
+#include "internals/EPropertySemantics.h"
 
 #include <string>
 #include <vector>
@@ -35,19 +36,13 @@ namespace rlogic::internal
 {
     class LogicNodeImpl;
 
-    enum class EPropertySemantics : uint8_t
-    {
-        ScriptInput,
-        BindingInput,
-        ScriptOutput
-    };
-
     class PropertyImpl
     {
     public:
         PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics);
-        PropertyImpl(const rlogic_serialization::Property& prop, EPropertySemantics semantics);
-        static std::unique_ptr<PropertyImpl> Create(const rlogic_serialization::Property& prop, EPropertySemantics semantics);
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> Serialize(const PropertyImpl& prop, flatbuffers::FlatBufferBuilder& builder);
+        [[nodiscard]] static std::unique_ptr<PropertyImpl> Deserialize(const rlogic_serialization::Property& prop, EPropertySemantics semantics);
+
 
         // Move-able (noexcept); Not copy-able
         ~PropertyImpl() noexcept = default;
@@ -99,8 +94,6 @@ namespace rlogic::internal
             m_value = value;
         }
 
-        flatbuffers::Offset<rlogic_serialization::Property> serialize(flatbuffers::FlatBufferBuilder& builder);
-
         void setLogicNode(LogicNodeImpl& logicNode);
         [[nodiscard]] LogicNodeImpl& getLogicNode();
 
@@ -117,6 +110,7 @@ namespace rlogic::internal
         EPropertySemantics                              m_semantics;
 
         template <typename T> bool set(T value);
-        flatbuffers::Offset<rlogic_serialization::Property> serialize_recursive(flatbuffers::FlatBufferBuilder& builder);
+
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> SerializeRecursive(const PropertyImpl& prop, flatbuffers::FlatBufferBuilder& builder);
     };
 }

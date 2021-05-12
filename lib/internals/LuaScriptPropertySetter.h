@@ -9,7 +9,6 @@
 #pragma once
 
 #include "internals/SolWrapper.h"
-#include "internals/LuaScriptHandler.h"
 
 namespace rlogic
 {
@@ -20,7 +19,7 @@ namespace rlogic::internal
 {
     class LuaScriptPropertyHandler;
 
-    class LuaScriptPropertySetter : public LuaScriptHandler
+    class LuaScriptPropertySetter
     {
     public:
         static void Set(Property& property, const sol::object& value);

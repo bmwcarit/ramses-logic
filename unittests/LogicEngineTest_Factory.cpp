@@ -134,7 +134,7 @@ namespace rlogic
             {
             }
 
-            bool update() override { return true; }
+            std::optional<internal::LogicNodeRuntimeError> update() override { return std::nullopt; }
         };
 
         struct UnknownObject : LogicNode

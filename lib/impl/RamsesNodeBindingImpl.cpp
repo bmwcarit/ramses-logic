@@ -17,32 +17,51 @@
 
 namespace rlogic::internal
 {
-    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Create(std::string_view name)
-    {
-        // We can't use std::make_unique here, because the constructor is private
-        return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name));
-    }
-
-    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Create(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode)
-    {
-        // TODO Violin/Sven Test with large scene how much overhead it is to store lots of bindings with empty names
-        assert(nullptr != nodeBinding.logicnode());
-        assert(nullptr != nodeBinding.logicnode()->name());
-        assert(nullptr != nodeBinding.logicnode()->inputs());
-
-        auto inputs = PropertyImpl::Create(*nodeBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
-
-        assert (nullptr != inputs);
-
-        const auto name = nodeBinding.logicnode()->name()->string_view();
-
-        return std::unique_ptr<RamsesNodeBindingImpl>(new RamsesNodeBindingImpl(name, static_cast<ramses::ERotationConvention>(nodeBinding.rotationConvention()), std::move(inputs), ramsesNode));
-    }
-
     RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name) noexcept
         : RamsesBindingImpl(name, CreateNodeProperties(), nullptr)
     {
         // TODO Violin this still needs some thought (the impl lifecycle with and without deserialization + base classes)
+    }
+
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept
+        : RamsesBindingImpl(name, std::move(inputs), nullptr)
+        , m_ramsesNode(ramsesNode)
+        , m_rotationConvention(rotationConvention)
+    {
+    }
+
+    flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::Serialize(const RamsesNodeBindingImpl& nodeBinding, flatbuffers::FlatBufferBuilder& builder)
+    {
+        ramses::sceneObjectId_t ramsesNodeId;
+        if (nodeBinding.m_ramsesNode != nullptr)
+        {
+            ramsesNodeId = nodeBinding.m_ramsesNode->getSceneObjectId();
+        }
+
+        auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
+            LogicNodeImpl::Serialize(nodeBinding, builder), // Serialize base class
+            ramsesNodeId.getValue(),
+            static_cast<uint8_t>(nodeBinding.m_rotationConvention)
+        );
+        builder.Finish(ramsesNodeBinding);
+
+        return ramsesNodeBinding;
+    }
+
+    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Deserialize(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode)
+    {
+        assert(nullptr != nodeBinding.logicnode());
+        assert(nullptr != nodeBinding.logicnode()->name());
+        assert(nullptr != nodeBinding.logicnode()->inputs());
+
+        std::unique_ptr<PropertyImpl> inputs = PropertyImpl::Deserialize(*nodeBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
+        assert(nullptr != inputs);
+
+        return std::make_unique<RamsesNodeBindingImpl>(
+            nodeBinding.logicnode()->name()->string_view(),
+            static_cast<ramses::ERotationConvention>(nodeBinding.rotationConvention()),
+            std::move(inputs),
+            ramsesNode);
     }
 
     std::unique_ptr<PropertyImpl> RamsesNodeBindingImpl::CreateNodeProperties()
@@ -62,14 +81,7 @@ namespace rlogic::internal
         return inputsImpl;
     }
 
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept
-        : RamsesBindingImpl(name, std::move(inputs), nullptr)
-        , m_ramsesNode(ramsesNode)
-        , m_rotationConvention(rotationConvention)
-    {
-    }
-
-    bool RamsesNodeBindingImpl::update()
+    std::optional<LogicNodeRuntimeError> RamsesNodeBindingImpl::update()
     {
         if (m_ramsesNode != nullptr)
         {
@@ -89,8 +101,7 @@ namespace rlogic::internal
 
                 if (status != ramses::StatusOK)
                 {
-                    addError(m_ramsesNode->getStatusMessage(status));
-                    return false;
+                    return LogicNodeRuntimeError{m_ramsesNode->getStatusMessage(status)};
                 }
             }
 
@@ -102,8 +113,7 @@ namespace rlogic::internal
 
                 if (status != ramses::StatusOK)
                 {
-                    addError(m_ramsesNode->getStatusMessage(status));
-                    return false;
+                    return LogicNodeRuntimeError{m_ramsesNode->getStatusMessage(status)};
                 }
             }
 
@@ -115,8 +125,7 @@ namespace rlogic::internal
 
                 if (status != ramses::StatusOK)
                 {
-                    addError(m_ramsesNode->getStatusMessage(status));
-                    return false;
+                    return LogicNodeRuntimeError{ m_ramsesNode->getStatusMessage(status) };
                 }
             }
 
@@ -128,31 +137,12 @@ namespace rlogic::internal
 
                 if (status != ramses::StatusOK)
                 {
-                    addError(m_ramsesNode->getStatusMessage(status));
-                    return false;
+                    return LogicNodeRuntimeError{ m_ramsesNode->getStatusMessage(status) };
                 }
             }
         }
 
-        return true;
-    }
-
-    flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
-    {
-        ramses::sceneObjectId_t ramsesNodeId;
-        if (m_ramsesNode != nullptr)
-        {
-            ramsesNodeId = m_ramsesNode->getSceneObjectId();
-        }
-
-        auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
-            LogicNodeImpl::serialize(builder),
-            ramsesNodeId.getValue(),
-            static_cast<uint8_t>(m_rotationConvention)
-        );
-        builder.Finish(ramsesNodeBinding);
-
-        return ramsesNodeBinding;
+        return std::nullopt;
     }
 
     bool RamsesNodeBindingImpl::setRamsesNode(ramses::Node* node)

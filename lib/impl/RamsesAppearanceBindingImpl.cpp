@@ -38,10 +38,55 @@ namespace rlogic::internal
     {
     }
 
-    std::unique_ptr<RamsesAppearanceBindingImpl> RamsesAppearanceBindingImpl::Create(std::string_view name)
+    flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> RamsesAppearanceBindingImpl::Serialize(const RamsesAppearanceBindingImpl& binding, flatbuffers::FlatBufferBuilder& builder)
     {
-        // We can't use std::make_unique here, because the constructor is private
-        return std::unique_ptr<RamsesAppearanceBindingImpl>(new RamsesAppearanceBindingImpl(name));
+        ramses::sceneObjectId_t appearanceId;
+        if (binding.m_appearance != nullptr)
+        {
+            appearanceId = binding.m_appearance->getSceneObjectId();
+        }
+        auto ramsesAppearanceBinding = rlogic_serialization::CreateRamsesAppearanceBinding(
+            builder,
+            LogicNodeImpl::Serialize(binding, builder), // Serialize base class
+            appearanceId.getValue());
+        builder.Finish(ramsesAppearanceBinding);
+
+        return ramsesAppearanceBinding;
+    }
+
+    std::unique_ptr<RamsesAppearanceBindingImpl> RamsesAppearanceBindingImpl::Deserialize(
+        const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding,
+        ramses::Appearance* appearance,
+        ErrorReporting& errorReporting)
+    {
+        assert(nullptr != appearanceBinding.logicnode());
+        assert(nullptr != appearanceBinding.logicnode()->name());
+        assert(nullptr != appearanceBinding.logicnode()->inputs());
+
+        std::unique_ptr<PropertyImpl> inputsImpl = PropertyImpl::Deserialize(*appearanceBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
+        if (nullptr != appearance)
+        {
+            if (!AppearanceCompatibleWithDeserializedInputs(*inputsImpl, *appearance, errorReporting))
+            {
+                return nullptr;
+            }
+            // TODO Violin redesign this (currently not possible because of impl restrictions)
+            std::unique_ptr<RamsesAppearanceBindingImpl> implWhichNeedsUpdating(new RamsesAppearanceBindingImpl(
+                appearanceBinding.logicnode()->name()->string_view(),
+                std::move(inputsImpl),
+                *appearance));
+            implWhichNeedsUpdating->populatePropertyMappingCache(*appearance);
+            return implWhichNeedsUpdating;
+        }
+
+        if (inputsImpl->getChildCount() != 0u)
+        {
+            errorReporting.add(fmt::format("Fatal error while loading from file: appearance binding (name: {}) has stored inputs, but a ramses appearance (id: {}) could not be resolved",
+                appearanceBinding.logicnode()->name()->string_view(),
+                appearanceBinding.ramsesAppearance()));
+            return nullptr;
+        }
+        return std::make_unique<RamsesAppearanceBindingImpl>(appearanceBinding.logicnode()->name()->string_view());
     }
 
     bool RamsesAppearanceBindingImpl::UniformTypeMatchesBindingInputType(const ramses::UniformInput& uniformInput, const PropertyImpl& bindingInput, ErrorReporting& errorReporting)
@@ -100,37 +145,7 @@ namespace rlogic::internal
         return true;
     }
 
-    std::unique_ptr<RamsesAppearanceBindingImpl> RamsesAppearanceBindingImpl::Create(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, ErrorReporting& errorReporting)
-    {
-        // TODO Test with large scene how much overhead it is to store lots of bindings with empty names
-        assert(nullptr != appearanceBinding.logicnode());
-        assert(nullptr != appearanceBinding.logicnode()->name());
-        assert(nullptr != appearanceBinding.logicnode()->inputs());
-
-        std::unique_ptr<PropertyImpl> inputsImpl = PropertyImpl::Create(*appearanceBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
-        if (nullptr != appearance)
-        {
-            if (!AppearanceCompatibleWithDeserializedInputs(*inputsImpl, *appearance, errorReporting))
-            {
-                return nullptr;
-            }
-            // TODO Violin code needs more redesign here
-            auto implWhichNeedsUpdating = std::unique_ptr<RamsesAppearanceBindingImpl>(new RamsesAppearanceBindingImpl(appearanceBinding.logicnode()->name()->string_view(), std::move(inputsImpl), *appearance));
-            implWhichNeedsUpdating->populatePropertyMappingCache(*appearance);
-            return implWhichNeedsUpdating;
-        }
-
-        if (inputsImpl->getChildCount() != 0u)
-        {
-            errorReporting.add(fmt::format("Fatal error while loading from file: appearance binding (name: {}) has stored inputs, but a ramses appearance (id: {}) could not be resolved",
-                appearanceBinding.logicnode()->name()->string_view(),
-                appearanceBinding.ramsesAppearance()));
-            return nullptr;
-        }
-        return std::unique_ptr<RamsesAppearanceBindingImpl>(new RamsesAppearanceBindingImpl(appearanceBinding.logicnode()->name()->string_view()));
-    }
-
-    bool RamsesAppearanceBindingImpl::update()
+    std::optional<LogicNodeRuntimeError> RamsesAppearanceBindingImpl::update()
     {
         const Property& inputs = *getInputs();
         const size_t childCount = inputs.getChildCount();
@@ -139,7 +154,7 @@ namespace rlogic::internal
             setInputValueToUniform(*inputs.getChild(i)->m_impl);
         }
 
-        return true;
+        return std::nullopt;
     }
 
     void RamsesAppearanceBindingImpl::setInputValueToUniform(PropertyImpl& property)
@@ -347,21 +362,5 @@ namespace rlogic::internal
     ramses::Appearance* RamsesAppearanceBindingImpl::getRamsesAppearance() const
     {
         return m_appearance;
-    }
-
-    flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> RamsesAppearanceBindingImpl::serialize(flatbuffers::FlatBufferBuilder& builder) const
-    {
-        ramses::sceneObjectId_t appearanceId;
-        if (m_appearance != nullptr)
-        {
-            appearanceId = m_appearance->getSceneObjectId();
-        }
-        auto ramsesAppearanceBinding = rlogic_serialization::CreateRamsesAppearanceBinding(
-            builder,
-            LogicNodeImpl::serialize(builder),
-            appearanceId.getValue());
-        builder.Finish(ramsesAppearanceBinding);
-
-        return ramsesAppearanceBinding;
     }
 }

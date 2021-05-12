@@ -17,6 +17,13 @@ namespace rlogic::internal
     {
         protected:
             SolState m_solState;
+
+            const std::string_view m_valid_empty_script = R"(
+                function interface()
+                end
+                function run()
+                end
+            )";
     };
 
     TEST_F(ASolState, DoesNotHaveErrorsAfterLoadingEmptyScript)
@@ -28,14 +35,7 @@ namespace rlogic::internal
 
     TEST_F(ASolState, HasNoErrorsAfterLoadingValidScript)
     {
-        const std::string_view valid_empty_script = R"(
-                function interface()
-                end
-                function run()
-                end
-            )";
-
-        auto load_result = m_solState.loadScript(valid_empty_script, "validEmptryScript");
+        auto load_result = m_solState.loadScript(m_valid_empty_script, "validEmptryScript");
         EXPECT_TRUE(load_result.valid());
     }
 
@@ -47,26 +47,85 @@ namespace rlogic::internal
         EXPECT_THAT(error.what(), ::testing::HasSubstr("'<name>' expected near 'not'"));
     }
 
-    TEST_F(ASolState, CanCreateAnEnvironmentOnValidScript)
+    TEST_F(ASolState, CreatesNewEnvironment)
     {
-        auto load_result = m_solState.loadScript(R"(
-            function interface()
-            end
-            function run()
-            end
-        )", "invalidscript");
-
-        EXPECT_TRUE(load_result.valid());
-        sol::protected_function func = load_result;
-        auto                    env  = m_solState.createEnvironment(func);
-        EXPECT_TRUE(env);
+        sol::environment env = m_solState.createEnvironment();
+        EXPECT_TRUE(env.valid());
     }
 
-    TEST_F(ASolState, CantCreateEnvironmentOnInvalidSCript)
+    TEST_F(ASolState, NewEnvironment_InheritsGlobals)
     {
-        sol::protected_function func;
-        auto                    env  = m_solState.createEnvironment(func);
+        sol::environment env = m_solState.createEnvironment();
+        ASSERT_TRUE(env.valid());
 
-        EXPECT_FALSE(env);
+        // Libs
+        EXPECT_TRUE(env["print"].valid());
+        EXPECT_TRUE(env["math"].valid());
+
+        // Our defined symbols
+        EXPECT_TRUE(env["INT"].valid());
+        EXPECT_TRUE(env["STRING"].valid());
+    }
+
+    // Those are created at a later point of the script lifecycle
+    TEST_F(ASolState, NewEnvironment_HasNo_IN_OUT_globalsYet)
+    {
+        sol::environment env = m_solState.createEnvironment();
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_FALSE(env["IN"].valid());
+        EXPECT_FALSE(env["OUT"].valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_HasNoFunctionsExpectedByUserScript)
+    {
+        sol::environment env = m_solState.createEnvironment();
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_FALSE(env["interface"].valid());
+        EXPECT_FALSE(env["run"].valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_TwoEnvironmentsShareNoData)
+    {
+        sol::environment env1 = m_solState.createEnvironment();
+        sol::environment env2 = m_solState.createEnvironment();
+        ASSERT_TRUE(env1.valid());
+        ASSERT_TRUE(env2.valid());
+
+        env1["thisBelongsTo"] = "env1";
+        env2["thisBelongsTo"] = "env2";
+
+        const std::string data1 = env1["thisBelongsTo"];
+        const std::string data2 = env2["thisBelongsTo"];
+
+        EXPECT_EQ(data1, "env1");
+        EXPECT_EQ(data2, "env2");
+    }
+
+
+    TEST_F(ASolState, NewEnvironment_OverridesEnvironmentOfScript_AfterAppliedOnIt)
+    {
+        const std::string_view reportData = R"(
+                if data ~= nil then
+                    return "data: " .. data
+                else
+                    return "no data"
+                end
+            )";
+
+        sol::protected_function script = m_solState.loadScript(reportData, "test script");
+
+        std::string dataStatus = script();
+        EXPECT_EQ(dataStatus, "no data");
+
+        sol::environment env = m_solState.createEnvironment();
+        ASSERT_TRUE(env.valid());
+        env["data"] = "a lot of data!";
+
+        env.set_on(script);
+
+        dataStatus = script();
+        EXPECT_EQ(dataStatus, "data: a lot of data!");
     }
 }

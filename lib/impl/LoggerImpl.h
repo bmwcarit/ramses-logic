@@ -13,7 +13,11 @@
 
 #include "fmt/format.h"
 
+#ifdef __ANDROID__
+#include <android/log.h>
+#else
 #include <iostream>
+#endif
 
 #define LOG_FATAL(...) \
 internal::LoggerImpl::GetInstance().log(rlogic::ELogMessageType::Fatal, __VA_ARGS__)
@@ -86,6 +90,8 @@ namespace rlogic::internal
             return (messageType > m_logVerbosityLimit);
         }
 
+        static void PrintLogMessage(ELogMessageType messageType, const std::string& message);
+
         Logger::LogHandlerFunc m_logHandler;
         bool                   m_defaultLogging = true;
 
@@ -102,15 +108,52 @@ namespace rlogic::internal
             return;
         }
 
-        const auto formattedMessage = fmt::format(args...);
+        const std::string formattedMessage = fmt::format(args...);
         if (m_defaultLogging)
         {
-            std::cout << "[ " << GetLogMessageTypeString(messageType) << " ] " << formattedMessage << std::endl;
+            PrintLogMessage(messageType, formattedMessage);
         }
         if (nullptr != m_logHandler)
         {
             m_logHandler(messageType, formattedMessage);
         }
+    }
+
+    inline void LoggerImpl::PrintLogMessage(ELogMessageType messageType, const std::string& message)
+    {
+#ifdef __ANDROID__
+
+        android_LogPriority logLevel;
+
+        switch (messageType)
+        {
+        case ELogMessageType::Trace:
+            logLevel = ANDROID_LOG_VERBOSE;
+            break;
+        case ELogMessageType::Debug:
+            logLevel = ANDROID_LOG_DEBUG;
+            break;
+        case ELogMessageType::Info:
+            logLevel = ANDROID_LOG_INFO;
+            break;
+        case ELogMessageType::Warn:
+            logLevel = ANDROID_LOG_WARN;
+            break;
+        case ELogMessageType::Error:
+            logLevel = ANDROID_LOG_ERROR;
+            break;
+        case ELogMessageType::Fatal:
+            logLevel = ANDROID_LOG_FATAL;
+            break;
+        default:
+            logLevel = ANDROID_LOG_UNKNOWN;
+            break;
+        }
+
+        __android_log_print(logLevel, "Ramses.Logic", "%s", message.c_str());
+#else
+        std::cout << "[ " << GetLogMessageTypeString(messageType) << " ] " << message << std::endl;
+#endif
     }
 
     inline LoggerImpl& LoggerImpl::GetInstance()

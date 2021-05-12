@@ -46,6 +46,18 @@ Examples
 Prefer to learn by example? Have a look at our `self-contained example snippets <https://ramses-logic.readthedocs.io/en/latest/api.html#list-of-all-examples>`_.
 
 ========================
+Version matrix
+========================
+
+=======   =============================  ===================================
+Logic     Included Ramses version        Minimum required Ramses version
+=======   =============================  ===================================
+0.6.1     27.0.103 (includes 27.0.11)    same as 0.6.0
+0.6.0     27.0.102 (includes 27.0.10)    27.0.100
+0.5.3     27.0.101                       27.0.100
+=======   =============================  ===================================
+
+========================
 License
 ========================
 

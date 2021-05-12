@@ -46,36 +46,41 @@ Data flow
 --------------------------------------
 
 The cornerstone of the ``Logic Engine`` is the :func:`rlogic::LogicEngine::update` method which
-"executes" the script network and updates the values of the ``Ramses`` scene bound to it. The nodes
+"executes" the network of logic nodes and updates the values of the ``Ramses`` scene bound to some of them. The nodes
 are executed based on a topological graph sort, where the traversal direction is given by the link
 pairs (A, B) where A is an output and B is an input property in the logic graph
 (as shown :ref:`here <Object types and their relationships>`).
 
-In order to save performance, logic nodes are not executed again if none of their input values changed since
-the last update. ``Bindings`` are an exception to this rule - setting a value of a binding input always results in
-the value of that input being passed further to the bound ``Ramses`` object, regardless if the corresponding value in ``Ramses`` is the
-same or not. This can be useful when you want to force re-apply the value to ``Ramses`` e.g. you can have your own logic
-to control the visibility of all ``Ramses`` nodes, and only use ``Logic Engine`` to control transformation properties. In that case
-you should never set the "visibility" property of a Binding object, instead set the visibility directly on the bound ramses::Node.
+The update logic of each node depends on its type. ``Lua`` scripts execute their ``run()`` function
+and modify some or all of their outputs based on the logic defined in ``run()``. Ramses bindings pass the values of their
+input properties to the bound Ramses object.
+
+Logic nodes are not executed on every :func:`rlogic::LogicEngine::update` iteration in order to save performance.
+However, it's guaranteed that:
+
+* scripts which were just created will be executed on next update
+* scripts which inputs received a new value (either from calling :func:`rlogic::Property::set` or from a link)
+  will be executed on next update
+* binding properties which received a value (regardless of their current value or from the value stored in Ramses) will
+  overwrite the value in Ramses on next update. This works both for direct :func:`rlogic::Property::set` calls and for values
+  received over links
+
+
+Additionally, bindings' properties are applied selectively - e.g. setting the ``scaling`` property of a :class:`rlogic::RamsesNodeBinding`
+will result in a call to ``ramses::Node::setScaling()``, but will not cause setting any other ``ramses::Node`` properties.
+This can be useful if you want to have your own logic e.g.
+to control the visibility of all ``Ramses`` nodes, and only use a ``Logic Engine`` to control transformation properties. In that case
+you should never set the ``visibility`` property of a Binding object, instead set the visibility directly on the bound ``ramses::Node``.
 
 .. warning::
 
     We strongly discourage setting values to ``Ramses`` objects and to ``Ramses Logic`` bindings in the same update cycle
-    to avoid unexpected behavior. At any given time, use one *or* the other, not both mechanisms to set values!
-
-The execution logic is slightly different for scripts and bindings. Scripts will set the values of their outputs
-based on the logic in their ``run()`` function, which may set all, a subset or none of the script's outputs.
-Bindings execution logic processes each of its input slots individually and checks if
-a value was explicitly set on it (either from user code or from an incoming link). Only those inputs
-which have such value are also set on the bound ``Ramses`` object.
-
---------------------------------------
-Save/load to file
---------------------------------------
+    for the same property to avoid unexpected behavior. At any given time, use one *or* the other, not both mechanisms to set values!
 
 .. todo: Violin this behavior is still a bit inconsistent... Maybe we should change this to: scripts and bindings are not executed after load, unless an input is set before. This would be much more consistent!
 
-The ``Logic Engine`` is designed to be serialized and deserialized into binary files for fast loading. The first call to
+The ``Logic Engine`` can be also serialized and deserialized into binary files for fast loading.
+The above data flow rules still apply as if all the scripts and binding objects were just created. The first call to
 :func:`rlogic::LogicEngine::update` after loading from file will execute all scripts. Bindings will only be executed if
 some or all of their inputs are linked to a script output. Binding values will only be passed further to ``Ramses``
 if their values were modified, e.g. by a link which produced a different value than before saving, or if the application
@@ -173,7 +178,10 @@ Creating links between scripts
 One of the complex problems of 3D graphics development is managing complexity, especially for larger projects.
 For that purpose it is useful to split the application logic into multiple scripts, so that individual scripts
 can remain small and easy to understand. To do that, ``Ramses Logic`` provides a mechanism to link script
-properties - either statically or during runtime. Here is a simple example how links are created:
+properties - either statically or during runtime, in order to pass data from ``1`` producer script to ``N``
+consumer scripts.
+
+Here is a simple example how links are created:
 
 .. code-block::
     :linenos:
@@ -228,11 +236,9 @@ A link can be removed in a similar fashion:
         *sourceScript->getOutputs()->getChild("source"),
         *destinationScript->getInputs()->getChild("destination"));
 
-ATTENTION: Currently it is not possible to link structured data to other structured data directly. If you want to link all parts of a structured data,
-you need to link each property individually.
-
 For more detailed information on the exact behavior of these methods, refer to the documentation of the :func:`rlogic::LogicEngine::link`
-and :func:`rlogic::LogicEngine::unlink` documentation.
+and :func:`rlogic::LogicEngine::unlink` documentation. The `data flow section <Data Flow>`_ explains in detail how data is passed throughout the
+network of logic nodes when connected by links.
 
 ==================================================
 Linking scripts to Ramses scenes
@@ -253,57 +259,9 @@ The reason for that is two-fold:
 * This allows to handle all inputs and outputs in a generic way using the :class:`rlogic::LogicNode` class' interface from
   which both :class:`rlogic::LuaScript` and :class:`rlogic::RamsesNodeBinding` derive
 
+The `section on data flow <Data Flow>`_ describes how data is passed throughout the network of logic nodes and when
+bound Ramses objects are updated and when not.
 
-.. note::
-    Bindings are 'updated' slightly differently than :class:`rlogic::LuaScript`. A script will be executed if and only if any of
-    its input values have changed since last time it was executed. A :class:`rlogic::RamsesBinding` in contrast will also check
-    if its input properties have a value which was explicitly set by the user, either by direct :func:`rlogic::Property::set` or
-    indirectly with a :func:`rlogic::LogicEngine::link`. This way, only intended changes are passed further to ``Ramses`` objects
-    and you can mix and match different control systems. For example, you can use script logic to control the transformation properties
-    of nodes, but have your own logic/code for controlling the visibility or resource loading.
-
-If you destroy a LogicNode calling :func:`rlogic::LogicEngine::destroy`, all links from and to this :class:`rlogic::LogicNode` will
-be automatically removed.
-
-==================================================
-What happens on update
-==================================================
-
-The ``Logic Engine`` manages a network of Logic Nodes of various types which are executed in every
-update loop (as triggered by :func:`rlogic::LogicEngine::update`). But what happens inside each update loop?
-
-First, all :class:`rlogic::LogicNode` objects are ordered based on the links between them (as described in
-the :ref:`section explaining links <Creating links between scripts>`). Then, each of the nodes is executed
-according to that order, unless it does not need to be executed. A node needs to be executed if:
-
-* it was never executed before, i.e.:
-
-    * it was just created
-    * it was loaded from a file
-
-* it was executed in a previous update loop, but the value of at least one of its inputs changed. The cause of such change can either be:
-
-    * Setting the value directly over :func:`rlogic::Property::set`, or...
-    * An output of another :class:`rlogic::LogicNode` which changed in the same update loop is linked to this input or...
-    * A link to this input was just created
-
-In other words, the network of logic nodes is traversed along the links between them, the values of nodes' outputs
-is carried over to the linked nodes' inputs, and if no input changed for a given node, its execution is skipped to
-save CPU cycles.
-
-The execution logic is different for each type of :class:`rlogic::LogicNode`. :class:`rlogic::LuaScript` instances execute their ``run()`` method
-while :class:`rlogic::RamsesBinding` set the values of bound Ramses objects. For more details, consult the documentation of the specific
-classes.
-
-==================================================
-Performance and caching
-==================================================
-
-From performance point of view, it is not necessary to execute each :class:`rlogic::LogicNode` in an update step. LogicNodes with not changed inputs
-since the last update step, can be omitted. This is because the outputs of this :class:`rlogic::LogicNode` should not change if another update will be executed.
-There is one exception to this rule. If a :class:`rlogic::LogicNode` has not been updated before, it will always be updated, no matter whether inputs
-are changed or not.
-As a user you usally don't have to care about this mechanism, you just should know that LogicNode are only executed if at least one input is changed.
 
 =========================
 Error handling

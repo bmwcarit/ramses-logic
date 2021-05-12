@@ -276,6 +276,24 @@ is to ensure consistent behavior when propagating these values - for example whe
 or uniforms.
 
 -----------------------------------------------------
+Numerics
+-----------------------------------------------------
+
+Lua's internal `number` type is represented by a IEEE-754 double precision float internally.
+This is very flexible for scripting, but numerically dangerous when converting to other number
+types. Examples for such types are floats (commonly used for uniforms), and unsigned integers
+(when indexing arrays). To avoid numeric issues, the ``Logic Engine`` treats all value overflows and
+automatic roundings as hard errors when implicitly rounding to ints or casting large doubles.
+
+To avoid such numeric runtime errors, make sure you are not using
+numbers larger than what a signed int32 type permits when indexing, and not rounding using
+floating point arithmetics when computing indices. One way to denote an `invalid index` is using a
+negative number and explicitly checking the sign of indices. Floats can be assigned
+to integers by using the `math.floor/ceil` Lua functions explicitly.
+
+Numeric rules apply for all number types, independent if they are part of a struct, array or component in VECx.
+
+-----------------------------------------------------
 The global IN and OUT objects
 -----------------------------------------------------
 

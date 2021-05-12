@@ -18,9 +18,52 @@ namespace rlogic::internal
     class TypeUtils
     {
     public:
+        // Enum classes should not require range checks, but EPropertyType is marshalled from Lua and from files
+        // this method should be used to check if the enum is in range
+        static bool IsValidType(EPropertyType type)
+        {
+            switch (type)
+            {
+            case EPropertyType::Float:
+            case EPropertyType::Vec2f:
+            case EPropertyType::Vec3f:
+            case EPropertyType::Vec4f:
+            case EPropertyType::Int32:
+            case EPropertyType::Vec2i:
+            case EPropertyType::Vec3i:
+            case EPropertyType::Vec4i:
+            case EPropertyType::String:
+            case EPropertyType::Bool:
+            case EPropertyType::Struct:
+            case EPropertyType::Array:
+                return true;
+            default:
+                return false;
+            }
+        }
+
         static bool IsPrimitiveType(EPropertyType type)
         {
-            return (type != EPropertyType::Array && type != EPropertyType::Struct);
+            assert(IsValidType(type));
+
+            switch (type)
+            {
+            case EPropertyType::Float:
+            case EPropertyType::Vec2f:
+            case EPropertyType::Vec3f:
+            case EPropertyType::Vec4f:
+            case EPropertyType::Int32:
+            case EPropertyType::Vec2i:
+            case EPropertyType::Vec3i:
+            case EPropertyType::Vec4i:
+            case EPropertyType::String:
+            case EPropertyType::Bool:
+                return true;
+            case EPropertyType::Struct:
+            case EPropertyType::Array:
+            default:
+                return false;
+            }
         }
 
         // This method is for better readability in code
@@ -36,6 +79,7 @@ namespace rlogic::internal
         template <typename RAMSESTYPE, typename LOGICTYPE>
         static std::vector<RAMSESTYPE> FlattenArrayData(const PropertyImpl& arrayProperty)
         {
+            assert(arrayProperty.getType() == EPropertyType::Array);
             std::vector<RAMSESTYPE> arrayData;
             // Reserve space for array size times size of logic array element type
             arrayData.reserve(arrayProperty.getChildCount() * ComponentsSizeForPropertyType(arrayProperty.getChild(0)->getType()));

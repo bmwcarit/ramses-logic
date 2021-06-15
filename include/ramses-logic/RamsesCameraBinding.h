@@ -53,6 +53,11 @@ namespace rlogic
      *                             frustumProperties  --> leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane
      *  - #rlogic::LogicNode::getOutputs: returns always nullptr, because a #RamsesCameraBinding does not have outputs,
      *    it implicitly controls the ramses Camera
+     * \rst
+    .. warning::
+        When a new ramses::Camera is assigned, the inputs are re-created and :func:`rlogic::LogicNode::getInputs` will return a new pointer!
+        Make sure you are not using the old one any more!
+       \endrst
      */
     class RamsesCameraBinding : public RamsesBinding
     {

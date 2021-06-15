@@ -81,7 +81,7 @@ namespace rlogic::internal
         std::optional<LogicNodeRuntimeError> update() override;
 
     private:
-        ramses::Camera* m_camera = nullptr;
+        ramses::Camera* m_ramsesCamera = nullptr;
 
         void createCameraProperties(ramses::ERamsesObjectType cameraType);
     };

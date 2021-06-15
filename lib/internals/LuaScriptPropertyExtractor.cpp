@@ -68,7 +68,7 @@ namespace rlogic::internal
     {
         const std::string_view name = LuaTypeConversions::GetIndexAsString(propertyName);
 
-        if (nullptr != parentStruct.getChild(name))
+        if (parentStruct.hasChild(name))
         {
             sol_helper::throwSolException("Property '{}' already exists! Can't declare the same property twice!", name);
         }

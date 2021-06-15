@@ -23,10 +23,8 @@
 
 #include "generated/ramsesnodebinding_gen.h"
 
-namespace rlogic
+namespace rlogic::internal
 {
-    using rlogic::internal::ENodePropertyStaticIndex;
-
     class ARamsesNodeBinding : public ::testing::Test
     {
     protected:
@@ -177,7 +175,7 @@ namespace rlogic
         const auto inputCount = inputs->getChildCount();
         for (size_t i = 0; i < inputCount; ++i)
         {
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild(i)->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild(i)->m_impl->getPropertySemantics());
         }
     }
 
@@ -415,9 +413,6 @@ namespace rlogic
 
     }
 
-    //don't repeat internal:: everywhere
-    using internal::RamsesNodeBindingImpl;
-
     // This fixture only contains serialization unit tests, for higher order tests see `ARamsesNodeBinding_SerializationWithFile`
     class ARamsesNodeBinding_SerializationLifecycle : public ARamsesNodeBinding
     {
@@ -455,7 +450,7 @@ namespace rlogic
             ASSERT_TRUE(deserializedBinding);
             EXPECT_EQ(deserializedBinding->getName(), "name");
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
-            EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
             EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 4u);
         }
@@ -551,22 +546,22 @@ namespace rlogic
             ASSERT_NE(nullptr, rotation);
             EXPECT_EQ("rotation", rotation->getName());
             EXPECT_EQ(EPropertyType::Vec3f, rotation->getType());
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, rotation->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, rotation->m_impl->getPropertySemantics());
             EXPECT_THAT(*rotation->get<vec3f>(), ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
             ASSERT_NE(nullptr, translation);
             EXPECT_EQ("translation", translation->getName());
             EXPECT_EQ(EPropertyType::Vec3f, translation->getType());
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, translation->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, translation->m_impl->getPropertySemantics());
             EXPECT_THAT(*translation->get<vec3f>(), ::testing::ElementsAre(1.1f, 1.2f, 1.3f));
             ASSERT_NE(nullptr, scaling);
             EXPECT_EQ("scaling", scaling->getName());
             EXPECT_EQ(EPropertyType::Vec3f, scaling->getType());
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, scaling->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, scaling->m_impl->getPropertySemantics());
             EXPECT_THAT(*scaling->get<vec3f>(), ::testing::ElementsAre(2.1f, 2.2f, 2.3f));
             ASSERT_NE(nullptr, visibility);
             EXPECT_EQ("visibility", visibility->getName());
             EXPECT_EQ(EPropertyType::Bool, visibility->getType());
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, visibility->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, visibility->m_impl->getPropertySemantics());
             EXPECT_TRUE(*visibility->get<bool>());
 
             // Test that internal indices match properties resolved by name

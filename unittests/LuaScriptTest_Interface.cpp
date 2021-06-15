@@ -10,6 +10,7 @@
 
 #include "ramses-logic/Property.h"
 #include "impl/PropertyImpl.h"
+#include "LogTestUtils.h"
 
 
 namespace rlogic
@@ -17,6 +18,8 @@ namespace rlogic
     class ALuaScript_Interface : public ALuaScript
     {
     protected:
+        // Silence logs, unless explicitly enabled, to reduce spam and speed up tests
+        ScopedLogContextLevel m_silenceLogs{ ELogMessageType::Off };
     };
 
     // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value

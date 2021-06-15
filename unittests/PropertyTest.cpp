@@ -20,8 +20,10 @@
 
 #include "generated/property_gen.h"
 
-#include <memory>
 #include "LogicNodeDummy.h"
+#include "LogTestUtils.h"
+
+#include <memory>
 
 namespace rlogic::internal
 {
@@ -56,6 +58,9 @@ namespace rlogic::internal
             }
             return property;
         }
+
+        // Silence logs, unless explicitly enabled, to reduce spam and speed up tests
+        ScopedLogContextLevel m_silenceLogs{ELogMessageType::Off};
     };
 
     TEST_F(AProperty, HasANameAfterCreation)

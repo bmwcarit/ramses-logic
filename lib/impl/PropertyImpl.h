@@ -70,6 +70,7 @@ namespace rlogic::internal
 
         [[nodiscard]] Property* getChild(size_t index);
         [[nodiscard]] Property* getChild(std::string_view name);
+        [[nodiscard]] bool hasChild(std::string_view name) const;
 
         void addChild(std::unique_ptr<PropertyImpl> child);
         void clearChildren();

@@ -27,13 +27,8 @@
 #include "ramses-client-api/PerspectiveCamera.h"
 #include "ramses-client-api/OrthographicCamera.h"
 
-namespace rlogic
+namespace rlogic::internal
 {
-    using rlogic::internal::EPerspectiveCameraFrustumPropertyStaticIndex;
-    using rlogic::internal::EOrthographicCameraFrustumPropertyStaticIndex;
-    using rlogic::internal::ECameraPropertyStructStaticIndex;
-    using rlogic::internal::ECameraViewportPropertyStaticIndex;
-
     constexpr int32_t DefaultViewportOffsetX = 0;
     constexpr int32_t DefaultViewportOffsetY = 0;
     constexpr uint32_t DefaultViewportWidth = 16u;
@@ -557,12 +552,12 @@ namespace rlogic
         for (size_t i = 0; i < inputs->getChildCount(); ++i)
         {
             const auto inputStruct = inputs->getChild(i);
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputStruct->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, inputStruct->m_impl->getPropertySemantics());
 
             for (size_t j = 0; j < inputs->getChild(i)->getChildCount(); ++j)
             {
                 const auto inputProperty = inputStruct->m_impl->getChild(j);
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputProperty->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputProperty->m_impl->getPropertySemantics());
             }
         }
     }
@@ -577,12 +572,12 @@ namespace rlogic
         for (size_t i = 0; i < inputs->getChildCount(); ++i)
         {
             const auto inputStruct = inputs->getChild(i);
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputStruct->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, inputStruct->m_impl->getPropertySemantics());
 
             for (size_t j = 0; j < inputs->getChild(i)->getChildCount(); ++j)
             {
                 const auto inputProperty = inputStruct->m_impl->getChild(j);
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputProperty->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputProperty->m_impl->getPropertySemantics());
             }
         }
     }
@@ -917,11 +912,6 @@ namespace rlogic
         EXPECT_EQ(perspectiveCam.getViewportX(), vpOffsetXvalue1);
     }
 
-
-
-    //don't repeat internal:: everywhere
-    using internal::RamsesCameraBindingImpl;
-
     // This fixture only contains serialization unit tests, for higher order tests see `ARamsesCameraBinding_SerializationWithFile`
     class ARamsesCameraBinding_SerializationLifecycle : public ::testing::Test
     {
@@ -959,7 +949,7 @@ namespace rlogic
             ASSERT_TRUE(deserializedBinding);
             EXPECT_EQ(deserializedBinding->getName(), "name");
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
-            EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
             EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 0u);
         }
@@ -1041,27 +1031,27 @@ namespace rlogic
             auto vpProperties = inputs->getChild("viewPortProperties");
             auto frustumProperties = inputs->getChild("frustumProperties");
             ASSERT_EQ(vpProperties->getChildCount(), 4u);
-            ASSERT_EQ(vpProperties->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            ASSERT_EQ(vpProperties->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             ASSERT_EQ(frustumProperties->getChildCount(), 4u);
-            ASSERT_EQ(frustumProperties->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            ASSERT_EQ(frustumProperties->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
 
             EXPECT_EQ(*vpProperties->getChild("viewPortOffsetX")->get<int32_t>(), newVpOffsetX);
-            EXPECT_EQ(vpProperties->getChild("viewPortOffsetX")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(vpProperties->getChild("viewPortOffsetX")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(*vpProperties->getChild("viewPortOffsetY")->get<int32_t>(), newVpOffsetY);
-            EXPECT_EQ(vpProperties->getChild("viewPortOffsetY")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(vpProperties->getChild("viewPortOffsetY")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(*vpProperties->getChild("viewPortWidth")->get<int32_t>(), newVpWidth);
-            EXPECT_EQ(vpProperties->getChild("viewPortWidth")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(vpProperties->getChild("viewPortWidth")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(*vpProperties->getChild("viewPortHeight")->get<int32_t>(), newVpHeight);
-            EXPECT_EQ(vpProperties->getChild("viewPortHeight")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(vpProperties->getChild("viewPortHeight")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
 
             EXPECT_EQ(*frustumProperties->getChild("nearPlane")->get<float>(), newNearPlane);
-            EXPECT_EQ(frustumProperties->getChild("nearPlane")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(frustumProperties->getChild("nearPlane")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(*frustumProperties->getChild("farPlane")->get<float>(), newFarPlane);
-            EXPECT_EQ(frustumProperties->getChild("farPlane")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(frustumProperties->getChild("farPlane")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_NEAR(*frustumProperties->getChild("fieldOfView")->get<float>(), newFov, 0.001f);
-            EXPECT_EQ(frustumProperties->getChild("fieldOfView")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(frustumProperties->getChild("fieldOfView")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(*frustumProperties->getChild("aspectRatio")->get<float>(), newAR);
-            EXPECT_EQ(frustumProperties->getChild("aspectRatio")->m_impl->getPropertySemantics(), internal::EPropertySemantics::BindingInput);
+            EXPECT_EQ(frustumProperties->getChild("aspectRatio")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
 
             // Test that internal indices match properties resolved by name
             EXPECT_EQ(vpProperties->getChild("viewPortOffsetX"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX)));

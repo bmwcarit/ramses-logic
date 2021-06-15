@@ -26,6 +26,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-client-api/PerspectiveCamera.h"
 #include "RamsesTestUtils.h"
+#include "LogTestUtils.h"
 #include "RamsesObjectResolverMock.h"
 
 namespace rlogic::internal
@@ -44,6 +45,8 @@ namespace rlogic::internal
             end
         )";
 
+        // Silence logs, unless explicitly enabled, to reduce spam and speed up tests
+        ScopedLogContextLevel m_silenceLogs{ ELogMessageType::Off };
     };
 
     TEST_F(AnApiObjects, ProducesErrorWhenCreatingEmptyScript)

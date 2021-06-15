@@ -37,8 +37,8 @@ def main():
         r"^lib/libramses-logic\.so\.\d+\.\d+$",
         r"^lib/cmake/ramses-logic-\d+\.\d+/ramses-logicConfig\.cmake$",
         r"^lib/cmake/ramses-logic-\d+\.\d+/ramses-logicConfigVersion\.cmake$",
-        r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/CHANGELOG\.rst$",
-        r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/README\.rst$",
+        r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/CHANGELOG\.md$",
+        r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/README\.md$",
         r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/LICENSE\.txt$",
     ]
 

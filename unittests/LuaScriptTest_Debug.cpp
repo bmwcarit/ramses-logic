@@ -11,6 +11,7 @@
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
+#include "LogTestUtils.h"
 
 #include <fstream>
 
@@ -34,6 +35,9 @@ namespace rlogic
                 IN.prop = nil
             end
         )";
+
+        // Silence logs, unless explicitly enabled, to reduce spam and speed up tests
+        ScopedLogContextLevel m_silenceLogs{ ELogMessageType::Off };
     };
 
     TEST_F(ALuaScript_Debug, ProducesErrorWithFullStackTrace_WhenErrorsInInterface)

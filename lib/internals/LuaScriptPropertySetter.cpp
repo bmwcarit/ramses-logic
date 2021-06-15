@@ -12,6 +12,8 @@
 #include "internals/SolHelper.h"
 #include "internals/LuaTypeConversions.h"
 
+#include "impl/PropertyImpl.h"
+
 #include "ramses-logic/Property.h"
 
 namespace rlogic::internal
@@ -22,7 +24,7 @@ namespace rlogic::internal
     // - it's probably possible to unify the "table" handling between tables and user types using sol mechanics
     // - maybe possible to simplify some of the code by using sol iterators instead of for loops and array checks
 
-    void LuaScriptPropertySetter::Set(Property& property, const sol::object& value)
+    void LuaScriptPropertySetter::Set(PropertyImpl& property, const sol::object& value)
     {
         switch (value.get_type())
         {
@@ -74,22 +76,22 @@ namespace rlogic::internal
                 SetStruct(property, structPropertyHandler);
                 break;
             case EPropertyType::Vec2f:
-                property.m_impl->setOutputFromScript<vec2f>(*structPropertyHandler.getPropertyImpl().get<vec2f>());
+                property.setOutputFromScript<vec2f>(*structPropertyHandler.getPropertyImpl().get<vec2f>());
                 break;
             case EPropertyType::Vec3f:
-                property.m_impl->setOutputFromScript<vec3f>(*structPropertyHandler.getPropertyImpl().get<vec3f>());
+                property.setOutputFromScript<vec3f>(*structPropertyHandler.getPropertyImpl().get<vec3f>());
                 break;
             case EPropertyType::Vec4f:
-                property.m_impl->setOutputFromScript<vec4f>(*structPropertyHandler.getPropertyImpl().get<vec4f>());
+                property.setOutputFromScript<vec4f>(*structPropertyHandler.getPropertyImpl().get<vec4f>());
                 break;
             case EPropertyType::Vec2i:
-                property.m_impl->setOutputFromScript<vec2i>(*structPropertyHandler.getPropertyImpl().get<vec2i>());
+                property.setOutputFromScript<vec2i>(*structPropertyHandler.getPropertyImpl().get<vec2i>());
                 break;
             case EPropertyType::Vec3i:
-                property.m_impl->setOutputFromScript<vec3i>(*structPropertyHandler.getPropertyImpl().get<vec3i>());
+                property.setOutputFromScript<vec3i>(*structPropertyHandler.getPropertyImpl().get<vec3i>());
                 break;
             case EPropertyType::Vec4i:
-                property.m_impl->setOutputFromScript<vec4i>(*structPropertyHandler.getPropertyImpl().get<vec4i>());
+                property.setOutputFromScript<vec4i>(*structPropertyHandler.getPropertyImpl().get<vec4i>());
                 break;
             case EPropertyType::String:
             case EPropertyType::Bool:
@@ -109,19 +111,24 @@ namespace rlogic::internal
         }
     }
 
-    void LuaScriptPropertySetter::SetNumber(Property& property, const sol::object& number)
+    void LuaScriptPropertySetter::SetNumber(PropertyImpl& property, const sol::object& number)
     {
+        if (property.getPropertySemantics() != EPropertySemantics::ScriptOutput)
+        {
+            sol_helper::throwSolException("Error while writing to '{}'. Writing input values is not allowed, only outputs!", property.getName());
+        }
+
         switch (property.getType())
         {
         case EPropertyType::Float:
-            property.m_impl->setOutputFromScript(number.as<float>());
+            property.setOutputFromScript(number.as<float>());
             break;
         case EPropertyType::Int32:
         {
             std::optional<int32_t> maybeInt32 = LuaTypeConversions::ExtractSpecificType<int32_t>(number);
             if (maybeInt32)
             {
-                property.m_impl->setOutputFromScript(*maybeInt32);
+                property.setOutputFromScript(*maybeInt32);
             }
             else
             {
@@ -130,12 +137,12 @@ namespace rlogic::internal
         }
             break;
         default:
-                sol_helper::throwSolException(
-                    "Assigning wrong type ({}) to output '{}'!", sol_helper::GetSolTypeName(number.get_type()), property.getName());
+            sol_helper::throwSolException(
+                "Assigning wrong type ({}) to output '{}'!", sol_helper::GetSolTypeName(number.get_type()), property.getName());
         }
     }
 
-    void LuaScriptPropertySetter::SetTable(Property& property, const sol::table& table)
+    void LuaScriptPropertySetter::SetTable(PropertyImpl& property, const sol::table& table)
     {
         // table.size() does return 0, but iterating over the table does work
         // therefore we have to count ourselves.
@@ -155,8 +162,8 @@ namespace rlogic::internal
 
             for (auto& key_value : table)
             {
-                const auto child = property.getChild(key_value.first.as<std::string_view>());
-                Set(*child, key_value.second);
+                PropertyImpl& child = *property.getChild(key_value.first.as<std::string_view>())->m_impl;
+                Set(child, key_value.second);
             }
         }
         else if (propType == EPropertyType::Array)
@@ -178,7 +185,7 @@ namespace rlogic::internal
                     sol_helper::throwSolException("Error during assignment of array property '{}'! Expected a value at index {}",
                         property.getName(), luaIndex);
                 }
-                Set(*property.getChild(i), solObject);
+                Set(*property.getChild(i)->m_impl, solObject);
             }
         }
         else
@@ -187,22 +194,22 @@ namespace rlogic::internal
             switch (propType)
             {
             case EPropertyType::Vec2f:
-                property.m_impl->setOutputFromScript<vec2f>(LuaTypeConversions::ExtractArray<float, 2>(table));
+                property.setOutputFromScript<vec2f>(LuaTypeConversions::ExtractArray<float, 2>(table));
                 break;
             case EPropertyType::Vec3f:
-                property.m_impl->setOutputFromScript<vec3f>(LuaTypeConversions::ExtractArray<float, 3>(table));
+                property.setOutputFromScript<vec3f>(LuaTypeConversions::ExtractArray<float, 3>(table));
                 break;
             case EPropertyType::Vec4f:
-                property.m_impl->setOutputFromScript<vec4f>(LuaTypeConversions::ExtractArray<float, 4>(table));
+                property.setOutputFromScript<vec4f>(LuaTypeConversions::ExtractArray<float, 4>(table));
                 break;
             case EPropertyType::Vec2i:
-                property.m_impl->setOutputFromScript<vec2i>(LuaTypeConversions::ExtractArray<int32_t, 2>(table));
+                property.setOutputFromScript<vec2i>(LuaTypeConversions::ExtractArray<int32_t, 2>(table));
                 break;
             case EPropertyType::Vec3i:
-                property.m_impl->setOutputFromScript<vec3i>(LuaTypeConversions::ExtractArray<int32_t, 3>(table));
+                property.setOutputFromScript<vec3i>(LuaTypeConversions::ExtractArray<int32_t, 3>(table));
                 break;
             case EPropertyType::Vec4i:
-                property.m_impl->setOutputFromScript<vec4i>(LuaTypeConversions::ExtractArray<int32_t, 4>(table));
+                property.setOutputFromScript<vec4i>(LuaTypeConversions::ExtractArray<int32_t, 4>(table));
                 break;
                 // TODO Violin/Sven/Tobias this kind of a bad design, and the reason for it lies
                 // with the fact that we handle 3 different things in the same base class - "Property"
@@ -223,11 +230,11 @@ namespace rlogic::internal
         }
     }
 
-    void LuaScriptPropertySetter::SetString(Property& property, std::string_view string)
+    void LuaScriptPropertySetter::SetString(PropertyImpl& property, std::string_view string)
     {
         if(property.getType() == EPropertyType::String)
         {
-            property.m_impl->setOutputFromScript(std::string(string));
+            property.setOutputFromScript(std::string(string));
         }
         else
         {
@@ -235,11 +242,11 @@ namespace rlogic::internal
         }
     }
 
-    void LuaScriptPropertySetter::SetBool(Property& property, bool boolean)
+    void LuaScriptPropertySetter::SetBool(PropertyImpl& property, bool boolean)
     {
         if (property.getType() == EPropertyType::Bool)
         {
-            property.m_impl->setOutputFromScript(boolean);
+            property.setOutputFromScript(boolean);
         }
         else
         {
@@ -247,18 +254,18 @@ namespace rlogic::internal
         }
     }
 
-    void LuaScriptPropertySetter::SetStruct(Property& property, LuaScriptPropertyHandler& structPropertyHandler)
+    void LuaScriptPropertySetter::SetStruct(PropertyImpl& property, LuaScriptPropertyHandler& structPropertyHandler)
     {
         const size_t childCount = property.getChildCount();
         for (size_t i = 0u; i < childCount; ++i)
         {
-            Property* child = property.getChild(i);
-            const sol::object rhs   = structPropertyHandler.getChildPropertyAsSolObject(child->getName());
-            Set(*child, rhs);
+            PropertyImpl& child = *property.getChild(i)->m_impl;
+            const sol::object rhs   = structPropertyHandler.getChildPropertyAsSolObject(child.getName());
+            Set(child, rhs);
         }
     }
 
-    void LuaScriptPropertySetter::SetArray(Property& property, LuaScriptPropertyHandler& structPropertyHandler)
+    void LuaScriptPropertySetter::SetArray(PropertyImpl& property, LuaScriptPropertyHandler& structPropertyHandler)
     {
         const PropertyImpl& rhsProperty = structPropertyHandler.getPropertyImpl();
         assert (rhsProperty.getType() == EPropertyType::Array);
@@ -275,10 +282,10 @@ namespace rlogic::internal
 
         for (size_t i = 0u; i < childCount; ++i)
         {
-            Property* child = property.getChild(i);
-            const Property* rhsChild = rhsProperty.getChild(i);
-            const EPropertyType expectedElementType = child->getType();
-            const EPropertyType rhsElementType = rhsChild->getType();
+            PropertyImpl& child = *property.getChild(i)->m_impl;
+            PropertyImpl& rhsChild = *rhsProperty.getChild(i)->m_impl;
+            const EPropertyType expectedElementType = child.getType();
+            const EPropertyType rhsElementType = rhsChild.getType();
 
             if(rhsElementType != expectedElementType)
             {
@@ -294,34 +301,34 @@ namespace rlogic::internal
             switch (expectedElementType)
             {
             case EPropertyType::Bool:
-                child->m_impl->setOutputFromScript(*rhsChild->get<bool>());
+                child.setOutputFromScript(*rhsChild.get<bool>());
                 break;
             case EPropertyType::Float:
-                child->m_impl->setOutputFromScript(*rhsChild->get<float>());
+                child.setOutputFromScript(*rhsChild.get<float>());
                 break;
             case EPropertyType::Int32:
-                child->m_impl->setOutputFromScript(*rhsChild->get<int32_t>());
+                child.setOutputFromScript(*rhsChild.get<int32_t>());
                 break;
             case EPropertyType::String:
-                child->m_impl->setOutputFromScript(*rhsChild->get<std::string>());
+                child.setOutputFromScript(*rhsChild.get<std::string>());
                 break;
             case EPropertyType::Vec2f:
-                child->m_impl->setOutputFromScript<vec2f>(*rhsChild->get<vec2f>());
+                child.setOutputFromScript<vec2f>(*rhsChild.get<vec2f>());
                 break;
             case EPropertyType::Vec3f:
-                child->m_impl->setOutputFromScript<vec3f>(*rhsChild->get<vec3f>());
+                child.setOutputFromScript<vec3f>(*rhsChild.get<vec3f>());
                 break;
             case EPropertyType::Vec4f:
-                child->m_impl->setOutputFromScript<vec4f>(*rhsChild->get<vec4f>());
+                child.setOutputFromScript<vec4f>(*rhsChild.get<vec4f>());
                 break;
             case EPropertyType::Vec2i:
-                child->m_impl->setOutputFromScript<vec2i>(*rhsChild->get<vec2i>());
+                child.setOutputFromScript<vec2i>(*rhsChild.get<vec2i>());
                 break;
             case EPropertyType::Vec3i:
-                child->m_impl->setOutputFromScript<vec3i>(*rhsChild->get<vec3i>());
+                child.setOutputFromScript<vec3i>(*rhsChild.get<vec3i>());
                 break;
             case EPropertyType::Vec4i:
-                child->m_impl->setOutputFromScript<vec4i>(*rhsChild->get<vec4i>());
+                child.setOutputFromScript<vec4i>(*rhsChild.get<vec4i>());
                 break;
             case EPropertyType::Array:
                 assert(false && "Array children can never be of type array themselves, that's handled during array declaration");
@@ -330,8 +337,8 @@ namespace rlogic::internal
             {
                 // TODO Violin this can be improved by refactoring the "handler" classes
                 // For now, use the "LuaScriptPropertyHandler" class to assign structs, to reduce code duplication
-                LuaScriptPropertyHandler childPropertyHandler(structPropertyHandler.getSolState(), *rhsChild->m_impl);
-                SetStruct(*child, childPropertyHandler);
+                LuaScriptPropertyHandler childPropertyHandler(structPropertyHandler.getSolState(), rhsChild);
+                SetStruct(child, childPropertyHandler);
                 break;
             }
             }

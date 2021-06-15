@@ -272,6 +272,7 @@ namespace rlogic::internal
             return m_children[index].get();
         }
 
+        LOG_ERROR("No child property with index '{}' found in '{}'", index, m_name);
         return nullptr;
     }
 
@@ -282,6 +283,7 @@ namespace rlogic::internal
             return m_children[index].get();
         }
 
+        LOG_ERROR("No child property with index '{}' found in '{}'", index, m_name);
         return nullptr;
     }
 
@@ -294,7 +296,15 @@ namespace rlogic::internal
         {
             return it->get();
         }
+        LOG_ERROR("No child property with name '{}' found in '{}'", name, m_name);
         return nullptr;
+    }
+
+    bool PropertyImpl::hasChild(std::string_view name) const
+    {
+        return m_children.end() != std::find_if(m_children.begin(), m_children.end(), [&name](const std::vector<std::unique_ptr<Property>>::value_type& property) {
+            return property->getName() == name;
+            });
     }
 
     void PropertyImpl::addChild(std::unique_ptr<PropertyImpl> child)
@@ -310,11 +320,12 @@ namespace rlogic::internal
     {
         if (PropertyTypeToEnum<T>::TYPE == m_type)
         {
-            if (auto value = std::get_if<T>(&m_value))
-            {
-                return {*value};
-            }
+            const T* value = std::get_if<T>(&m_value);
+            assert(value);
+            return {*value};
         }
+        LOG_ERROR("Invalid type '{}' when accessing property '{}', correct type is '{}'",
+            GetLuaPrimitiveTypeName(PropertyTypeToEnum<T>::TYPE), m_name, GetLuaPrimitiveTypeName(m_type));
         return std::nullopt;
     }
 
@@ -347,6 +358,8 @@ namespace rlogic::internal
             }
             return true;
         }
+        LOG_ERROR("Invalid type '{}' when setting property '{}', correct type is '{}'",
+            GetLuaPrimitiveTypeName(PropertyTypeToEnum<T>::TYPE), m_name, GetLuaPrimitiveTypeName(m_type));
         return false;
     }
 

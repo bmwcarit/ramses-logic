@@ -75,9 +75,9 @@ add_custom_command(OUTPUT ${SPHINX_IDX_FILE}
                    DEPENDS
                         ${SPHINX_INPUT_LIST}
                         ${DOXYGEN_STAMP_FILE}
-                        ${PROJECT_SOURCE_DIR}/README.rst
+                        ${PROJECT_SOURCE_DIR}/README.md
                         ${PROJECT_SOURCE_DIR}/CONTRIBUTING.rst
-                        ${PROJECT_SOURCE_DIR}/CHANGELOG.rst
+                        ${PROJECT_SOURCE_DIR}/CHANGELOG.md
                    MAIN_DEPENDENCY ${SPHINX_SRC_FILES}/conf.py
                    COMMENT "Generating Sphinx docs")
 

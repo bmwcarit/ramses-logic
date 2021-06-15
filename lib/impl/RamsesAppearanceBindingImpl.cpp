@@ -28,22 +28,22 @@ namespace rlogic::internal
 {
     RamsesAppearanceBindingImpl::RamsesAppearanceBindingImpl(std::string_view name)
         : RamsesBindingImpl(name, std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput), nullptr)
-        , m_appearance(nullptr)
+        , m_ramsesAppearance(nullptr)
     {
     }
 
     RamsesAppearanceBindingImpl::RamsesAppearanceBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Appearance& appearance)
         : RamsesBindingImpl(name, std::move(inputs), nullptr)
-        , m_appearance(&appearance)
+        , m_ramsesAppearance(&appearance)
     {
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> RamsesAppearanceBindingImpl::Serialize(const RamsesAppearanceBindingImpl& binding, flatbuffers::FlatBufferBuilder& builder)
     {
         ramses::sceneObjectId_t appearanceId;
-        if (binding.m_appearance != nullptr)
+        if (binding.m_ramsesAppearance != nullptr)
         {
-            appearanceId = binding.m_appearance->getSceneObjectId();
+            appearanceId = binding.m_ramsesAppearance->getSceneObjectId();
         }
         auto ramsesAppearanceBinding = rlogic_serialization::CreateRamsesAppearanceBinding(
             builder,
@@ -147,68 +147,73 @@ namespace rlogic::internal
 
     std::optional<LogicNodeRuntimeError> RamsesAppearanceBindingImpl::update()
     {
-        const Property& inputs = *getInputs();
-        const size_t childCount = inputs.getChildCount();
-        for (size_t i = 0; i < childCount; ++i)
+        // Early exit if appearance is not set
+        if (m_ramsesAppearance)
         {
-            setInputValueToUniform(*inputs.getChild(i)->m_impl);
+            const size_t childCount = getInputs()->getChildCount();
+            for (size_t i = 0; i < childCount; ++i)
+            {
+                setInputValueToUniform(i);
+            }
         }
 
         return std::nullopt;
     }
 
-    void RamsesAppearanceBindingImpl::setInputValueToUniform(PropertyImpl& property)
+    void RamsesAppearanceBindingImpl::setInputValueToUniform(size_t inputIndex)
     {
-        const EPropertyType propertyType = property.getType();
-        auto it = m_propertyToUniformInput.find(&property);
-        assert(it != m_propertyToUniformInput.end() && "Searched for a Uniform by Property in RamsesAppearanceBindingImpl. This should never happen");
+        PropertyImpl& inputProperty = *getInputs()->getChild(inputIndex)->m_impl;
+        const EPropertyType propertyType = inputProperty.getType();
 
         if (TypeUtils::IsPrimitiveType(propertyType))
         {
-            if (property.checkForBindingInputNewValueAndReset())
+            if (inputProperty.checkForBindingInputNewValueAndReset())
             {
+                ramses::UniformInput uniform;
+                m_ramsesAppearance->getEffect().getUniformInput(m_uniformIndices[inputIndex], uniform);
+
                 switch (propertyType)
                 {
                 case EPropertyType::Float:
-                    m_appearance->setInputValueFloat(*it->second, *property.get<float>());
+                    m_ramsesAppearance->setInputValueFloat(uniform, *inputProperty.get<float>());
                     break;
                 case EPropertyType::Int32:
-                    m_appearance->setInputValueInt32(*it->second, *property.get<int32_t>());
+                    m_ramsesAppearance->setInputValueInt32(uniform, *inputProperty.get<int32_t>());
                     break;
                 case EPropertyType::Vec2f:
                 {
-                    const auto vec = *property.get<vec2f>();
-                    m_appearance->setInputValueVector2f(*it->second, vec[0], vec[1]);
+                    const auto vec = *inputProperty.get<vec2f>();
+                    m_ramsesAppearance->setInputValueVector2f(uniform, vec[0], vec[1]);
                     break;
                 }
                 case EPropertyType::Vec2i:
                 {
-                    const auto vec = *property.get<vec2i>();
-                    m_appearance->setInputValueVector2i(*it->second, vec[0], vec[1]);
+                    const auto vec = *inputProperty.get<vec2i>();
+                    m_ramsesAppearance->setInputValueVector2i(uniform, vec[0], vec[1]);
                     break;
                 }
                 case EPropertyType::Vec3f:
                 {
-                    const auto vec = *property.get<vec3f>();
-                    m_appearance->setInputValueVector3f(*it->second, vec[0], vec[1], vec[2]);
+                    const auto vec = *inputProperty.get<vec3f>();
+                    m_ramsesAppearance->setInputValueVector3f(uniform, vec[0], vec[1], vec[2]);
                     break;
                 }
                 case EPropertyType::Vec3i:
                 {
-                    const auto vec = *property.get<vec3i>();
-                    m_appearance->setInputValueVector3i(*it->second, vec[0], vec[1], vec[2]);
+                    const auto vec = *inputProperty.get<vec3i>();
+                    m_ramsesAppearance->setInputValueVector3i(uniform, vec[0], vec[1], vec[2]);
                     break;
                 }
                 case EPropertyType::Vec4f:
                 {
-                    const auto vec = *property.get<vec4f>();
-                    m_appearance->setInputValueVector4f(*it->second, vec[0], vec[1], vec[2], vec[3]);
+                    const auto vec = *inputProperty.get<vec4f>();
+                    m_ramsesAppearance->setInputValueVector4f(uniform, vec[0], vec[1], vec[2], vec[3]);
                     break;
                 }
                 case EPropertyType::Vec4i:
                 {
-                    const auto vec = *property.get<vec4i>();
-                    m_appearance->setInputValueVector4i(*it->second, vec[0], vec[1], vec[2], vec[3]);
+                    const auto vec = *inputProperty.get<vec4i>();
+                    m_ramsesAppearance->setInputValueVector4i(uniform, vec[0], vec[1], vec[2], vec[3]);
                     break;
                 }
                 case EPropertyType::String:
@@ -227,10 +232,10 @@ namespace rlogic::internal
             // A new value on any of the array element causes the whole array to be updated
             // Ramses does not allow partial updates so this is the only option here
             bool anyArrayElementWasSet = false;
-            const size_t arraySize = property.getChildCount();
+            const size_t arraySize = inputProperty.getChildCount();
             for (size_t i = 0; i < arraySize; ++i)
             {
-                if (property.getChild(i)->m_impl->checkForBindingInputNewValueAndReset())
+                if (inputProperty.getChild(i)->m_impl->checkForBindingInputNewValueAndReset())
                 {
                     anyArrayElementWasSet = true;
                 }
@@ -238,32 +243,35 @@ namespace rlogic::internal
 
             if (anyArrayElementWasSet)
             {
-                const EPropertyType arrayElementType = property.getChild(0)->getType();
+                ramses::UniformInput uniform;
+                m_ramsesAppearance->getEffect().getUniformInput(m_uniformIndices[inputIndex], uniform);
+
+                const EPropertyType arrayElementType = inputProperty.getChild(0)->getType();
                 switch (arrayElementType)
                 {
                 case EPropertyType::Float:
-                    m_appearance->setInputValueFloat(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, float>(property).data());
+                    m_ramsesAppearance->setInputValueFloat(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, float>(inputProperty).data());
                     break;
                 case EPropertyType::Int32:
-                    m_appearance->setInputValueInt32(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, int32_t>(property).data());
+                    m_ramsesAppearance->setInputValueInt32(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, int32_t>(inputProperty).data());
                     break;
                 case EPropertyType::Vec2f:
-                    m_appearance->setInputValueVector2f(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, vec2f>(property).data());
+                    m_ramsesAppearance->setInputValueVector2f(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, vec2f>(inputProperty).data());
                     break;
                 case EPropertyType::Vec2i:
-                    m_appearance->setInputValueVector2i(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, vec2i>(property).data());
+                    m_ramsesAppearance->setInputValueVector2i(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, vec2i>(inputProperty).data());
                     break;
                 case EPropertyType::Vec3f:
-                    m_appearance->setInputValueVector3f(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, vec3f>(property).data());
+                    m_ramsesAppearance->setInputValueVector3f(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, vec3f>(inputProperty).data());
                     break;
                 case EPropertyType::Vec3i:
-                    m_appearance->setInputValueVector3i(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, vec3i>(property).data());
+                    m_ramsesAppearance->setInputValueVector3i(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, vec3i>(inputProperty).data());
                     break;
                 case EPropertyType::Vec4f:
-                    m_appearance->setInputValueVector4f(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, vec4f>(property).data());
+                    m_ramsesAppearance->setInputValueVector4f(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<float, vec4f>(inputProperty).data());
                     break;
                 case EPropertyType::Vec4i:
-                    m_appearance->setInputValueVector4i(*it->second, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, vec4i>(property).data());
+                    m_ramsesAppearance->setInputValueVector4i(uniform, static_cast<uint32_t>(arraySize), TypeUtils::FlattenArrayData<int32_t, vec4i>(inputProperty).data());
                     break;
                 case EPropertyType::String:
                 case EPropertyType::Array:
@@ -325,22 +333,21 @@ namespace rlogic::internal
     // The name of this method is a bit ugly, but reflects exactly what it does
     void RamsesAppearanceBindingImpl::populatePropertyMappingCache(ramses::Appearance& appearance)
     {
-        PropertyImpl& inputsImpl = *getInputs()->m_impl;
+        m_uniformIndices.clear();
+
         auto& effect = appearance.getEffect();
         const uint32_t uniformCount = effect.getUniformInputCount();
+        m_uniformIndices.reserve(getInputs()->getChildCount());
 
         for (uint32_t i = 0; i < uniformCount; ++i)
         {
-            // TODO Violin this is an allocation which can be easily optimized. Investigate why UniformInput can't be moved in ramses
-            auto uniformInput = std::make_unique<ramses::UniformInput>();
-            effect.getUniformInput(i, *uniformInput);
+            ramses::UniformInput uniformInput;
+            effect.getUniformInput(i, uniformInput);
 
-            const auto convertedType = ConvertRamsesUniformTypeToPropertyType(uniformInput->getDataType());
-            if (convertedType && uniformInput->getSemantics() == ramses::EEffectUniformSemantic::Invalid)
+            const auto convertedType = ConvertRamsesUniformTypeToPropertyType(uniformInput.getDataType());
+            if (convertedType && uniformInput.getSemantics() == ramses::EEffectUniformSemantic::Invalid)
             {
-                Property* property = inputsImpl.getChild(uniformInput->getName());
-                assert(nullptr != property && "This should never happen");
-                m_propertyToUniformInput.insert(std::make_pair(property->m_impl.get(), std::move(uniformInput)));
+                m_uniformIndices.push_back(i);
             }
         }
     }
@@ -349,11 +356,10 @@ namespace rlogic::internal
     {
         PropertyImpl& inputsImpl = *getInputs()->m_impl;
         inputsImpl.clearChildren();
-        m_propertyToUniformInput.clear();
 
-        m_appearance = appearance;
+        m_ramsesAppearance = appearance;
 
-        if (nullptr != m_appearance)
+        if (nullptr != m_ramsesAppearance)
         {
             createInputProperties(*appearance);
         }
@@ -361,6 +367,6 @@ namespace rlogic::internal
 
     ramses::Appearance* RamsesAppearanceBindingImpl::getRamsesAppearance() const
     {
-        return m_appearance;
+        return m_ramsesAppearance;
     }
 }

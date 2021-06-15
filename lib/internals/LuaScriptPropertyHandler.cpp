@@ -90,7 +90,7 @@ namespace rlogic::internal
             childProperty = getArrayProperty(propertyIndex);
         }
 
-        LuaScriptPropertySetter::Set(*childProperty, rhs);
+        LuaScriptPropertySetter::Set(*childProperty->m_impl, rhs);
     }
 
     sol::object LuaScriptPropertyHandler::getChildPropertyAsSolObject(const sol::object& propertyIndex)

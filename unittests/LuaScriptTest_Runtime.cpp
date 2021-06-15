@@ -101,6 +101,24 @@ namespace rlogic
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
     }
 
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToWriteInputValues)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                IN.value = FLOAT
+            end
+
+            function run()
+                IN.value = 5
+            end
+        )");
+
+        EXPECT_FALSE(m_logicEngine.update());
+
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("lua: error: Error while writing to 'value'. Writing input values is not allowed, only outputs!"));
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
+    }
+
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToAccessPropertiesWithNonStringIndexAtRunTime)
     {
         const std::vector<std::string> wrongIndexTypes = {"[1]", "[true]", "[{x=5}]", "[nil]"};
@@ -108,7 +126,6 @@ namespace rlogic
         const std::string expectedErrorMessageIN = "Only strings supported as table key type!";
 
         const std::string expectedErrorMessageOUT = "Only strings supported as table key type!";
-
 
         std::vector<LuaTestError> allErrorCases;
         for (const auto& errorType : wrongIndexTypes)
@@ -429,7 +446,6 @@ namespace rlogic
         EXPECT_EQ(10, *field1->get<int32_t>());
         EXPECT_EQ(25, *field2->get<int32_t>());
     }
-
 
     TEST_F(ALuaScript_Runtime, StoresDataToNestedOutputs_Individually)
     {

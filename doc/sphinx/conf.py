@@ -49,6 +49,7 @@ extensions = [
     "breathe",                      # Converts doxygen to sphinx
     "sphinx_rtd_theme",             # Read-the-docs html theme
     "sphinx.ext.autosectionlabel",  # Creates labels to sections in documents for easier :ref:-ing
+    "myst_parser",                  # Can parse MyST markdown dialect
 ]
 
 # Breathe options

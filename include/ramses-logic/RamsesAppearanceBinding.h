@@ -36,6 +36,11 @@ namespace rlogic
      *  - #rlogic::LogicNode::getOutputs: returns always nullptr, because a #RamsesAppearanceBinding does not have outputs,
      *    it implicitly controls the ramses Appearance
      *
+     * \rst
+    .. warning::
+        When a new ramses::Appearance is assigned, the inputs are re-created and :func:`rlogic::LogicNode::getInputs` will return a new pointer!
+        Make sure you are not using the old one any more!
+       \endrst
      * All shader uniforms are supported, except the following:
      * - texture samplers of any kind
      * - matrix types (e.g. mat4, mat23 etc.)

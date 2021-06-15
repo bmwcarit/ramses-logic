@@ -31,16 +31,16 @@ namespace rlogic::internal
 
     RamsesCameraBindingImpl::RamsesCameraBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> deserializedInputs, ramses::Camera* camera)
         : RamsesBindingImpl(name, std::move(deserializedInputs), nullptr)
-        , m_camera(camera)
+        , m_ramsesCamera(camera)
     {
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> RamsesCameraBindingImpl::Serialize(const RamsesCameraBindingImpl& cameraBinding, flatbuffers::FlatBufferBuilder& builder)
     {
         ramses::sceneObjectId_t cameraId;
-        if (cameraBinding.m_camera != nullptr)
+        if (cameraBinding.m_ramsesCamera != nullptr)
         {
-            cameraId = cameraBinding.m_camera->getSceneObjectId();
+            cameraId = cameraBinding.m_ramsesCamera->getSceneObjectId();
         }
         auto ramsesCameraBinding = rlogic_serialization::CreateRamsesCameraBinding(
             builder,
@@ -130,7 +130,7 @@ namespace rlogic::internal
     std::optional<LogicNodeRuntimeError> RamsesCameraBindingImpl::update()
     {
         ramses::PerspectiveCamera* perspectiveCam = nullptr;
-        if (m_camera != nullptr)
+        if (m_ramsesCamera != nullptr)
         {
             ramses::status_t status = ramses::StatusOK;
             PropertyImpl& vpProperties = *getInputs()->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Viewport))->m_impl;
@@ -154,11 +154,11 @@ namespace rlogic::internal
                     return LogicNodeRuntimeError{ fmt::format("Camera viewport size must be positive! (width: {}; height: {})", vpW, vpH) };
                 }
 
-                status = m_camera->setViewport(vpX, vpY, vpW, vpH);
+                status = m_ramsesCamera->setViewport(vpX, vpY, vpW, vpH);
 
                 if (status != ramses::StatusOK)
                 {
-                    return LogicNodeRuntimeError{m_camera->getStatusMessage(status)};
+                    return LogicNodeRuntimeError{m_ramsesCamera->getStatusMessage(status)};
                 }
             }
 
@@ -168,7 +168,7 @@ namespace rlogic::internal
             PropertyImpl& nearPlane = *frustumProperties.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane))->m_impl;
             PropertyImpl& farPlane = *frustumProperties.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane))->m_impl;
 
-            if (m_camera->getType() == ramses::ERamsesObjectType_PerspectiveCamera)
+            if (m_ramsesCamera->getType() == ramses::ERamsesObjectType_PerspectiveCamera)
             {
                 PropertyImpl& fov = *frustumProperties.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView))->m_impl;
                 PropertyImpl& aR = *frustumProperties.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio))->m_impl;
@@ -178,16 +178,16 @@ namespace rlogic::internal
                     || fov.checkForBindingInputNewValueAndReset()
                     || aR.checkForBindingInputNewValueAndReset())
                 {
-                    perspectiveCam = ramses::RamsesUtils::TryConvert<ramses::PerspectiveCamera>(*m_camera);
+                    perspectiveCam = ramses::RamsesUtils::TryConvert<ramses::PerspectiveCamera>(*m_ramsesCamera);
                     status = perspectiveCam->setFrustum(*fov.get<float>(), *aR.get<float>(), *nearPlane.get<float>(), *farPlane.get<float>());
 
                     if (status != ramses::StatusOK)
                     {
-                        return LogicNodeRuntimeError{ m_camera->getStatusMessage(status) };
+                        return LogicNodeRuntimeError{ m_ramsesCamera->getStatusMessage(status) };
                     }
                 }
             }
-            else if (m_camera->getType() == ramses::ERamsesObjectType_OrthographicCamera)
+            else if (m_ramsesCamera->getType() == ramses::ERamsesObjectType_OrthographicCamera)
             {
                 PropertyImpl& leftPlane = *frustumProperties.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::LeftPlane))->m_impl;
                 PropertyImpl& rightPlane = *frustumProperties.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::RightPlane))->m_impl;
@@ -201,11 +201,11 @@ namespace rlogic::internal
                     || bottomPlane.checkForBindingInputNewValueAndReset()
                     || topPlane.checkForBindingInputNewValueAndReset())
                 {
-                    status = m_camera->setFrustum(*leftPlane.get<float>(), *rightPlane.get<float>(), *bottomPlane.get<float>(), *topPlane.get<float>(), *nearPlane.get<float>(), *farPlane.get<float>());
+                    status = m_ramsesCamera->setFrustum(*leftPlane.get<float>(), *rightPlane.get<float>(), *bottomPlane.get<float>(), *topPlane.get<float>(), *nearPlane.get<float>(), *farPlane.get<float>());
 
                     if (status != ramses::StatusOK)
                     {
-                        return LogicNodeRuntimeError{ m_camera->getStatusMessage(status) };
+                        return LogicNodeRuntimeError{ m_ramsesCamera->getStatusMessage(status) };
                     }
                 }
             }
@@ -221,9 +221,9 @@ namespace rlogic::internal
 
     ramses::ERamsesObjectType RamsesCameraBindingImpl::getCameraType() const
     {
-        if (m_camera)
+        if (m_ramsesCamera)
         {
-            return m_camera->getType();
+            return m_ramsesCamera->getType();
         }
         return ramses::ERamsesObjectType::ERamsesObjectType_Invalid;
     }
@@ -233,9 +233,9 @@ namespace rlogic::internal
         PropertyImpl& inputsImpl = *getInputs()->m_impl;
         inputsImpl.clearChildren();
 
-        m_camera = camera;
+        m_ramsesCamera = camera;
 
-        if (nullptr != m_camera)
+        if (nullptr != m_ramsesCamera)
         {
             createCameraProperties(camera->getType());
         }
@@ -243,6 +243,6 @@ namespace rlogic::internal
 
     ramses::Camera* RamsesCameraBindingImpl::getRamsesCamera() const
     {
-        return m_camera;
+        return m_ramsesCamera;
     }
 }

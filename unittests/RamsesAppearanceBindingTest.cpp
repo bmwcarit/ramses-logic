@@ -31,7 +31,7 @@
 
 #include "ramses-utils.h"
 
-namespace rlogic
+namespace rlogic::internal
 {
     class ARamsesAppearanceBinding : public ::testing::Test
     {
@@ -80,10 +80,8 @@ namespace rlogic
     {
     protected:
         flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
-        internal::ErrorReporting m_errorReporting;
+        ErrorReporting m_errorReporting;
     };
-
-    using internal::RamsesAppearanceBindingImpl;
 
     // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
     TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, RemembersBaseClassData)
@@ -344,7 +342,7 @@ namespace rlogic
         const auto inputCount  = inputs->getChildCount();
         for (size_t i = 0; i < inputCount; ++i)
         {
-            EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild(i)->m_impl->getPropertySemantics());
+            EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild(i)->m_impl->getPropertySemantics());
         }
     }
 
@@ -717,29 +715,29 @@ namespace rlogic
             auto expectValues = [&inputs](){
                 EXPECT_FLOAT_EQ(42.42f, *inputs->getChild("floatUniform")->get<float>());
                 EXPECT_EQ(42, *inputs->getChild("intUniform")->get<int32_t>());
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("intUniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("intUniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec2Uniform")->get<vec2f>(), ::testing::ElementsAre(0.1f, 0.2f));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec2Uniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("vec2Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec3Uniform")->get<vec3f>(), ::testing::ElementsAre(1.1f, 1.2f, 1.3f));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec3Uniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("vec3Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec4Uniform")->get<vec4f>(), ::testing::ElementsAre(2.1f, 2.2f, 2.3f, 2.4f));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec4Uniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("vec4Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec4Uniform_shouldHaveDefaultValue")->get<vec4f>(), ::testing::ElementsAre(.0f, .0f, .0f, .0f));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec4Uniform_shouldHaveDefaultValue")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("vec4Uniform_shouldHaveDefaultValue")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec2Uniform")->get<vec2i>(), ::testing::ElementsAre(1, 2));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec2Uniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("ivec2Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec3Uniform")->get<vec3i>(), ::testing::ElementsAre(3, 4, 5));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec3Uniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("ivec3Uniform")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec4Uniform")->get<vec4i>(), ::testing::ElementsAre(6, 7, 8, 9));
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec4Uniform")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("ivec4Uniform")->m_impl->getPropertySemantics());
 
                 // Arrays
                 EXPECT_EQ(EPropertyType::Array, inputs->getChild("ivec2Array")->getType());
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("ivec2Array")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("ivec2Array")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("ivec2Array")->getChild(0)->get<vec2i>(), ::testing::ElementsAre(11, 12));
                 EXPECT_THAT(*inputs->getChild("ivec2Array")->getChild(1)->get<vec2i>(), ::testing::ElementsAre(13, 14));
                 EXPECT_EQ(EPropertyType::Array, inputs->getChild("vec2Array")->getType());
-                EXPECT_EQ(internal::EPropertySemantics::BindingInput, inputs->getChild("vec2Array")->m_impl->getPropertySemantics());
+                EXPECT_EQ(EPropertySemantics::BindingInput, inputs->getChild("vec2Array")->m_impl->getPropertySemantics());
                 EXPECT_THAT(*inputs->getChild("vec2Array")->getChild(0)->get<vec2f>(), ::testing::ElementsAre(.11f, .12f));
                 EXPECT_THAT(*inputs->getChild("vec2Array")->getChild(1)->get<vec2f>(), ::testing::ElementsAre(.13f, .14f));
             };

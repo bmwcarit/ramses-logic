@@ -99,7 +99,7 @@ def main():
     shared_blacklist_non_src_files = shared_blacklist | {
         # Externals allowed to have own formatting and license
         r'^external',
-        r'^CHANGELOG\.rst$',  # Doesn't need a license
+        r'^CHANGELOG\.md$',  # Doesn't need a license
         r'^LICENSE\.txt$',  # Contains license info, not related to code/content
     }
 

@@ -10,26 +10,22 @@
 
 #include "internals/SolWrapper.h"
 
-namespace rlogic
-{
-    class Property;
-}
-
 namespace rlogic::internal
 {
     class LuaScriptPropertyHandler;
+    class PropertyImpl;
 
     class LuaScriptPropertySetter
     {
     public:
-        static void Set(Property& property, const sol::object& value);
+        static void Set(PropertyImpl& property, const sol::object& value);
 
     private:
-        static void SetNumber(Property& property, const sol::object& number);
-        static void SetTable(Property& property, const sol::table& table);
-        static void SetString(Property& property, std::string_view string);
-        static void SetBool(Property& property, bool boolean);
-        static void SetStruct(Property& property, LuaScriptPropertyHandler& structPropertyHandler);
-        static void SetArray(Property& property, LuaScriptPropertyHandler& structPropertyHandler);
+        static void SetNumber(PropertyImpl& property, const sol::object& number);
+        static void SetTable(PropertyImpl& property, const sol::table& table);
+        static void SetString(PropertyImpl& property, std::string_view string);
+        static void SetBool(PropertyImpl& property, bool boolean);
+        static void SetStruct(PropertyImpl& property, LuaScriptPropertyHandler& structPropertyHandler);
+        static void SetArray(PropertyImpl& property, LuaScriptPropertyHandler& structPropertyHandler);
     };
 }

@@ -79,7 +79,7 @@ namespace rlogic::internal
             const auto type = propertyValue.as<EPropertyType>();
             if (TypeUtils::IsValidType(type) && TypeUtils::IsPrimitiveType(type))
             {
-                parentStruct.addChild(std::make_unique<PropertyImpl>(name, type, parentStruct.getPropertySemantics()));
+                parentStruct.addChild(std::make_unique<PropertyImpl>(name, type, parentStruct.getPropertySemantics()), true);
             }
             else
             {
@@ -96,7 +96,7 @@ namespace rlogic::internal
                 addStructProperty(tableEntry.first, tableEntry.second, *propertyStruct);
             }
 
-            parentStruct.addChild(std::move(propertyStruct));
+            parentStruct.addChild(std::move(propertyStruct), true);
         }
         else if (solType == sol::type::userdata)
         {
@@ -158,7 +158,7 @@ namespace rlogic::internal
                     sol_helper::throwSolException("Unsupported type '{}' for array property '{}'!", sol_helper::GetSolTypeName(solArrayType), name);
                 }
 
-                parentStruct.addChild(std::move(arrayProperty));
+                parentStruct.addChild(std::move(arrayProperty), true);
             }
             else
             {

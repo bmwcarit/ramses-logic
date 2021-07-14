@@ -185,7 +185,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwice_RamsesBinding)
     {
-        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding("RamsesBinding");
+        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
 
         const auto visibilityProperty = ramsesBinding->getInputs()->getChild("visibility");
 
@@ -209,7 +209,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesNodeBinding)
     {
-        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding("RamsesBinding");
+        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
 
         const auto visibilityProperty = ramsesBinding->getInputs()->getChild("visibility");
 
@@ -291,7 +291,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, PropagatesValuesAcrossMultipleLinksInAChain)
     {
-        LogicEngine logicEngine;
         auto scriptSource = R"(
             function interface()
                 IN.inString1 = STRING
@@ -303,9 +302,9 @@ namespace rlogic
             end
         )";
 
-        auto script1 = logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
-        auto script2 = logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
-        auto script3 = logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
+        auto script1 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
+        auto script2 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
+        auto script3 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
 
         auto script1Input2 = script1->getInputs()->getChild("inString2");
         auto script2Input1 = script2->getInputs()->getChild("inString1");
@@ -316,14 +315,14 @@ namespace rlogic
         auto script2Output = script2->getOutputs()->getChild("outString");
         auto script3Output = script3->getOutputs()->getChild("outString");
 
-        logicEngine.link(*script1Output, *script2Input1);
-        logicEngine.link(*script2Output, *script3Input1);
+        m_logicEngine.link(*script1Output, *script2Input1);
+        m_logicEngine.link(*script2Output, *script3Input1);
 
         script1Input2->set(std::string("Script1"));
         script2Input2->set(std::string("Script2"));
         script3Input2->set(std::string("Script3"));
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_EQ("Script1Script2Script3", script3Output->get<std::string>());
     }
@@ -421,7 +420,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesBinding)
     {
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
         const auto visibilityProperty = targetBinding->getInputs()->getChild("visibility");
         const auto unlinkedTargetProperty = targetBinding->getInputs()->getChild("translation");
 
@@ -647,31 +646,6 @@ namespace rlogic
     // TODO Violin need more tests - what is with default values after unlinking?
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesAppearanceBindings)
     {
-        RamsesTestSetup testSetup;
-        ramses::Scene* scene = testSetup.createScene();
-
-        ramses::EffectDescription effectDesc;
-        effectDesc.setFragmentShader(R"(
-        #version 100
-
-        void main(void)
-        {
-            gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
-        })");
-
-        effectDesc.setVertexShader(R"(
-        #version 100
-
-        uniform highp float floatUniform;
-
-        void main()
-        {
-            gl_Position = floatUniform * vec4(1.0);
-        })");
-
-        const ramses::Effect* effect     = scene->createEffect(effectDesc);
-        ramses::Appearance*   appearance = scene->createAppearance(*effect);
-
         const auto  luaScriptSource = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -683,8 +657,7 @@ namespace rlogic
         )";
 
         auto sourceScript  = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetBinding = m_logicEngine.createRamsesAppearanceBinding("TargetBinding");
-        targetBinding->setRamsesAppearance(appearance);
+        auto targetBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "TargetBinding");
 
         auto sourceInput  = sourceScript->getInputs()->getChild("floatInput");
         auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
@@ -696,19 +669,14 @@ namespace rlogic
         m_logicEngine.update();
 
         ramses::UniformInput floatUniform;
-        effect->findUniformInput("floatUniform", floatUniform);
+        m_appearance->getEffect().findUniformInput("floatUniform", floatUniform);
         float result = 0.0f;
-        appearance->getInputValueFloat(floatUniform, result);
+        m_appearance->getInputValueFloat(floatUniform, result);
         EXPECT_FLOAT_EQ(47.11f, result);
     }
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesCameraBindings)
     {
-        RamsesTestSetup testSetup;
-        ramses::Scene* scene = testSetup.createScene();
-
-        ramses::PerspectiveCamera* camera = scene->createPerspectiveCamera();
-
         const auto  luaScriptSource = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -720,19 +688,18 @@ namespace rlogic
         )";
 
         auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetBinding = m_logicEngine.createRamsesCameraBinding("TargetBinding");
-        targetBinding->setRamsesCamera(camera);
+        auto targetBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "TargetBinding");
 
         auto sourceInput = sourceScript->getInputs()->getChild("floatInput");
         auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
-        auto targetInput = targetBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane");
+        auto targetInput = targetBinding->getInputs()->getChild("frustum")->getChild("farPlane");
 
         m_logicEngine.link(*sourceOutput, *targetInput);
 
         sourceInput->set(47.11f);
         m_logicEngine.update();
 
-        EXPECT_FLOAT_EQ(47.11f, camera->getFarPlane());
+        EXPECT_FLOAT_EQ(47.11f, m_camera->getFarPlane());
     }
 
     // TODO Violin test should actually test that the links propagates the value *even if the output is NOT set any more in the source script!*
@@ -1093,7 +1060,7 @@ namespace rlogic
 
         auto script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
         // TODO Violin add appearance binding here too, once test PR #305 is merged
-        auto nodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
 
         auto nestedOutput_bool = script->getOutputs()->getChild("nested")->getChild("bool");
         auto nestedOutput_vec3f = script->getOutputs()->getChild("nested")->getChild("vec3f");
@@ -1118,7 +1085,6 @@ namespace rlogic
          *  ScriptA ---------------->ScriptC
          */
 
-        LogicEngine logicEngine;
         const auto  sourceScript = R"(
             function interface()
                 IN.floatInput = FLOAT
@@ -1141,9 +1107,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
-        auto scriptB = logicEngine.createLuaScriptFromSource(sourceScript, "ScriptB");
-        auto scriptC = logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
+        auto scriptB = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptB");
+        auto scriptC = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
 
         auto scriptAInput  = scriptA->getInputs()->getChild("floatInput");
         auto scriptAOutput = scriptA->getOutputs()->getChild("floatOutput");
@@ -1156,13 +1122,13 @@ namespace rlogic
         auto scriptCOutput1 = scriptC->getOutputs()->getChild("floatOutput1");
         auto scriptCOutput2 = scriptC->getOutputs()->getChild("floatOutput2");
 
-        logicEngine.link(*scriptAOutput, *scriptBInput);
-        logicEngine.link(*scriptAOutput, *scriptCInput1);
-        logicEngine.link(*scriptBOutput, *scriptCInput2);
+        m_logicEngine.link(*scriptAOutput, *scriptBInput);
+        m_logicEngine.link(*scriptAOutput, *scriptCInput1);
+        m_logicEngine.link(*scriptBOutput, *scriptCInput2);
 
         scriptAInput->set(42.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *scriptCOutput1->get<float>());
         EXPECT_FLOAT_EQ(42.f, *scriptCOutput2->get<float>());
@@ -1172,11 +1138,11 @@ namespace rlogic
          *                  \
          *  ScriptA ----------->ScriptC
          */
-        logicEngine.unlink(*scriptAOutput, *scriptBInput);
+        m_logicEngine.unlink(*scriptAOutput, *scriptBInput);
 
         scriptBInput->set(23.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *scriptCOutput1->get<float>());
         EXPECT_FLOAT_EQ(23.f, *scriptCOutput2->get<float>());
@@ -1184,7 +1150,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, canDestroyBindingAfterUnlinkingFromScript)
     {
-        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("");
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, "");
 
         auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
@@ -1216,7 +1182,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, WHEN_ScriptWasUnlinkedFromBindingAndMultipleLinksDestroyed_THEN_UpdateDoesNotOverwriteBindingInputsByDanglingLinks)
     {
-        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding("");
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, "");
 
         auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
@@ -1588,10 +1554,8 @@ namespace rlogic
             )";
 
             auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
-            auto nodeBinding1 = tmpLogicEngine.createRamsesNodeBinding("NodeBinding1");
-            auto nodeBinding2 = tmpLogicEngine.createRamsesNodeBinding("NodeBinding2");
-            nodeBinding1->setRamsesNode(ramsesNode1);
-            nodeBinding2->setRamsesNode(ramsesNode2);
+            auto nodeBinding1 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode1, "NodeBinding1");
+            auto nodeBinding2 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode2, "NodeBinding2");
 
             auto scriptOutputVec3f = script->getOutputs()->getChild("vec3f");
             auto scriptOutputBool = script->getOutputs()->getChild("visibility");
@@ -1646,9 +1610,9 @@ namespace rlogic
             auto bindingVisibilityInput = nodeBinding1->getInputs()->getChild("visibility");
 
             // These values should be overwritten by the link - set them to a different value to make sure that happens
-            binding1TranslationInput->m_impl->setInternal<vec3f>({ 99.0f, 99.0f, 99.0f });
-            binding2RotationInput->m_impl->setInternal<vec3f>({ 99.0f, 99.0f, 99.0f });
-            bindingVisibilityInput->m_impl->setInternal<bool>(true);
+            binding1TranslationInput->m_impl->setValue(vec3f{ 99.0f, 99.0f, 99.0f });
+            binding2RotationInput->m_impl->setValue(vec3f{ 99.0f, 99.0f, 99.0f });
+            bindingVisibilityInput->m_impl->setValue(true);
             // This should not be overwritten, but should keep the manual value instead
             ASSERT_TRUE(notLinkedManualInputProperty->set<vec3f>({100.0f, 101.0f, 102.0f}));
             EXPECT_TRUE(m_logicEngine.update());
@@ -1697,10 +1661,8 @@ namespace rlogic
             )";
 
             auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
-            auto appBinding1 = tmpLogicEngine.createRamsesAppearanceBinding("AppBinding1");
-            auto appBinding2 = tmpLogicEngine.createRamsesAppearanceBinding("AppBinding2");
-            appBinding1->setRamsesAppearance(&appearance1);
-            appBinding2->setRamsesAppearance(&appearance2);
+            auto appBinding1 = tmpLogicEngine.createRamsesAppearanceBinding(appearance1, "AppBinding1");
+            auto appBinding2 = tmpLogicEngine.createRamsesAppearanceBinding(appearance2, "AppBinding2");
 
             auto scriptOutput = script->getOutputs()->getChild("uniform");
             auto binding1uniform1 = appBinding1->getInputs()->getChild("uniform1");
@@ -1745,12 +1707,12 @@ namespace rlogic
             auto binding2uniform2 = appBinding2->getInputs()->getChild("uniform2");
 
             // These values should be overwritten by the link - set them to a different value to make sure that happens
-            binding1uniform1->m_impl->setInternal<vec3f>({ 99.0f, 99.0f, 99.0f });
+            binding1uniform1->m_impl->setValue(vec3f{ 99.0f, 99.0f, 99.0f });
             // This should not be overwritten, but should keep the manual value instead, because no link points to it
             ASSERT_TRUE(binding1uniform2->set<vec3f>({ 100.0f, 101.0f, 102.0f }));
             // These values should be overwritten by the link - set them to a different value to make sure that happens
-            binding2uniform1->m_impl->setInternal<vec3f>({ 99.0f, 99.0f, 99.0f });
-            binding2uniform2->m_impl->setInternal<vec3f>({ 99.0f, 99.0f, 99.0f });
+            binding2uniform1->m_impl->setValue(vec3f{ 99.0f, 99.0f, 99.0f });
+            binding2uniform2->m_impl->setValue(vec3f{ 99.0f, 99.0f, 99.0f });
             EXPECT_TRUE(m_logicEngine.update());
 
             ExpectVec3f(appearance1, "uniform1", { 100.0f, 200.0f, 300.0f });
@@ -1784,16 +1746,14 @@ namespace rlogic
             )";
 
             auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
-            auto cameraBinding1 = tmpLogicEngine.createRamsesCameraBinding("CameraBinding1");
-            auto cameraBinding2 = tmpLogicEngine.createRamsesCameraBinding("CameraBinding2");
-            cameraBinding1->setRamsesCamera(camera1);
-            cameraBinding2->setRamsesCamera(camera2);
+            auto cameraBinding1 = tmpLogicEngine.createRamsesCameraBinding(*camera1, "CameraBinding1");
+            auto cameraBinding2 = tmpLogicEngine.createRamsesCameraBinding(*camera2, "CameraBinding2");
 
             auto scriptOutputOffset = script->getOutputs()->getChild("vpOffsetX");
             auto scriptOutputFarPlane = script->getOutputs()->getChild("farPlane");
-            auto binding1cameraProperty1 = cameraBinding1->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
-            auto binding2cameraProperty1 = cameraBinding2->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
-            auto binding2cameraProperty2 = cameraBinding2->getInputs()->getChild("frustumProperties")->getChild("farPlane");
+            auto binding1cameraProperty1 = cameraBinding1->getInputs()->getChild("viewport")->getChild("offsetX");
+            auto binding2cameraProperty1 = cameraBinding2->getInputs()->getChild("viewport")->getChild("offsetX");
+            auto binding2cameraProperty2 = cameraBinding2->getInputs()->getChild("frustum")->getChild("farPlane");
 
             ASSERT_TRUE(tmpLogicEngine.link(*scriptOutputOffset, *binding1cameraProperty1));
             ASSERT_TRUE(tmpLogicEngine.link(*scriptOutputOffset, *binding2cameraProperty1));
@@ -1826,18 +1786,18 @@ namespace rlogic
             auto cameraBinding1 = m_logicEngine.findCameraBinding("CameraBinding1");
             auto cameraBinding2 = m_logicEngine.findCameraBinding("CameraBinding2");
 
-            auto binding1cameraProperty1 = cameraBinding1->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
-            auto binding1cameraProperty2 = cameraBinding1->getInputs()->getChild("frustumProperties")->getChild("farPlane");
-            auto binding2cameraProperty1 = cameraBinding2->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
-            auto binding2cameraProperty2 = cameraBinding2->getInputs()->getChild("frustumProperties")->getChild("farPlane");
+            auto binding1cameraProperty1 = cameraBinding1->getInputs()->getChild("viewport")->getChild("offsetX");
+            auto binding1cameraProperty2 = cameraBinding1->getInputs()->getChild("frustum")->getChild("farPlane");
+            auto binding2cameraProperty1 = cameraBinding2->getInputs()->getChild("viewport")->getChild("offsetX");
+            auto binding2cameraProperty2 = cameraBinding2->getInputs()->getChild("frustum")->getChild("farPlane");
 
             // These values should be overwritten by the link - set them to a different value to make sure that happens
-            binding1cameraProperty1->m_impl->setInternal<int32_t>(100);
+            binding1cameraProperty1->m_impl->setValue(100);
             // This should not be overwritten, but should keep the manual value instead, because no link points to it
             ASSERT_TRUE(binding1cameraProperty2->set<float>(100.f));
             // These values should be overwritten by the link - set them to a different value to make sure that happens
-            binding2cameraProperty1->m_impl->setInternal<int32_t>(100);
-            binding2cameraProperty2->m_impl->setInternal<float>(100.f);
+            binding2cameraProperty1->m_impl->setValue(100);
+            binding2cameraProperty2->m_impl->setValue(100.f);
             EXPECT_TRUE(m_logicEngine.update());
 
             EXPECT_EQ(camera1->getViewportX(), 19);
@@ -1849,7 +1809,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ReportsNodeAsLinked_IFF_ItHasIncomingOrOutgoingLinks)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.input = {
@@ -1863,38 +1822,37 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto middleScript = logicEngine.createLuaScriptFromSource(scriptSource, "MiddleScript");
-        auto targetBinding = logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto middleScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "MiddleScript");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
 
         auto sourceOutputBool = sourceScript->getOutputs()->getChild("output")->getChild("outBool");
         auto middleInputBool  = middleScript->getInputs()->getChild("input")->getChild("inBool");
         auto middleOutputBool = middleScript->getOutputs()->getChild("output")->getChild("outBool");
         auto targetInputBool  = targetBinding->getInputs()->getChild("visibility");
 
-        logicEngine.link(*sourceOutputBool, *middleInputBool);
-        logicEngine.link(*middleOutputBool, *targetInputBool);
+        m_logicEngine.link(*sourceOutputBool, *middleInputBool);
+        m_logicEngine.link(*middleOutputBool, *targetInputBool);
 
-        EXPECT_TRUE(logicEngine.isLinked(*sourceScript));
-        EXPECT_TRUE(logicEngine.isLinked(*middleScript));
-        EXPECT_TRUE(logicEngine.isLinked(*targetBinding));
+        EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript));
+        EXPECT_TRUE(m_logicEngine.isLinked(*middleScript));
+        EXPECT_TRUE(m_logicEngine.isLinked(*targetBinding));
 
-        logicEngine.unlink(*middleOutputBool, *targetInputBool);
+        m_logicEngine.unlink(*middleOutputBool, *targetInputBool);
 
-        EXPECT_TRUE(logicEngine.isLinked(*sourceScript));
-        EXPECT_TRUE(logicEngine.isLinked(*middleScript));
-        EXPECT_FALSE(logicEngine.isLinked(*targetBinding));
+        EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript));
+        EXPECT_TRUE(m_logicEngine.isLinked(*middleScript));
+        EXPECT_FALSE(m_logicEngine.isLinked(*targetBinding));
 
-        logicEngine.unlink(*sourceOutputBool, *middleInputBool);
+        m_logicEngine.unlink(*sourceOutputBool, *middleInputBool);
 
-        EXPECT_FALSE(logicEngine.isLinked(*sourceScript));
-        EXPECT_FALSE(logicEngine.isLinked(*middleScript));
-        EXPECT_FALSE(logicEngine.isLinked(*targetBinding));
+        EXPECT_FALSE(m_logicEngine.isLinked(*sourceScript));
+        EXPECT_FALSE(m_logicEngine.isLinked(*middleScript));
+        EXPECT_FALSE(m_logicEngine.isLinked(*targetBinding));
     }
 
     TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinking)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.input = BOOL
@@ -1904,10 +1862,10 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript  = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetBinding = logicEngine.createRamsesNodeBinding("RamsesBinding");
+        auto sourceScript  = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
@@ -1915,7 +1873,7 @@ namespace rlogic
         auto output = sourceScript->getOutputs()->getChild("output");
         auto input  = targetBinding->getInputs()->getChild("visibility");
 
-        logicEngine.link(*output, *input);
+        m_logicEngine.link(*output, *input);
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_TRUE(targetBinding->m_impl.get().isDirty());
@@ -1923,7 +1881,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinkingWithStructs)
     {
-        LogicEngine logicEngine;
         auto scriptSource = R"(
             function interface()
                 IN.struct = {
@@ -1937,10 +1894,10 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript  = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript  = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetScript->m_impl.get().isDirty());
@@ -1948,7 +1905,7 @@ namespace rlogic
         auto output = sourceScript->getOutputs()->getChild("struct")->getChild("outBool");
         auto input = targetScript->getInputs()->getChild("struct")->getChild("inBool");
 
-        logicEngine.link(*output, *input);
+        m_logicEngine.link(*output, *input);
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_TRUE(targetScript->m_impl.get().isDirty());
@@ -1956,7 +1913,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, SetsNeitherTargetNodeNorSourceNodeToDirtyAfterUnlink)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.input = BOOL
@@ -1966,20 +1922,20 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetBinding = logicEngine.createRamsesNodeBinding("RamsesBinding");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
 
         auto output = sourceScript->getOutputs()->getChild("output");
         auto input  = targetBinding->getInputs()->getChild("visibility");
 
-        logicEngine.link(*output, *input);
+        m_logicEngine.link(*output, *input);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
 
-        logicEngine.unlink(*output, *input);
+        m_logicEngine.unlink(*output, *input);
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
@@ -2080,7 +2036,7 @@ namespace rlogic
     {
         LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
 
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
         auto translationProperty = targetBinding->getInputs()->getChild("translation");
 
         const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild(0)->getChild("vec3f"));

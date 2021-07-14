@@ -10,11 +10,13 @@
 
 #include "ramses-logic/EPropertyType.h"
 
-#include "generated/property_gen.h"
+#include "generated/PropertyGen.h"
+
+#include <optional>
 
 namespace rlogic::internal
 {
-    static EPropertyType ConvertSerializationTypeToEPropertyType(rlogic_serialization::EPropertyRootType propertyRootType, rlogic_serialization::PropertyValue valueType)
+    static std::optional<EPropertyType> ConvertSerializationTypeToEPropertyType(rlogic_serialization::EPropertyRootType propertyRootType, rlogic_serialization::PropertyValue valueType)
     {
         switch (propertyRootType)
         {
@@ -46,11 +48,9 @@ namespace rlogic::internal
             case rlogic_serialization::PropertyValue::string_s:
                 return EPropertyType::String;
             case rlogic_serialization::PropertyValue::NONE:
-                assert(false && "Should never reach this code");
-                return EPropertyType::Struct;
+                return std::nullopt;
             }
         }
-        assert(false && "Should never reach this code unless doing crazy things with enums");
-        return EPropertyType::Struct;
+        return std::nullopt;
     }
 }

@@ -16,13 +16,13 @@
 #include "internals/SolHelper.h"
 #include "internals/ErrorReporting.h"
 
-#include "generated/luascript_gen.h"
+#include "generated/LuaScriptGen.h"
 
 #include <iostream>
 
 namespace rlogic::internal
 {
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Create(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting)
+    std::optional<CompiledScript> LuaScriptImpl::Compile(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting)
     {
         const std::string chunkname = BuildChunkName(scriptName, filename);
         sol::load_result load_result = solState.loadScript(source, chunkname);
@@ -31,7 +31,7 @@ namespace rlogic::internal
         {
             sol::error error = load_result;
             errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()));
-            return nullptr;
+            return std::nullopt;
         }
 
         sol::protected_function mainFunction = load_result;
@@ -44,7 +44,7 @@ namespace rlogic::internal
         {
             sol::error error = main_result;
             errorReporting.add(error.what());
-            return nullptr;
+            return std::nullopt;
         }
 
         sol::protected_function intf = env["interface"];
@@ -52,7 +52,7 @@ namespace rlogic::internal
         if (!intf.valid())
         {
             errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname));
-            return nullptr;
+            return std::nullopt;
         }
 
         sol::protected_function run = env["run"];
@@ -60,7 +60,7 @@ namespace rlogic::internal
         if (!run.valid())
         {
             errorReporting.add(fmt::format("[{}] No 'run' function defined!", chunkname));
-            return nullptr;
+            return std::nullopt;
         }
 
         auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput);
@@ -75,97 +75,153 @@ namespace rlogic::internal
         {
             sol::error error = intfResult;
             errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()));
-            return nullptr;
+            return std::nullopt;
         }
 
-        return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl (solState, sol::protected_function(std::move(load_result)),
-            scriptName, filename, source, std::move(inputsImpl), std::move(outputsImpl)));
+        return CompiledScript {
+            source,
+            scriptName,
+            filename,
+            solState,
+            std::move(load_result),
+            std::make_unique<Property>(std::move(inputsImpl)),
+            std::make_unique<Property>(std::move(outputsImpl))
+        };
     }
 
-    LuaScriptImpl::LuaScriptImpl(SolState& solState,
-        sol::protected_function       solFunction,
-        std::string_view              scriptName,
-        std::string_view              filename,
-        std::string_view              source,
-        std::unique_ptr<PropertyImpl> inputs,
-        std::unique_ptr<PropertyImpl> outputs)
-        : LogicNodeImpl(scriptName, std::move(inputs), std::move(outputs))
-        , m_filename(filename)
-        , m_source(source)
-        , m_state(solState)
-        , m_solFunction(std::move(solFunction))
+    LuaScriptImpl::LuaScriptImpl(CompiledScript compiledScript)
+        : LogicNodeImpl(compiledScript.scriptName)
+        , m_filename(compiledScript.fileName)
+        , m_source(compiledScript.sourceCode)
+        , m_state(compiledScript.solState)
+        , m_solFunction(std::move(compiledScript.mainFunction))
         , m_luaPrintFunction(&LuaScriptImpl::DefaultLuaPrintFunction)
     {
-        initParameters();
+        setRootProperties(std::move(compiledScript.rootInput), std::move(compiledScript.rootOutput));
+
+        sol::environment env = sol::get_environment(m_solFunction);
+
+        env["IN"] = m_state.get().createUserObject(LuaScriptPropertyHandler(m_state, *getInputs()->m_impl));
+        env["OUT"] = m_state.get().createUserObject(LuaScriptPropertyHandler(m_state, *getOutputs()->m_impl));
+        // override the lua print function to handle it by ourselves
+        env.set_function("print", &LuaScriptImpl::luaPrint, this);
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder)
+    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap)
     {
         // TODO Violin investigate options to save byte code, instead of plain text, e.g.:
         //sol::bytecode scriptCode = m_solFunction.dump();
 
-        auto luascript = rlogic_serialization::CreateLuaScript(
-            builder,
-            LogicNodeImpl::Serialize(luaScript, builder), // Serialize base class
-            builder.CreateString(luaScript.m_filename),
+        auto script = rlogic_serialization::CreateLuaScript(builder,
+            builder.CreateString(luaScript.getName()),
+            builder.CreateString(luaScript.getFilename()),
             builder.CreateString(luaScript.m_source),
-            0
+            PropertyImpl::Serialize(*luaScript.getInputs()->m_impl, builder, serializationMap),
+            PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap)
         );
+        builder.Finish(script);
 
-        builder.Finish(luascript);
-        return luascript;
+        return script;
     }
 
-    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Deserialize(SolState& solState, const rlogic_serialization::LuaScript& luaScript)
+    std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Deserialize(
+        SolState& solState,
+        const rlogic_serialization::LuaScript& luaScript,
+        ErrorReporting& errorReporting,
+        DeserializationMap& deserializationMap)
     {
-        assert(nullptr != luaScript.filename());
-        assert(nullptr != luaScript.logicnode());
-        assert(nullptr != luaScript.logicnode()->name());
+        // TODO Violin make optional - no need to always serialize string if not used
+        if (!luaScript.name())
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing name!");
+            return nullptr;
+        }
 
-        const auto name = luaScript.logicnode()->name()->string_view();
+        if (!luaScript.filename())
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing filename!");
+            return nullptr;
+        }
 
-        const auto filename = luaScript.filename()->string_view();
+        const std::string_view name = luaScript.name()->string_view();
+        const std::string_view filename = luaScript.filename()->string_view();
 
-        std::string_view load_source;
-        std::string_view string_source;
+        if (!luaScript.luaSourceCode())
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!");
+            return nullptr;
+        }
 
-        assert (nullptr == luaScript.bytecode() && "Bytecode serialization not implemented yet!");
-        // TODO Violin/Sven re-enable this once bytecode is implemented and tested
-        //load_source = std::string_view(reinterpret_cast<const char*>(luaScript.bytecode()->data()) ,
-        //luaScript.bytecode()->size()); // NOLINT(cppcoreguidelines-pro-type-reinterpret-cast) We know what we do and this is only solvable with reinterpret-cast
-        assert(nullptr != luaScript.source());
-        assert(nullptr != luaScript.logicnode()->inputs());
-        assert(nullptr != luaScript.logicnode()->outputs());
-        load_source = luaScript.source()->string_view();
-        string_source = load_source;
+        const std::string_view sourceCode = luaScript.luaSourceCode()->string_view();
 
-        auto inputs = PropertyImpl::Deserialize(*luaScript.logicnode()->inputs(), EPropertySemantics::ScriptInput);
-        assert(inputs);
+        if (!luaScript.rootInput())
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root input!");
+            return nullptr;
+        }
 
-        auto outputs = PropertyImpl::Deserialize(*luaScript.logicnode()->outputs(), EPropertySemantics::ScriptOutput);
-        assert(outputs);
+        std::unique_ptr<PropertyImpl> rootInput = PropertyImpl::Deserialize(*luaScript.rootInput(), EPropertySemantics::ScriptInput, errorReporting, deserializationMap);
+        if (!rootInput)
+        {
+            return nullptr;
+        }
 
-        sol::load_result load_result = solState.loadScript(load_source, name);
-        assert (load_result.valid());
+        if (!luaScript.rootOutput())
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root output!");
+            return nullptr;
+        }
+
+        std::unique_ptr<PropertyImpl> rootOutput = PropertyImpl::Deserialize(*luaScript.rootOutput(), EPropertySemantics::ScriptOutput, errorReporting, deserializationMap);
+        if (!rootOutput)
+        {
+            return nullptr;
+        }
+
+        if (rootInput->getName() != "IN" || rootInput->getType() != EPropertyType::Struct)
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root input has unexpected name or type!");
+            return nullptr;
+        }
+
+        if (rootOutput->getName() != "OUT" || rootOutput->getType() != EPropertyType::Struct)
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root output has unexpected name or type!");
+            return nullptr;
+        }
+
+        // TODO Violin we use 'name' here, and not 'chunkname' as in Create(). This is inconsistent! Investigate closer
+        sol::load_result load_result = solState.loadScript(sourceCode, name);
+        if (!load_result.valid())
+        {
+            sol::error error = load_result;
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed parsing Lua source code:\n{}", name, error.what()));
+            return nullptr;
+        }
 
         sol::protected_function mainFunction = load_result;
         sol::environment env = solState.createEnvironment();
         env.set_on(mainFunction);
 
         sol::protected_function_result main_result = mainFunction();
-        assert (main_result.valid());
-        return std::unique_ptr<LuaScriptImpl>(new LuaScriptImpl(solState, sol::protected_function(std::move(load_result)), name, filename, string_source, std::move(inputs), std::move(outputs)));
-    }
+        if (!main_result.valid())
+        {
+            sol::error error = main_result;
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed executing script:\n{}!", name, error.what()));
+            return nullptr;
+        }
 
-    // TODO Violin can we remove this init, e.g. move to Create?
-    void LuaScriptImpl::initParameters()
-    {
-        sol::environment env = sol::get_environment(m_solFunction);
-
-        env["IN"]  = m_state.get().createUserObject(LuaScriptPropertyHandler(m_state, *getInputs()->m_impl));
-        env["OUT"] = m_state.get().createUserObject(LuaScriptPropertyHandler(m_state, *getOutputs()->m_impl));
-        // override the lua print function to handle it by ourselves
-        env.set_function("print", &LuaScriptImpl::luaPrint, this);
+        return std::make_unique<LuaScriptImpl>(
+            CompiledScript{
+                sourceCode,
+                name,
+                filename,
+                solState,
+                sol::protected_function(std::move(load_result)),
+                std::make_unique<Property>(std::move(rootInput)),
+                std::make_unique<Property>(std::move(rootOutput))
+            }
+            );
     }
 
     std::string LuaScriptImpl::BuildChunkName(std::string_view scriptName, std::string_view fileName)

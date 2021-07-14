@@ -265,6 +265,15 @@ type system and memory management. This is mostly transparent to the user, but t
 special cases worth explaining.
 
 -----------------------------------------------------
+Userdata vs. table
+-----------------------------------------------------
+
+The properties declared in the IN and OUT objects are stored as so-called `usertype` Lua objects, not standard tables.
+`Userdata` are C++ objects which are exposed to the Lua script. This limits the operations possible with
+those types - only the `index`, `newIndex` and for some containers the size (`#` operator) are supported.
+Using other Lua operations (e.g. pairs/ipairs) will result in errors.
+
+-----------------------------------------------------
 Vec2/3/4 types
 -----------------------------------------------------
 

@@ -97,5 +97,3 @@ table Property
     children:[Property];
     value:PropertyValue;
 }
-
-root_type Property;

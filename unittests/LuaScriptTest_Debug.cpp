@@ -105,9 +105,7 @@ namespace rlogic
     // Logic engine always overrides the print function internally - test that it doesn't cause crashes
     TEST_F(ALuaScript_Debug, DefaultOverrideOfLuaPrintFunctionDoesNotCrash)
     {
-        LogicEngine logicEngine;
-
-        LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
             end
             function run()
@@ -117,16 +115,14 @@ namespace rlogic
 
         ASSERT_NE(nullptr, script);
 
-        EXPECT_TRUE(logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.update());
     }
 
     TEST_F(ALuaScript_Debug, OverridesLuaPrintFunctionWithCustomFunction)
     {
-        LogicEngine logicEngine;
-
         std::vector<std::string> messages;
 
-        LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
             end
             function run()
@@ -141,7 +137,7 @@ namespace rlogic
             messages.emplace_back(message);
             });
 
-        EXPECT_TRUE(logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.update());
 
         ASSERT_EQ(4u, messages.size());
         EXPECT_EQ("PrintingScript", messages[0]);
@@ -152,11 +148,9 @@ namespace rlogic
 
     TEST_F(ALuaScript_Debug, ProducesErrorIfPrintFunctionIsCalledWithWrongArgument)
     {
-        LogicEngine logicEngine;
-
         std::vector<std::string> messages;
 
-        LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
             end
             function run()
@@ -165,8 +159,8 @@ namespace rlogic
         )", "PrintingScript");
 
         ASSERT_NE(nullptr, script);
-        EXPECT_FALSE(logicEngine.update());
-        const auto& errors = logicEngine.getErrors();
+        EXPECT_FALSE(m_logicEngine.update());
+        const auto& errors = m_logicEngine.getErrors();
         EXPECT_EQ(1u, errors.size());
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Called 'print' with wrong argument type 'number'. Only string is allowed"));
         EXPECT_EQ(script, errors[0].node);

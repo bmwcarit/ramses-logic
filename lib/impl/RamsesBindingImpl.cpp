@@ -8,15 +8,30 @@
 
 
 #include "impl/RamsesBindingImpl.h"
-#include "impl/PropertyImpl.h"
 
-#include "ramses-logic/Property.h"
-#include "internals/TypeUtils.h"
+#include "ramses-client-api/SceneObject.h"
+
+#include "generated/RamsesReferenceGen.h"
 
 namespace rlogic::internal
 {
-    RamsesBindingImpl::RamsesBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs)
-        : LogicNodeImpl(name, std::move(inputs), std::move(outputs))
+    RamsesBindingImpl::RamsesBindingImpl(std::string_view name) noexcept
+        : LogicNodeImpl(name)
     {
     }
+
+    flatbuffers::Offset<rlogic_serialization::RamsesReference> RamsesBindingImpl::SerializeRamsesReference(const ramses::SceneObject& object, flatbuffers::FlatBufferBuilder& builder)
+    {
+        const ramses::sceneObjectId_t ramsesObjectId = object.getSceneObjectId();
+        const ramses::ERamsesObjectType ramsesObjectType = object.getType();
+
+        auto ramsesRef = rlogic_serialization::CreateRamsesReference(builder,
+            ramsesObjectId.getValue(),
+            static_cast<uint32_t>(ramsesObjectType)
+        );
+        builder.Finish(ramsesRef);
+
+        return ramsesRef;
+    }
+
 }

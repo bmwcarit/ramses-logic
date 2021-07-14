@@ -17,6 +17,9 @@
 namespace ramses
 {
     class Scene;
+    class Node;
+    class Appearance;
+    class Camera;
 }
 
 namespace rlogic
@@ -30,11 +33,12 @@ namespace rlogic
 
 namespace rlogic_serialization
 {
-    struct LogicEngine;
+    struct ApiObjects;
 }
 
 namespace flatbuffers
 {
+    template<typename T> struct Offset;
     class FlatBufferBuilder;
 }
 
@@ -62,19 +66,19 @@ namespace rlogic::internal
         ApiObjects& operator=(const ApiObjects& other) = delete;
 
         // Serialization/Deserialization
-        static void Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder);
+        static flatbuffers::Offset<rlogic_serialization::ApiObjects> Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder);
         static std::optional<ApiObjects> Deserialize(
             SolState& solState,
-            const rlogic_serialization::LogicEngine& logicEngineData,
+            const rlogic_serialization::ApiObjects& apiObjects,
             const IRamsesObjectResolver& ramsesResolver,
             const std::string& dataSourceDescription,
             ErrorReporting& errorReporting);
 
         // Create/destroy API objects
         LuaScript* createLuaScript(SolState& solState, std::string_view source, std::string_view filename, std::string_view scriptName, ErrorReporting& errorReporting);
-        RamsesNodeBinding* createRamsesNodeBinding(std::string_view name);
-        RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name);
-        RamsesCameraBinding* createRamsesCameraBinding(std::string_view name);
+        RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name);
+        RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
+        RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
         bool destroy(LogicNode& logicNode, ErrorReporting& errorReporting);
 
         // Invariance checks
@@ -94,6 +98,10 @@ namespace rlogic::internal
         [[nodiscard]] LogicNodeDependencies& getLogicNodeDependencies();
 
         [[nodiscard]] LogicNode* getApiObject(LogicNodeImpl& impl) const;
+
+        // Internally used
+        [[nodiscard]] bool isDirty() const;
+        [[nodiscard]] bool bindingsDirty() const;
 
         // Strictly for testing purposes (inverse mappings require extra attention and test coverage)
         [[nodiscard]] const std::unordered_map<LogicNodeImpl*, LogicNode*>& getReverseImplMapping() const;

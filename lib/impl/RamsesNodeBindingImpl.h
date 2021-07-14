@@ -9,6 +9,8 @@
 #pragma once
 
 #include "impl/RamsesBindingImpl.h"
+#include "internals/SerializationMap.h"
+#include "internals/DeserializationMap.h"
 #include "ramses-client-api/ERotationConvention.h"
 
 #include <memory>
@@ -32,6 +34,9 @@ namespace flatbuffers
 
 namespace rlogic::internal
 {
+    class IRamsesObjectResolver;
+    class ErrorReporting;
+
     enum class ENodePropertyStaticIndex : size_t
     {
         Visibility = 0,
@@ -44,20 +49,25 @@ namespace rlogic::internal
     {
     public:
         // Move-able (noexcept); Not copy-able
-        explicit RamsesNodeBindingImpl(std::string_view name) noexcept;
+        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, std::string_view name);
         ~RamsesNodeBindingImpl() noexcept override = default;
         RamsesNodeBindingImpl(RamsesNodeBindingImpl&& other) noexcept = default;
         RamsesNodeBindingImpl& operator=(RamsesNodeBindingImpl&& other) noexcept = default;
         RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other)                = delete;
         RamsesNodeBindingImpl& operator=(const RamsesNodeBindingImpl& other) = delete;
 
-        // TODO Violin we can remove this, Bindings don't need to deserialize their values after recent rework!
-        RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept;
-        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> Serialize(const RamsesNodeBindingImpl& nodeBinding, flatbuffers::FlatBufferBuilder& builder);
-        [[nodiscard]] static std::unique_ptr<RamsesNodeBindingImpl> Deserialize(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode);
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> Serialize(
+            const RamsesNodeBindingImpl& nodeBinding,
+            flatbuffers::FlatBufferBuilder& builder,
+            SerializationMap& serializationMap);
 
-        bool setRamsesNode(ramses::Node* node);
-        [[nodiscard]] ramses::Node* getRamsesNode() const;
+        [[nodiscard]] static std::unique_ptr<RamsesNodeBindingImpl> Deserialize(
+            const rlogic_serialization::RamsesNodeBinding& nodeBinding,
+            const IRamsesObjectResolver& ramsesResolver,
+            ErrorReporting& errorReporting,
+            DeserializationMap& deserializationMap);
+
+        [[nodiscard]] ramses::Node& getRamsesNode() const;
 
         bool setRotationConvention(ramses::ERotationConvention rotationConvention);
         [[nodiscard]] ramses::ERotationConvention getRotationConvention() const;
@@ -66,9 +76,9 @@ namespace rlogic::internal
 
 
     private:
-        ramses::Node* m_ramsesNode = nullptr;
+        std::reference_wrapper<ramses::Node> m_ramsesNode;
         ramses::ERotationConvention m_rotationConvention = ramses::ERotationConvention::XYZ;
 
-        [[nodiscard]] static std::unique_ptr<PropertyImpl> CreateNodeProperties();
+        static void ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode);
     };
 }

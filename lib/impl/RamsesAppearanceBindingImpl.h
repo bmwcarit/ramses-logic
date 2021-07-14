@@ -9,9 +9,13 @@
 #pragma once
 
 #include "impl/RamsesBindingImpl.h"
+#include "internals/SerializationMap.h"
+#include "internals/DeserializationMap.h"
 
+#include "ramses-logic/EPropertyType.h"
 #include "ramses-client-api/UniformInput.h"
 
+#include <optional>
 #include <memory>
 #include <unordered_map>
 
@@ -36,31 +40,35 @@ namespace rlogic::internal
 {
     class PropertyImpl;
     class ErrorReporting;
+    class IRamsesObjectResolver;
 
     class RamsesAppearanceBindingImpl : public RamsesBindingImpl
     {
     public:
-        explicit RamsesAppearanceBindingImpl(std::string_view name);
-        // Special constructor used when deserialized with appearance reference and inputs have pre-populated values
-        // TODO Violin we can remove this, Bindings don't need to deserialize their values after recent rework!
-        RamsesAppearanceBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, ramses::Appearance& appearance);
-        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> Serialize(const RamsesAppearanceBindingImpl& binding, flatbuffers::FlatBufferBuilder& builder);
-        [[nodiscard]] static std::unique_ptr<RamsesAppearanceBindingImpl> Deserialize(const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding, ramses::Appearance* appearance, ErrorReporting& errorReporting);
+        explicit RamsesAppearanceBindingImpl(ramses::Appearance& ramsesAppearance, std::string_view name);
 
-        void setRamsesAppearance(ramses::Appearance* appearance);
-        [[nodiscard]] ramses::Appearance* getRamsesAppearance() const;
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> Serialize(
+            const RamsesAppearanceBindingImpl& binding,
+            flatbuffers::FlatBufferBuilder& builder,
+            SerializationMap& serializationMap);
+
+        [[nodiscard]] static std::unique_ptr<RamsesAppearanceBindingImpl> Deserialize(
+            const rlogic_serialization::RamsesAppearanceBinding& appearanceBinding,
+            const IRamsesObjectResolver& ramsesResolver,
+            ErrorReporting& errorReporting,
+            DeserializationMap& deserializationMap);
+
+        [[nodiscard]] ramses::Appearance& getRamsesAppearance() const;
 
         std::optional<LogicNodeRuntimeError> update() override;
 
     private:
 
-        ramses::Appearance* m_ramsesAppearance;
+        std::reference_wrapper<ramses::Appearance> m_ramsesAppearance;
         std::vector<uint32_t> m_uniformIndices;
 
         void setInputValueToUniform(size_t inputIndex);
-        [[nodiscard]] static bool UniformTypeMatchesBindingInputType(const ramses::UniformInput& uniformInput, const PropertyImpl& bindingInput, ErrorReporting& errorReporting);
-        [[nodiscard]] static bool AppearanceCompatibleWithDeserializedInputs(PropertyImpl& deserializedInputs, ramses::Appearance& appearance, ErrorReporting& errorReporting);
-        void populatePropertyMappingCache(ramses::Appearance& appearance);
-        void createInputProperties(ramses::Appearance& appearance);
+
+        static std::optional<EPropertyType> GetPropertyTypeForUniform(const ramses::UniformInput& uniform);
     };
 }

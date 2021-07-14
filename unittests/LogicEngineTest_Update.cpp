@@ -38,8 +38,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Update, UpdatesRamsesNodeBindingValuesOnUpdate)
     {
-        LogicEngine logicEngine;
-        auto        luaScript = logicEngine.createLuaScriptFromSource(R"(
+        auto        luaScript = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
                 IN.param = BOOL
                 OUT.param = BOOL
@@ -49,7 +48,7 @@ namespace rlogic
             end
         )", "Script");
 
-        auto        ramsesNodeBinding = logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto        ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
 
         auto scriptInput  = luaScript->getInputs()->getChild("param");
         auto scriptOutput = luaScript->getOutputs()->getChild("param");
@@ -57,10 +56,10 @@ namespace rlogic
         scriptInput->set(true);
         nodeInput->set(false);
 
-        logicEngine.link(*scriptOutput, *nodeInput);
+        m_logicEngine.link(*scriptOutput, *nodeInput);
 
         EXPECT_FALSE(*nodeInput->get<bool>());
-        EXPECT_TRUE(logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.update());
         EXPECT_TRUE(*nodeInput->get<bool>());
     }
 
@@ -69,8 +68,7 @@ namespace rlogic
         RamsesTestSetup testSetup;
         ramses::Scene* scene = testSetup.createScene();
 
-        LogicEngine logicEngine;
-        auto        luaScript = logicEngine.createLuaScriptFromSource(R"(
+        auto        luaScript = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
                 IN.param = INT
                 OUT.param = INT
@@ -80,19 +78,18 @@ namespace rlogic
             end
         )", "Script");
 
-        auto ramsesCameraBinding = logicEngine.createRamsesCameraBinding("CameraBinding");
-        ramsesCameraBinding->setRamsesCamera(scene->createPerspectiveCamera());
+        auto ramsesCameraBinding = m_logicEngine.createRamsesCameraBinding(*scene->createPerspectiveCamera(), "CameraBinding");
 
         auto scriptInput = luaScript->getInputs()->getChild("param");
         auto scriptOutput = luaScript->getOutputs()->getChild("param");
-        auto cameraInput = ramsesCameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
+        auto cameraInput = ramsesCameraBinding->getInputs()->getChild("viewport")->getChild("offsetX");
         scriptInput->set(34);
         cameraInput->set(21);
 
-        logicEngine.link(*scriptOutput, *cameraInput);
+        m_logicEngine.link(*scriptOutput, *cameraInput);
 
         EXPECT_EQ(21, *cameraInput->get<int32_t>());
-        EXPECT_TRUE(logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.update());
         EXPECT_EQ(34, *cameraInput->get<int32_t>());
     }
 
@@ -124,14 +121,12 @@ namespace rlogic
         const ramses::Effect* effect = scene->createEffect(effectDesc);
         ramses::Appearance* appearance = scene->createAppearance(*effect);
 
-        LogicEngine logicEngine;
-        auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("appearancebinding");
-        appearanceBinding->setRamsesAppearance(appearance);
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*appearance, "appearancebinding");
 
         auto floatUniform = appearanceBinding->getInputs()->getChild("floatUniform");
         floatUniform->set(47.11f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         ramses::UniformInput floatInput;
         effect->findUniformInput("floatUniform", floatInput);
@@ -168,9 +163,8 @@ namespace rlogic
         EXPECT_THAT(m_logicEngine.getErrors()[0].node, sourceScript);
     }
 
-    TEST(LogicNodeConnector, PropagatesValuesOnlyToConnectedLogicNodes)
+    TEST_F(ALogicEngine_Update, PropagatesValuesOnlyToConnectedLogicNodes)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.inFloat = FLOAT
@@ -187,71 +181,35 @@ namespace rlogic
             end
         )";
 
-        const std::string_view vertexShaderSource = R"(
-            #version 300 es
-
-            uniform highp float floatUniform;
-
-            void main()
-            {
-                gl_Position = floatUniform * vec4(1.0);
-            })";
-
-        const std::string_view fragmentShaderSource = R"(
-            #version 300 es
-
-            out lowp vec4 color;
-            void main(void)
-            {
-                color = vec4(1.0, 0.0, 0.0, 1.0);
-            })";
-
-        auto script            = logicEngine.createLuaScriptFromSource(scriptSource, "Script");
-        auto nodeBinding       = logicEngine.createRamsesNodeBinding("NodeBinding");
-        auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
-        auto cameraBinding = logicEngine.createRamsesCameraBinding("CameraBinding");
-
-        ramses::RamsesFramework ramsesFramework;
-        auto                    ramsesClient = ramsesFramework.createClient("client");
-        auto                    ramsesScene  = ramsesClient->createScene(ramses::sceneId_t(1));
-
-        ramses::EffectDescription ramsesEffectDesc;
-        ramsesEffectDesc.setVertexShader(vertexShaderSource.data());
-        ramsesEffectDesc.setFragmentShader(fragmentShaderSource.data());
-        auto ramsesEffect     = ramsesScene->createEffect(ramsesEffectDesc);
-        auto ramsesAppearance = ramsesScene->createAppearance(*ramsesEffect);
-        appearanceBinding->setRamsesAppearance(ramsesAppearance);
-
-        auto ramsesCamera = ramsesScene->createPerspectiveCamera();
-        cameraBinding->setRamsesCamera(ramsesCamera);
-
-        auto ramsesNode = ramsesScene->createNode();
-        nodeBinding->setRamsesNode(ramsesNode);
+        auto script            = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script");
+        auto nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
+        auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
 
         auto nodeBindingTranslation = nodeBinding->getInputs()->getChild("translation");
         nodeBindingTranslation->set(vec3f{1.f, 2.f, 3.f});
         auto appearanceBindingFloatUniform = appearanceBinding->getInputs()->getChild("floatUniform");
         appearanceBindingFloatUniform->set(42.f);
-        auto cameraBindingViewportOffsetX = cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX");
+        auto cameraBindingViewportOffsetX = cameraBinding->getInputs()->getChild("viewport")->getChild("offsetX");
         cameraBindingViewportOffsetX->set(43);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         ramses::UniformInput floatInput;
-        ramsesEffect->findUniformInput("floatUniform", floatInput);
+        m_appearance->getEffect().findUniformInput("floatUniform", floatInput);
         float floatUniformValue = 0.0f;
-        ramsesAppearance->getInputValueFloat(floatInput, floatUniformValue);
+        m_appearance->getInputValueFloat(floatInput, floatUniformValue);
 
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
-        EXPECT_EQ(43, ramsesCamera->getViewportX());
+        EXPECT_EQ(43, m_camera->getViewportX());
         {
             std::array<float, 3> values = {0.0f, 0.0f, 0.0f};
-            ramsesNode->getTranslation(values[0], values[1], values[2]);
+            m_node->getTranslation(values[0], values[1], values[2]);
             EXPECT_THAT(values, ::testing::ElementsAre(1.f, 2.f, 3.f));
         }
 
         auto nodeBindingScaling = nodeBinding->getInputs()->getChild("scaling");
-        auto cameraBindingVpY   = cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetY");
+        auto cameraBindingVpY   = cameraBinding->getInputs()->getChild("viewport")->getChild("offsetY");
         auto scriptOutputVec3   = script->getOutputs()->getChild("outVec3");
         auto scriptOutputFloat  = script->getOutputs()->getChild("outFloat");
         auto scriptOutputInt    = script->getOutputs()->getChild("outInt");
@@ -260,55 +218,54 @@ namespace rlogic
         auto scriptInputInt     = script->getInputs()->getChild("inInt");
         auto appearanceInput    = appearanceBinding->getInputs()->getChild("floatUniform");
 
-        logicEngine.link(*scriptOutputVec3, *nodeBindingScaling);
+        m_logicEngine.link(*scriptOutputVec3, *nodeBindingScaling);
         scriptInputVec3->set(vec3f{3.f, 2.f, 1.f});
         scriptInputFloat->set(42.f);
         scriptInputInt->set(43);
 
-        logicEngine.update();
+        m_logicEngine.update();
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
-        EXPECT_EQ(43, ramsesCamera->getViewportX());
+        EXPECT_EQ(43, m_camera->getViewportX());
         {
             std::array<float, 3> values = {0.0f, 0.0f, 0.0f};
-            ramsesNode->getTranslation(values[0], values[1], values[2]);
+            m_node->getTranslation(values[0], values[1], values[2]);
             EXPECT_THAT(values, ::testing::ElementsAre(1.f, 2.f, 3.f));
         }
         {
             std::array<float, 3> values = {0.0f, 0.0f, 0.0f};
-            ramsesNode->getScaling(values[0], values[1], values[2]);
+            m_node->getScaling(values[0], values[1], values[2]);
             EXPECT_THAT(values, ::testing::ElementsAre(3.f, 2.f, 1.f));
         }
         {
             std::array<float, 3> values = { 0.0f, 0.0f, 0.0f };
             ramses::ERotationConvention unused;
             (void)unused;
-            ramsesNode->getRotation(values[0], values[1], values[2], unused);
+            m_node->getRotation(values[0], values[1], values[2], unused);
             EXPECT_THAT(values, ::testing::ElementsAre(0.f, 0.f, 0.f));
         }
 
         ramses::UniformInput floatUniform;
-        ramsesEffect->findUniformInput("floatUniform", floatUniform);
+        m_appearance->getEffect().findUniformInput("floatUniform", floatUniform);
         floatUniformValue = 0.0f;
-        ramsesAppearance->getInputValueFloat(floatUniform, floatUniformValue);
+        m_appearance->getInputValueFloat(floatUniform, floatUniformValue);
 
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
 
-        logicEngine.link(*scriptOutputFloat, *appearanceInput);
-        logicEngine.link(*scriptOutputInt, *cameraBindingVpY);
+        m_logicEngine.link(*scriptOutputFloat, *appearanceInput);
+        m_logicEngine.link(*scriptOutputInt, *cameraBindingVpY);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
-        ramsesAppearance->getInputValueFloat(floatUniform, floatUniformValue);
+        m_appearance->getInputValueFloat(floatUniform, floatUniformValue);
         EXPECT_FLOAT_EQ(42.f, floatUniformValue);
 
-        EXPECT_EQ(43, ramsesCamera->getViewportY());
+        EXPECT_EQ(43, m_camera->getViewportY());
 
-        logicEngine.unlink(*scriptOutputVec3, *nodeBindingScaling);
+        m_logicEngine.unlink(*scriptOutputVec3, *nodeBindingScaling);
     }
 
     TEST_F(ALogicEngine_Update, OnlyUpdatesDirtyLogicNodes)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.inFloat = FLOAT
@@ -320,8 +277,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
 
         auto sourceInput  = sourceScript->getInputs()->getChild("inFloat");
         auto sourceOutput = sourceScript->getOutputs()->getChild("outFloat");
@@ -338,12 +295,12 @@ namespace rlogic
         EXPECT_TRUE(sourceScript->m_impl.get().isDirty());
         EXPECT_TRUE(targetScript->m_impl.get().isDirty());
 
-        logicEngine.link(*sourceOutput, *targetInput);
+        m_logicEngine.link(*sourceOutput, *targetInput);
 
         EXPECT_TRUE(sourceScript->m_impl.get().isDirty());
         EXPECT_TRUE(targetScript->m_impl.get().isDirty());
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetScript->m_impl.get().isDirty());
@@ -354,7 +311,7 @@ namespace rlogic
         EXPECT_EQ("TargetScript", messages[1].first);
 
         messages.clear();
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_TRUE(messages.empty());
         messages.clear();
@@ -365,7 +322,7 @@ namespace rlogic
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetScript->m_impl.get().isDirty());
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
         EXPECT_FALSE(targetScript->m_impl.get().isDirty());
@@ -375,7 +332,7 @@ namespace rlogic
 
         sourceInput->set(24.f);
         messages.clear();
-        logicEngine.update();
+        m_logicEngine.update();
 
         // Both scripts are updated, because the input of the first script is changed and changes target through link.
         ASSERT_EQ(2u, messages.size());
@@ -385,7 +342,6 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Update, OnlyUpdatesDirtyLogicNodesInAComplexLogicGraph)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.in1 = INT
@@ -401,7 +357,7 @@ namespace rlogic
         std::array<LuaScript*, 6> s = {};
         for (size_t i = 0; i < s.size(); ++i)
         {
-            s[i] = logicEngine.createLuaScriptFromSource(scriptSource, fmt::format("Script{}", i));
+            s[i] = m_logicEngine.createLuaScriptFromSource(scriptSource, fmt::format("Script{}", i));
         }
 
         auto in1S0  = s[0]->getInputs()->getChild("in1");
@@ -428,13 +384,13 @@ namespace rlogic
                              s4
          */
 
-        logicEngine.link(*out1S0, *in2S1);
-        logicEngine.link(*out1S1, *in2S3);
-        logicEngine.link(*out1S2, *in1S1);
-        logicEngine.link(*out1S2, *in1S3);
-        logicEngine.link(*out1S3, *in1S5);
-        logicEngine.link(*out1S3, *in1S4);
-        logicEngine.link(*out1S4, *in2S5);
+        m_logicEngine.link(*out1S0, *in2S1);
+        m_logicEngine.link(*out1S1, *in2S3);
+        m_logicEngine.link(*out1S2, *in1S1);
+        m_logicEngine.link(*out1S2, *in1S3);
+        m_logicEngine.link(*out1S3, *in1S5);
+        m_logicEngine.link(*out1S3, *in1S4);
+        m_logicEngine.link(*out1S4, *in2S5);
 
         std::vector<std::string> messages;
         for (auto script : s)
@@ -442,48 +398,47 @@ namespace rlogic
             script->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view /*message*/) { messages.emplace_back(scriptName); });
         }
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         // All scripts are executed
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({ "Script0", "Script1", "Script2", "Script3", "Script4", "Script5" }));
         messages.clear();
 
-        logicEngine.update();
+        m_logicEngine.update();
         EXPECT_TRUE(messages.empty());
 
         in2S4->set(1);
-        logicEngine.update();
+        m_logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script4", "Script5"}));
         messages.clear();
 
-        logicEngine.update();
+        m_logicEngine.update();
         EXPECT_TRUE(messages.empty());
 
         in1S2->set(2);
-        logicEngine.update();
+        m_logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script1", "Script2", "Script3", "Script4", "Script5"}));
         messages.clear();
 
-        logicEngine.update();
+        m_logicEngine.update();
         EXPECT_TRUE(messages.empty());
 
         in1S0->set(42);
-        logicEngine.update();
+        m_logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script0", "Script1", "Script3", "Script4", "Script5"}));
         messages.clear();
 
-        logicEngine.update();
+        m_logicEngine.update();
         EXPECT_TRUE(messages.empty());
 
         in1S0->set(24);
         in1S2->set(23);
-        logicEngine.update();
+        m_logicEngine.update();
         ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script0", "Script1", "Script2", "Script3", "Script4", "Script5"}));
     }
 
     TEST_F(ALogicEngine_Update, AlwaysUpdatesNodeIfDirtyHandlingIsDisabled)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.inFloat = FLOAT
@@ -495,8 +450,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
 
         auto sourceInput  = sourceScript->getInputs()->getChild("inFloat");
         auto sourceOutput = sourceScript->getOutputs()->getChild("outFloat");
@@ -506,8 +461,8 @@ namespace rlogic
         sourceScript->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view message) { messages.emplace_back(std::make_pair(scriptName, message)); });
         targetScript->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view message) { messages.emplace_back(std::make_pair(scriptName, message)); });
 
-        logicEngine.link(*sourceOutput, *targetInput);
-        logicEngine.m_impl->update(true);
+        m_logicEngine.link(*sourceOutput, *targetInput);
+        m_logicEngine.m_impl->update(true);
 
         // both scripts are updated, because its the first update
         ASSERT_EQ(2u, messages.size());
@@ -516,7 +471,7 @@ namespace rlogic
 
         targetInput->set(42.f);
         messages.clear();
-        logicEngine.m_impl->update(true);
+        m_logicEngine.m_impl->update(true);
 
         // Both scripts are updated, because dirty handling is disabled
         ASSERT_EQ(2u, messages.size());
@@ -525,7 +480,7 @@ namespace rlogic
 
         sourceInput->set(24.f);
         messages.clear();
-        logicEngine.m_impl->update(true);
+        m_logicEngine.m_impl->update(true);
 
         // Both scripts are updated, because dirty handling is disabled
         ASSERT_EQ(2u, messages.size());

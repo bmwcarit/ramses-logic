@@ -6,15 +6,12 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-include "property.fbs";
+include "Property.fbs";
 
 namespace rlogic_serialization;
 
-table LogicNode
+table Link
 {
-    name:string;
-    inputs:Property;
-    outputs:Property;
+    sourceProperty:Property;
+    targetProperty:Property;
 }
-
-root_type LogicNode;

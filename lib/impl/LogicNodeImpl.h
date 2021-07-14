@@ -14,19 +14,6 @@
 #include <vector>
 #include <optional>
 
-#include "generated/logicnode_gen.h"
-
-namespace flatbuffers
-{
-    template<typename T> struct Offset;
-    class FlatBufferBuilder;
-}
-
-namespace rlogic_serialization
-{
-    struct LogicNode;
-}
-
 namespace rlogic
 {
     class Property;
@@ -66,10 +53,7 @@ namespace rlogic::internal
         LogicNodeImpl(LogicNodeImpl&& other) noexcept = default;
         LogicNodeImpl& operator=(LogicNodeImpl && other) noexcept = default;
 
-        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LogicNode> Serialize(const LogicNodeImpl & logicNode, flatbuffers::FlatBufferBuilder & builder);
-        // The deserialization code must be a constructor because LogicNodeImpl is a base class
-        // TODO Violin put the code which deserializes property trees here as a static function, instead of each subclass having their own copy
-        LogicNodeImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs);
+        void setRootProperties(std::unique_ptr<Property> rootInput, std::unique_ptr<Property> rootOutput);
 
     private:
         std::string               m_name;

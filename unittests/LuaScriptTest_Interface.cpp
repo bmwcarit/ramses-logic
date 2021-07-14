@@ -232,47 +232,47 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALuaScript_Interface, ReturnsItsTopLevelOutputsByIndex_IndexEqualsOrderOfDeclaration)
+    TEST_F(ALuaScript_Interface, ReturnsItsTopLevelOutputsByIndex_OrderedLexicographically)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
 
         auto outputs = script->getOutputs();
 
         ASSERT_EQ(10u, outputs->getChildCount());
-        EXPECT_EQ("speed", outputs->getChild(0)->getName());
-        EXPECT_EQ(EPropertyType::Int32, outputs->getChild(0)->getType());
-        EXPECT_EQ("temp", outputs->getChild(1)->getName());
-        EXPECT_EQ(EPropertyType::Float, outputs->getChild(1)->getType());
-        EXPECT_EQ("name", outputs->getChild(2)->getName());
-        EXPECT_EQ(EPropertyType::String, outputs->getChild(2)->getType());
-        EXPECT_EQ("enabled", outputs->getChild(3)->getName());
-        EXPECT_EQ(EPropertyType::Bool, outputs->getChild(3)->getType());
+        EXPECT_EQ("enabled", outputs->getChild(0)->getName());
+        EXPECT_EQ(EPropertyType::Bool, outputs->getChild(0)->getType());
+        EXPECT_EQ("name", outputs->getChild(1)->getName());
+        EXPECT_EQ(EPropertyType::String, outputs->getChild(1)->getType());
+        EXPECT_EQ("speed", outputs->getChild(2)->getName());
+        EXPECT_EQ(EPropertyType::Int32, outputs->getChild(2)->getType());
+        EXPECT_EQ("temp", outputs->getChild(3)->getName());
+        EXPECT_EQ(EPropertyType::Float, outputs->getChild(3)->getType());
 
         // Vec2/3/4 f/i
         EXPECT_EQ("vec2f", outputs->getChild(4)->getName());
         EXPECT_EQ(EPropertyType::Vec2f, outputs->getChild(4)->getType());
-        EXPECT_EQ("vec3f", outputs->getChild(5)->getName());
-        EXPECT_EQ(EPropertyType::Vec3f, outputs->getChild(5)->getType());
-        EXPECT_EQ("vec4f", outputs->getChild(6)->getName());
-        EXPECT_EQ(EPropertyType::Vec4f, outputs->getChild(6)->getType());
-        EXPECT_EQ("vec2i", outputs->getChild(7)->getName());
-        EXPECT_EQ(EPropertyType::Vec2i, outputs->getChild(7)->getType());
-        EXPECT_EQ("vec3i", outputs->getChild(8)->getName());
-        EXPECT_EQ(EPropertyType::Vec3i, outputs->getChild(8)->getType());
+        EXPECT_EQ("vec2i", outputs->getChild(5)->getName());
+        EXPECT_EQ(EPropertyType::Vec2i, outputs->getChild(5)->getType());
+        EXPECT_EQ("vec3f", outputs->getChild(6)->getName());
+        EXPECT_EQ(EPropertyType::Vec3f, outputs->getChild(6)->getType());
+        EXPECT_EQ("vec3i", outputs->getChild(7)->getName());
+        EXPECT_EQ(EPropertyType::Vec3i, outputs->getChild(7)->getType());
+        EXPECT_EQ("vec4f", outputs->getChild(8)->getName());
+        EXPECT_EQ(EPropertyType::Vec4f, outputs->getChild(8)->getType());
         EXPECT_EQ("vec4i", outputs->getChild(9)->getName());
         EXPECT_EQ(EPropertyType::Vec4i, outputs->getChild(9)->getType());
     }
 
-    TEST_F(ALuaScript_Interface, ReturnsNestedOutputsByIndex_IndexEqualsOrderOfDeclaration_ifDeclaredOneByOne)
+    TEST_F(ALuaScript_Interface, ReturnsNestedOutputsByIndex_OrderedLexicographically_whenDeclaredOneByOne)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
                 OUT.struct = {}
-                OUT.struct.field1 = INT
-                OUT.struct.field2 = FLOAT
                 OUT.struct.field3 = {}
-                OUT.struct.field3.subfield1 = INT
+                OUT.struct.field2 = FLOAT
+                OUT.struct.field1 = INT
                 OUT.struct.field3.subfield2 = FLOAT
+                OUT.struct.field3.subfield1 = INT
             end
 
             function run()

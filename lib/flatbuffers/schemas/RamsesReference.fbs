@@ -6,16 +6,10 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-include "logicnode.fbs";
-
 namespace rlogic_serialization;
 
-table LuaScript
+table RamsesReference
 {
-    logicnode:LogicNode;
-    filename:string;
-    source:string;
-    bytecode:[ubyte];
+    objectId:uint64;
+    objectType:uint32;
 }
-
-root_type LuaScript;

@@ -67,9 +67,9 @@ namespace rlogic
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
         ASSERT_NE(nullptr, script);
-        auto speed_byIndex = script->getInputs()->getChild(0);
-        EXPECT_NE(nullptr, speed_byIndex);
-        EXPECT_EQ("speed", speed_byIndex->getName());
+        auto enabled_byIndex = script->getInputs()->getChild(0);
+        EXPECT_NE(nullptr, enabled_byIndex);
+        EXPECT_EQ("enabled", enabled_byIndex->getName());
         auto speed_byName = script->getInputs()->getChild("speed");
         EXPECT_NE(nullptr, speed_byName);
         EXPECT_EQ("speed", speed_byName->getName());
@@ -79,9 +79,9 @@ namespace rlogic
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
         ASSERT_NE(nullptr, script);
-        auto speed_byIndex = script->getOutputs()->getChild(0);
-        EXPECT_NE(nullptr, speed_byIndex);
-        EXPECT_EQ("speed", speed_byIndex->getName());
+        auto enabled_byIndex = script->getOutputs()->getChild(0);
+        EXPECT_NE(nullptr, enabled_byIndex);
+        EXPECT_EQ("enabled", enabled_byIndex->getName());
         auto speed_byName = script->getOutputs()->getChild("speed");
         EXPECT_NE(nullptr, speed_byName);
         EXPECT_EQ("speed", speed_byName->getName());
@@ -108,33 +108,33 @@ namespace rlogic
         EXPECT_EQ(EPropertyType::Struct, outputs->getType());
     }
 
-    TEST_F(ALuaScript_Types, ReturnsItsTopLevelInputsByIndex_IndexEqualsOrderOfDeclaration)
+    TEST_F(ALuaScript_Types, ReturnsItsTopLevelInputsByIndex_IndexEqualsLexicographicOrder)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
 
         auto inputs = script->getInputs();
 
         ASSERT_EQ(10u, inputs->getChildCount());
-        EXPECT_EQ("speed", inputs->getChild(0)->getName());
-        EXPECT_EQ(EPropertyType::Int32, inputs->getChild(0)->getType());
-        EXPECT_EQ("temp", inputs->getChild(1)->getName());
-        EXPECT_EQ(EPropertyType::Float, inputs->getChild(1)->getType());
-        EXPECT_EQ("name", inputs->getChild(2)->getName());
-        EXPECT_EQ(EPropertyType::String, inputs->getChild(2)->getType());
-        EXPECT_EQ("enabled", inputs->getChild(3)->getName());
-        EXPECT_EQ(EPropertyType::Bool, inputs->getChild(3)->getType());
+        EXPECT_EQ("enabled", inputs->getChild(0)->getName());
+        EXPECT_EQ(EPropertyType::Bool, inputs->getChild(0)->getType());
+        EXPECT_EQ("name", inputs->getChild(1)->getName());
+        EXPECT_EQ(EPropertyType::String, inputs->getChild(1)->getType());
+        EXPECT_EQ("speed", inputs->getChild(2)->getName());
+        EXPECT_EQ(EPropertyType::Int32, inputs->getChild(2)->getType());
+        EXPECT_EQ("temp", inputs->getChild(3)->getName());
+        EXPECT_EQ(EPropertyType::Float, inputs->getChild(3)->getType());
 
         // Vec2/3/4 f/i
         EXPECT_EQ("vec2f", inputs->getChild(4)->getName());
         EXPECT_EQ(EPropertyType::Vec2f, inputs->getChild(4)->getType());
-        EXPECT_EQ("vec3f", inputs->getChild(5)->getName());
-        EXPECT_EQ(EPropertyType::Vec3f, inputs->getChild(5)->getType());
-        EXPECT_EQ("vec4f", inputs->getChild(6)->getName());
-        EXPECT_EQ(EPropertyType::Vec4f, inputs->getChild(6)->getType());
-        EXPECT_EQ("vec2i", inputs->getChild(7)->getName());
-        EXPECT_EQ(EPropertyType::Vec2i, inputs->getChild(7)->getType());
-        EXPECT_EQ("vec3i", inputs->getChild(8)->getName());
-        EXPECT_EQ(EPropertyType::Vec3i, inputs->getChild(8)->getType());
+        EXPECT_EQ("vec2i", inputs->getChild(5)->getName());
+        EXPECT_EQ(EPropertyType::Vec2i, inputs->getChild(5)->getType());
+        EXPECT_EQ("vec3f", inputs->getChild(6)->getName());
+        EXPECT_EQ(EPropertyType::Vec3f, inputs->getChild(6)->getType());
+        EXPECT_EQ("vec3i", inputs->getChild(7)->getName());
+        EXPECT_EQ(EPropertyType::Vec3i, inputs->getChild(7)->getType());
+        EXPECT_EQ("vec4f", inputs->getChild(8)->getName());
+        EXPECT_EQ(EPropertyType::Vec4f, inputs->getChild(8)->getType());
         EXPECT_EQ("vec4i", inputs->getChild(9)->getName());
         EXPECT_EQ(EPropertyType::Vec4i, inputs->getChild(9)->getType());
     }
@@ -160,34 +160,34 @@ namespace rlogic
         for (auto rootProp : rootProperties)
         {
             ASSERT_EQ(2u, rootProp->getChildCount());
-            auto in_array_int = rootProp->getChild(0);
+            auto array_int = rootProp->getChild("array_int");
 
-            EXPECT_EQ("array_int", in_array_int->getName());
-            EXPECT_EQ(EPropertyType::Array, in_array_int->getType());
-            EXPECT_EQ(2, in_array_int->getChildCount());
-            EXPECT_EQ(EPropertyType::Int32, in_array_int->getChild(0)->getType());
-            EXPECT_EQ(EPropertyType::Int32, in_array_int->getChild(1)->getType());
-            EXPECT_EQ("", in_array_int->getChild(0)->getName());
-            EXPECT_EQ("", in_array_int->getChild(1)->getName());
-            EXPECT_EQ(0, in_array_int->getChild(0)->getChildCount());
-            EXPECT_EQ(0, in_array_int->getChild(1)->getChildCount());
+            EXPECT_EQ("array_int", array_int->getName());
+            EXPECT_EQ(EPropertyType::Array, array_int->getType());
+            EXPECT_EQ(2, array_int->getChildCount());
+            EXPECT_EQ(EPropertyType::Int32, array_int->getChild(0)->getType());
+            EXPECT_EQ(EPropertyType::Int32, array_int->getChild(1)->getType());
+            EXPECT_EQ("", array_int->getChild(0)->getName());
+            EXPECT_EQ("", array_int->getChild(1)->getName());
+            EXPECT_EQ(0, array_int->getChild(0)->getChildCount());
+            EXPECT_EQ(0, array_int->getChild(1)->getChildCount());
 
-            auto in_array_float = rootProp->getChild(1);
-            EXPECT_EQ("array_float", in_array_float->getName());
-            EXPECT_EQ(EPropertyType::Array, in_array_float->getType());
-            EXPECT_EQ(3, in_array_float->getChildCount());
-            auto in_array_float_0 = in_array_float->getChild(0);
-            auto in_array_float_1 = in_array_float->getChild(1);
-            auto in_array_float_2 = in_array_float->getChild(2);
-            EXPECT_EQ(EPropertyType::Float, in_array_float_0->getType());
-            EXPECT_EQ(EPropertyType::Float, in_array_float_1->getType());
-            EXPECT_EQ(EPropertyType::Float, in_array_float_2->getType());
-            EXPECT_EQ("", in_array_float_0->getName());
-            EXPECT_EQ("", in_array_float_1->getName());
-            EXPECT_EQ("", in_array_float_2->getName());
-            EXPECT_EQ(0, in_array_float_0->getChildCount());
-            EXPECT_EQ(0, in_array_float_1->getChildCount());
-            EXPECT_EQ(0, in_array_float_2->getChildCount());
+            auto array_float = rootProp->getChild("array_float");
+            EXPECT_EQ("array_float", array_float->getName());
+            EXPECT_EQ(EPropertyType::Array, array_float->getType());
+            EXPECT_EQ(3, array_float->getChildCount());
+            auto array_float_0 = array_float->getChild(0);
+            auto array_float_1 = array_float->getChild(1);
+            auto array_float_2 = array_float->getChild(2);
+            EXPECT_EQ(EPropertyType::Float, array_float_0->getType());
+            EXPECT_EQ(EPropertyType::Float, array_float_1->getType());
+            EXPECT_EQ(EPropertyType::Float, array_float_2->getType());
+            EXPECT_EQ("", array_float_0->getName());
+            EXPECT_EQ("", array_float_1->getName());
+            EXPECT_EQ("", array_float_2->getName());
+            EXPECT_EQ(0, array_float_0->getChildCount());
+            EXPECT_EQ(0, array_float_1->getChildCount());
+            EXPECT_EQ(0, array_float_2->getChildCount());
         }
     }
 

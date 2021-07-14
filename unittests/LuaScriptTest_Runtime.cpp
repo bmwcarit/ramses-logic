@@ -567,9 +567,7 @@ namespace rlogic
         EXPECT_EQ(0, *field2->get<int32_t>());
     }
 
-    // Seems to be very expensive to check beforehand if output and input do match
-    // The current implementation does a simple check on each structured level, but not as a whole
-    TEST_F(ALuaScript_Runtime, DISABLED_ProducesErrorWhenAssigningNestedProperties_WhenNestedSubStructDoesNotMatch)
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenNestedSubStructDoesNotMatch)
     {
         auto* script = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
@@ -585,22 +583,23 @@ namespace rlogic
                 OUT.data = {
                     field1 = 5,
                     field2 = 5,
-                    nested = {}
+                    nested = {
+                        wrong_field = 5
+                    }
                 }
             end
         )");
 
         auto outputs = script->getOutputs();
-        auto field1 = outputs->getChild("data")->getChild("field1");
-        auto field2 = outputs->getChild("data")->getChild("field2");
         auto nestedfield = outputs->getChild("data")->getChild("nested")->getChild("field");
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Not possible to partially assign structs!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Unexpected property 'wrong_field' while assigning values to struct 'nested'"));
 
-        EXPECT_EQ(0, *field1->get<int32_t>());
-        EXPECT_EQ(0, *field2->get<int32_t>());
+        // TODO Violin don't assign other fields on type mismatch - and re-enable this check that values were not updated
+        //EXPECT_EQ(0, *field1->get<int32_t>());
+        //EXPECT_EQ(0, *field2->get<int32_t>());
         EXPECT_EQ(0, *nestedfield->get<int32_t>());
     }
 
@@ -1683,7 +1682,6 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, HasNoInfluenceOnBindingsIfTheyAreNotLinked)
     {
-        LogicEngine logicEngine;
         auto        scriptSource = R"(
             function interface()
                 IN.inFloat = FLOAT
@@ -1716,9 +1714,9 @@ namespace rlogic
                 color = vec4(1.0, 0.0, 0.0, 1.0);
             })";
 
-        auto script1 = logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
-        auto script2 = logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
-        auto script3 = logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
+        auto script1 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
+        auto script2 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
+        auto script3 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
 
         auto script1FloatInput  = script1->getInputs()->getChild("inFloat");
         auto script1FloatOutput = script1->getOutputs()->getChild("outFloat");
@@ -1733,10 +1731,6 @@ namespace rlogic
         auto script3Vec3Input   = script3->getInputs()->getChild("inVec3");
         auto script3Vec3Output  = script3->getOutputs()->getChild("outVec3");
 
-        auto nodeBinding       = logicEngine.createRamsesNodeBinding("NodeBinding");
-        auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
-        auto cameraBinding     = logicEngine.createRamsesCameraBinding("CameraBinding");
-
         ramses::RamsesFramework ramsesFramework;
         auto                    ramsesClient = ramsesFramework.createClient("client");
         auto                    ramsesScene  = ramsesClient->createScene(ramses::sceneId_t(1));
@@ -1746,33 +1740,13 @@ namespace rlogic
         ramsesEffectDesc.setFragmentShader(fragmentShaderSource.data());
         auto ramsesEffect     = ramsesScene->createEffect(ramsesEffectDesc);
         auto ramsesAppearance = ramsesScene->createAppearance(*ramsesEffect);
-        appearanceBinding->setRamsesAppearance(ramsesAppearance);
-
         ramses::PerspectiveCamera* camera = ramsesScene->createPerspectiveCamera();
-        cameraBinding->setRamsesCamera(camera);
 
-        logicEngine.update();
+        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*ramsesAppearance, "AppearanceBinding");
+        auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*camera, "CameraBinding");
 
-        EXPECT_TRUE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
-        EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
-        EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
-        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(1.f, 1.f, 1.f));
-        EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
-        EXPECT_EQ(camera->getViewportX(), 0);
-        EXPECT_EQ(camera->getViewportY(), 0);
-        EXPECT_EQ(camera->getViewportWidth(), 16u);
-        EXPECT_EQ(camera->getViewportHeight(), 16u);
-        EXPECT_NEAR(camera->getVerticalFieldOfView(), 168.579f, 0.001f);
-        EXPECT_EQ(camera->getAspectRatio(), 1.f);
-        EXPECT_EQ(camera->getNearPlane(), 0.1f);
-        EXPECT_EQ(camera->getFarPlane(), 1.f);
-
-        logicEngine.link(*script1FloatOutput, *script2FloatInput);
-        logicEngine.link(*script2FloatOutput, *script3FloatInput);
-        logicEngine.link(*script1Vec3Output,  *script2Vec3Input);
-        logicEngine.link(*script2Vec3Output,  *script3Vec3Input);
-
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_TRUE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
@@ -1788,34 +1762,55 @@ namespace rlogic
         EXPECT_EQ(camera->getNearPlane(), 0.1f);
         EXPECT_EQ(camera->getFarPlane(), 1.f);
 
-        logicEngine.link(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
+        m_logicEngine.link(*script1FloatOutput, *script2FloatInput);
+        m_logicEngine.link(*script2FloatOutput, *script3FloatInput);
+        m_logicEngine.link(*script1Vec3Output,  *script2Vec3Input);
+        m_logicEngine.link(*script2Vec3Output,  *script3Vec3Input);
+
+        m_logicEngine.update();
+
+        EXPECT_TRUE(*nodeBinding->getInputs()->getChild("visibility")->get<bool>());
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_THAT(*nodeBinding->getInputs()->getChild("scaling")->get<vec3f>(), ::testing::ElementsAre(1.f, 1.f, 1.f));
+        EXPECT_EQ(0.0f, appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
+        EXPECT_EQ(camera->getViewportX(), 0);
+        EXPECT_EQ(camera->getViewportY(), 0);
+        EXPECT_EQ(camera->getViewportWidth(), 16u);
+        EXPECT_EQ(camera->getViewportHeight(), 16u);
+        EXPECT_NEAR(camera->getVerticalFieldOfView(), 168.579f, 0.001f);
+        EXPECT_EQ(camera->getAspectRatio(), 1.f);
+        EXPECT_EQ(camera->getNearPlane(), 0.1f);
+        EXPECT_EQ(camera->getFarPlane(), 1.f);
+
+        m_logicEngine.link(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
 
         script1Vec3Input->set(vec3f{1.f, 2.f, 3.f});
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
 
-        logicEngine.link(*script3FloatOutput, *appearanceBinding->getInputs()->getChild("floatUniform"));
-        logicEngine.link(*script3FloatOutput, *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane"));
+        m_logicEngine.link(*script3FloatOutput, *appearanceBinding->getInputs()->getChild("floatUniform"));
+        m_logicEngine.link(*script3FloatOutput, *cameraBinding->getInputs()->getChild("frustum")->getChild("farPlane"));
 
         script1FloatInput->set(42.f);
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_FLOAT_EQ(42.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
-        EXPECT_EQ(42.f, *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane")->get<float>());
+        EXPECT_EQ(42.f, *cameraBinding->getInputs()->getChild("frustum")->getChild("farPlane")->get<float>());
 
-        logicEngine.unlink(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
+        m_logicEngine.unlink(*script3Vec3Output, *nodeBinding->getInputs()->getChild("translation"));
 
         script1FloatInput->set(23.f);
         script1Vec3Input->set(vec3f{3.f, 2.f, 1.f});
 
-        logicEngine.update();
+        m_logicEngine.update();
 
         EXPECT_THAT(*nodeBinding->getInputs()->getChild("translation")->get<vec3f>(), ::testing::ElementsAre(1.f, 2.f, 3.f));
         EXPECT_FLOAT_EQ(23.f, *appearanceBinding->getInputs()->getChild("floatUniform")->get<float>());
-        EXPECT_EQ(23.f, *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane")->get<float>());
+        EXPECT_EQ(23.f, *cameraBinding->getInputs()->getChild("frustum")->getChild("farPlane")->get<float>());
     }
 
 

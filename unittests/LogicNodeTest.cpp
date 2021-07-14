@@ -14,13 +14,18 @@
 
 namespace rlogic::internal
 {
-    class DerivedLogicNode : public LogicNodeImpl
+    class LogicNodeImplMock : public LogicNodeImpl
     {
     public:
         // Forwarding constructor
-        DerivedLogicNode(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs)
-            : LogicNodeImpl(name, std::move(inputs), std::move(outputs))
+        explicit LogicNodeImplMock(std::string_view name)
+            : LogicNodeImpl(name)
         {
+        }
+
+        void takeOwnershipOfProperties(std::unique_ptr<Property> inputs, std::unique_ptr<Property> outputs)
+        {
+            setRootProperties(std::move(inputs), std::move(outputs));
         }
 
         MOCK_METHOD(std::optional<LogicNodeRuntimeError>, update, (), (override, final));
@@ -28,32 +33,30 @@ namespace rlogic::internal
 
     class ALogicNodeImpl : public ::testing::Test
     {
-    protected:
-        std::unique_ptr<PropertyImpl> m_testInputs {std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput)};
     };
 
     TEST_F(ALogicNodeImpl, RemembersNameGivenInConstructor)
     {
-        const DerivedLogicNode logicNode("name", std::move(m_testInputs), nullptr);
+        const LogicNodeImplMock logicNode("name");
         EXPECT_EQ(logicNode.getName(), "name");
     }
 
     TEST_F(ALogicNodeImpl, CanReceiveNewName)
     {
-        DerivedLogicNode logicNode("name", std::move(m_testInputs), nullptr);
+        LogicNodeImplMock logicNode("name");
         logicNode.setName("newName");
         EXPECT_EQ(logicNode.getName(), "newName");
     }
 
     TEST_F(ALogicNodeImpl, DirtyByDefault)
     {
-        const DerivedLogicNode logicNode("", std::move(m_testInputs), nullptr);
+        const LogicNodeImplMock logicNode("");
         EXPECT_TRUE(logicNode.isDirty());
     }
 
     TEST_F(ALogicNodeImpl, DirtyWhenSetDirty)
     {
-        DerivedLogicNode logicNode("", std::move(m_testInputs), nullptr);
+        LogicNodeImplMock logicNode("");
         logicNode.setDirty(false);
         EXPECT_FALSE(logicNode.isDirty());
         logicNode.setDirty(true);
@@ -63,12 +66,13 @@ namespace rlogic::internal
     TEST_F(ALogicNodeImpl, TakesOwnershipOfGivenProperties)
     {
         // These usually come from subclasses deserialization code
-        std::unique_ptr<PropertyImpl> inputs = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput);
-        inputs->addChild(std::make_unique<PropertyImpl>("subProperty", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-        std::unique_ptr<PropertyImpl> outputs = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput);
-        outputs->addChild(std::make_unique<PropertyImpl>("subProperty", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
+        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput));
+        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("subProperty", EPropertyType::Int32, EPropertySemantics::ScriptInput));
+        auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
+        outputs->m_impl->addChild(std::make_unique<PropertyImpl>("subProperty", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
 
-        DerivedLogicNode logicNode("", std::move(inputs), std::move(outputs));
+        LogicNodeImplMock logicNode("");
+        logicNode.takeOwnershipOfProperties(std::move(inputs), std::move(outputs));
 
         EXPECT_EQ(logicNode.getInputs()->getName(), "IN");
         EXPECT_EQ(&logicNode.getInputs()->m_impl->getLogicNode(), &logicNode);

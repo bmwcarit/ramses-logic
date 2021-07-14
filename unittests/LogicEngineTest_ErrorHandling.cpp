@@ -59,12 +59,12 @@ namespace rlogic
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnCreateNewRamsesNodeBinding)
     {
         LogicEngine otherLogicEngine;
-        auto        ramsesNodeBinding = otherLogicEngine.createRamsesNodeBinding("NodeBinding");
+        auto        ramsesNodeBinding = otherLogicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
 
         ASSERT_FALSE(m_logicEngine.destroy(*ramsesNodeBinding));
 
         EXPECT_FALSE(m_logicEngine.getErrors().empty());
-        auto anotherNodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
+        auto anotherNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
         EXPECT_NE(nullptr, anotherNodeBinding);
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }

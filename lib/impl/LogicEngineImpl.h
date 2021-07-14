@@ -67,9 +67,9 @@ namespace rlogic::internal
         // Public API
         LuaScript* createLuaScriptFromFile(std::string_view filename, std::string_view scriptName);
         LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName);
-        RamsesNodeBinding* createRamsesNodeBinding(std::string_view name);
-        RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name);
-        RamsesCameraBinding* createRamsesCameraBinding(std::string_view name);
+        RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name);
+        RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
+        RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
 
         bool destroy(LogicNode& logicNode);
 
@@ -84,10 +84,6 @@ namespace rlogic::internal
         bool unlink(const Property& sourceProperty, const Property& targetProperty);
 
         [[nodiscard]] bool isLinked(const LogicNode& logicNode) const;
-
-        // Internally used
-        [[nodiscard]] bool isDirty() const;
-        [[nodiscard]] bool bindingsDirty() const;
 
         [[nodiscard]] ApiObjects& getApiObjects();
         [[nodiscard]] const ApiObjects& getApiObjects() const;

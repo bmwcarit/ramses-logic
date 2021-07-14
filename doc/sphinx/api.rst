@@ -33,7 +33,9 @@ The greyed-out slots in the image above represent input properties which are nei
 have a statically configured value. In bindings, this denotes that the corresponding ``Ramses`` property
 is not being updated by the ``Logic Engine`` (see also :ref:`next section <Data Flow>`). In scripts, these
 properties will receive a default value at runtime (0, 0.0f, "", true etc.) unless explicitly set by the application
-logic. Usually, script inputs without a configured value or a link to other output are considered the ``interface``
+logic. Bindings' input values are initialized with the values of the bound `Ramses` object, for all bindings except
+:class:`rlogic::RamsesAppearanceBinding`.
+Usually, script inputs without a configured value or a link to other output are considered the ``interface``
 of the logic network towards a runtime application, and their values are supposed to be explicitly set at runtime.
 
 .. note::
@@ -81,8 +83,7 @@ you should never set the ``visibility`` property of a Binding object, instead se
 
 The ``Logic Engine`` can be also serialized and deserialized into binary files for fast loading.
 The above data flow rules still apply as if all the scripts and binding objects were just created. The first call to
-:func:`rlogic::LogicEngine::update` after loading from file will execute all scripts. Bindings will only be executed if
-some or all of their inputs are linked to a script output. Binding values will only be passed further to ``Ramses``
+:func:`rlogic::LogicEngine::update` after loading from file will execute all scripts. Binding values will only be passed further to ``Ramses``
 if their values were modified, e.g. by a link which produced a different value than before saving, or if the application
 called :func:`rlogic::Property::set` explicitly on any of the bindings' input properties. For more details on saving and loading,
 see the :ref:`section further down <Saving/Loading from file>`.
@@ -261,6 +262,12 @@ The reason for that is two-fold:
 
 The `section on data flow <Data Flow>`_ describes how data is passed throughout the network of logic nodes and when
 bound Ramses objects are updated and when not.
+
+.. note::
+
+    Binding input values are initialized with the same values as the `Ramses` objects they "bind". The only
+    exception to this are Appearance bindings - extracting all data from Ramses Appearances would incur performance
+    costs not worth the convenience.
 
 
 =========================

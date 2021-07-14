@@ -1,5 +1,31 @@
 # master
 
+# v0.7.0
+
+**Features**
+
+* Struct properties from Lua are now sorted in ascending lexicographic order
+* Loading from file or buffer data handles most error cases gracefully, and handles more error cases
+    * Ramses object type mismatches after loading result in errors
+    * Appearances must be from the same base effect after loading
+    * Corrupted data results in graceful errors, not in crashes and undefined behavior
+
+**Breaking changes**
+
+* Ramses Bindings are now statically attached to their Ramses object
+    * Ramses object is provided as reference during construction of the binding
+    * Can't be changed or set to nullptr
+    * Fixes bug when ramses object was re-set and links were not automatically removed (can not happen now by design)
+    * Binding input values are initialized with the values from the bound ramses object (all except appearance)
+    * See reworked documentation for more details
+* Renamed Camera binding inputs to have shorter names
+    * See class docs for new names: https://ramses-logic.readthedocs.io/en/latest/api.html#_CPPv4N6rlogic19RamsesCameraBindingE
+    * Reason: shorter strings are faster to resolve and easier to read
+* Bindings receive their input values from Ramses (after construction and after loading from file/memory)
+    * This is more consistent and eliminates data race conditions
+* New serialization format (must re-export binary files to use this version of the logic engine)
+    * This is a preparation for the first LTS version of the logic engine (API, ABI and file format)
+
 # v0.6.2
 
 **Features**

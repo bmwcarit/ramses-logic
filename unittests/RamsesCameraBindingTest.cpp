@@ -6,17 +6,18 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "gtest/gtest.h"
-#include "gmock/gmock.h"
+#include "LogicEngineTest_Base.h"
 
+#include "RamsesObjectResolverMock.h"
 #include "RamsesTestUtils.h"
+#include "SerializationTestUtils.h"
 #include "WithTempDirectory.h"
 
 #include "impl/LogicEngineImpl.h"
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/PropertyImpl.h"
 #include "internals/RamsesHelper.h"
-#include "generated/ramsescamerabinding_gen.h"
+#include "generated/RamsesCameraBindingGen.h"
 
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/Property.h"
@@ -45,32 +46,12 @@ namespace rlogic::internal
     constexpr float OrthoFrustumBPdefault = -1.f;
     constexpr float OrthoFrustumTPdefault = 1.0f;
 
-    class ARamsesCameraBinding : public ::testing::Test
+    class ARamsesCameraBinding : public ALogicEngine
     {
     protected:
         ARamsesCameraBinding()
             : m_testScene(*m_ramsesTestSetup.createScene(ramses::sceneId_t(1)))
         {
-        }
-
-        RamsesCameraBinding& createCameraBindingForTest(std::string_view name, ramses::Camera* ramsesCamera = nullptr)
-        {
-            auto cameraBinding = m_logicEngine.createRamsesCameraBinding(name);
-            if (ramsesCamera)
-            {
-                cameraBinding->setRamsesCamera(ramsesCamera);
-            }
-            return *cameraBinding;
-        }
-
-        ramses::PerspectiveCamera& createPerspectiveCameraForTest()
-        {
-            return *m_testScene.createPerspectiveCamera();
-        }
-
-        ramses::OrthographicCamera& createOrthoCameraForTest()
-        {
-            return *m_testScene.createOrthographicCamera();
         }
 
         static void ExpectPropertyTypeAndChildCount(Property* prop, EPropertyType type, uint32_t childCount)
@@ -129,424 +110,314 @@ namespace rlogic::internal
         RamsesTestSetup m_ramsesTestSetup;
         ramses::Scene& m_testScene;
         LogicEngine m_logicEngine;
+        ramses::OrthographicCamera& m_orthoCam = { *m_testScene.createOrthographicCamera() };
+        ramses::PerspectiveCamera& m_perspectiveCam = { *m_testScene.createPerspectiveCamera() };
     };
 
     TEST_F(ARamsesCameraBinding, HasANameAfterCreation)
     {
-        auto& cameraBinding = createCameraBindingForTest("CameraBinding");
+        auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
         EXPECT_EQ("CameraBinding", cameraBinding.getName());
     }
 
     TEST_F(ARamsesCameraBinding, HasInvalidCameraTypeAfterCreation)
     {
-        auto& cameraBinding = createCameraBindingForTest("");
-        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_Invalid, cameraBinding.m_cameraBinding->getCameraType());
-    }
-
-    TEST_F(ARamsesCameraBinding, HasEmptyInputsAfterCreation)
-    {
-        auto& appearanceBinding = createCameraBindingForTest("");
-        EXPECT_EQ(appearanceBinding.getInputs()->getChildCount(), 0u);
-        EXPECT_EQ(appearanceBinding.getInputs()->getType(), EPropertyType::Struct);
-        EXPECT_EQ(appearanceBinding.getInputs()->getName(), "IN");
+        auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "");
+        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_OrthographicCamera, cameraBinding.m_cameraBinding->getCameraType());
     }
 
     TEST_F(ARamsesCameraBinding, HasNoOutputsAfterCreation)
     {
-        auto& cameraBinding = createCameraBindingForTest("");
+        auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "");
         EXPECT_EQ(nullptr, cameraBinding.getOutputs());
     }
 
     TEST_F(ARamsesCameraBinding, ProducesNoErrorsDuringUpdate_IfNoRamsesCameraIsAssigned)
     {
-        auto& cameraBinding = createCameraBindingForTest("");
+        auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "");
         EXPECT_EQ(std::nullopt, cameraBinding.m_impl.get().update());
     }
 
-    TEST_F(ARamsesCameraBinding, ReturnsPointerToRamsesCamera)
+    TEST_F(ARamsesCameraBinding, ReturnsReferenceToRamsesCamera)
     {
-        RamsesCameraBinding& cameraBinding = createCameraBindingForTest("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_Invalid, cameraBinding.m_cameraBinding->getCameraType());
-
-        EXPECT_EQ(nullptr, cameraBinding.getRamsesCamera());
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-        EXPECT_EQ(&perspectiveCam, cameraBinding.getRamsesCamera());
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
         EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_PerspectiveCamera, cameraBinding.m_cameraBinding->getCameraType());
-
-        cameraBinding.setRamsesCamera(nullptr);
-        EXPECT_EQ(nullptr, cameraBinding.getRamsesCamera());
-        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_Invalid, cameraBinding.m_cameraBinding->getCameraType());
-
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&orthoCam);
-        EXPECT_EQ(&orthoCam, cameraBinding.getRamsesCamera());
-        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_OrthographicCamera, cameraBinding.m_cameraBinding->getCameraType());
+        EXPECT_EQ(&m_perspectiveCam, &cameraBinding.getRamsesCamera());
     }
 
-    TEST_F(ARamsesCameraBinding, ClearsInputsAfterSettingCameraToNullptr)
+    TEST_F(ARamsesCameraBinding, HasInputsAfterInitializingWithPerspectiveCamera)
     {
-        RamsesCameraBinding& cameraBinding = createCameraBindingForTest("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding.setRamsesCamera(&perspectiveCam);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
         const auto inputs = cameraBinding.getInputs();
         ASSERT_EQ(2u, inputs->getChildCount());
 
-        const auto vpProperties = inputs->getChild("viewPortProperties");
-        const auto frustumProperties = inputs->getChild("frustumProperties");
+        const auto vpProperties = inputs->getChild("viewport");
+        const auto frustum = inputs->getChild("frustum");
         ASSERT_EQ(4u, vpProperties->getChildCount());
-        ASSERT_EQ(4u, frustumProperties->getChildCount());
+        ASSERT_EQ(4u, frustum->getChildCount());
 
-        cameraBinding.setRamsesCamera(nullptr);
-        ASSERT_EQ(0u, cameraBinding.getInputs()->getChildCount());
-    }
+        const auto vpOffsetX = vpProperties->getChild("offsetX");
+        const auto vpOffsety = vpProperties->getChild("offsetY");
+        const auto vpWidth = vpProperties->getChild("width");
+        const auto vpHeight = vpProperties->getChild("height");
 
-    TEST_F(ARamsesCameraBinding, SwitchingBetweenCameraTypesRecreatesRespectiveSetOfInputsWithDefaultValues)
-    {
-        RamsesCameraBinding& cameraBinding = createCameraBindingForTest("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-
-        ASSERT_EQ(0u, cameraBinding.getInputs()->getChildCount());
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-
-        const auto perspectiveInputs = cameraBinding.getInputs();
-        const auto vpPropertiesPerspective = perspectiveInputs->getChild("viewPortProperties");
-        const auto frustumPropertiesPerspective = perspectiveInputs->getChild("frustumProperties");
-        ASSERT_EQ(2u, perspectiveInputs->getChildCount());
-        ASSERT_EQ(4u, vpPropertiesPerspective->getChildCount());
-        ASSERT_EQ(4u, frustumPropertiesPerspective->getChildCount());
-
-        EXPECT_EQ(*vpPropertiesPerspective->getChild("viewPortOffsetX")->get<int32_t>(), DefaultViewportOffsetX);
-        EXPECT_EQ(*vpPropertiesPerspective->getChild("viewPortOffsetY")->get<int32_t>(), DefaultViewportOffsetY);
-        EXPECT_EQ(*vpPropertiesPerspective->getChild("viewPortWidth")->get<int32_t>(), static_cast<int32_t>(DefaultViewportWidth));
-        EXPECT_EQ(*vpPropertiesPerspective->getChild("viewPortHeight")->get<int32_t>(), static_cast<int32_t>(DefaultViewportHeight));
-        EXPECT_NEAR(*frustumPropertiesPerspective->getChild("fieldOfView")->get<float>(), PerspectiveFrustumFOVdefault, 0.001f);
-        EXPECT_EQ(*frustumPropertiesPerspective->getChild("aspectRatio")->get<float>(), PerspectiveFrustumARdefault);
-        EXPECT_EQ(*frustumPropertiesPerspective->getChild("nearPlane")->get<float>(), NearPlaneDefault);
-        EXPECT_EQ(*frustumPropertiesPerspective->getChild("farPlane")->get<float>(), FarPlaneDefault);
-
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&orthoCam);
-
-        const auto orthoInputs = cameraBinding.getInputs();
-        const auto vpPropertiesOrtho = orthoInputs->getChild("viewPortProperties");
-        const auto frustumPropertiesOrtho = orthoInputs->getChild("frustumProperties");
-        ASSERT_EQ(2u, orthoInputs->getChildCount());
-        ASSERT_EQ(4u, vpPropertiesOrtho->getChildCount());
-        ASSERT_EQ(6u, frustumPropertiesOrtho->getChildCount());
-
-        EXPECT_EQ(*vpPropertiesOrtho->getChild("viewPortOffsetX")->get<int32_t>(), DefaultViewportOffsetX);
-        EXPECT_EQ(*vpPropertiesOrtho->getChild("viewPortOffsetY")->get<int32_t>(), DefaultViewportOffsetY);
-        EXPECT_EQ(*vpPropertiesOrtho->getChild("viewPortWidth")->get<int32_t>(), static_cast<int32_t>(DefaultViewportWidth));
-        EXPECT_EQ(*vpPropertiesOrtho->getChild("viewPortHeight")->get<int32_t>(), static_cast<int32_t>(DefaultViewportHeight));
-        EXPECT_NEAR(*frustumPropertiesOrtho->getChild("leftPlane")->get<float>(), OrthoFrustumLPdefault, 0.001f);
-        EXPECT_EQ(*frustumPropertiesOrtho->getChild("rightPlane")->get<float>(), OrthoFrustumRPdefault);
-        EXPECT_EQ(*frustumPropertiesOrtho->getChild("bottomPlane")->get<float>(), OrthoFrustumBPdefault);
-        EXPECT_EQ(*frustumPropertiesOrtho->getChild("topPlane")->get<float>(), OrthoFrustumTPdefault);
-        EXPECT_EQ(*frustumPropertiesOrtho->getChild("nearPlane")->get<float>(), NearPlaneDefault);
-        EXPECT_EQ(*frustumPropertiesOrtho->getChild("farPlane")->get<float>(), FarPlaneDefault);
-    }
-
-    TEST_F(ARamsesCameraBinding, HasInputsAfterSettingPerspectiveCamera)
-    {
-        RamsesCameraBinding& cameraBinding = createCameraBindingForTest("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-        const auto inputs = cameraBinding.getInputs();
-        ASSERT_EQ(2u, inputs->getChildCount());
-
-        const auto vpProperties = inputs->getChild("viewPortProperties");
-        const auto frustumProperties = inputs->getChild("frustumProperties");
-        ASSERT_EQ(4u, vpProperties->getChildCount());
-        ASSERT_EQ(4u, frustumProperties->getChildCount());
-
-        const auto vpOffsetX = vpProperties->getChild("viewPortOffsetX");
-        const auto vpOffsety = vpProperties->getChild("viewPortOffsetY");
-        const auto vpWidth = vpProperties->getChild("viewPortWidth");
-        const auto vpHeight = vpProperties->getChild("viewPortHeight");
-
-        const auto nP = frustumProperties->getChild("nearPlane");
-        const auto fP = frustumProperties->getChild("farPlane");
-        const auto fov = frustumProperties->getChild("fieldOfView");
-        const auto aR = frustumProperties->getChild("aspectRatio");
+        const auto nP = frustum->getChild("nearPlane");
+        const auto fP = frustum->getChild("farPlane");
+        const auto fov = frustum->getChild("fieldOfView");
+        const auto aR = frustum->getChild("aspectRatio");
 
         // Test that internal indices match properties resolved by name
         EXPECT_EQ(vpProperties, inputs->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Viewport)));
-        EXPECT_EQ(frustumProperties, inputs->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Frustum)));
+        EXPECT_EQ(frustum, inputs->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Frustum)));
 
         EXPECT_EQ(vpOffsetX, vpProperties->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX)));
         EXPECT_EQ(vpOffsety, vpProperties->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetY)));
         EXPECT_EQ(vpWidth, vpProperties->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortWidth)));
         EXPECT_EQ(vpHeight, vpProperties->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortHeight)));
-        EXPECT_EQ(nP, frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane)));
-        EXPECT_EQ(fP, frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane)));
-        EXPECT_EQ(fov, frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView)));
-        EXPECT_EQ(aR, frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio)));
+        EXPECT_EQ(nP, frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane)));
+        EXPECT_EQ(fP, frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane)));
+        EXPECT_EQ(fov, frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView)));
+        EXPECT_EQ(aR, frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio)));
 
-        ExpectPropertyTypeAndChildCount(inputs->getChild("viewPortProperties"), EPropertyType::Struct, 4);
-        ExpectPropertyTypeAndChildCount(inputs->getChild("frustumProperties"), EPropertyType::Struct, 4);
+        ExpectPropertyTypeAndChildCount(inputs->getChild("viewport"), EPropertyType::Struct, 4);
+        ExpectPropertyTypeAndChildCount(inputs->getChild("frustum"), EPropertyType::Struct, 4);
 
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortOffsetX"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortOffsetY"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortWidth"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortHeight"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("nearPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("farPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("fieldOfView"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("aspectRatio"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("offsetX"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("offsetY"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("width"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("height"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("nearPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("farPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("fieldOfView"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("aspectRatio"), EPropertyType::Float, 0);
     }
 
-    TEST_F(ARamsesCameraBinding, HasInputsAfterSettingOrthoCamera)
+    TEST_F(ARamsesCameraBinding, HasInputsAfterInitializingFromOrthoCamera)
     {
-        RamsesCameraBinding& cameraBinding = createCameraBindingForTest("");
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
-        cameraBinding.setRamsesCamera(&orthoCam);
         const auto inputs = cameraBinding.getInputs();
         ASSERT_EQ(2u, inputs->getChildCount());
 
-        const auto vpProperties = inputs->getChild("viewPortProperties");
-        const auto frustumProperties = inputs->getChild("frustumProperties");
+        const auto vpProperties = inputs->getChild("viewport");
+        const auto frustum = inputs->getChild("frustum");
         ASSERT_EQ(4u, vpProperties->getChildCount());
-        ASSERT_EQ(6u, frustumProperties->getChildCount());
+        ASSERT_EQ(6u, frustum->getChildCount());
 
-        const auto vpOffsetX = vpProperties->getChild("viewPortOffsetX");
-        const auto vpOffsety = vpProperties->getChild("viewPortOffsetY");
-        const auto vpWidth = vpProperties->getChild("viewPortWidth");
-        const auto vpHeight = vpProperties->getChild("viewPortHeight");
-        const auto nP = frustumProperties->getChild("nearPlane");
-        const auto fP = frustumProperties->getChild("farPlane");
-        const auto lp = frustumProperties->getChild("leftPlane");
-        const auto rP = frustumProperties->getChild("rightPlane");
-        const auto bP = frustumProperties->getChild("bottomPlane");
-        const auto tP = frustumProperties->getChild("topPlane");
+        const auto vpOffsetX = vpProperties->getChild("offsetX");
+        const auto vpOffsety = vpProperties->getChild("offsetY");
+        const auto vpWidth = vpProperties->getChild("width");
+        const auto vpHeight = vpProperties->getChild("height");
+        const auto nP = frustum->getChild("nearPlane");
+        const auto fP = frustum->getChild("farPlane");
+        const auto lp = frustum->getChild("leftPlane");
+        const auto rP = frustum->getChild("rightPlane");
+        const auto bP = frustum->getChild("bottomPlane");
+        const auto tP = frustum->getChild("topPlane");
 
         // Test that internal indices match properties resolved by name
         EXPECT_EQ(vpProperties, inputs->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Viewport)));
-        EXPECT_EQ(frustumProperties, inputs->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Frustum)));
+        EXPECT_EQ(frustum, inputs->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Frustum)));
 
         EXPECT_EQ(vpOffsetX, vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX)));
         EXPECT_EQ(vpOffsety, vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex ::ViewPortOffsetY)));
         EXPECT_EQ(vpWidth, vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortWidth)));
         EXPECT_EQ(vpHeight, vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortHeight)));
-        EXPECT_EQ(nP, frustumProperties->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::NearPlane)));
-        EXPECT_EQ(fP, frustumProperties->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::FarPlane)));
-        EXPECT_EQ(lp, frustumProperties->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::LeftPlane)));
-        EXPECT_EQ(rP, frustumProperties->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::RightPlane)));
-        EXPECT_EQ(bP, frustumProperties->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::BottomPlane)));
-        EXPECT_EQ(tP, frustumProperties->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::TopPlane)));
+        EXPECT_EQ(nP, frustum->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::NearPlane)));
+        EXPECT_EQ(fP, frustum->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::FarPlane)));
+        EXPECT_EQ(lp, frustum->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::LeftPlane)));
+        EXPECT_EQ(rP, frustum->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::RightPlane)));
+        EXPECT_EQ(bP, frustum->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::BottomPlane)));
+        EXPECT_EQ(tP, frustum->m_impl->getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::TopPlane)));
 
-        ExpectPropertyTypeAndChildCount(inputs->getChild("viewPortProperties"), EPropertyType::Struct, 4);
-        ExpectPropertyTypeAndChildCount(inputs->getChild("frustumProperties"), EPropertyType::Struct, 6);
+        ExpectPropertyTypeAndChildCount(inputs->getChild("viewport"), EPropertyType::Struct, 4);
+        ExpectPropertyTypeAndChildCount(inputs->getChild("frustum"), EPropertyType::Struct, 6);
 
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortOffsetX"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortOffsetY"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortWidth"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(vpProperties->getChild("viewPortHeight"), EPropertyType::Int32, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("nearPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("farPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("leftPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("rightPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("bottomPlane"), EPropertyType::Float, 0);
-        ExpectPropertyTypeAndChildCount(frustumProperties->getChild("topPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("offsetX"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("offsetY"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("width"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(vpProperties->getChild("height"), EPropertyType::Int32, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("nearPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("farPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("leftPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("rightPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("bottomPlane"), EPropertyType::Float, 0);
+        ExpectPropertyTypeAndChildCount(frustum->getChild("topPlane"), EPropertyType::Float, 0);
     }
 
-    TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenOrthoCameraAssigned)
+    TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenCreatedFromOrthoCamera)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&orthoCam);
+        m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
         m_logicEngine.update();
 
         //Expect default values on the camera, because nothing was set so far
-        ExpectDefaultViewportValues(orthoCam);
-        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
+        ExpectDefaultViewportValues(m_orthoCam);
+        ExpectDefaultOrthoCameraFrustumValues(m_orthoCam);
     }
 
-    TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenPerspectiveCameraAssigned)
+    TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenCreatedFromPerspectiveCamera)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::PerspectiveCamera& perspCam = createPerspectiveCameraForTest();
-        cameraBinding.setRamsesCamera(&perspCam);
+        m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
         m_logicEngine.update();
 
         //Expect default values on the camera, because nothing was set so far
-        ExpectDefaultViewportValues(perspCam);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspCam);
+        ExpectDefaultViewportValues(m_perspectiveCam);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
     }
 
     TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingZeroToViewportSize)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::OrthographicCamera& camera = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&camera);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
         const auto inputs = cameraBinding.getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
+        auto vpProperties = inputs->getChild("viewport");
         // Setting illegal viewport values: width and height cannot be 0 so an error will be produced on ramses camera
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(0);
+        vpProperties->getChild("width")->set<int32_t>(0);
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera viewport size must be positive! (width: 0; height: 16)");
 
         // Fix width, break height -> still generates error
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(8);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(0);
+        vpProperties->getChild("width")->set<int32_t>(8);
+        vpProperties->getChild("height")->set<int32_t>(0);
 
         // Expect default values on the camera, because setting values failed
-        ExpectDefaultViewportValues(camera);
+        ExpectDefaultViewportValues(m_orthoCam);
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera viewport size must be positive! (width: 8; height: 0)");
 
         // Fix height and update recovers the errors
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(32);
+        vpProperties->getChild("height")->set<int32_t>(32);
         EXPECT_TRUE(m_logicEngine.update());
 
-        EXPECT_EQ(camera.getViewportWidth(), 8u);
-        EXPECT_EQ(camera.getViewportHeight(), 32u);
+        EXPECT_EQ(m_orthoCam.getViewportWidth(), 8u);
+        EXPECT_EQ(m_orthoCam.getViewportHeight(), 32u);
     }
 
     TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingNegativeViewportSize)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::OrthographicCamera& camera = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&camera);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
         const auto inputs = cameraBinding.getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
+        auto vpProperties = inputs->getChild("viewport");
         // Setting illegal viewport values: width and height cannot be 0 so an error will be produced on ramses camera
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(-1);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(-1);
+        vpProperties->getChild("width")->set<int32_t>(-1);
+        vpProperties->getChild("height")->set<int32_t>(-1);
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera viewport size must be positive! (width: -1; height: -1)");
 
         // Setting positive values recovers from the error
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(10);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(12);
+        vpProperties->getChild("width")->set<int32_t>(10);
+        vpProperties->getChild("height")->set<int32_t>(12);
         EXPECT_TRUE(m_logicEngine.update());
 
-        EXPECT_EQ(camera.getViewportWidth(), 10u);
-        EXPECT_EQ(camera.getViewportHeight(), 12u);
+        EXPECT_EQ(m_orthoCam.getViewportWidth(), 10u);
+        EXPECT_EQ(m_orthoCam.getViewportHeight(), 12u);
     }
 
     TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingInvalidFrustumValuesOnOrthoCamera)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&orthoCam);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
-        auto frustumProperties = cameraBinding.getInputs()->getChild("frustumProperties");
+        auto frustum = cameraBinding.getInputs()->getChild("frustum");
         // Setting illegal frustum values: left plane cannot be smaller than right plane so an error will be produced on ramses camera
-        frustumProperties->getChild("leftPlane")->set<float>(2.f);
-        frustumProperties->getChild("rightPlane")->set<float>(1.f);
+        frustum->getChild("leftPlane")->set<float>(2.f);
+        frustum->getChild("rightPlane")->set<float>(1.f);
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Camera::setFrustum failed - check validity of given frustum planes");
 
         //Still expect default values on the camera, because setting values failed
-        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
+        ExpectDefaultOrthoCameraFrustumValues(m_orthoCam);
 
         // Recovers from the error once values are ok
-        frustumProperties->getChild("rightPlane")->set<float>(3.f);
+        frustum->getChild("rightPlane")->set<float>(3.f);
         EXPECT_TRUE(m_logicEngine.update());
     }
 
     TEST_F(ARamsesCameraBinding, ReportsErrorOnUpdate_WhenSettingInvalidFrustumValuesOnPerspectiveCamera)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding.setRamsesCamera(&perspectiveCam);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
-        auto frustumProperties = cameraBinding.getInputs()->getChild("frustumProperties");
+        auto frustum = cameraBinding.getInputs()->getChild("frustum");
         // Setting illegal frustum values: fov and aspect ratio cannot be 0 so an error will be produced on ramses camera
-        frustumProperties->getChild("fieldOfView")->set<float>(0.f);
-        frustumProperties->getChild("aspectRatio")->set<float>(0.f);
+        frustum->getChild("fieldOfView")->set<float>(0.f);
+        frustum->getChild("aspectRatio")->set<float>(0.f);
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "PerspectiveCamera::setFrustum failed - check validity of given frustum planes");
 
         // Fixing just the FOV does not fix the issue, need to also fix aspect ratio
-        frustumProperties->getChild("fieldOfView")->set<float>(15.f);
+        frustum->getChild("fieldOfView")->set<float>(15.f);
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "PerspectiveCamera::setFrustum failed - check validity of given frustum planes");
 
         //Still expect default values on the camera, because setting values failed
-        ExpectDefaultViewportValues(perspectiveCam);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        ExpectDefaultViewportValues(m_perspectiveCam);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
-        frustumProperties->getChild("aspectRatio")->set<float>(1.f);
+        frustum->getChild("aspectRatio")->set<float>(1.f);
         EXPECT_TRUE(m_logicEngine.update());
     }
 
     TEST_F(ARamsesCameraBinding, InitializesInputPropertiesOfPerpespectiveCameraToMatchRamsesDefaultValues)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
         const auto inputs = cameraBinding.getInputs();
         ASSERT_NE(nullptr, inputs);
-        EXPECT_EQ(0u, inputs->getChildCount());
 
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-
-        const auto vpProperties = inputs->getChild("viewPortProperties");
-        const auto frustumProperties = inputs->getChild("frustumProperties");
+        const auto vpProperties = inputs->getChild("viewport");
+        const auto frustum = inputs->getChild("frustum");
         ASSERT_EQ(4u, vpProperties->getChildCount());
-        ASSERT_EQ(4u, frustumProperties->getChildCount());
+        ASSERT_EQ(4u, frustum->getChildCount());
 
-        EXPECT_EQ(*vpProperties->getChild("viewPortOffsetX")->get<int32_t>(), perspectiveCam.getViewportX());
-        EXPECT_EQ(*vpProperties->getChild("viewPortOffsetY")->get<int32_t>(), perspectiveCam.getViewportY());
-        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("viewPortWidth")->get<int32_t>()), perspectiveCam.getViewportWidth());
-        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("viewPortHeight")->get<int32_t>()), perspectiveCam.getViewportHeight());
+        EXPECT_EQ(*vpProperties->getChild("offsetX")->get<int32_t>(), m_perspectiveCam.getViewportX());
+        EXPECT_EQ(*vpProperties->getChild("offsetY")->get<int32_t>(), m_perspectiveCam.getViewportY());
+        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("width")->get<int32_t>()), m_perspectiveCam.getViewportWidth());
+        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("height")->get<int32_t>()), m_perspectiveCam.getViewportHeight());
 
-        EXPECT_EQ(*frustumProperties->getChild("nearPlane")->get<float>(), perspectiveCam.getNearPlane());
-        EXPECT_EQ(*frustumProperties->getChild("farPlane")->get<float>(), perspectiveCam.getFarPlane());
-        EXPECT_NEAR(*frustumProperties->getChild("fieldOfView")->get<float>(), perspectiveCam.getVerticalFieldOfView(), 0.001f);
-        EXPECT_EQ(*frustumProperties->getChild("aspectRatio")->get<float>(), perspectiveCam.getAspectRatio());
+        EXPECT_EQ(*frustum->getChild("nearPlane")->get<float>(), m_perspectiveCam.getNearPlane());
+        EXPECT_EQ(*frustum->getChild("farPlane")->get<float>(), m_perspectiveCam.getFarPlane());
+        EXPECT_NEAR(*frustum->getChild("fieldOfView")->get<float>(), m_perspectiveCam.getVerticalFieldOfView(), 0.001f);
+        EXPECT_EQ(*frustum->getChild("aspectRatio")->get<float>(), m_perspectiveCam.getAspectRatio());
     }
 
     TEST_F(ARamsesCameraBinding, InitializesInputPropertiesOfOrthographicCameraToMatchRamsesDefaultValues)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
         const auto inputs = cameraBinding.getInputs();
         ASSERT_NE(nullptr, inputs);
-        EXPECT_EQ(0u, inputs->getChildCount());
 
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding.setRamsesCamera(&orthoCam);
-
-        const auto vpProperties = inputs->getChild("viewPortProperties");
-        const auto frustumProperties = inputs->getChild("frustumProperties");
+        const auto vpProperties = inputs->getChild("viewport");
+        const auto frustum = inputs->getChild("frustum");
         ASSERT_EQ(4u, vpProperties->getChildCount());
-        ASSERT_EQ(6u, frustumProperties->getChildCount());
+        ASSERT_EQ(6u, frustum->getChildCount());
 
-        EXPECT_EQ(*vpProperties->getChild("viewPortOffsetX")->get<int32_t>(), orthoCam.getViewportX());
-        EXPECT_EQ(*vpProperties->getChild("viewPortOffsetY")->get<int32_t>(), orthoCam.getViewportY());
-        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("viewPortWidth")->get<int32_t>()), orthoCam.getViewportWidth());
-        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("viewPortHeight")->get<int32_t>()), orthoCam.getViewportHeight());
+        EXPECT_EQ(*vpProperties->getChild("offsetX")->get<int32_t>(), m_orthoCam.getViewportX());
+        EXPECT_EQ(*vpProperties->getChild("offsetY")->get<int32_t>(), m_orthoCam.getViewportY());
+        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("width")->get<int32_t>()), m_orthoCam.getViewportWidth());
+        EXPECT_EQ(static_cast<uint32_t>(*vpProperties->getChild("height")->get<int32_t>()), m_orthoCam.getViewportHeight());
 
-        EXPECT_EQ(*frustumProperties->getChild("nearPlane")->get<float>(), orthoCam.getNearPlane());
-        EXPECT_EQ(*frustumProperties->getChild("farPlane")->get<float>(), orthoCam.getFarPlane());
-        EXPECT_EQ(*frustumProperties->getChild("leftPlane")->get<float>(), orthoCam.getLeftPlane());
-        EXPECT_EQ(*frustumProperties->getChild("rightPlane")->get<float>(), orthoCam.getRightPlane());
-        EXPECT_EQ(*frustumProperties->getChild("bottomPlane")->get<float>(), orthoCam.getBottomPlane());
-        EXPECT_EQ(*frustumProperties->getChild("topPlane")->get<float>(), orthoCam.getTopPlane());
+        EXPECT_EQ(*frustum->getChild("nearPlane")->get<float>(), m_orthoCam.getNearPlane());
+        EXPECT_EQ(*frustum->getChild("farPlane")->get<float>(), m_orthoCam.getFarPlane());
+        EXPECT_EQ(*frustum->getChild("leftPlane")->get<float>(), m_orthoCam.getLeftPlane());
+        EXPECT_EQ(*frustum->getChild("rightPlane")->get<float>(), m_orthoCam.getRightPlane());
+        EXPECT_EQ(*frustum->getChild("bottomPlane")->get<float>(), m_orthoCam.getBottomPlane());
+        EXPECT_EQ(*frustum->getChild("topPlane")->get<float>(), m_orthoCam.getTopPlane());
     }
 
     TEST_F(ARamsesCameraBinding, MarksInputsAsBindingInputsForPerspectiveCameraBinding)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding->setRamsesCamera(&perspectiveCam);
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
         const auto inputs = cameraBinding->getInputs();
         for (size_t i = 0; i < inputs->getChildCount(); ++i)
@@ -564,9 +435,7 @@ namespace rlogic::internal
 
     TEST_F(ARamsesCameraBinding, MarksInputsAsBindingInputsForOrthoCameraBinding)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding->setRamsesCamera(&orthoCam);
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
         const auto inputs = cameraBinding->getInputs();
         for (size_t i = 0; i < inputs->getChildCount(); ++i)
@@ -584,96 +453,77 @@ namespace rlogic::internal
 
     TEST_F(ARamsesCameraBinding, ReturnsBoundRamsesCamera)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding->setRamsesCamera(&perspectiveCam);
-
-        EXPECT_EQ(&perspectiveCam, cameraBinding->getRamsesCamera());
-
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding->setRamsesCamera(&orthoCam);
-        EXPECT_EQ(&orthoCam, cameraBinding->getRamsesCamera());
-
-        cameraBinding->setRamsesCamera(nullptr);
-        EXPECT_EQ(nullptr, cameraBinding->getRamsesCamera());
+        EXPECT_EQ(&m_perspectiveCam, &cameraBinding->getRamsesCamera());
     }
 
     TEST_F(ARamsesCameraBinding, DoesNotModifyRamsesWithoutUpdateBeingCalledWithPerspectiveCamera)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
-
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding->setRamsesCamera(&perspectiveCam);
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
         auto inputs = cameraBinding->getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
-        auto frustumProperties = inputs->getChild("frustumProperties");
+        auto vpProperties = inputs->getChild("viewport");
+        auto frustum = inputs->getChild("frustum");
 
-        vpProperties->getChild("viewPortOffsetX")->set<int32_t>(4);
-        vpProperties->getChild("viewPortOffsetY")->set<int32_t>(7);
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(11);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(19);
+        vpProperties->getChild("offsetX")->set<int32_t>(4);
+        vpProperties->getChild("offsetY")->set<int32_t>(7);
+        vpProperties->getChild("width")->set<int32_t>(11);
+        vpProperties->getChild("height")->set<int32_t>(19);
 
-        frustumProperties->getChild("nearPlane")->set<float>(3.1f);
-        frustumProperties->getChild("farPlane")->set<float>(.2f);
-        frustumProperties->getChild("fieldOfView")->set<float>(4.2f);
-        frustumProperties->getChild("aspectRatio")->set<float>(2.1f);
+        frustum->getChild("nearPlane")->set<float>(3.1f);
+        frustum->getChild("farPlane")->set<float>(.2f);
+        frustum->getChild("fieldOfView")->set<float>(4.2f);
+        frustum->getChild("aspectRatio")->set<float>(2.1f);
 
-        ExpectDefaultValues(perspectiveCam);
+        ExpectDefaultValues(m_perspectiveCam);
     }
 
     TEST_F(ARamsesCameraBinding, DoesNotModifyRamsesWithoutUpdateBeingCalledWithOrthoCamera)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
-
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding->setRamsesCamera(&orthoCam);
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
         auto inputs = cameraBinding->getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
-        auto frustumProperties = inputs->getChild("frustumProperties");
+        auto vpProperties = inputs->getChild("viewport");
+        auto frustum = inputs->getChild("frustum");
 
-        vpProperties->getChild("viewPortOffsetX")->set<int32_t>(4);
-        vpProperties->getChild("viewPortOffsetY")->set<int32_t>(7);
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(11);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(19);
+        vpProperties->getChild("offsetX")->set<int32_t>(4);
+        vpProperties->getChild("offsetY")->set<int32_t>(7);
+        vpProperties->getChild("width")->set<int32_t>(11);
+        vpProperties->getChild("height")->set<int32_t>(19);
 
-        frustumProperties->getChild("nearPlane")->set<float>(3.1f);
-        frustumProperties->getChild("farPlane")->set<float>(.2f);
-        frustumProperties->getChild("leftPlane")->set<float>(6.2f);
-        frustumProperties->getChild("rightPlane")->set<float>(2.8f);
-        frustumProperties->getChild("bottomPlane")->set<float>(1.9f);
-        frustumProperties->getChild("topPlane")->set<float>(7.1f);
+        frustum->getChild("nearPlane")->set<float>(3.1f);
+        frustum->getChild("farPlane")->set<float>(.2f);
+        frustum->getChild("leftPlane")->set<float>(6.2f);
+        frustum->getChild("rightPlane")->set<float>(2.8f);
+        frustum->getChild("bottomPlane")->set<float>(1.9f);
+        frustum->getChild("topPlane")->set<float>(7.1f);
 
-        ExpectDefaultValues(orthoCam);
+        ExpectDefaultValues(m_orthoCam);
     }
 
     TEST_F(ARamsesCameraBinding, ModifiesRamsesPerspectiveCamOnUpdate_OnlyAfterExplicitlyAssignedToInputs)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
-
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding->setRamsesCamera(&perspectiveCam);
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
         auto inputs = cameraBinding->getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
-        auto frustumProperties = inputs->getChild("frustumProperties");
+        auto vpProperties = inputs->getChild("viewport");
+        auto frustum = inputs->getChild("frustum");
 
         const int32_t newVpOffsetX = 23;
-        vpProperties->getChild("viewPortOffsetX")->set<int32_t>(newVpOffsetX);
+        vpProperties->getChild("offsetX")->set<int32_t>(newVpOffsetX);
 
         // Update not called yet -> still default values
-        ExpectDefaultValues(perspectiveCam);
+        ExpectDefaultValues(m_perspectiveCam);
 
         cameraBinding->m_cameraBinding->update();
         // Only propagated vpOffsetX, the others have default values
-        EXPECT_EQ(perspectiveCam.getViewportX(), newVpOffsetX);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 0);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 16u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 16u);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), newVpOffsetX);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 0);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 16u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 16u);
 
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
         // Set and test all properties
         const int32_t newVpOffsetY = 13;
@@ -685,52 +535,49 @@ namespace rlogic::internal
         const float newNearPlane = 4.4f;
         const float newFarPlane = 5.1f;
 
-        vpProperties->getChild("viewPortOffsetY")->set<int32_t>(newVpOffsetY);
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(newVpWidth);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(newVpHeight);
+        vpProperties->getChild("offsetY")->set<int32_t>(newVpOffsetY);
+        vpProperties->getChild("width")->set<int32_t>(newVpWidth);
+        vpProperties->getChild("height")->set<int32_t>(newVpHeight);
 
-        frustumProperties->getChild("fieldOfView")->set<float>(newFov);
-        frustumProperties->getChild("aspectRatio")->set<float>(newAR);
-        frustumProperties->getChild("nearPlane")->set<float>(newNearPlane);
-        frustumProperties->getChild("farPlane")->set<float>(newFarPlane);
+        frustum->getChild("fieldOfView")->set<float>(newFov);
+        frustum->getChild("aspectRatio")->set<float>(newAR);
+        frustum->getChild("nearPlane")->set<float>(newNearPlane);
+        frustum->getChild("farPlane")->set<float>(newFarPlane);
         cameraBinding->m_cameraBinding->update();
 
-        EXPECT_EQ(perspectiveCam.getViewportX(), newVpOffsetX);
-        EXPECT_EQ(perspectiveCam.getViewportY(), newVpOffsetY);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), static_cast<uint32_t>(newVpWidth));
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), static_cast<uint32_t>(newVpHeight));
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), newVpOffsetX);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), newVpOffsetY);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), static_cast<uint32_t>(newVpWidth));
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), static_cast<uint32_t>(newVpHeight));
 
-        EXPECT_NEAR(perspectiveCam.getVerticalFieldOfView(), newFov, 0.001f);
-        EXPECT_EQ(perspectiveCam.getAspectRatio(), newAR);
-        EXPECT_EQ(perspectiveCam.getNearPlane(), newNearPlane);
-        EXPECT_EQ(perspectiveCam.getFarPlane(), newFarPlane);
+        EXPECT_NEAR(m_perspectiveCam.getVerticalFieldOfView(), newFov, 0.001f);
+        EXPECT_EQ(m_perspectiveCam.getAspectRatio(), newAR);
+        EXPECT_EQ(m_perspectiveCam.getNearPlane(), newNearPlane);
+        EXPECT_EQ(m_perspectiveCam.getFarPlane(), newFarPlane);
     }
 
     TEST_F(ARamsesCameraBinding, ModifiesRamsesOrthoCamOnUpdate_OnlyAfterExplicitlyAssignedToInputs)
     {
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
-
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding->setRamsesCamera(&orthoCam);
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
         auto inputs = cameraBinding->getInputs();
-        auto vpProperties = inputs->getChild("viewPortProperties");
-        auto frustumProperties = inputs->getChild("frustumProperties");
+        auto vpProperties = inputs->getChild("viewport");
+        auto frustum = inputs->getChild("frustum");
 
         const int32_t newVpOffsetX = 23;
-        vpProperties->getChild("viewPortOffsetX")->set<int32_t>(newVpOffsetX);
+        vpProperties->getChild("offsetX")->set<int32_t>(newVpOffsetX);
 
         // Update not called yet -> still default values
-        ExpectDefaultValues(orthoCam);
+        ExpectDefaultValues(m_orthoCam);
 
         cameraBinding->m_cameraBinding->update();
         // Only propagated vpOffsetX, the others have default values
-        EXPECT_EQ(orthoCam.getViewportX(), newVpOffsetX);
-        EXPECT_EQ(orthoCam.getViewportY(), 0);
-        EXPECT_EQ(orthoCam.getViewportWidth(), 16u);
-        EXPECT_EQ(orthoCam.getViewportHeight(), 16u);
+        EXPECT_EQ(m_orthoCam.getViewportX(), newVpOffsetX);
+        EXPECT_EQ(m_orthoCam.getViewportY(), 0);
+        EXPECT_EQ(m_orthoCam.getViewportWidth(), 16u);
+        EXPECT_EQ(m_orthoCam.getViewportHeight(), 16u);
 
-        ExpectDefaultOrthoCameraFrustumValues(orthoCam);
+        ExpectDefaultOrthoCameraFrustumValues(m_orthoCam);
 
         // Set and test all properties
         const int32_t newVpOffsetY = 13;
@@ -744,29 +591,29 @@ namespace rlogic::internal
         const float newNearPlane = 4.f;
         const float newFarPlane = 5.1f;
 
-        vpProperties->getChild("viewPortOffsetY")->set<int32_t>(newVpOffsetY);
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(newVpWidth);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(newVpHeight);
+        vpProperties->getChild("offsetY")->set<int32_t>(newVpOffsetY);
+        vpProperties->getChild("width")->set<int32_t>(newVpWidth);
+        vpProperties->getChild("height")->set<int32_t>(newVpHeight);
 
-        frustumProperties->getChild("leftPlane")->set<float>(newLeftPlane);
-        frustumProperties->getChild("rightPlane")->set<float>(newRightPlane);
-        frustumProperties->getChild("bottomPlane")->set<float>(newBottomPlane);
-        frustumProperties->getChild("topPlane")->set<float>(newTopPlane);
-        frustumProperties->getChild("nearPlane")->set<float>(newNearPlane);
-        frustumProperties->getChild("farPlane")->set<float>(newFarPlane);
+        frustum->getChild("leftPlane")->set<float>(newLeftPlane);
+        frustum->getChild("rightPlane")->set<float>(newRightPlane);
+        frustum->getChild("bottomPlane")->set<float>(newBottomPlane);
+        frustum->getChild("topPlane")->set<float>(newTopPlane);
+        frustum->getChild("nearPlane")->set<float>(newNearPlane);
+        frustum->getChild("farPlane")->set<float>(newFarPlane);
         cameraBinding->m_cameraBinding->update();
 
-        EXPECT_EQ(orthoCam.getViewportX(), newVpOffsetX);
-        EXPECT_EQ(orthoCam.getViewportY(), newVpOffsetY);
-        EXPECT_EQ(orthoCam.getViewportWidth(), static_cast<uint32_t>(newVpWidth));
-        EXPECT_EQ(orthoCam.getViewportHeight(), static_cast<uint32_t>(newVpHeight));
+        EXPECT_EQ(m_orthoCam.getViewportX(), newVpOffsetX);
+        EXPECT_EQ(m_orthoCam.getViewportY(), newVpOffsetY);
+        EXPECT_EQ(m_orthoCam.getViewportWidth(), static_cast<uint32_t>(newVpWidth));
+        EXPECT_EQ(m_orthoCam.getViewportHeight(), static_cast<uint32_t>(newVpHeight));
 
-        EXPECT_EQ(orthoCam.getLeftPlane(), newLeftPlane);
-        EXPECT_EQ(orthoCam.getRightPlane(), newRightPlane);
-        EXPECT_EQ(orthoCam.getBottomPlane(), newBottomPlane);
-        EXPECT_EQ(orthoCam.getTopPlane(), newTopPlane);
-        EXPECT_EQ(orthoCam.getNearPlane(), newNearPlane);
-        EXPECT_EQ(orthoCam.getFarPlane(), newFarPlane);
+        EXPECT_EQ(m_orthoCam.getLeftPlane(), newLeftPlane);
+        EXPECT_EQ(m_orthoCam.getRightPlane(), newRightPlane);
+        EXPECT_EQ(m_orthoCam.getBottomPlane(), newBottomPlane);
+        EXPECT_EQ(m_orthoCam.getTopPlane(), newTopPlane);
+        EXPECT_EQ(m_orthoCam.getNearPlane(), newNearPlane);
+        EXPECT_EQ(m_orthoCam.getFarPlane(), newFarPlane);
     }
 
     TEST_F(ARamsesCameraBinding, PropagatesItsInputsToRamsesPerspectiveCameraOnUpdate_WithLinksInsteadOfSetCall)
@@ -792,27 +639,24 @@ namespace rlogic::internal
 
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
 
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding->setRamsesCamera(&perspectiveCam);
-
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpX"), *cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpY"), *cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetY")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpW"), *cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortWidth")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpH"), *cameraBinding->getInputs()->getChild("viewPortProperties")->getChild("viewPortHeight")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpX"), *cameraBinding->getInputs()->getChild("viewport")->getChild("offsetX")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpY"), *cameraBinding->getInputs()->getChild("viewport")->getChild("offsetY")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpW"), *cameraBinding->getInputs()->getChild("viewport")->getChild("width")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpProps")->getChild("vpH"), *cameraBinding->getInputs()->getChild("viewport")->getChild("height")));
 
         // Links have no effect before update() explicitly called
-        ExpectDefaultValues(perspectiveCam);
+        ExpectDefaultValues(m_perspectiveCam);
 
         m_logicEngine.update();
 
         // Linked values got updates, not-linked values were not modified
-        EXPECT_EQ(perspectiveCam.getViewportX(), 5);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 10);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 35u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 19u);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 5);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 10);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 35u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 19u);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
     }
 
     TEST_F(ARamsesCameraBinding, PropagatesItsInputsToRamsesOrthoCameraOnUpdate_WithLinksInsteadOfSetCall)
@@ -842,81 +686,58 @@ namespace rlogic::internal
 
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
 
-        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding("");
+        auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
-        ramses::OrthographicCamera& orthoCam = createOrthoCameraForTest();
-        cameraBinding->setRamsesCamera(&orthoCam);
-
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("lP"), *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("leftPlane")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("rP"), *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("rightPlane")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("bP"), *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("bottomPlane")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("tP"), *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("topPlane")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("nP"), *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("nearPlane")));
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fP"), *cameraBinding->getInputs()->getChild("frustumProperties")->getChild("farPlane")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("lP"), *cameraBinding->getInputs()->getChild("frustum")->getChild("leftPlane")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("rP"), *cameraBinding->getInputs()->getChild("frustum")->getChild("rightPlane")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("bP"), *cameraBinding->getInputs()->getChild("frustum")->getChild("bottomPlane")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("tP"), *cameraBinding->getInputs()->getChild("frustum")->getChild("topPlane")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("nP"), *cameraBinding->getInputs()->getChild("frustum")->getChild("nearPlane")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fP"), *cameraBinding->getInputs()->getChild("frustum")->getChild("farPlane")));
 
         // Links have no effect before update() explicitly called
-        ExpectDefaultValues(orthoCam);
+        ExpectDefaultValues(m_orthoCam);
 
         m_logicEngine.update();
 
         // Linked values got updates, not-linked values were not modified
-        EXPECT_EQ(orthoCam.getLeftPlane(), 0.2f);
-        EXPECT_EQ(orthoCam.getRightPlane(), 0.3f);
-        EXPECT_EQ(orthoCam.getBottomPlane(), 0.4f);
-        EXPECT_EQ(orthoCam.getTopPlane(), 0.5f);
-        EXPECT_EQ(orthoCam.getNearPlane(), 0.6f);
-        EXPECT_EQ(orthoCam.getFarPlane(), 0.7f);
-        ExpectDefaultViewportValues(orthoCam);
+        EXPECT_EQ(m_orthoCam.getLeftPlane(), 0.2f);
+        EXPECT_EQ(m_orthoCam.getRightPlane(), 0.3f);
+        EXPECT_EQ(m_orthoCam.getBottomPlane(), 0.4f);
+        EXPECT_EQ(m_orthoCam.getTopPlane(), 0.5f);
+        EXPECT_EQ(m_orthoCam.getNearPlane(), 0.6f);
+        EXPECT_EQ(m_orthoCam.getFarPlane(), 0.7f);
+        ExpectDefaultViewportValues(m_orthoCam);
     }
 
     TEST_F(ARamsesCameraBinding, DoesNotOverrideExistingValuesAfterRamsesCameraIsAssignedToBinding)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
+        m_perspectiveCam.setViewport(3, 4, 10u, 11u);
+        m_perspectiveCam.setFrustum(30.f, 640.f / 480.f, 2.3f, 5.6f);
 
-        perspectiveCam.setViewport(3, 4, 10u, 11u);
-        perspectiveCam.setFrustum(30.f, 640.f / 480.f, 2.3f, 5.6f);
+        m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
-        cameraBinding.setRamsesCamera(&perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 3);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 4);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 10u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 11u);
 
-        EXPECT_EQ(perspectiveCam.getViewportX(), 3);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 4);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 10u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 11u);
-
-        EXPECT_NEAR(perspectiveCam.getVerticalFieldOfView(), 30.f, 0.001f);
-        EXPECT_EQ(perspectiveCam.getAspectRatio(), 640.f / 480.f);
-        EXPECT_EQ(perspectiveCam.getNearPlane(), 2.3f);
-        EXPECT_EQ(perspectiveCam.getFarPlane(), 5.6f);
-    }
-
-    TEST_F(ARamsesCameraBinding, StopsPropagatingValuesAfterTargetCameraSetToNull)
-    {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-
-        const int32_t vpOffsetXvalue1 = 34;
-        const int32_t vpOffsetXvalue2 = 52;
-
-        auto inputs = cameraBinding.getInputs();
-        inputs->getChild("viewPortProperties")->getChild("viewPortOffsetX")->set<int32_t>(vpOffsetXvalue1);
-
-        cameraBinding.m_cameraBinding->update();
-
-        EXPECT_EQ(perspectiveCam.getViewportX(), vpOffsetXvalue1);
-
-        inputs->getChild("viewPortProperties")->getChild("viewPortOffsetX")->set<int32_t>(vpOffsetXvalue2);
-        cameraBinding.setRamsesCamera(nullptr);
-        EXPECT_EQ(std::nullopt, cameraBinding.m_cameraBinding->update());
-        EXPECT_EQ(perspectiveCam.getViewportX(), vpOffsetXvalue1);
+        EXPECT_NEAR(m_perspectiveCam.getVerticalFieldOfView(), 30.f, 0.001f);
+        EXPECT_EQ(m_perspectiveCam.getAspectRatio(), 640.f / 480.f);
+        EXPECT_EQ(m_perspectiveCam.getNearPlane(), 2.3f);
+        EXPECT_EQ(m_perspectiveCam.getFarPlane(), 5.6f);
     }
 
     // This fixture only contains serialization unit tests, for higher order tests see `ARamsesCameraBinding_SerializationWithFile`
-    class ARamsesCameraBinding_SerializationLifecycle : public ::testing::Test
+    class ARamsesCameraBinding_SerializationLifecycle : public ARamsesCameraBinding
     {
     protected:
         flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+        SerializationTestUtils m_testUtils{ m_flatBufferBuilder };
+        ::testing::StrictMock<RamsesObjectResolverMock> m_resolverMock;
+        ErrorReporting m_errorReporting;
+        SerializationMap m_serializationMap;
+        DeserializationMap m_deserializationMap;
     };
 
     // More unit tests with inputs/outputs declared in LogicNode (base class) serialization tests
@@ -924,62 +745,211 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesCameraBindingImpl binding("name");
-            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder);
+            RamsesCameraBindingImpl binding(*m_camera, "name");
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
         // Inspect flatbuffers data
-        const rlogic_serialization::RamsesCameraBinding& serializedBinding = *rlogic_serialization::GetRamsesCameraBinding(m_flatBufferBuilder.GetBufferPointer());
+        const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
 
-        ASSERT_TRUE(serializedBinding.logicnode());
-        ASSERT_TRUE(serializedBinding.logicnode()->name());
-        EXPECT_EQ(serializedBinding.logicnode()->name()->string_view(), "name");
+        ASSERT_TRUE(serializedBinding.base());
+        ASSERT_TRUE(serializedBinding.base()->name());
+        EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
 
-        ASSERT_TRUE(serializedBinding.logicnode()->inputs());
-        EXPECT_EQ(serializedBinding.logicnode()->inputs()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
-        ASSERT_TRUE(serializedBinding.logicnode()->inputs()->children());
-        EXPECT_EQ(serializedBinding.logicnode()->inputs()->children()->size(), 0u);
-
-        EXPECT_FALSE(serializedBinding.logicnode()->outputs());
+        ASSERT_TRUE(serializedBinding.base()->rootInput());
+        EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
+        ASSERT_TRUE(serializedBinding.base()->rootInput()->children());
+        EXPECT_EQ(serializedBinding.base()->rootInput()->children()->size(), 2u);
 
         // Deserialize
         {
-            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(serializedBinding, nullptr);
+            EXPECT_CALL(m_resolverMock, findRamsesCameraInScene(::testing::Eq("name"), m_camera->getSceneObjectId())).WillOnce(::testing::Return(m_camera));
+            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(serializedBinding, m_resolverMock, m_errorReporting, m_deserializationMap);
 
             ASSERT_TRUE(deserializedBinding);
             EXPECT_EQ(deserializedBinding->getName(), "name");
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
             EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
-            EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 0u);
+            EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 2u);
         }
     }
 
-
     TEST_F(ARamsesCameraBinding_SerializationLifecycle, RemembersRamsesCameraId)
     {
-        RamsesTestSetup ramses;
-        ramses::Camera* testCamera = ramses.createScene()->createOrthographicCamera();
-
         // Serialize
         {
-            RamsesCameraBindingImpl binding("");
-            binding.setRamsesCamera(testCamera);
-            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder);
+            RamsesCameraBindingImpl binding(*m_camera, "name");
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
         // Inspect flatbuffers data
-        const rlogic_serialization::RamsesCameraBinding& serializedBinding = *rlogic_serialization::GetRamsesCameraBinding(m_flatBufferBuilder.GetBufferPointer());
+        const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
 
-        EXPECT_EQ(serializedBinding.ramsesCamera(), testCamera->getSceneObjectId().getValue());
+        EXPECT_EQ(serializedBinding.base()->boundRamsesObject()->objectId(), m_camera->getSceneObjectId().getValue());
+        EXPECT_EQ(serializedBinding.base()->boundRamsesObject()->objectType(), static_cast<uint32_t>(ramses::ERamsesObjectType_OrthographicCamera));
 
         // Deserialize
         {
-            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(serializedBinding, testCamera);
+            EXPECT_CALL(m_resolverMock, findRamsesCameraInScene(::testing::Eq("name"), m_camera->getSceneObjectId())).WillOnce(::testing::Return(m_camera));
+            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(serializedBinding, m_resolverMock, m_errorReporting, m_deserializationMap);
 
             ASSERT_TRUE(deserializedBinding);
-            EXPECT_EQ(deserializedBinding->getRamsesCamera(), testCamera);
+            EXPECT_EQ(&deserializedBinding->getRamsesCamera(), m_camera);
         }
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoBindingBaseData)
+    {
+        {
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(
+                m_flatBufferBuilder,
+                0 // no base binding info
+            );
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing base class info!");
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoBindingName)
+    {
+        {
+            auto base = rlogic_serialization::CreateRamsesBinding(
+                m_flatBufferBuilder,
+                0 // no name!
+            );
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(
+                m_flatBufferBuilder,
+                base
+            );
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing name!");
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoRootInput)
+    {
+        {
+            auto base = rlogic_serialization::CreateRamsesBinding(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                0 // no root input
+            );
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(
+                m_flatBufferBuilder,
+                base
+            );
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing root input!");
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenRootInputHasErrors)
+    {
+        {
+            auto base = rlogic_serialization::CreateRamsesBinding(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                0,
+                m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
+            );
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(
+                m_flatBufferBuilder,
+                base
+            );
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: missing name!");
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenBoundCameraCannotBeResolved)
+    {
+        const ramses::sceneObjectId_t mockObjectId{ 12 };
+        {
+            auto ramsesRef = rlogic_serialization::CreateRamsesReference(
+                m_flatBufferBuilder,
+                mockObjectId.getValue()
+            );
+            auto base = rlogic_serialization::CreateRamsesBinding(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                ramsesRef,
+                m_testUtils.serializeTestProperty("IN")
+            );
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(
+                m_flatBufferBuilder,
+                base
+            );
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        EXPECT_CALL(m_resolverMock, findRamsesCameraInScene(::testing::Eq("name"), mockObjectId)).WillOnce(::testing::Return(nullptr));
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenSavedCameraTypeDoesNotMatchResolvedCameraType)
+    {
+        RamsesTestSetup ramses;
+        ramses::Scene* scene = ramses.createScene();
+        auto* perspCamera = scene->createPerspectiveCamera();
+
+        const ramses::sceneObjectId_t mockObjectId{ 12 };
+        {
+            auto ramsesRef = rlogic_serialization::CreateRamsesReference(
+                m_flatBufferBuilder,
+                mockObjectId.getValue(),
+                uint32_t(ramses::ERamsesObjectType_OrthographicCamera) // save ortho camera
+            );
+            auto base = rlogic_serialization::CreateRamsesBinding(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                ramsesRef,
+                m_testUtils.serializeTestProperty("IN")
+            );
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(
+                m_flatBufferBuilder,
+                base
+            );
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        // resolver returns perspective camera, but orthographic camera is expected -> error
+        EXPECT_CALL(m_resolverMock, findRamsesCameraInScene(::testing::Eq("name"), mockObjectId)).WillOnce(::testing::Return(perspCamera));
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: loaded type does not match referenced camera type!");
     }
 
     class ARamsesCameraBinding_SerializationWithFile : public ARamsesCameraBinding
@@ -990,7 +960,6 @@ namespace rlogic::internal
 
     TEST_F(ARamsesCameraBinding_SerializationWithFile, ContainsItsDataAfterLoading)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         const int32_t newVpOffsetX = 10;
         const int32_t newVpOffsetY = 13;
         const int32_t newVpWidth = 56;
@@ -1001,22 +970,21 @@ namespace rlogic::internal
         const float newNearPlane = 4.4f;
         const float newFarPlane = 5.1f;
         {
-            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
+            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
 
             auto inputs = cameraBinding.getInputs();
-            auto vpProperties = inputs->getChild("viewPortProperties");
-            auto frustumProperties = inputs->getChild("frustumProperties");
+            auto vpProperties = inputs->getChild("viewport");
+            auto frustum = inputs->getChild("frustum");
 
-            vpProperties->getChild("viewPortOffsetX")->set<int32_t>(newVpOffsetX);
-            vpProperties->getChild("viewPortOffsetY")->set<int32_t>(newVpOffsetY);
-            vpProperties->getChild("viewPortWidth")->set<int32_t>(newVpWidth);
-            vpProperties->getChild("viewPortHeight")->set<int32_t>(newVpHeight);
+            vpProperties->getChild("offsetX")->set<int32_t>(newVpOffsetX);
+            vpProperties->getChild("offsetY")->set<int32_t>(newVpOffsetY);
+            vpProperties->getChild("width")->set<int32_t>(newVpWidth);
+            vpProperties->getChild("height")->set<int32_t>(newVpHeight);
 
-            frustumProperties->getChild("fieldOfView")->set<float>(newFov);
-            frustumProperties->getChild("aspectRatio")->set<float>(newAR);
-            frustumProperties->getChild("nearPlane")->set<float>(newNearPlane);
-            frustumProperties->getChild("farPlane")->set<float>(newFarPlane);
+            frustum->getChild("fieldOfView")->set<float>(newFov);
+            frustum->getChild("aspectRatio")->set<float>(newAR);
+            frustum->getChild("nearPlane")->set<float>(newNearPlane);
+            frustum->getChild("farPlane")->set<float>(newFarPlane);
             m_logicEngine.update();
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
@@ -1024,60 +992,60 @@ namespace rlogic::internal
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
             const auto& loadedCameraBinding = *m_logicEngine.findCameraBinding("CameraBinding");
             EXPECT_EQ("CameraBinding", loadedCameraBinding.getName());
-            EXPECT_EQ(loadedCameraBinding.getRamsesCamera()->getSceneObjectId(), perspectiveCam.getSceneObjectId());
+            EXPECT_EQ(loadedCameraBinding.getRamsesCamera().getSceneObjectId(), m_perspectiveCam.getSceneObjectId());
 
             const auto& inputs = loadedCameraBinding.getInputs();
             ASSERT_EQ(inputs->getChildCount(), 2u);
-            auto vpProperties = inputs->getChild("viewPortProperties");
-            auto frustumProperties = inputs->getChild("frustumProperties");
+            auto vpProperties = inputs->getChild("viewport");
+            auto frustum = inputs->getChild("frustum");
             ASSERT_EQ(vpProperties->getChildCount(), 4u);
             ASSERT_EQ(vpProperties->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            ASSERT_EQ(frustumProperties->getChildCount(), 4u);
-            ASSERT_EQ(frustumProperties->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            ASSERT_EQ(frustum->getChildCount(), 4u);
+            ASSERT_EQ(frustum->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
 
-            EXPECT_EQ(*vpProperties->getChild("viewPortOffsetX")->get<int32_t>(), newVpOffsetX);
-            EXPECT_EQ(vpProperties->getChild("viewPortOffsetX")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(*vpProperties->getChild("viewPortOffsetY")->get<int32_t>(), newVpOffsetY);
-            EXPECT_EQ(vpProperties->getChild("viewPortOffsetY")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(*vpProperties->getChild("viewPortWidth")->get<int32_t>(), newVpWidth);
-            EXPECT_EQ(vpProperties->getChild("viewPortWidth")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(*vpProperties->getChild("viewPortHeight")->get<int32_t>(), newVpHeight);
-            EXPECT_EQ(vpProperties->getChild("viewPortHeight")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*vpProperties->getChild("offsetX")->get<int32_t>(), newVpOffsetX);
+            EXPECT_EQ(vpProperties->getChild("offsetX")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*vpProperties->getChild("offsetY")->get<int32_t>(), newVpOffsetY);
+            EXPECT_EQ(vpProperties->getChild("offsetY")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*vpProperties->getChild("width")->get<int32_t>(), newVpWidth);
+            EXPECT_EQ(vpProperties->getChild("width")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*vpProperties->getChild("height")->get<int32_t>(), newVpHeight);
+            EXPECT_EQ(vpProperties->getChild("height")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
 
-            EXPECT_EQ(*frustumProperties->getChild("nearPlane")->get<float>(), newNearPlane);
-            EXPECT_EQ(frustumProperties->getChild("nearPlane")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(*frustumProperties->getChild("farPlane")->get<float>(), newFarPlane);
-            EXPECT_EQ(frustumProperties->getChild("farPlane")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_NEAR(*frustumProperties->getChild("fieldOfView")->get<float>(), newFov, 0.001f);
-            EXPECT_EQ(frustumProperties->getChild("fieldOfView")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(*frustumProperties->getChild("aspectRatio")->get<float>(), newAR);
-            EXPECT_EQ(frustumProperties->getChild("aspectRatio")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*frustum->getChild("nearPlane")->get<float>(), newNearPlane);
+            EXPECT_EQ(frustum->getChild("nearPlane")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*frustum->getChild("farPlane")->get<float>(), newFarPlane);
+            EXPECT_EQ(frustum->getChild("farPlane")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_NEAR(*frustum->getChild("fieldOfView")->get<float>(), newFov, 0.001f);
+            EXPECT_EQ(frustum->getChild("fieldOfView")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
+            EXPECT_EQ(*frustum->getChild("aspectRatio")->get<float>(), newAR);
+            EXPECT_EQ(frustum->getChild("aspectRatio")->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
 
             // Test that internal indices match properties resolved by name
-            EXPECT_EQ(vpProperties->getChild("viewPortOffsetX"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX)));
-            EXPECT_EQ(vpProperties->getChild("viewPortOffsetY"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetY)));
-            EXPECT_EQ(vpProperties->getChild("viewPortWidth"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortWidth)));
-            EXPECT_EQ(vpProperties->getChild("viewPortHeight"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortHeight)));
+            EXPECT_EQ(vpProperties->getChild("offsetX"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX)));
+            EXPECT_EQ(vpProperties->getChild("offsetY"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetY)));
+            EXPECT_EQ(vpProperties->getChild("width"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortWidth)));
+            EXPECT_EQ(vpProperties->getChild("height"), vpProperties->m_impl->getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortHeight)));
 
-            EXPECT_EQ(frustumProperties->getChild("nearPlane"), frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane)));
-            EXPECT_EQ(frustumProperties->getChild("farPlane"), frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane)));
-            EXPECT_EQ(frustumProperties->getChild("fieldOfView"), frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView)));
-            EXPECT_EQ(frustumProperties->getChild("aspectRatio"), frustumProperties->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio)));
+            EXPECT_EQ(frustum->getChild("nearPlane"), frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane)));
+            EXPECT_EQ(frustum->getChild("farPlane"), frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane)));
+            EXPECT_EQ(frustum->getChild("fieldOfView"), frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView)));
+            EXPECT_EQ(frustum->getChild("aspectRatio"), frustum->m_impl->getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio)));
         }
     }
 
     TEST_F(ARamsesCameraBinding_SerializationWithFile, KeepsItsProperties_WhenNoRamsesLinksAndSceneProvided)
     {
         {
-            createCameraBindingForTest("CameraBinding");
+            m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
             ASSERT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
 
         {
-            ASSERT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin"));
+            ASSERT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", m_scene));
             auto loadedCameraBinding = m_logicEngine.findCameraBinding("CameraBinding");
-            EXPECT_EQ(loadedCameraBinding->getRamsesCamera(), nullptr);
-            EXPECT_EQ(loadedCameraBinding->getInputs()->getChildCount(), 0u);
+            EXPECT_EQ(&loadedCameraBinding->getRamsesCamera(), m_camera);
+            EXPECT_EQ(loadedCameraBinding->getInputs()->getChildCount(), 2u);
             EXPECT_EQ(loadedCameraBinding->getOutputs(), nullptr);
             EXPECT_EQ(loadedCameraBinding->getName(), "CameraBinding");
         }
@@ -1085,119 +1053,133 @@ namespace rlogic::internal
 
     TEST_F(ARamsesCameraBinding_SerializationWithFile, RestoresLinkToRamsesCamera)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
-            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
+            m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
             const auto& cameraBinding = *m_logicEngine.findCameraBinding("CameraBinding");
-            EXPECT_EQ(cameraBinding.getRamsesCamera(), &perspectiveCam);
+            EXPECT_EQ(&cameraBinding.getRamsesCamera(), &m_perspectiveCam);
         }
     }
 
     TEST_F(ARamsesCameraBinding_SerializationWithFile, ProducesError_WhenHavingLinkToRamsesCamera_ButNoSceneWasProvided)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
-            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
+            m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile("camerabinding.bin"));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'CameraBinding' points to a Ramses object (id: 1), but no Ramses scene was provided to resolve the Ramses object!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'CameraBinding' points to a Ramses object (id: 2), but no Ramses scene was provided to resolve the Ramses object!");
+        }
+    }
+
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, HandlesErrorWhenRamsesSceneWasSerializedWithOneTypeOfCamera_ButLoadedWithADifferentOne)
+    {
+        {
+            m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
+            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+        }
+
+        // Fake that the ramses scene is exactly the same, just camera type changed (perspective -> ortho)
+        // This is a bit evil, but quite possible e.g. if camera was switched from perspective -> ortho and the ramses id didn't change because no other change in the scene and
+        // the camera is exported at the exact same time -> receives the same ID
+        ramses::Scene& slightlyModifiedScene = *m_ramsesTestSetup.createScene(ramses::sceneId_t(2));
+        slightlyModifiedScene.createOrthographicCamera("");
+        {
+            // loadFromFile catches the error -> content is not modified
+            EXPECT_FALSE(m_logicEngine.loadFromFile("camerabinding.bin", &slightlyModifiedScene));
+            // Update still works with the old state of the logic engine
+            EXPECT_TRUE(m_logicEngine.update());
         }
     }
 
     TEST_F(ARamsesCameraBinding_SerializationWithFile, ProducesError_WhenHavingLinkToRamsesCamera_WhichWasDeleted)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
-            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
+            m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
 
-        m_testScene.destroy(perspectiveCam);
+        m_testScene.destroy(m_perspectiveCam);
 
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'CameraBinding' points to a Ramses object (id: 1) which couldn't be found in the provided scene!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'CameraBinding' points to a Ramses object (id: 2) which couldn't be found in the provided scene!");
         }
     }
 
     TEST_F(ARamsesCameraBinding_SerializationWithFile, DoesNotModifyRamsesCameraProperties_WhenNoValuesWereExplicitlySetBeforeSaving)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
-            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
+            m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
             EXPECT_TRUE(m_logicEngine.update());
 
-            ExpectDefaultValues(perspectiveCam);
+            ExpectDefaultValues(m_perspectiveCam);
         }
     }
 
     // Tests that the camera properties don't overwrite ramses' values after loading from file, until
     // set() is called again explicitly after loadFromFile()
-    TEST_F(ARamsesCameraBinding_SerializationWithFile, ReappliesAllPropertiesOfOneStructToRamsesCamera_WhenExplicitlySetAgain)
+    TEST_F(ARamsesCameraBinding_SerializationWithFile, ReappliesViewportPropertiesToRamsesCamera_OnlyAfterExplicitlySetAgain)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
         {
-            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
-            // Set some values to the binding's inputs
-            auto vpProperties = cameraBinding.getInputs()->getChild("viewPortProperties");
-            vpProperties->getChild("viewPortOffsetX")->set<int32_t>(4);
-            vpProperties->getChild("viewPortOffsetY")->set<int32_t>(5);
-            vpProperties->getChild("viewPortWidth")->set<int32_t>(6);
-            vpProperties->getChild("viewPortHeight")->set<int32_t>(7);
+            auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
+            // Set some values to the binding's inputs. Those should be lost/discarded on save() because we dont' call update() below
+            auto vpProperties = cameraBinding.getInputs()->getChild("viewport");
+            vpProperties->getChild("offsetX")->set<int32_t>(4);
+            vpProperties->getChild("offsetY")->set<int32_t>(5);
+            vpProperties->getChild("width")->set<int32_t>(6);
+            vpProperties->getChild("height")->set<int32_t>(7);
 
-            auto frustumProperties = cameraBinding.getInputs()->getChild("frustumProperties");
-            frustumProperties->getChild("fieldOfView")->set<float>(30.f);
-            frustumProperties->getChild("aspectRatio")->set<float>(640.f / 480.f);
-            frustumProperties->getChild("nearPlane")->set<float>(2.3f);
-            frustumProperties->getChild("farPlane")->set<float>(5.6f);
+            auto frustum = cameraBinding.getInputs()->getChild("frustum");
+            frustum->getChild("fieldOfView")->set<float>(30.f);
+            frustum->getChild("aspectRatio")->set<float>(640.f / 480.f);
+            frustum->getChild("nearPlane")->set<float>(2.3f);
+            frustum->getChild("farPlane")->set<float>(5.6f);
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
 
-        // Set viewport properties to different values to check if they are overwritten after load
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        // These values will be used to fill the cache of camera bindings on load()
+        m_perspectiveCam.setViewport(11, 12, 13u, 14u);
 
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
 
+            // Artificially set to other values so that we can verify update() didn't change them
+            m_perspectiveCam.setViewport(9, 8, 1u, 2u);
+
             EXPECT_TRUE(m_logicEngine.update());
 
-            // Camera binding does not re-apply its values to ramses camera viewport
-            EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-            EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-            EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-            EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
-            ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+            // Camera binding does not re-apply its cached values to ramses camera viewport
+            EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+            EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+            EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+            EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
+            ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
-            // Set only one value of viewport struct. Use the same value as before save on purpose! Calling set forces set on ramses
-            m_logicEngine.findCameraBinding("CameraBinding")->getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX")->set<int32_t>(4);
+            // Set only one value of viewport struct. Use the same value as the one in cache on purpose!
+            // Calling set forces set on ramses regardless of the value used
+            m_logicEngine.findCameraBinding("CameraBinding")->getInputs()->getChild("viewport")->getChild("offsetX")->set<int32_t>(11);
             EXPECT_TRUE(m_logicEngine.update());
 
             // vpOffsetX changed, the rest is taken from the initially saved inputs, not what was set on the camera!
-            EXPECT_EQ(perspectiveCam.getViewportX(), 4);
-            EXPECT_EQ(perspectiveCam.getViewportY(), 5);
-            EXPECT_EQ(perspectiveCam.getViewportWidth(), 6u);
-            EXPECT_EQ(perspectiveCam.getViewportHeight(), 7u);
+            EXPECT_EQ(m_perspectiveCam.getViewportX(), 11);
+            EXPECT_EQ(m_perspectiveCam.getViewportY(), 12);
+            EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 13u);
+            EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 14u);
             // frustum values will still be default values as there was no set of any value on the frustum struct and thus the update doesn't change the struct
-            ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+            ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
         }
     }
 
@@ -1208,10 +1190,8 @@ namespace rlogic::internal
     // properties wrapped by a LogicBinding which is linked to a script
     TEST_F(ARamsesCameraBinding_SerializationWithFile, SetsOnlyRamsesCameraPropertiesForWhichTheBindingInputIsLinked_WhenCallingUpdateAfterLoading)
     {
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-
         // These values should not be overwritten by logic on update()
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        m_perspectiveCam.setViewport(9, 8, 1u, 2u);
 
         {
             const std::string_view scriptSrc = R"(
@@ -1235,19 +1215,18 @@ namespace rlogic::internal
 
             LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
 
-            RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-            cameraBinding.setRamsesCamera(&perspectiveCam);
+            RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
 
-            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fov"), *cameraBinding.getInputs()->getChild("frustumProperties")->getChild("fieldOfView")));
-            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("aR"), *cameraBinding.getInputs()->getChild("frustumProperties")->getChild("aspectRatio")));
-            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("nP"), *cameraBinding.getInputs()->getChild("frustumProperties")->getChild("nearPlane")));
-            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fP"), *cameraBinding.getInputs()->getChild("frustumProperties")->getChild("farPlane")));
+            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fov"), *cameraBinding.getInputs()->getChild("frustum")->getChild("fieldOfView")));
+            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("aR"), *cameraBinding.getInputs()->getChild("frustum")->getChild("aspectRatio")));
+            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("nP"), *cameraBinding.getInputs()->getChild("frustum")->getChild("nearPlane")));
+            ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fP"), *cameraBinding.getInputs()->getChild("frustum")->getChild("farPlane")));
 
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
 
         // Modify 'linked' properties before loading to check if logic will overwrite them after load + update
-        perspectiveCam.setFrustum(15.f, 320.f / 240.f, 4.1f, 7.9f);
+        m_perspectiveCam.setFrustum(15.f, 320.f / 240.f, 4.1f, 7.9f);
 
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
@@ -1255,24 +1234,24 @@ namespace rlogic::internal
             EXPECT_TRUE(m_logicEngine.update());
 
             // Viewport properties were not linked -> their values are not modified
-            EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-            EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-            EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-            EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
+            EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+            EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+            EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+            EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
             // Frustum properties are linked -> values were updated
-            EXPECT_NEAR(perspectiveCam.getVerticalFieldOfView(), 30.f, 0.001f);
-            EXPECT_EQ(perspectiveCam.getAspectRatio(), 640.f / 480.f);
-            EXPECT_EQ(perspectiveCam.getNearPlane(), 2.3f);
-            EXPECT_EQ(perspectiveCam.getFarPlane(), 5.6f);
+            EXPECT_NEAR(m_perspectiveCam.getVerticalFieldOfView(), 30.f, 0.001f);
+            EXPECT_EQ(m_perspectiveCam.getAspectRatio(), 640.f / 480.f);
+            EXPECT_EQ(m_perspectiveCam.getNearPlane(), 2.3f);
+            EXPECT_EQ(m_perspectiveCam.getFarPlane(), 5.6f);
 
             // Manually setting values on ramses followed by a logic update has no effect
             // Logic is not "dirty" and it doesn't know it needs to update ramses
-            perspectiveCam.setViewport(43, 34, 84u, 62u);
+            m_perspectiveCam.setViewport(43, 34, 84u, 62u);
             EXPECT_TRUE(m_logicEngine.update());
-            EXPECT_EQ(perspectiveCam.getViewportX(), 43);
-            EXPECT_EQ(perspectiveCam.getViewportY(), 34);
-            EXPECT_EQ(perspectiveCam.getViewportWidth(), 84u);
-            EXPECT_EQ(perspectiveCam.getViewportHeight(), 62u);
+            EXPECT_EQ(m_perspectiveCam.getViewportX(), 43);
+            EXPECT_EQ(m_perspectiveCam.getViewportY(), 34);
+            EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 84u);
+            EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 62u);
         }
     }
 
@@ -1287,93 +1266,90 @@ namespace rlogic::internal
 
     TEST_F(ARamsesCameraBinding_DataFlow, WithExplicitSet)
     {
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("");
-
         // Create camera and preset values
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        m_perspectiveCam.setViewport(11, 12, 13u, 14u);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
+        // set other values to artificially check that the binding won't override them
+        m_perspectiveCam.setViewport(9, 8, 1u, 2u);
 
-        cameraBinding.setRamsesCamera(&perspectiveCam);
-
+        // Nothing happens here - binding does not overwrite ramses values because no user value set() was called and no link exists
         m_logicEngine.update();
-
-        // Nothing happened - binding did not overwrite preset values because no user value set()
-        EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
 
         // Set only two view port properties
-        auto vpProperties = cameraBinding.getInputs()->getChild("viewPortProperties");
-        vpProperties->getChild("viewPortOffsetX")->set<int32_t>(4);
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(21);
+        auto vpProperties = cameraBinding.getInputs()->getChild("viewport");
+        vpProperties->getChild("offsetX")->set<int32_t>(4);
+        vpProperties->getChild("width")->set<int32_t>(21);
 
-        // Update not called yet -> still has preset values for vpOffsetX and vpWidth in ramses camera
-        EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        // Update not called yet -> still has preset values for vpOffsetX and vpWidth in ramses camera, and default frustum values
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
-        // Update() triggers all viewPortProperties to be set on ramses to the two values that were explicitly set
-        // and the other two default values of the binding
+        // Update() triggers all viewport to be set on ramses to the two values that were explicitly set
+        // and the other two previous values of the binding input
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 4);
-        EXPECT_EQ(perspectiveCam.getViewportY(), DefaultViewportOffsetY);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 21u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), DefaultViewportHeight);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 4);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 12);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 21u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 14u);
+        // Frustum is not modified - only viewport was explicitly set
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
         // Set two properties of each viewPort and frustum property struct
-        vpProperties->getChild("viewPortOffsetY")->set<int32_t>(13);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(63);
-        auto frustumProperties = cameraBinding.getInputs()->getChild("frustumProperties");
-        frustumProperties->getChild("nearPlane")->set<float>(2.3f);
-        frustumProperties->getChild("farPlane")->set<float>(5.6f);
+        vpProperties->getChild("offsetY")->set<int32_t>(13);
+        vpProperties->getChild("height")->set<int32_t>(63);
+        auto frustum = cameraBinding.getInputs()->getChild("frustum");
+        frustum->getChild("nearPlane")->set<float>(2.3f);
+        frustum->getChild("farPlane")->set<float>(5.6f);
 
         // On update all values of both structs are set
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 4);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 13);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 21u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 63u);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 4);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 13);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 21u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 63u);
 
-        EXPECT_NEAR(perspectiveCam.getVerticalFieldOfView(), PerspectiveFrustumFOVdefault, 0.001f);
-        EXPECT_EQ(perspectiveCam.getAspectRatio(), PerspectiveFrustumARdefault);
-        EXPECT_EQ(perspectiveCam.getNearPlane(), 2.3f);
-        EXPECT_EQ(perspectiveCam.getFarPlane(), 5.6f);
+        EXPECT_NEAR(m_perspectiveCam.getVerticalFieldOfView(), PerspectiveFrustumFOVdefault, 0.001f);
+        EXPECT_EQ(m_perspectiveCam.getAspectRatio(), PerspectiveFrustumARdefault);
+        EXPECT_EQ(m_perspectiveCam.getNearPlane(), 2.3f);
+        EXPECT_EQ(m_perspectiveCam.getFarPlane(), 5.6f);
 
         // Calling update again does not "rewrite" the data to ramses. Check this by setting a value manually and call update() again
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        m_perspectiveCam.setViewport(9, 8, 1u, 2u);
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
 
         // Set all properties manually this time
-        vpProperties->getChild("viewPortOffsetX")->set<int32_t>(4);
-        vpProperties->getChild("viewPortOffsetY")->set<int32_t>(5);
-        vpProperties->getChild("viewPortWidth")->set<int32_t>(6);
-        vpProperties->getChild("viewPortHeight")->set<int32_t>(7);
+        vpProperties->getChild("offsetX")->set<int32_t>(4);
+        vpProperties->getChild("offsetY")->set<int32_t>(5);
+        vpProperties->getChild("width")->set<int32_t>(6);
+        vpProperties->getChild("height")->set<int32_t>(7);
 
-        frustumProperties->getChild("fieldOfView")->set<float>(30.f);
-        frustumProperties->getChild("aspectRatio")->set<float>(640.f / 480.f);
-        frustumProperties->getChild("nearPlane")->set<float>(1.3f);
-        frustumProperties->getChild("farPlane")->set<float>(7.6f);
+        frustum->getChild("fieldOfView")->set<float>(30.f);
+        frustum->getChild("aspectRatio")->set<float>(640.f / 480.f);
+        frustum->getChild("nearPlane")->set<float>(1.3f);
+        frustum->getChild("farPlane")->set<float>(7.6f);
         m_logicEngine.update();
 
         // All of the property values were passed to ramses
-        EXPECT_EQ(perspectiveCam.getViewportX(), 4);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 5);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 6u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 7u);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 4);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 5);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 6u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 7u);
 
-        EXPECT_NEAR(perspectiveCam.getVerticalFieldOfView(), 30.f, 0.001f);
-        EXPECT_EQ(perspectiveCam.getAspectRatio(), 640.f / 480.f);
-        EXPECT_EQ(perspectiveCam.getNearPlane(), 1.3f);
-        EXPECT_EQ(perspectiveCam.getFarPlane(), 7.6f);
+        EXPECT_NEAR(m_perspectiveCam.getVerticalFieldOfView(), 30.f, 0.001f);
+        EXPECT_EQ(m_perspectiveCam.getAspectRatio(), 640.f / 480.f);
+        EXPECT_EQ(m_perspectiveCam.getNearPlane(), 1.3f);
+        EXPECT_EQ(m_perspectiveCam.getFarPlane(), 7.6f);
     }
 
     TEST_F(ARamsesCameraBinding_DataFlow, WithLinks)
@@ -1383,55 +1359,58 @@ namespace rlogic::internal
                 OUT.vpOffsetX = INT
             end
             function run()
-                OUT.vpOffsetX = 14
+                OUT.vpOffsetX = 15
             end
         )";
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
-        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding("CameraBinding");
-
         // Create camera and preset values
-        ramses::PerspectiveCamera& perspectiveCam = createPerspectiveCameraForTest();
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        m_perspectiveCam.setViewport(11, 12, 13u, 14u);
 
-        cameraBinding.setRamsesCamera(&perspectiveCam);
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
+        // set other values to artificially check that the binding won't override them
+        m_perspectiveCam.setViewport(9, 8, 1u, 2u);
 
         // Adding and removing link does not set anything in ramses
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX")));
-        ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX")));
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewport")->getChild("offsetX")));
+        ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewport")->getChild("offsetX")));
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
-        // Create link and calling update -> sets values to ramses
-        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX")));
+        // Create link and calling update -> sets values to ramses set by the link (vpOffsetX)
+        // and uses cached values in the binding for the other vp properties
+        ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewport")->getChild("offsetX")));
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 14);
-        EXPECT_EQ(perspectiveCam.getViewportY(), DefaultViewportOffsetY);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), DefaultViewportWidth);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), DefaultViewportHeight);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 15);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 12);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 13u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 14u);
+        // Does not touch the frustum because not linked or set at all
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
+        // TODO Violin investigate this... There is some problem with dirty handling which causes links to always
+        // re-apply their values, even if nothing changed in the script or in the binding -> this is inefficient
         // As long as link is active, binding overwrites value which was manually set directly to the ramses camera
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        m_perspectiveCam.setViewport(9, 8, 1u, 2u);
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 14);
-        EXPECT_EQ(perspectiveCam.getViewportY(), DefaultViewportOffsetY);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), DefaultViewportWidth);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), DefaultViewportHeight);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 15);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 12);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 13u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 14u);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
         // Remove link -> value is not overwritten any more
-        ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewPortProperties")->getChild("viewPortOffsetX")));
-        perspectiveCam.setViewport(9, 8, 1u, 2u);
+        ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("vpOffsetX"), *cameraBinding.getInputs()->getChild("viewport")->getChild("offsetX")));
+        m_perspectiveCam.setViewport(9, 8, 1u, 2u);
         m_logicEngine.update();
-        EXPECT_EQ(perspectiveCam.getViewportX(), 9);
-        EXPECT_EQ(perspectiveCam.getViewportY(), 8);
-        EXPECT_EQ(perspectiveCam.getViewportWidth(), 1u);
-        EXPECT_EQ(perspectiveCam.getViewportHeight(), 2u);
-        ExpectDefaultPerspectiveCameraFrustumValues(perspectiveCam);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
+        ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
     }
 }

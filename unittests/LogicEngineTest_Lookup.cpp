@@ -17,9 +17,9 @@ namespace rlogic
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
-        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("nodebinding");
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding("appbinding");
-        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding("camerabinding");
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
 
         EXPECT_EQ(script, m_logicEngine.findScript("script"));
         EXPECT_EQ(nodeBinding, m_logicEngine.findNodeBinding("nodebinding"));
@@ -29,16 +29,16 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CutsNameAtNullTermination)
     {
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding("appbinding");
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         EXPECT_EQ(appearanceBinding, m_logicEngine.findAppearanceBinding("appbinding\0withsurprise"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsAfterRenaming_ByNewNameOnly)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
-        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("nodebinding");
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding("appbinding");
-        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding("camerabinding");
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
 
         // Rename
         script->setName("S");
@@ -62,9 +62,9 @@ namespace rlogic
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyIfTypeMatches)
     {
         m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
-        m_logicEngine.createRamsesNodeBinding("nodebinding");
-        m_logicEngine.createRamsesAppearanceBinding("appbinding");
-        m_logicEngine.createRamsesCameraBinding("camerabinding");
+        m_logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
+        m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
 
         EXPECT_EQ(nullptr, m_logicEngine.findScript("nodebinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("appbinding"));
@@ -75,7 +75,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyStringMatchesExactly)
     {
-        m_logicEngine.createRamsesNodeBinding("nodebinding");
+        m_logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
 
         EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("Nodebinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findNodeBinding("node"));

@@ -95,7 +95,7 @@ int main()
     std::array<float, 3> nodeRotation{};
     ramses::ERotationConvention unused;
     (void)unused;
-    triangleNodeBinding->getRamsesNode()->getRotation(nodeRotation[0], nodeRotation[1], nodeRotation[2], unused);
+    triangleNodeBinding->getRamsesNode().getRotation(nodeRotation[0], nodeRotation[1], nodeRotation[2], unused);
 
     std::cout << "\n\nRamses node rotation after loading from file and updating: {" << nodeRotation[0] << ", " << nodeRotation[1] << ", " << nodeRotation[2] << "}\n\n";
 
@@ -181,12 +181,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
      * Create a temporary LogicEngine instance for creating and saving a simple script which references a ramses Node
      */
     rlogic::LogicEngine logicEngine;
-    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding("link to triangle node");
-
-    /**
-     * Assign the meshNode created above to the node binding object.
-     */
-    nodeBinding->setRamsesNode(meshNode);
+    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*meshNode, "link to triangle node");
 
     /**
      * Create a simple script which sets the rotation values of a node based on simulated time

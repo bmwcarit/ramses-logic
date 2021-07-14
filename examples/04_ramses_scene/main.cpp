@@ -69,13 +69,7 @@ int main(int argc, char* argv[])
      * Create a binding object which serves as a bridge between logic scripts and animations on one end
      * and a Ramses scene on the other end
      */
-    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding("binding to triangle mesh node");
-
-    /**
-     * Connect the binding object to the Ramses node we created above. This will cause the LogicEngine
-     * to overwrite the properties of the linked Ramses node whenever this RamsesNodeBinding is updated.
-     */
-    nodeBinding->setRamsesNode(triangleNode);
+    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*triangleNode, "binding to triangle mesh node");
 
     /**
      * Create a simple script which takes the current time in milliseconds

@@ -127,17 +127,17 @@ namespace rlogic::internal
         switch (propertyType)
         {
         case EPropertyType::Vec2f:
-            return m_solState.createUserObject((*m_propertyDescription.get<vec2f>()).at(indexAsUInt));
+            return m_solState.createUserObject(m_propertyDescription.getValueAs<vec2f>().at(indexAsUInt));
         case EPropertyType::Vec3f:
-            return m_solState.createUserObject((*m_propertyDescription.get<vec3f>()).at(indexAsUInt));
+            return m_solState.createUserObject(m_propertyDescription.getValueAs<vec3f>().at(indexAsUInt));
         case EPropertyType::Vec4f:
-            return m_solState.createUserObject((*m_propertyDescription.get<vec4f>()).at(indexAsUInt));
+            return m_solState.createUserObject(m_propertyDescription.getValueAs<vec4f>().at(indexAsUInt));
         case EPropertyType::Vec2i:
-            return m_solState.createUserObject((*m_propertyDescription.get<vec2i>()).at(indexAsUInt));
+            return m_solState.createUserObject(m_propertyDescription.getValueAs<vec2i>().at(indexAsUInt));
         case EPropertyType::Vec3i:
-            return m_solState.createUserObject((*m_propertyDescription.get<vec3i>()).at(indexAsUInt));
+            return m_solState.createUserObject(m_propertyDescription.getValueAs<vec3i>().at(indexAsUInt));
         case EPropertyType::Vec4i:
-            return m_solState.createUserObject((*m_propertyDescription.get<vec4i>()).at(indexAsUInt));
+            return m_solState.createUserObject(m_propertyDescription.getValueAs<vec4i>().at(indexAsUInt));
         // TODO Violin/Sven/Tobias this kind of a bad design, and the reason for it lies
         // with the fact that we handle 3 different things in the same base class - "Property"
         // Discuss whether we want this pattern, or maybe there are some other ideas how to deal

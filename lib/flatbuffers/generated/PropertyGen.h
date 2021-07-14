@@ -673,36 +673,6 @@ inline bool VerifyPropertyValueVector(flatbuffers::Verifier &verifier, const fla
   return true;
 }
 
-inline const rlogic_serialization::Property *GetProperty(const void *buf) {
-  return flatbuffers::GetRoot<rlogic_serialization::Property>(buf);
-}
-
-inline const rlogic_serialization::Property *GetSizePrefixedProperty(const void *buf) {
-  return flatbuffers::GetSizePrefixedRoot<rlogic_serialization::Property>(buf);
-}
-
-inline bool VerifyPropertyBuffer(
-    flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<rlogic_serialization::Property>(nullptr);
-}
-
-inline bool VerifySizePrefixedPropertyBuffer(
-    flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<rlogic_serialization::Property>(nullptr);
-}
-
-inline void FinishPropertyBuffer(
-    flatbuffers::FlatBufferBuilder &fbb,
-    flatbuffers::Offset<rlogic_serialization::Property> root) {
-  fbb.Finish(root);
-}
-
-inline void FinishSizePrefixedPropertyBuffer(
-    flatbuffers::FlatBufferBuilder &fbb,
-    flatbuffers::Offset<rlogic_serialization::Property> root) {
-  fbb.FinishSizePrefixed(root);
-}
-
 }  // namespace rlogic_serialization
 
 #endif  // FLATBUFFERS_GENERATED_PROPERTY_RLOGIC_SERIALIZATION_H_

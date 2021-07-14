@@ -73,7 +73,7 @@ namespace rlogic
     {
         LogicEngine otherLogicEngine;
 
-        auto ramsesNodeBinding = otherLogicEngine.createRamsesNodeBinding("NodeBinding");
+        auto ramsesNodeBinding = otherLogicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
         ASSERT_TRUE(ramsesNodeBinding);
         ASSERT_FALSE(m_logicEngine.destroy(*ramsesNodeBinding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -83,7 +83,7 @@ namespace rlogic
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesAppearanceBindingFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
-        auto binding = otherLogicEngine.createRamsesAppearanceBinding("AppearanceBinding");
+        auto binding = otherLogicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
         ASSERT_TRUE(binding);
         ASSERT_FALSE(m_logicEngine.destroy(*binding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -92,7 +92,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Factory, DestroysRamsesCameraBindingWithoutErrors)
     {
-        auto binding = m_logicEngine.createRamsesCameraBinding("CameraBinding");
+        auto binding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
         ASSERT_TRUE(binding);
         ASSERT_TRUE(m_logicEngine.destroy(*binding));
     }
@@ -100,7 +100,7 @@ namespace rlogic
     TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesCameraBindingFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
-        auto binding = otherLogicEngine.createRamsesCameraBinding("CameraBinding");
+        auto binding = otherLogicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
         ASSERT_TRUE(binding);
         ASSERT_FALSE(m_logicEngine.destroy(*binding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -110,9 +110,9 @@ namespace rlogic
     TEST_F(ALogicEngine_Factory, RenamesObjectsAfterCreation)
     {
         auto script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "");
-        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding("NodeBinding");
-        auto ramsesAppearanceBinding = m_logicEngine.createRamsesAppearanceBinding("AppearanceBinding");
-        auto ramsesCameraBinding = m_logicEngine.createRamsesCameraBinding("CameraBinding");
+        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto ramsesAppearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
+        auto ramsesCameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
 
         script->setName("same name twice");
         ramsesNodeBinding->setName("same name twice");

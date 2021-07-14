@@ -25,12 +25,7 @@ namespace rlogic
 
     RamsesAppearanceBinding::~RamsesAppearanceBinding() noexcept = default;
 
-    void RamsesAppearanceBinding::setRamsesAppearance(ramses::Appearance* appearance)
-    {
-        m_appearanceBinding->setRamsesAppearance(appearance);
-    }
-
-    ramses::Appearance* RamsesAppearanceBinding::getRamsesAppearance() const
+    ramses::Appearance& RamsesAppearanceBinding::getRamsesAppearance() const
     {
         return m_appearanceBinding->getRamsesAppearance();
     }

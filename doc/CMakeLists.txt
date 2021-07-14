@@ -6,9 +6,27 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
+if(ramses-logic_FORCE_BUILD_DOCS)
+    set(PACKAGE_FIND_MODE REQUIRED)
+    set(DOCS_ERROR_TYPE FATAL_ERROR)
+else()
+    set(PACKAGE_FIND_MODE QUIET)
+    set(DOCS_ERROR_TYPE STATUS)
+endif()
+
 # error if doxygen not found
-find_package(Doxygen QUIET REQUIRED)
-find_package(Sphinx QUIET REQUIRED)
+find_package(Doxygen ${PACKAGE_FIND_MODE})
+
+if (NOT DOXYGEN_FOUND)
+    message(${DOCS_ERROR_TYPE} "Doxygen was not found on this system. Documentation generation was disabled.")
+    return()
+endif()
+
+find_package(Sphinx ${PACKAGE_FIND_MODE})
+if (NOT SPHINX_FOUND)
+    message(${DOCS_ERROR_TYPE} "Sphinx was not found on this system. Documentation generation was disabled.")
+    return()
+endif()
 
 # only used to set as dependency for docs build (so that docs are rebuilt in developer mode
 # when an API file is changed)

@@ -55,13 +55,13 @@ namespace rlogic
 
     template <typename T> std::optional<T> Property::getInternal() const
     {
-        return m_impl->get<T>();
+        return m_impl->getValue_PublicApi<T>();
     }
 
     template<typename T>
     bool Property::setInternal(T value)
     {
-        return m_impl->setManually<T>(value);
+        return m_impl->setValue_PublicApi(std::move(value));
     }
 
     // Lua works with int. The logic engine API uses int32_t. To ensure that the runtime has no side effects

@@ -20,7 +20,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 
 #include "ramses-logic-build-config.h"
-#include "generated/logicengine_gen.h"
+#include "generated/LogicEngineGen.h"
 
 #include "ramses-framework-api/RamsesVersion.h"
 
@@ -55,22 +55,22 @@ namespace rlogic::internal
         return m_apiObjects.createLuaScript(m_luaState, source, "", scriptName, m_errors);
     }
 
-    RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(std::string_view name)
+    RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesNodeBinding(name);
+        return m_apiObjects.createRamsesNodeBinding(ramsesNode, name);
     }
 
-    RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(std::string_view name)
+    RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesAppearanceBinding(name);
+        return m_apiObjects.createRamsesAppearanceBinding(ramsesAppearance, name);
     }
 
-    RamsesCameraBinding* LogicEngineImpl::createRamsesCameraBinding(std::string_view name)
+    RamsesCameraBinding* LogicEngineImpl::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesCameraBinding(name);
+        return m_apiObjects.createRamsesCameraBinding(ramsesCamera, name);
     }
 
     bool LogicEngineImpl::destroy(LogicNode& logicNode)
@@ -101,7 +101,7 @@ namespace rlogic::internal
                 const PropertyImpl* output = m_apiObjects.getLogicNodeDependencies().getLinkedOutput(*child.m_impl);
                 if (nullptr != output)
                 {
-                    child.m_impl->setInternal(*output);
+                    child.m_impl->setValue(output->getValue(), true);
                 }
             }
         }
@@ -208,9 +208,9 @@ namespace rlogic::internal
             }
         }
 
-        const auto logicEngine = rlogic_serialization::GetLogicEngine(byteData);
+        const auto* logicEngine = rlogic_serialization::GetLogicEngine(byteData);
 
-        if (nullptr == logicEngine || nullptr == logicEngine->ramsesVersion() || nullptr == logicEngine->rlogicVersion())
+        if (nullptr == logicEngine)
         {
             m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSourceDescription));
             return false;
@@ -234,10 +234,16 @@ namespace rlogic::internal
             return false;
         }
 
+        if (nullptr == logicEngine->apiObjects())
+        {
+            m_errors.add(fmt::format("Fatal error while loading {}: doesn't contain API objects!", dataSourceDescription));
+            return false;
+        }
+
         RamsesObjectResolver ramsesResolver(m_errors, scene);
 
         // TODO Violin also use fresh Lua environment, so that we don't pollute current one when loading failed
-        std::optional<ApiObjects> deserializedObjects = ApiObjects::Deserialize(m_luaState, *logicEngine, ramsesResolver, dataSourceDescription, m_errors);
+        std::optional<ApiObjects> deserializedObjects = ApiObjects::Deserialize(m_luaState, *logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
 
         if (!deserializedObjects)
         {
@@ -248,66 +254,6 @@ namespace rlogic::internal
         m_apiObjects = std::move(*deserializedObjects);
 
         return true;
-    }
-
-    // TODO Violin this needs more testing (both internal and user-side). Concretely, ensure that:
-    // - if anything is dirty, this will always warn
-    // - the logic engine is never dirty immediately after update()
-    // - some specific cases that need special attention:
-    //      - what is the dirty state after unlink?
-    //      - what is the dirty state when setting a binding property (with same value?)
-    bool LogicEngineImpl::isDirty() const
-    {
-        // TODO Violin the ugliness of this code shows the problems with the current dirty handling implementation
-        // Refactor the dirty handling, and this code will disappear
-
-        // TODO Violin improve internal management of logic nodes so that we don't have to loop over three
-        // different containers below which all call a method on LogicNode
-
-        // Scripts dirty?
-        for (const auto& script : m_apiObjects.getScripts())
-        {
-            if (script->m_impl.get().isDirty())
-            {
-                return true;
-            }
-        }
-
-        if (bindingsDirty())
-        {
-            return true;
-        }
-
-        return false;
-    }
-
-    bool LogicEngineImpl::bindingsDirty() const
-    {
-        for (const auto& nodeBinding : m_apiObjects.getNodeBindings())
-        {
-            if (nodeBinding->m_impl.get().isDirty())
-            {
-                return true;
-            }
-        }
-
-        for (const auto& appBinding : m_apiObjects.getAppearanceBindings())
-        {
-            if (appBinding->m_impl.get().isDirty())
-            {
-                return true;
-            }
-        }
-
-        for (const auto& camBinding : m_apiObjects.getCameraBindings())
-        {
-            if (camBinding->m_impl.get().isDirty())
-            {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     bool LogicEngineImpl::saveToFile(std::string_view filename)
@@ -327,13 +273,33 @@ namespace rlogic::internal
             return false;
         }
 
-        if (bindingsDirty())
+        if (m_apiObjects.bindingsDirty())
         {
             LOG_WARN("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!");
         }
 
         flatbuffers::FlatBufferBuilder builder;
-        ApiObjects::Serialize(m_apiObjects, builder);
+        ramses::RamsesVersion ramsesVersion = ramses::GetRamsesVersion();
+
+        const auto ramsesVersionOffset = rlogic_serialization::CreateVersion(builder,
+            ramsesVersion.major,
+            ramsesVersion.minor,
+            ramsesVersion.patch,
+            builder.CreateString(ramsesVersion.string));
+        builder.Finish(ramsesVersionOffset);
+
+        const auto ramsesLogicVersionOffset = rlogic_serialization::CreateVersion(builder,
+            g_PROJECT_VERSION_MAJOR,
+            g_PROJECT_VERSION_MINOR,
+            g_PROJECT_VERSION_PATCH,
+            builder.CreateString(g_PROJECT_VERSION));
+        builder.Finish(ramsesLogicVersionOffset);
+
+        const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
+            ramsesVersionOffset,
+            ramsesLogicVersionOffset,
+            ApiObjects::Serialize(m_apiObjects, builder));
+        builder.Finish(logicEngine);
 
         if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
         {

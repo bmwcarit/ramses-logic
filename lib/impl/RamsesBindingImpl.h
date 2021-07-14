@@ -10,20 +10,40 @@
 
 #include "impl/LogicNodeImpl.h"
 
+namespace ramses
+{
+    class SceneObject;
+}
+
+namespace flatbuffers
+{
+    template<typename T> struct Offset;
+    class FlatBufferBuilder;
+}
+
+namespace rlogic_serialization
+{
+    struct RamsesReference;
+}
+
 namespace rlogic::internal
 {
-    // Currently this is just a common base class for all ramses bindings
     class RamsesBindingImpl : public LogicNodeImpl
     {
     public:
+        // This is a base class, only deleted functions are public
+        RamsesBindingImpl(const RamsesBindingImpl& other) = delete;
+        RamsesBindingImpl& operator=(const RamsesBindingImpl& other) = delete;
+    protected:
         // Move-able (noexcept); Not copy-able
+        explicit RamsesBindingImpl(std::string_view name) noexcept;
         ~RamsesBindingImpl() noexcept override                           = default;
         RamsesBindingImpl(RamsesBindingImpl&& other) noexcept            = default;
         RamsesBindingImpl& operator=(RamsesBindingImpl&& other) noexcept = default;
-        RamsesBindingImpl(const RamsesBindingImpl& other)                = delete;
-        RamsesBindingImpl& operator=(const RamsesBindingImpl& other)     = delete;
 
-    protected:
-        RamsesBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> inputs, std::unique_ptr<PropertyImpl> outputs);
+        // Used by subclasses to handle serialization
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesReference> SerializeRamsesReference(const ramses::SceneObject& object, flatbuffers::FlatBufferBuilder& builder);
+
+        // TODO Violin consider moving pointer(s) to ramses objects here and add templated getters for subclasses
     };
 }

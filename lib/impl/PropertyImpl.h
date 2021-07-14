@@ -10,8 +10,12 @@
 
 #include "ramses-logic/EPropertyType.h"
 #include "internals/EPropertySemantics.h"
+#include "internals/SerializationMap.h"
+#include "internals/DeserializationMap.h"
 
+#include <cassert>
 #include <string>
+#include <unordered_map>
 #include <vector>
 #include <optional>
 #include <variant>
@@ -35,13 +39,26 @@ namespace flatbuffers
 namespace rlogic::internal
 {
     class LogicNodeImpl;
+    class ErrorReporting;
+
+    using PropertyValue = std::variant<int32_t, float, bool, std::string, vec2f, vec3f, vec4f, vec2i, vec3i, vec4i>;
 
     class PropertyImpl
     {
     public:
         PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics);
-        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> Serialize(const PropertyImpl& prop, flatbuffers::FlatBufferBuilder& builder);
-        [[nodiscard]] static std::unique_ptr<PropertyImpl> Deserialize(const rlogic_serialization::Property& prop, EPropertySemantics semantics);
+        PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics, PropertyValue initialValue);
+
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> Serialize(
+            const PropertyImpl& prop,
+            flatbuffers::FlatBufferBuilder& builder,
+            SerializationMap& serializationMap);
+
+        [[nodiscard]] static std::unique_ptr<PropertyImpl> Deserialize(
+            const rlogic_serialization::Property& prop,
+            EPropertySemantics semantics,
+            ErrorReporting& errorReporting,
+            DeserializationMap& deserializationMap);
 
 
         // Move-able (noexcept); Not copy-able
@@ -72,29 +89,30 @@ namespace rlogic::internal
         [[nodiscard]] Property* getChild(std::string_view name);
         [[nodiscard]] bool hasChild(std::string_view name) const;
 
-        void addChild(std::unique_ptr<PropertyImpl> child);
-        void clearChildren();
+        void addChild(std::unique_ptr<PropertyImpl> child, bool sortChildrenLexicographically = false);
 
-        // TODO Violin refactor the different setters below to reduce code duplication
-        // and make better readable (have only one place where values are set, and a consistent
-        // "dirtyness" check)
+        // Public API access - only ever called by user, full error check and logs
+        template <typename T>
+        [[nodiscard]] std::optional<T> getValue_PublicApi() const;
+        [[nodiscard]] bool setValue_PublicApi(PropertyValue value);
 
-        template <typename T> [[nodiscard]] std::optional<T> get() const;
+        // Access from inside Lua scripts
+        void setOutputValue_FromScript(PropertyValue value);
 
-        template <typename T> bool setManually(T value);
-        template <typename T> bool setOutputFromScript(T value);
-        void setIsLinkedInput(bool isLinkedInput);
+        // Generic setter. Can optionally skip dirty-check
+        void setValue(PropertyValue value, bool checkDirty = true);
 
-        // This version is used by links to avoid type expansion
-        void setInternal(const PropertyImpl& other);
-        // This version is used for non-default value initialization (to avoid having templated constructor)
-        template <typename T> void setInternal(T value)
+        // Generic getter for use in other non-template code
+        [[nodiscard]] const PropertyValue& getValue() const;
+        // std::get wrapper for use in template code
+        template <typename T>
+        [[nodiscard]] const T& getValueAs() const
         {
-            assert (PropertyTypeToEnum<T>::TYPE == m_type);
-            assert (std::get<T>(m_value) != value && "Use this only to set non-default values!");
-            m_value = value;
+            return std::get<T>(m_value);
         }
 
+        // Design smells (can fix by changing class design and topology)
+        void setIsLinkedInput(bool isLinkedInput);
         void setLogicNode(LogicNodeImpl& logicNode);
         [[nodiscard]] LogicNodeImpl& getLogicNode();
 
@@ -102,7 +120,7 @@ namespace rlogic::internal
         std::string                                     m_name;
         EPropertyType                                   m_type;
         std::vector<std::unique_ptr<Property>>          m_children;
-        std::variant<int32_t, float, bool, std::string, vec2f, vec3f, vec4f, vec2i, vec3i, vec4i> m_value;
+        PropertyValue                                   m_value;
 
         // TODO Violin/Sven consider solving this more elegantly
         LogicNodeImpl*                                  m_logicNode = nullptr;
@@ -110,8 +128,9 @@ namespace rlogic::internal
         bool m_isLinkedInput = false;
         EPropertySemantics                              m_semantics;
 
-        template <typename T> bool set(T value);
-
-        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> SerializeRecursive(const PropertyImpl& prop, flatbuffers::FlatBufferBuilder& builder);
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> SerializeRecursive(
+            const PropertyImpl& prop,
+            flatbuffers::FlatBufferBuilder& builder,
+            SerializationMap& serializationMap);
     };
 }

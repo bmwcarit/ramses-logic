@@ -18,7 +18,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
-#include "generated/property_gen.h"
+#include "generated/PropertyGen.h"
 
 #include "LogicNodeDummy.h"
 #include "LogTestUtils.h"
@@ -31,11 +31,6 @@ namespace rlogic::internal
     {
     public:
         LogicNodeDummyImpl m_dummyNode{ "DummyNode" };
-
-        static std::unique_ptr<PropertyImpl> Deserialize(const void* buffer)
-        {
-            return PropertyImpl::Deserialize(*rlogic_serialization::GetProperty(buffer), EPropertySemantics::ScriptInput);
-        }
 
         std::unique_ptr<PropertyImpl> CreateInputProperty(std::string_view name, EPropertyType type, bool assignDummyLogicNode = true)
         {
@@ -75,6 +70,12 @@ namespace rlogic::internal
         EXPECT_EQ(EPropertyType::Float, desc.getType());
     }
 
+    TEST_F(AProperty, CanBeInitializedWithAValue)
+    {
+        PropertyImpl property("", EPropertyType::Float, EPropertySemantics::ScriptInput, PropertyValue{0.5f});
+        EXPECT_FLOAT_EQ(0.5f, property.getValueAs<float>());
+    }
+
     TEST_F(AProperty, BindingInputHasNoUserValueBeforeSetExplicitly)
     {
         Property prop(CreateProperty("", EPropertyType::Float, EPropertySemantics::BindingInput, true));
@@ -101,10 +102,10 @@ namespace rlogic::internal
         Property linkSource(CreateProperty("", EPropertyType::Float, EPropertySemantics::ScriptOutput, true));
 
         // Set to different than default value
-        linkSource.m_impl->setManually<float>(0.5f);
+        linkSource.set<float>(0.5f);
 
         // Simulate link behavior
-        linkTarget.m_impl->setInternal(*linkSource.m_impl);
+        linkTarget.m_impl->setValue(linkSource.m_impl->getValue());
         EXPECT_TRUE(linkTarget.m_impl->checkForBindingInputNewValueAndReset());
     }
 
@@ -118,7 +119,7 @@ namespace rlogic::internal
         linkTarget.set<float>(.5f);
 
         // Simulate link behavior
-        linkTarget.m_impl->setInternal(*linkSource.m_impl);
+        linkTarget.m_impl->setValue(linkSource.m_impl->getValue());
         EXPECT_TRUE(linkTarget.m_impl->checkForBindingInputNewValueAndReset());
     }
 
@@ -559,27 +560,104 @@ namespace rlogic::internal
         EXPECT_FALSE(c3);
     }
 
-    TEST_F(AProperty, CanBeSerializedAndDeserializedWhenEmpty)
+    class AProperty_SerializationLifecycle : public AProperty
     {
-        flatbuffers::FlatBufferBuilder builder;
-        {
-            auto rootImpl = CreateInputProperty("EmptyProperty", EPropertyType::Struct);
+    protected:
+        ErrorReporting m_errorReporting;
+        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+        SerializationMap m_serializationMap;
+        DeserializationMap m_deserializationMap;
+    };
 
-            (void)PropertyImpl::Serialize(*rootImpl, builder);
+    TEST_F(AProperty_SerializationLifecycle, StructWithoutChildren)
+    {
+        {
+            PropertyImpl structNoChildren("noChildren", EPropertyType::Struct, EPropertySemantics::ScriptInput);
+            (void)PropertyImpl::Serialize(structNoChildren, m_flatBufferBuilder, m_serializationMap);
         }
-        {
-            auto root = Deserialize(builder.GetBufferPointer());
 
-            ASSERT_EQ(0u, root->getChildCount());
-            EXPECT_EQ(EPropertyType::Struct, root->getType());
-            EXPECT_EQ("EmptyProperty", root->getName());
-            EXPECT_EQ(EPropertySemantics::ScriptInput, root->getPropertySemantics());
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+
+        EXPECT_EQ(serialized.name()->string_view(), "noChildren");
+        EXPECT_EQ(serialized.children()->size(), 0u);
+
+        {
+            std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
+            ASSERT_EQ(0u, deserialized->getChildCount());
+            EXPECT_EQ(EPropertyType::Struct, deserialized->getType());
+            EXPECT_EQ("noChildren", deserialized->getName());
+            EXPECT_EQ(EPropertySemantics::ScriptInput, deserialized->getPropertySemantics());
         }
     }
 
-    TEST_F(AProperty, CanBeSerializedAndDeserialized_ForAllSupportedTypes)
+    TEST_F(AProperty_SerializationLifecycle, KeepsPropertyOrder)
     {
-        flatbuffers::FlatBufferBuilder builder;
+        {
+            auto parent = CreateInputProperty("parent", EPropertyType::Struct);
+            parent->addChild(CreateInputProperty("child0", EPropertyType::Float, false));
+            parent->addChild(CreateInputProperty("child1", EPropertyType::Float, false));
+            parent->addChild(CreateInputProperty("child2", EPropertyType::Float, false));
+
+            (void)PropertyImpl::Serialize(*parent, m_flatBufferBuilder, m_serializationMap);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
+
+        ASSERT_EQ(3u, deserialized->getChildCount());
+        EXPECT_EQ(EPropertyType::Struct, deserialized->getType());
+
+        EXPECT_EQ("child0", deserialized->getChild(0)->getName());
+        EXPECT_EQ("child1", deserialized->getChild(1)->getName());
+        EXPECT_EQ("child2", deserialized->getChild(2)->getName());
+    }
+
+    TEST_F(AProperty_SerializationLifecycle, MultiLevelNesting)
+    {
+        {
+            auto root = CreateInputProperty("root", EPropertyType::Struct);
+            auto nested1 = CreateInputProperty("nested", EPropertyType::Struct, false);
+            auto float1 = CreateInputProperty("float", EPropertyType::Float, false);
+            auto nested2 = CreateInputProperty("nested", EPropertyType::Struct, false);
+            auto float2 = CreateInputProperty("float", EPropertyType::Float, false);
+
+            nested1->addChild(std::move(float1));
+            nested2->addChild(std::move(float2));
+            nested1->addChild(std::move(nested2));
+            root->addChild(std::move(nested1));
+
+            (void)PropertyImpl::Serialize(*root, m_flatBufferBuilder, m_serializationMap);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
+
+        ASSERT_EQ(1u, deserialized->getChildCount());
+        EXPECT_EQ(EPropertyType::Struct, deserialized->getType());
+
+        auto propertyNested1 = deserialized->getChild(0u);
+        EXPECT_EQ(EPropertyType::Struct, propertyNested1->getType());
+        EXPECT_EQ("nested", propertyNested1->getName());
+
+        ASSERT_EQ(2u, propertyNested1->getChildCount());
+        auto propertyFloat1 = propertyNested1->getChild(0u);
+        auto propertyNested2 = propertyNested1->getChild(1u);
+
+        EXPECT_EQ(EPropertyType::Float, propertyFloat1->getType());
+        EXPECT_EQ("float", propertyFloat1->getName());
+        EXPECT_EQ(EPropertyType::Struct, propertyNested2->getType());
+        EXPECT_EQ("nested", propertyNested2->getName());
+
+        ASSERT_EQ(1u, propertyNested2->getChildCount());
+        auto propertyFloat2 = propertyNested2->getChild(0u);
+
+        EXPECT_EQ(EPropertyType::Float, propertyFloat2->getType());
+        EXPECT_EQ("float", propertyFloat2->getName());
+    }
+
+    // Making this test templated makes it a lot harder to read, better leave it so - simple, stupid
+    TEST_F(AProperty_SerializationLifecycle, AllSupportedPropertyTypes)
+    {
         {
             auto rootImpl = CreateInputProperty("Root", EPropertyType::Struct);
 
@@ -617,134 +695,239 @@ namespace rlogic::internal
             propVec3i->set<vec3i>({3, 4, 5});
             propVec4i->set<vec4i>({6, 7, 8, 9});
 
-            (void)PropertyImpl::Serialize(*rootImpl, builder);
+            (void)PropertyImpl::Serialize(*rootImpl, m_flatBufferBuilder, m_serializationMap);
         }
-        {
 
-            auto root = Deserialize(builder.GetBufferPointer());
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
 
-            ASSERT_EQ(11u, root->getChildCount());
-            EXPECT_EQ(EPropertyType::Struct, root->getType());
+        ASSERT_EQ(11u, deserialized->getChildCount());
+        EXPECT_EQ(EPropertyType::Struct, deserialized->getType());
 
-            auto propInt32  = root->getChild(0);
-            auto propFloat  = root->getChild(1);
-            auto propBool   = root->getChild(2);
-            auto propString = root->getChild(3);
-            auto propVec2f  = root->getChild(4);
-            auto propVec3f  = root->getChild(5);
-            auto propVec4f  = root->getChild(6);
-            auto propVec2i  = root->getChild(7);
-            auto propVec3i  = root->getChild(8);
-            auto propVec4i  = root->getChild(9);
-            auto propDefValue  = root->getChild(10);
+        const auto propInt32 = deserialized->getChild(0);
+        const auto propFloat = deserialized->getChild(1);
+        const auto propBool = deserialized->getChild(2);
+        const auto propString = deserialized->getChild(3);
+        const auto propVec2f = deserialized->getChild(4);
+        const auto propVec3f = deserialized->getChild(5);
+        const auto propVec4f = deserialized->getChild(6);
+        const auto propVec2i = deserialized->getChild(7);
+        const auto propVec3i = deserialized->getChild(8);
+        const auto propVec4i = deserialized->getChild(9);
+        const auto propDefValue = deserialized->getChild(10);
 
-            EXPECT_EQ("Int32", propInt32->getName());
-            EXPECT_EQ("Float", propFloat->getName());
-            EXPECT_EQ("Bool", propBool->getName());
-            EXPECT_EQ("String", propString->getName());
-            EXPECT_EQ("Vec2f", propVec2f->getName());
-            EXPECT_EQ("Vec3f", propVec3f->getName());
-            EXPECT_EQ("Vec4f", propVec4f->getName());
-            EXPECT_EQ("Vec2i", propVec2i->getName());
-            EXPECT_EQ("Vec3i", propVec3i->getName());
-            EXPECT_EQ("Vec4i", propVec4i->getName());
-            EXPECT_EQ("DefaultValue", propDefValue->getName());
+        EXPECT_EQ("Int32", propInt32->getName());
+        EXPECT_EQ("Float", propFloat->getName());
+        EXPECT_EQ("Bool", propBool->getName());
+        EXPECT_EQ("String", propString->getName());
+        EXPECT_EQ("Vec2f", propVec2f->getName());
+        EXPECT_EQ("Vec3f", propVec3f->getName());
+        EXPECT_EQ("Vec4f", propVec4f->getName());
+        EXPECT_EQ("Vec2i", propVec2i->getName());
+        EXPECT_EQ("Vec3i", propVec3i->getName());
+        EXPECT_EQ("Vec4i", propVec4i->getName());
+        EXPECT_EQ("DefaultValue", propDefValue->getName());
 
-
-            vec2f expectedValueVec2f{0.1f, 0.2f};
-            vec3f expectedValueVec3f{1.1f, 1.2f, 1.3f};
-            vec4f expectedValueVec4f{2.1f, 2.2f, 2.3f, 2.4f};
-            vec2i expectedValueVec2i{1, 2};
-            vec3i expectedValueVec3i{3, 4, 5};
-            vec4i expectedValueVec4i{6, 7, 8, 9};
-            EXPECT_EQ(4711, *propInt32->get<int32_t>());
-            EXPECT_FLOAT_EQ(47.11f, *propFloat->get<float>());
-            EXPECT_TRUE(*propBool->get<bool>());
-            EXPECT_EQ("4711", *propString->get<std::string>());
-            EXPECT_EQ(expectedValueVec2f, *propVec2f->get<vec2f>());
-            EXPECT_EQ(expectedValueVec3f, *propVec3f->get<vec3f>());
-            EXPECT_EQ(expectedValueVec4f, *propVec4f->get<vec4f>());
-            EXPECT_EQ(expectedValueVec2i, *propVec2i->get<vec2i>());
-            EXPECT_EQ(expectedValueVec3i, *propVec3i->get<vec3i>());
-            EXPECT_EQ(expectedValueVec4i, *propVec4i->get<vec4i>());
-            EXPECT_FALSE(propDefValue->m_impl->checkForBindingInputNewValueAndReset());
-        }
+        const vec2f expectedValueVec2f{0.1f, 0.2f};
+        const vec3f expectedValueVec3f{1.1f, 1.2f, 1.3f};
+        const vec4f expectedValueVec4f{2.1f, 2.2f, 2.3f, 2.4f};
+        const vec2i expectedValueVec2i{1, 2};
+        const vec3i expectedValueVec3i{3, 4, 5};
+        const vec4i expectedValueVec4i{6, 7, 8, 9};
+        EXPECT_EQ(4711, *propInt32->get<int32_t>());
+        EXPECT_FLOAT_EQ(47.11f, *propFloat->get<float>());
+        EXPECT_TRUE(*propBool->get<bool>());
+        EXPECT_EQ("4711", *propString->get<std::string>());
+        EXPECT_EQ(expectedValueVec2f, *propVec2f->get<vec2f>());
+        EXPECT_EQ(expectedValueVec3f, *propVec3f->get<vec3f>());
+        EXPECT_EQ(expectedValueVec4f, *propVec4f->get<vec4f>());
+        EXPECT_EQ(expectedValueVec2i, *propVec2i->get<vec2i>());
+        EXPECT_EQ(expectedValueVec3i, *propVec3i->get<vec3i>());
+        EXPECT_EQ(expectedValueVec4i, *propVec4i->get<vec4i>());
+        EXPECT_FALSE(propDefValue->m_impl->checkForBindingInputNewValueAndReset());
     }
 
-    TEST_F(AProperty, KeepsOriginalPropertyOrderAfterDeserialization)
+    TEST_F(AProperty_SerializationLifecycle, ErrorWhenNameMissing)
     {
-        flatbuffers::FlatBufferBuilder builder;
         {
-            auto propertyRoot = CreateInputProperty("PropertyInt", EPropertyType::Struct);
-            auto c1 = CreateInputProperty("PropertyFloat1", EPropertyType::Float, false);
-            auto c2 = CreateInputProperty("PropertyFloat2", EPropertyType::Float, false);
-            auto c3 = CreateInputProperty("PropertyFloat3", EPropertyType::Float, false);
-
-            propertyRoot->addChild(std::move(c1));
-            propertyRoot->addChild(std::move(c2));
-            propertyRoot->addChild(std::move(c3));
-
-            (void)PropertyImpl::Serialize(*propertyRoot, builder);
+            auto propertyOffset = rlogic_serialization::CreateProperty(
+                m_flatBufferBuilder,
+                0
+            );
+            m_flatBufferBuilder.Finish(propertyOffset);
         }
-        {
-            auto root = Deserialize(builder.GetBufferPointer());
 
-            ASSERT_EQ(3u, root->getChildCount());
-            EXPECT_EQ(EPropertyType::Struct, root->getType());
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
 
-            auto c1    = root->getChild(0);
-            auto c2    = root->getChild(1);
-            auto c3    = root->getChild(2);
-
-            EXPECT_EQ("PropertyFloat1", c1->getName());
-            EXPECT_EQ("PropertyFloat2", c2->getName());
-            EXPECT_EQ("PropertyFloat3", c3->getName());
-        }
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: missing name!");
     }
 
-    TEST_F(AProperty, CanSerializeAndDeserializeMultiLevelProperties)
+    TEST_F(AProperty_SerializationLifecycle, ErrorWhenTypeCorrupted)
     {
-        flatbuffers::FlatBufferBuilder builder;
         {
-            auto propertyRoot    = CreateInputProperty("PropertyRoot", EPropertyType::Struct);
-            auto propertyNested1 = CreateInputProperty("PropertyNested", EPropertyType::Struct, false);
-            auto propertyFloat1  = CreateInputProperty("PropertyFloat", EPropertyType::Float, false);
-            auto propertyNested2 = CreateInputProperty("PropertyNested", EPropertyType::Struct, false);
-            auto propertyFloat2  = CreateInputProperty("PropertyFloat", EPropertyType::Float, false);
-
-            propertyNested1->addChild(std::move(propertyFloat1));
-            propertyNested2->addChild(std::move(propertyFloat2));
-            propertyNested1->addChild(std::move(propertyNested2));
-            propertyRoot->addChild(std::move(propertyNested1));
-
-            (void)PropertyImpl::Serialize(*propertyRoot, builder);
+            // Simulate bad things with enums, but this can happen with corrupted binary data and we need to handle it safely nevertheless
+            auto invalidType = static_cast<rlogic_serialization::EPropertyRootType>(std::numeric_limits<uint8_t>::max());
+            auto propertyOffset = rlogic_serialization::CreateProperty(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                invalidType
+            );
+            m_flatBufferBuilder.Finish(propertyOffset);
         }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: invalid type!");
+    }
+
+    TEST_F(AProperty_SerializationLifecycle, ErrorWhenChildHasErrors)
+    {
         {
-            auto root = Deserialize(builder.GetBufferPointer());
+            // Child is invalid because it has no name
+            auto childOffset = rlogic_serialization::CreateProperty(
+                m_flatBufferBuilder,
+                0
+            );
+            // Parent is fine, but references a corrupt child property
+            auto propertyOffset = rlogic_serialization::CreateProperty(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                rlogic_serialization::EPropertyRootType::Struct,
+                m_flatBufferBuilder.CreateVector(std::vector{childOffset})
+            );
+            m_flatBufferBuilder.Finish(propertyOffset);
+        }
 
-            ASSERT_EQ(1u, root->getChildCount());
-            EXPECT_EQ(EPropertyType::Struct, root->getType());
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
 
-            auto propertyNested1 = root->getChild(0u);
-            EXPECT_EQ(EPropertyType::Struct, propertyNested1->getType());
-            EXPECT_EQ("PropertyNested", propertyNested1->getName());
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: missing name!");
+    }
 
-            ASSERT_EQ(2u, propertyNested1->getChildCount());
-            auto propertyFloat1 = propertyNested1->getChild(0u);
-            auto propertyNested2 = propertyNested1->getChild(1u);
+    TEST_F(AProperty_SerializationLifecycle, ErrorWhenComplexTypeHasNoChildInfo)
+    {
+        {
+            // Parent is fine, but references a corrupt child property
+            auto propertyOffset = rlogic_serialization::CreateProperty(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                rlogic_serialization::EPropertyRootType::Struct,
+                0
+            );
+            m_flatBufferBuilder.Finish(propertyOffset);
+        }
 
-            EXPECT_EQ(EPropertyType::Float, propertyFloat1->getType());
-            EXPECT_EQ("PropertyFloat", propertyFloat1->getName());
-            EXPECT_EQ(EPropertyType::Struct, propertyNested2->getType());
-            EXPECT_EQ("PropertyNested", propertyNested2->getName());
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
 
-            ASSERT_EQ(1u, propertyNested2->getChildCount());
-            auto propertyFloat2 = propertyNested2->getChild(0u);
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: complex type has no child type info!");
+    }
 
-            EXPECT_EQ(EPropertyType::Float, propertyFloat2->getType());
-            EXPECT_EQ("PropertyFloat", propertyFloat2->getName());
+    TEST_F(AProperty_SerializationLifecycle, ErrorWhenMissingValueForPrimitiveType_AllUnionTypes)
+    {
+        // A bit ugly, but simple way to iterate all enum values
+        for (rlogic_serialization::PropertyValue valueType = rlogic_serialization::PropertyValue::float_s; valueType <= rlogic_serialization::PropertyValue::MAX; valueType = rlogic_serialization::PropertyValue(uint32_t(valueType) + 1))
+        {
+            {
+                auto propertyOffset = rlogic_serialization::CreateProperty(
+                    m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    rlogic_serialization::EPropertyRootType::Primitive,
+                    0,
+                    valueType,
+                    0 // no union value type provided -> error when deserialized
+                );
+                m_flatBufferBuilder.Finish(propertyOffset);
+            }
+
+            const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+            m_errorReporting.clear();
+            std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
+
+            EXPECT_FALSE(deserialized);
+            ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+            EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: invalid union!");
         }
     }
+
+    // String requires individual test, other types are tested below in AProperty_SerializationLifecycle_T
+    TEST_F(AProperty_SerializationLifecycle, ErrorWhenPrimitiveValueIsCorrupt_String)
+    {
+        {
+            auto propertyOffset = rlogic_serialization::CreateProperty(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                rlogic_serialization::EPropertyRootType::Primitive,
+                0,
+                rlogic_serialization::PropertyValue::NONE, // setting NONE here makes the enum tuple invalid and would trigger seg fault if not checked
+                m_flatBufferBuilder.CreateStruct(m_flatBufferBuilder.CreateString("test string")).Union()
+            );
+            m_flatBufferBuilder.Finish(propertyOffset);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: invalid type!");
+    }
+
+    // two element type
+    template <typename T>
+    class AProperty_SerializationLifecycle_T : public AProperty_SerializationLifecycle
+    {
+    };
+    // The list of types we want to test.
+    typedef ::testing::Types <
+        rlogic_serialization::float_s,
+        rlogic_serialization::vec2f_s,
+        rlogic_serialization::vec3f_s,
+        rlogic_serialization::vec4f_s,
+        rlogic_serialization::int32_s,
+        rlogic_serialization::vec2i_s,
+        rlogic_serialization::vec3i_s,
+        rlogic_serialization::vec4i_s,
+        rlogic_serialization::bool_s
+        //string_s requires a separate test because it's not a struct but a table, see below
+    > ValueTypes;
+
+    TYPED_TEST_SUITE(AProperty_SerializationLifecycle_T, ValueTypes);
+
+    TYPED_TEST(AProperty_SerializationLifecycle_T, ErrorWhenPrimitiveValueIsCorrupt)
+    {
+        {
+            const TypeParam unionValue; // data doesn't matter, just use default constructor for simplicity
+            auto propertyOffset = rlogic_serialization::CreateProperty(
+                this->m_flatBufferBuilder,
+                this->m_flatBufferBuilder.CreateString("name"),
+                rlogic_serialization::EPropertyRootType::Primitive,
+                0,
+                rlogic_serialization::PropertyValue::NONE, // setting NONE here makes the enum tuple invalid and would trigger seg fault if not checked
+                this->m_flatBufferBuilder.CreateStruct(unionValue).Union()
+            );
+            this->m_flatBufferBuilder.Finish(propertyOffset);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(this->m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, this->m_errorReporting, this->m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(this->m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(this->m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: invalid type!");
+    }
+
+    // TODO Violin restructure tests and move in fixtures for better readibility
 
     TEST_F(AProperty, InheritsLogicNodeAssignmentFromParent_AfterAddedAsChild)
     {
@@ -767,11 +950,11 @@ namespace rlogic::internal
         auto vec3iProperty  = CreateInputProperty("Property", EPropertyType::Vec3i);
         auto stringProperty = CreateInputProperty("Property", EPropertyType::String);
 
-        intProperty->setManually(42);
-        floatProperty->setManually(42.f);
-        vec2fProperty->setManually(vec2f{4.f, 2.f});
-        vec3iProperty->setManually(vec3i{4, 2, 3});
-        stringProperty->setManually(std::string("42"));
+        intProperty->setValue(42);
+        floatProperty->setValue(42.f);
+        vec2fProperty->setValue(vec2f{4.f, 2.f});
+        vec3iProperty->setValue(vec3i{4, 2, 3});
+        stringProperty->setValue(std::string("42"));
 
         intProperty->getLogicNode().setDirty(false);
         floatProperty->getLogicNode().setDirty(false);
@@ -779,11 +962,11 @@ namespace rlogic::internal
         vec3iProperty->getLogicNode().setDirty(false);
         stringProperty->getLogicNode().setDirty(false);
 
-        EXPECT_TRUE(intProperty->setManually(42));
-        EXPECT_TRUE(floatProperty->setManually(42.f));
-        EXPECT_TRUE(vec2fProperty->setManually(vec2f{4.f, 2.f}));
-        EXPECT_TRUE(vec3iProperty->setManually(vec3i{4, 2, 3}));
-        EXPECT_TRUE(stringProperty->setManually(std::string("42")));
+        intProperty->setValue(42);
+        floatProperty->setValue(42.f);
+        vec2fProperty->setValue(vec2f{ 4.f, 2.f });
+        vec3iProperty->setValue(vec3i{ 4, 2, 3 });
+        stringProperty->setValue(std::string("42"));
 
         EXPECT_FALSE(intProperty->getLogicNode().isDirty());
         EXPECT_FALSE(floatProperty->getLogicNode().isDirty());
@@ -800,17 +983,11 @@ namespace rlogic::internal
         auto vec3iProperty  = CreateInputProperty("Property", EPropertyType::Vec3i);
         auto stringProperty = CreateInputProperty("Property", EPropertyType::String);
 
-        intProperty->setManually(42);
-        floatProperty->setManually(42.f);
-        vec2fProperty->setManually(vec2f{4.f, 2.f});
-        vec3iProperty->setManually(vec3i{4, 2, 3});
-        stringProperty->setManually(std::string("42"));
-
-        EXPECT_TRUE(intProperty->setManually(43));
-        EXPECT_TRUE(floatProperty->setManually(43.f));
-        EXPECT_TRUE(vec2fProperty->setManually(vec2f{4.f, 3.f}));
-        EXPECT_TRUE(vec3iProperty->setManually(vec3i{4, 3, 3}));
-        EXPECT_TRUE(stringProperty->setManually(std::string("43")));
+        intProperty->setValue(42);
+        floatProperty->setValue(42.f);
+        vec2fProperty->setValue(vec2f{4.f, 2.f});
+        vec3iProperty->setValue(vec3i{4, 2, 3});
+        stringProperty->setValue(std::string("42"));
 
         EXPECT_TRUE(intProperty->getLogicNode().isDirty());
         EXPECT_TRUE(floatProperty->getLogicNode().isDirty());

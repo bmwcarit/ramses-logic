@@ -3,13 +3,13 @@
 
 [![build status](https://github.com/GENIVI/ramses-logic/workflows/CMake/badge.svg?branch=master)](https://github.com/GENIVI/ramses-logic/actions?query=branch%3Amaster) [![docs status](https://readthedocs.org/projects/ramses-logic/badge/?style=flat)](https://ramses-logic.readthedocs.io/en/latest/)
 
-`RAMSES logic` extends the [RAMSES rendering ecosystem](https://github.com/GENIVI/ramses) with scripting support based on
+`RAMSES logic` extends the [RAMSES rendering ecosystem](https://ramses-sdk.readthedocs.io/) with scripting support based on
 [Lua](https://github.com/lua/lua). `RAMSES` is designed to be minimalistic and closely aligned to OpenGL, which can be a
 limitation for more complex applications. `RAMSES logic` addresses this limitation by providing a runtime library which can
 load and run `Lua` scripts and provides a standard set of tools to let these scripts interact between each other and control
 a sophisticated `RAMSES` scene.
 
-You can find the full documentation of `RAMSES logic` [here](https://ramses-logic.readthedocs.io/en/latest).
+You can find the full documentation of `RAMSES logic` [here](https://ramses-logic.readthedocs.io/).
 
 # Build
 

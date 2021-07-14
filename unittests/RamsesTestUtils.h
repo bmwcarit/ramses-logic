@@ -42,6 +42,11 @@ namespace rlogic
             m_ramsesClient->destroy(scene);
         }
 
+        ramses::Scene& loadSceneFromFile(const char* fileName)
+        {
+            return *m_ramsesClient->loadSceneFromFile(fileName);
+        }
+
         static ramses::Appearance& CreateTestAppearance(ramses::Scene& scene, std::string_view vertShader, std::string_view fragShader)
         {
             ramses::EffectDescription effectDesc;

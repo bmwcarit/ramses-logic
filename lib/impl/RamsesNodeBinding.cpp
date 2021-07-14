@@ -21,12 +21,7 @@ namespace rlogic
     {
     }
 
-    bool RamsesNodeBinding::setRamsesNode(ramses::Node* node)
-    {
-        return m_nodeBinding->setRamsesNode(node);
-    }
-
-    ramses::Node* RamsesNodeBinding::getRamsesNode() const
+    ramses::Node& RamsesNodeBinding::getRamsesNode() const
     {
         return m_nodeBinding->getRamsesNode();
     }

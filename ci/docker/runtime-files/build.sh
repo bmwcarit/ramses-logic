@@ -6,7 +6,7 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-TARGETS="L64_GCC L64_GCCv7 L64_LLVM CHECK_FLATBUF_GEN  TEST_COVERAGE DOC_PACKAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE L64_LLVM_SHUFFLE"
+TARGETS="L64_GCC L64_GCCv7 L64_LLVM CHECK_FLATBUF_GEN  TEST_COVERAGE CLANG_TIDY THREAD_SANITIZER ADDRESS_SANITIZER UB_SANITIZER L64_GCC_LTO ANDROID_LIB_x86 ANDROID_LIB_x86_64 ANDROID_LIB_arm64-v8a ANDROID_LIB_armeabi-v7a L64_LLVM_COVERAGE L64_LLVM_SHUFFLE"
 
 # preset defaults
 CONFIG=Release
@@ -58,8 +58,6 @@ case $TARGET in
     TEST_COVERAGE)
              TOOLCHAIN=$RL_SRC/cmake/toolchain/Linux_X86_64_llvm.toolchain
              CONFIG=Debug
-             ;;
-    DOC_PACKAGE)
              ;;
     CLANG_TIDY)
              TOOLCHAIN=$RL_SRC/cmake/toolchain/Linux_X86_64_llvm.toolchain
@@ -127,29 +125,6 @@ if [ "$TARGET" = "ANDROID_LIB_x86" ] || [ "$TARGET" = "ANDROID_LIB_x86_64" ] || 
         cmake --build $BUILD_DIR --config $CONFIG --target package
         cp $BUILD_DIR/*.tar.gz $PACKAGE_DIR
     fi
-
-elif [ "$TARGET" = "DOC_PACKAGE" ]; then
-    cmake \
-        -G"Ninja"                       \
-        -Dramses-logic_BUILD_DOCS=ON    \
-        $RL_SRC
-
-    ninja rlogic-sphinx
-
-    # Obtain project version
-    pushd $RL_SRC
-    VERSION_MAJOR=`cat CMakeLists.txt | grep "set(RLOGIC_VERSION_MAJOR" | sed 's/^[^0-9]*\([0-9]*\).*$/\1/'`
-    VERSION_MINOR=`cat CMakeLists.txt | grep "set(RLOGIC_VERSION_MINOR" | sed 's/^[^0-9]*\([0-9]*\).*$/\1/'`
-    VERSION_PATCH=`cat CMakeLists.txt | grep "set(RLOGIC_VERSION_PATCH" | sed 's/^[^0-9]*\([0-9]*\).*$/\1/'`
-    GIT_COMMIT_HASH=`git rev-parse --short HEAD`
-    popd
-
-    VERSION_NAME="$VERSION_MAJOR.$VERSION_MINOR.$VERSION_PATCH-sha-$GIT_COMMIT_HASH"
-
-    pushd $BUILD_DIR/sphinx
-    DOC_PACKAGE_NAME=RAMSES_Logic_docs_$VERSION_NAME.tar.gz
-    tar cfz $PACKAGE_DIR/$DOC_PACKAGE_NAME *
-    popd
 
 elif [ "$TARGET" = "CLANG_TIDY" ]; then
 
@@ -272,7 +247,7 @@ else
         -DCMAKE_BUILD_TYPE=$CONFIG \
         -DCMAKE_TOOLCHAIN_FILE=$TOOLCHAIN \
         -DCMAKE_INSTALL_PREFIX=$INSTALL_DIR \
-        -Dramses-logic_BUILD_DOCS=$BUILD_DOCS \
+        -Dramses-logic_FORCE_BUILD_DOCS=$BUILD_DOCS \
         -Dramses-logic_BUILD_WITH_LTO=${ENABLE_LTO} \
         -Dramses-logic_ENABLE_FLATBUFFERS_GENERATION=OFF \
         -Dramses-logic_ENABLE_TEST_COVERAGE=${ENABLE_COVERAGE} \
@@ -322,7 +297,7 @@ else
 
 fi
 
-if [ "$BUILD_PACKAGE" = True ] && [ "$TARGET" != "DOC_PACKAGE" ]; then
+if [ "$BUILD_PACKAGE" = True ]; then
      cp $BUILD_DIR/*.tar.gz $PACKAGE_DIR
 fi
 

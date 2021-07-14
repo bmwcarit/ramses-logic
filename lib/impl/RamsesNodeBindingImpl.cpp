@@ -13,145 +13,185 @@
 
 #include "ramses-client-api/Node.h"
 
-#include "generated/ramsesnodebinding_gen.h"
+#include "generated/RamsesNodeBindingGen.h"
+#include "internals/ErrorReporting.h"
+#include "internals/IRamsesObjectResolver.h"
 
 namespace rlogic::internal
 {
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name) noexcept
-        : RamsesBindingImpl(name, CreateNodeProperties(), nullptr)
-    {
-        // TODO Violin this still needs some thought (the impl lifecycle with and without deserialization + base classes)
-    }
-
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(std::string_view name, ramses::ERotationConvention rotationConvention, std::unique_ptr<PropertyImpl> inputs, ramses::Node* ramsesNode) noexcept
-        : RamsesBindingImpl(name, std::move(inputs), nullptr)
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, std::string_view name)
+        : RamsesBindingImpl(name)
         , m_ramsesNode(ramsesNode)
-        , m_rotationConvention(rotationConvention)
     {
+        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput));
+
+        // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
+        // Set default values equivalent to those of Ramses
+        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool, EPropertySemantics::BindingInput));
+        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+
+        setRootProperties(std::move(inputs), {});
+
+        ApplyRamsesValuesToInputProperties(*this, ramsesNode);
     }
 
-    flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::Serialize(const RamsesNodeBindingImpl& nodeBinding, flatbuffers::FlatBufferBuilder& builder)
+    flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::Serialize(
+        const RamsesNodeBindingImpl& nodeBinding,
+        flatbuffers::FlatBufferBuilder& builder,
+        SerializationMap& serializationMap)
     {
-        ramses::sceneObjectId_t ramsesNodeId;
-        if (nodeBinding.m_ramsesNode != nullptr)
-        {
-            ramsesNodeId = nodeBinding.m_ramsesNode->getSceneObjectId();
-        }
+        auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(nodeBinding.m_ramsesNode, builder);
+
+        auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
+            builder.CreateString(nodeBinding.getName()),
+            ramsesReference,
+            // TODO Violin don't serialize inputs - it's better to re-create them on the fly, they are uniquely defined and don't need serialization
+            PropertyImpl::Serialize(*nodeBinding.getInputs()->m_impl, builder, serializationMap));
+        builder.Finish(ramsesBinding);
 
         auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
-            LogicNodeImpl::Serialize(nodeBinding, builder), // Serialize base class
-            ramsesNodeId.getValue(),
-            static_cast<uint8_t>(nodeBinding.m_rotationConvention)
+            ramsesBinding
         );
         builder.Finish(ramsesNodeBinding);
 
         return ramsesNodeBinding;
     }
 
-    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Deserialize(const rlogic_serialization::RamsesNodeBinding& nodeBinding, ramses::Node* ramsesNode)
+    std::unique_ptr<RamsesNodeBindingImpl> RamsesNodeBindingImpl::Deserialize(
+        const rlogic_serialization::RamsesNodeBinding& nodeBinding,
+        const IRamsesObjectResolver& ramsesResolver,
+        ErrorReporting& errorReporting,
+        DeserializationMap& deserializationMap)
     {
-        assert(nullptr != nodeBinding.logicnode());
-        assert(nullptr != nodeBinding.logicnode()->name());
-        assert(nullptr != nodeBinding.logicnode()->inputs());
+        if (!nodeBinding.base())
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing base class info!");
+            return nullptr;
+        }
 
-        std::unique_ptr<PropertyImpl> inputs = PropertyImpl::Deserialize(*nodeBinding.logicnode()->inputs(), EPropertySemantics::BindingInput);
-        assert(nullptr != inputs);
+        // TODO Violin make optional - no need to always serialize string if not used
+        if (!nodeBinding.base()->name())
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing name!");
+            return nullptr;
+        }
 
-        return std::make_unique<RamsesNodeBindingImpl>(
-            nodeBinding.logicnode()->name()->string_view(),
-            static_cast<ramses::ERotationConvention>(nodeBinding.rotationConvention()),
-            std::move(inputs),
-            ramsesNode);
-    }
+        const std::string_view name = nodeBinding.base()->name()->string_view();
 
-    std::unique_ptr<PropertyImpl> RamsesNodeBindingImpl::CreateNodeProperties()
-    {
-        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput);
-        // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
+        if (!nodeBinding.base()->rootInput())
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing root input!");
+            return nullptr;
+        }
 
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool, EPropertySemantics::BindingInput));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
-        inputsImpl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+        std::unique_ptr<PropertyImpl> deserializedRootInput = PropertyImpl::Deserialize(*nodeBinding.base()->rootInput(), EPropertySemantics::BindingInput, errorReporting, deserializationMap);
 
-        // Set default values equivalent to those of Ramses
-        inputsImpl->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->setInternal<bool>(true);
-        inputsImpl->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->setInternal<vec3f>({ 1.f, 1.f, 1.f });
+        if (!deserializedRootInput)
+        {
+            return nullptr;
+        }
 
-        return inputsImpl;
+        // TODO Violin don't serialize these inputs -> get rid of the check
+        if (deserializedRootInput->getName() != "IN" || deserializedRootInput->getType() != EPropertyType::Struct)
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: root input has unexpected name or type!");
+            return nullptr;
+        }
+
+        const auto* boundObject = nodeBinding.base()->boundRamsesObject();
+        if (!boundObject)
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing ramses object reference!");
+            return nullptr;
+        }
+
+        const ramses::sceneObjectId_t objectId(boundObject->objectId());
+
+        ramses::Node* ramsesNode = ramsesResolver.findRamsesNodeInScene(name, objectId);
+        if (!ramsesNode)
+        {
+            // TODO Violin improve error reporting for this particular error (it's reported in ramsesResolver currently): provide better message and scene/node ids
+            return nullptr;
+        }
+
+        if (ramsesNode->getType() != static_cast<int>(boundObject->objectType()))
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: loaded node type does not match referenced node type!");
+            return nullptr;
+        }
+
+        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, name);
+        binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
+
+        ApplyRamsesValuesToInputProperties(*binding, *ramsesNode);
+
+        return binding;
     }
 
     std::optional<LogicNodeRuntimeError> RamsesNodeBindingImpl::update()
     {
-        if (m_ramsesNode != nullptr)
+        ramses::status_t status = ramses::StatusOK;
+        PropertyImpl& visibility = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl;
+        if (visibility.checkForBindingInputNewValueAndReset())
         {
-            ramses::status_t status = ramses::StatusOK;
-            PropertyImpl& visibility = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl;
-            if (visibility.checkForBindingInputNewValueAndReset())
+            // TODO Violin what about 'Off' state? Worth discussing!
+            if (visibility.getValueAs<bool>())
             {
-                // TODO Violin what about 'Off' state? Worth discussing!
-                if (*visibility.get<bool>())
-                {
-                    status = m_ramsesNode->setVisibility(ramses::EVisibilityMode::Visible);
-                }
-                else
-                {
-                    status = m_ramsesNode->setVisibility(ramses::EVisibilityMode::Invisible);
-                }
-
-                if (status != ramses::StatusOK)
-                {
-                    return LogicNodeRuntimeError{m_ramsesNode->getStatusMessage(status)};
-                }
+                status = m_ramsesNode.get().setVisibility(ramses::EVisibilityMode::Visible);
+            }
+            else
+            {
+                status = m_ramsesNode.get().setVisibility(ramses::EVisibilityMode::Invisible);
             }
 
-            PropertyImpl& rotation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl;
-            if (rotation.checkForBindingInputNewValueAndReset())
+            if (status != ramses::StatusOK)
             {
-                vec3f value = *rotation.get<vec3f>();
-                status = m_ramsesNode->setRotation(value[0], value[1], value[2], m_rotationConvention);
-
-                if (status != ramses::StatusOK)
-                {
-                    return LogicNodeRuntimeError{m_ramsesNode->getStatusMessage(status)};
-                }
+                return LogicNodeRuntimeError{m_ramsesNode.get().getStatusMessage(status)};
             }
+        }
 
-            PropertyImpl& translation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl;
-            if (translation.checkForBindingInputNewValueAndReset())
+        PropertyImpl& rotation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl;
+        if (rotation.checkForBindingInputNewValueAndReset())
+        {
+            const auto& value = rotation.getValueAs<vec3f>();
+            status = m_ramsesNode.get().setRotation(value[0], value[1], value[2], m_rotationConvention);
+
+            if (status != ramses::StatusOK)
             {
-                vec3f value = *translation.get<vec3f>();
-                status = m_ramsesNode->setTranslation(value[0], value[1], value[2]);
-
-                if (status != ramses::StatusOK)
-                {
-                    return LogicNodeRuntimeError{ m_ramsesNode->getStatusMessage(status) };
-                }
+                return LogicNodeRuntimeError{m_ramsesNode.get().getStatusMessage(status)};
             }
+        }
 
-            PropertyImpl& scaling = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl;
-            if (scaling.checkForBindingInputNewValueAndReset())
+        PropertyImpl& translation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl;
+        if (translation.checkForBindingInputNewValueAndReset())
+        {
+            const auto& value = translation.getValueAs<vec3f>();
+            status = m_ramsesNode.get().setTranslation(value[0], value[1], value[2]);
+
+            if (status != ramses::StatusOK)
             {
-                vec3f value = *scaling.get<vec3f>();
-                status = m_ramsesNode->setScaling(value[0], value[1], value[2]);
+                return LogicNodeRuntimeError{ m_ramsesNode.get().getStatusMessage(status) };
+            }
+        }
 
-                if (status != ramses::StatusOK)
-                {
-                    return LogicNodeRuntimeError{ m_ramsesNode->getStatusMessage(status) };
-                }
+        PropertyImpl& scaling = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl;
+        if (scaling.checkForBindingInputNewValueAndReset())
+        {
+            const auto& value = scaling.getValueAs<vec3f>();
+            status = m_ramsesNode.get().setScaling(value[0], value[1], value[2]);
+
+            if (status != ramses::StatusOK)
+            {
+                return LogicNodeRuntimeError{ m_ramsesNode.get().getStatusMessage(status) };
             }
         }
 
         return std::nullopt;
     }
 
-    bool RamsesNodeBindingImpl::setRamsesNode(ramses::Node* node)
-    {
-        m_ramsesNode = node;
-        return true;
-    }
-
-    ramses::Node* RamsesNodeBindingImpl::getRamsesNode() const
+    ramses::Node& RamsesNodeBindingImpl::getRamsesNode() const
     {
         return m_ramsesNode;
     }
@@ -167,4 +207,25 @@ namespace rlogic::internal
         return m_rotationConvention;
     }
 
+    // Overwrites binding value cache silently (without triggering dirty check) - this code is only executed at initialization,
+    // should not overwrite values unless set() or link explicitly called
+    void RamsesNodeBindingImpl::ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode)
+    {
+        const bool visible = (ramsesNode.getVisibility() == ramses::EVisibilityMode::Visible);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->setValue( PropertyValue{ visible }, false);
+
+        vec3f rotationValue;
+        ramsesNode.getRotation(rotationValue[0], rotationValue[1], rotationValue[2], binding.m_rotationConvention);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->setValue( PropertyValue{ rotationValue }, false);
+
+        vec3f translationValue;
+        ramsesNode.getTranslation(translationValue[0], translationValue[1], translationValue[2]);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl->setValue( PropertyValue{ translationValue }, false);
+
+        vec3f scalingValue;
+        ramsesNode.getScaling(scalingValue[0], scalingValue[1], scalingValue[2]);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->setValue( PropertyValue{ scalingValue }, false);
+
+
+    }
 }

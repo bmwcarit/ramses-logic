@@ -33,7 +33,7 @@ set(flatbuffers_output_dir "${PROJECT_SOURCE_DIR}/lib/flatbuffers/generated")
 # create list of *_gen.h out of *.fbs file list
 foreach(schema ${flatbuffers_schemas})
     get_filename_component(filename ${schema} NAME_WE)
-    list(APPEND generated_headers "${flatbuffers_output_dir}/${filename}_gen.h")
+    list(APPEND generated_headers "${flatbuffers_output_dir}/${filename}Gen.h")
 endforeach()
 
 # TODO Violin/Tobias investigate the "--conform" option of flatc - looks very promising
@@ -55,7 +55,7 @@ add_custom_command(
     COMMAND $<TARGET_FILE:flatc>
         -o ${flatbuffers_output_dir}/
         --cpp ${flatbuffers_schemas}
-        --filename-suffix _gen
+        --filename-suffix Gen
         --filename-ext h
         --scoped-enums
         --no-prefix

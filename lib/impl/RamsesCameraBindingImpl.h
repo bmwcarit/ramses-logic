@@ -9,9 +9,12 @@
 #pragma once
 
 #include "impl/RamsesBindingImpl.h"
+#include "internals/SerializationMap.h"
+#include "internals/DeserializationMap.h"
+
+#include "ramses-client-api/RamsesObjectTypes.h"
 
 #include <memory>
-#include "ramses-client-api/RamsesObjectTypes.h"
 
 namespace ramses
 {
@@ -32,6 +35,8 @@ namespace flatbuffers
 namespace rlogic::internal
 {
     class PropertyImpl;
+    class IRamsesObjectResolver;
+    class ErrorReporting;
 
     enum class ECameraPropertyStructStaticIndex : size_t
     {
@@ -68,21 +73,28 @@ namespace rlogic::internal
     class RamsesCameraBindingImpl : public RamsesBindingImpl
     {
     public:
-        explicit RamsesCameraBindingImpl(std::string_view name);
-        // TODO Violin we can remove this, Bindings don't need to deserialize their values after recent rework!
-        RamsesCameraBindingImpl(std::string_view name, std::unique_ptr<PropertyImpl> deserializedInputs, ramses::Camera* camera);
-        static flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> Serialize(const RamsesCameraBindingImpl& cameraBinding, flatbuffers::FlatBufferBuilder& builder);
-        [[nodiscard]] static std::unique_ptr<RamsesCameraBindingImpl> Deserialize(const rlogic_serialization::RamsesCameraBinding& cameraBinding, ramses::Camera* camera);
+        explicit RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, std::string_view name);
 
-        void setRamsesCamera(ramses::Camera* camera);
-        [[nodiscard]] ramses::Camera* getRamsesCamera() const;
+        [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> Serialize(
+            const RamsesCameraBindingImpl& cameraBinding,
+            flatbuffers::FlatBufferBuilder& builder,
+            SerializationMap& serializationMap);
+
+        [[nodiscard]] static std::unique_ptr<RamsesCameraBindingImpl> Deserialize(
+            const rlogic_serialization::RamsesCameraBinding& cameraBinding,
+            const IRamsesObjectResolver& ramsesResolver,
+            ErrorReporting& errorReporting,
+            DeserializationMap& deserializationMap);
+
+        [[nodiscard]] ramses::Camera& getRamsesCamera() const;
         [[nodiscard]] ramses::ERamsesObjectType getCameraType() const;
 
+        // TODO Violin make nodiscard
         std::optional<LogicNodeRuntimeError> update() override;
 
     private:
-        ramses::Camera* m_ramsesCamera = nullptr;
+        std::reference_wrapper<ramses::Camera> m_ramsesCamera;
 
-        void createCameraProperties(ramses::ERamsesObjectType cameraType);
+        static void ApplyRamsesValuesToInputProperties(RamsesCameraBindingImpl& binding, ramses::Camera& ramsesCamera);
     };
 }

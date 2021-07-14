@@ -14,8 +14,8 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 6)
-set(RLOGIC_VERSION_PATCH 2)
+set(RLOGIC_VERSION_MINOR 7)
+set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -45,8 +45,8 @@ option(ramses-logic_ENABLE_INSTALL "Enable/disable installation of Ramses Logic"
 option(ramses-logic_BUILD_WITH_LTO "Build all targets with link time optimization enabled (not supported on all platforms)" OFF)
 option(ramses-logic_WARNINGS_AS_ERRORS "Treat warnings as errors when compiling" ON)
 option(ramses-logic_FORCE_BUILD_TESTS "Force build tests, even if built as a submodule" OFF)
+option(ramses-logic_FORCE_BUILD_DOCS "Abort build if documentation dependencies not found(doxygen, sphinx, breathe and the rtd theme for sphinx)" OFF)
 option(ramses-logic_BUILD_EXAMPLES "Build examples" ON)
-option(ramses-logic_BUILD_DOCS "Build documentation (ON/OFF). Requires doxygen, sphinx, breathe and the rtd theme for sphinx" OFF)
 option(ramses-logic_ENABLE_FLATBUFFERS_GENERATION "Create target to generate flatbuffers serialization files (ON/OFF)" ON)
 option(ramses-logic_ENABLE_TEST_COVERAGE "Enable test coverage - works on clang only (ON/OFF)" OFF)
 option(ramses-logic_ENABLE_CODE_STYLE "Enable code style checker target (requires python3.6+)" ON)
@@ -233,9 +233,7 @@ endif()
 # build and install documentation
 #==========================================================================
 
-if(ramses-logic_BUILD_DOCS)
-    add_subdirectory(doc)
-endif()
+add_subdirectory(doc)
 
 if(ramses-logic_ENABLE_INSTALL)
     install(FILES       README.md CHANGELOG.md LICENSE.txt

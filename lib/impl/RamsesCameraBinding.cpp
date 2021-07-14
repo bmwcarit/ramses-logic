@@ -25,12 +25,7 @@ namespace rlogic
 
     RamsesCameraBinding::~RamsesCameraBinding() noexcept = default;
 
-    void RamsesCameraBinding::setRamsesCamera(ramses::Camera* camera)
-    {
-        m_cameraBinding->setRamsesCamera(camera);
-    }
-
-    ramses::Camera* RamsesCameraBinding::getRamsesCamera() const
+    ramses::Camera& RamsesCameraBinding::getRamsesCamera() const
     {
         return m_cameraBinding->getRamsesCamera();
     }

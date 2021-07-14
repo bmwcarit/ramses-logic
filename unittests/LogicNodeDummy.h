@@ -20,30 +20,33 @@ namespace rlogic::internal
     {
     public:
         explicit LogicNodeDummyImpl(std::string_view name, bool createNestedProperties = false)
-            : LogicNodeImpl(name,
-                std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput),
-                std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput))
+            : LogicNodeImpl(name)
         {
-            getInputs()->m_impl->addChild(std::make_unique<PropertyImpl>("input1", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-            getInputs()->m_impl->addChild(std::make_unique<PropertyImpl>("input2", EPropertyType::Int32, EPropertySemantics::ScriptInput));
+            auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput));
+            auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
 
-            getOutputs()->m_impl->addChild(std::make_unique<PropertyImpl>("output1", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
-            getOutputs()->m_impl->addChild(std::make_unique<PropertyImpl>("output2", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
+            inputs->m_impl->addChild(std::make_unique<PropertyImpl>("input1", EPropertyType::Int32, EPropertySemantics::ScriptInput));
+            inputs->m_impl->addChild(std::make_unique<PropertyImpl>("input2", EPropertyType::Int32, EPropertySemantics::ScriptInput));
+
+            outputs->m_impl->addChild(std::make_unique<PropertyImpl>("output1", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
+            outputs->m_impl->addChild(std::make_unique<PropertyImpl>("output2", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
 
             if (createNestedProperties)
             {
-                getInputs()->m_impl->addChild(std::make_unique<PropertyImpl>("inputStruct", EPropertyType::Struct, EPropertySemantics::ScriptInput));
-                getInputs()->getChild("inputStruct")->m_impl->addChild(std::make_unique<PropertyImpl>("nested", EPropertyType::Int32, EPropertySemantics::ScriptInput));
+                inputs->m_impl->addChild(std::make_unique<PropertyImpl>("inputStruct", EPropertyType::Struct, EPropertySemantics::ScriptInput));
+                inputs->getChild("inputStruct")->m_impl->addChild(std::make_unique<PropertyImpl>("nested", EPropertyType::Int32, EPropertySemantics::ScriptInput));
 
-                getOutputs()->m_impl->addChild(std::make_unique<PropertyImpl>("outputStruct", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
-                getOutputs()->getChild("outputStruct")->m_impl->addChild(std::make_unique<PropertyImpl>("nested", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
+                outputs->m_impl->addChild(std::make_unique<PropertyImpl>("outputStruct", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
+                outputs->getChild("outputStruct")->m_impl->addChild(std::make_unique<PropertyImpl>("nested", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
 
-                getInputs()->m_impl->addChild(std::make_unique<PropertyImpl>("inputArray", EPropertyType::Array, EPropertySemantics::ScriptInput));
-                getInputs()->getChild("inputArray")->m_impl->addChild(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EPropertySemantics::ScriptInput));
+                inputs->m_impl->addChild(std::make_unique<PropertyImpl>("inputArray", EPropertyType::Array, EPropertySemantics::ScriptInput));
+                inputs->getChild("inputArray")->m_impl->addChild(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EPropertySemantics::ScriptInput));
 
-                getOutputs()->m_impl->addChild(std::make_unique<PropertyImpl>("outputArray", EPropertyType::Array, EPropertySemantics::ScriptOutput));
-                getOutputs()->getChild("outputArray")->m_impl->addChild(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
+                outputs->m_impl->addChild(std::make_unique<PropertyImpl>("outputArray", EPropertyType::Array, EPropertySemantics::ScriptOutput));
+                outputs->getChild("outputArray")->m_impl->addChild(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
             }
+
+            setRootProperties(std::move(inputs), std::move(outputs));
         }
 
         std::optional<LogicNodeRuntimeError> update() override

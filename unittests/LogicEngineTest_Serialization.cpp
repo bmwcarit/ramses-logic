@@ -29,7 +29,7 @@
 #include "internals/FileUtils.h"
 #include "LogTestUtils.h"
 
-#include "generated/logicengine_gen.h"
+#include "generated/LogicEngineGen.h"
 #include "ramses-logic-build-config.h"
 #include "fmt/format.h"
 
@@ -71,31 +71,6 @@ namespace rlogic::internal
         ASSERT_EQ(1u, errors.size());
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Failed to load file 'invalid'"));
     }
-
-    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithoutVersionInfo)
-    {
-        flatbuffers::FlatBufferBuilder builder;
-        auto logicEngine = rlogic_serialization::CreateLogicEngine(
-            builder
-        );
-
-        builder.Finish(logicEngine);
-        ASSERT_TRUE(FileUtils::SaveBinary("no_version.bin", builder.GetBufferPointer(), builder.GetSize()));
-
-        EXPECT_FALSE(m_logicEngine.loadFromFile("no_version.bin"));
-        auto errors = m_logicEngine.getErrors();
-        ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("file 'no_version.bin' (size: "));
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("doesn't contain logic engine data with readable version specifiers"));
-
-        //Also test with buffer version of the API
-        EXPECT_FALSE(m_logicEngine.loadFromBuffer(builder.GetBufferPointer(), builder.GetSize()));
-        errors = m_logicEngine.getErrors();
-        ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("data buffer "));
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("(size: 12) doesn't contain logic engine data with readable version specifiers"));
-    }
-
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongRamsesVersion)
     {
@@ -150,6 +125,36 @@ namespace rlogic::internal
         ASSERT_EQ(1u, errors.size());
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading file 'wrong_version.bin' (size: "));
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Expected version {}.{}.x but found 100.200.9000-suffix", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR)));
+    }
+
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithoutApiObjects)
+    {
+        {
+            ramses::RamsesVersion ramsesVersion = ramses::GetRamsesVersion();
+            flatbuffers::FlatBufferBuilder builder;
+            auto logicEngine = rlogic_serialization::CreateLogicEngine(
+                builder,
+                rlogic_serialization::CreateVersion(builder,
+                    ramsesVersion.major,
+                    ramsesVersion.minor,
+                    ramsesVersion.patch,
+                    builder.CreateString(ramsesVersion.string)),
+                rlogic_serialization::CreateVersion(builder,
+                    g_PROJECT_VERSION_MAJOR,
+                    g_PROJECT_VERSION_MINOR,
+                    g_PROJECT_VERSION_PATCH,
+                    builder.CreateString(g_PROJECT_VERSION)),
+                0
+            );
+
+            builder.Finish(logicEngine);
+            ASSERT_TRUE(FileUtils::SaveBinary("no_api_objects.bin", builder.GetBufferPointer(), builder.GetSize()));
+        }
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("no_api_objects.bin"));
+        const auto& errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("doesn't contain API objects"));
     }
 
     TEST_F(ALogicEngine_Serialization, ProducesErrorWhenProvidingAFolderAsTargetForSaving)
@@ -276,11 +281,11 @@ namespace rlogic::internal
     {
         {
             LogicEngine logicEngine;
-            logicEngine.createRamsesNodeBinding("binding");
+            logicEngine.createRamsesNodeBinding(*m_node, "binding");
             logicEngine.saveToFile("LogicEngine.bin");
         }
         {
-            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
@@ -324,8 +329,8 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_Serialization, ProducesWarningIfSavedWithBindingValuesWithoutCallingUpdateBefore)
     {
         // Put logic engine to a dirty state (create new object and don't call update)
-        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("binding");
-        ASSERT_TRUE(m_logicEngine.m_impl->isDirty());
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "binding");
+        ASSERT_TRUE(m_logicEngine.m_impl->getApiObjects().isDirty());
 
         std::string warningMessage;
         ELogMessageType messageType;
@@ -357,11 +362,8 @@ namespace rlogic::internal
         ramses::Node* node1 = scene1->createNode("node1");
         ramses::Node* node2 = scene2->createNode("node2");
 
-        rlogic::RamsesNodeBinding* binding1 = m_logicEngine.createRamsesNodeBinding("binding1");
-        rlogic::RamsesNodeBinding* binding2 = m_logicEngine.createRamsesNodeBinding("binding2");
-
-        binding1->setRamsesNode(node1);
-        binding2->setRamsesNode(node2);
+        m_logicEngine.createRamsesNodeBinding(*node1, "binding1");
+        rlogic::RamsesNodeBinding* binding2 = m_logicEngine.createRamsesNodeBinding(*node2, "binding2");
 
         EXPECT_FALSE(m_logicEngine.saveToFile("will_not_be_written.logic"));
         EXPECT_EQ(2u, m_logicEngine.getErrors().size());
@@ -380,11 +382,8 @@ namespace rlogic::internal
         ramses::PerspectiveCamera* camera1 = scene1->createPerspectiveCamera("camera1");
         ramses::PerspectiveCamera* camera2 = scene2->createPerspectiveCamera("camera2");
 
-        rlogic::RamsesCameraBinding* binding1 = m_logicEngine.createRamsesCameraBinding("binding1");
-        rlogic::RamsesCameraBinding* binding2 = m_logicEngine.createRamsesCameraBinding("binding2");
-
-        binding1->setRamsesCamera(camera1);
-        binding2->setRamsesCamera(camera2);
+        m_logicEngine.createRamsesCameraBinding(*camera1, "binding1");
+        rlogic::RamsesCameraBinding* binding2 = m_logicEngine.createRamsesCameraBinding(*camera2, "binding2");
 
         EXPECT_FALSE(m_logicEngine.saveToFile("will_not_be_written.logic"));
         EXPECT_EQ(2u, m_logicEngine.getErrors().size());
@@ -396,22 +395,14 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Serialization, RefusesToSaveAppearanceBindingWhichIsFromDifferentSceneThanNodeBinding)
     {
-        RamsesTestSetup testSetup;
-        ramses::Scene* scene1 = testSetup.createScene(ramses::sceneId_t(1));
-        ramses::Scene* scene2 = testSetup.createScene(ramses::sceneId_t(2));
+        ramses::Scene* scene2 = m_ramses.createScene(ramses::sceneId_t(2));
 
-        ramses::Node* node = scene1->createNode("node");
-        ramses::Appearance& appearance = RamsesTestSetup::CreateTrivialTestAppearance(*scene2);
-
-        rlogic::RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding("node binding");
-        rlogic::RamsesAppearanceBinding* appBinding = m_logicEngine.createRamsesAppearanceBinding("app binding");
-
-        nodeBinding->setRamsesNode(node);
-        appBinding->setRamsesAppearance(&appearance);
+        m_logicEngine.createRamsesNodeBinding(*scene2->createNode(), "node binding");
+        rlogic::RamsesAppearanceBinding* appBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "app binding");
 
         EXPECT_FALSE(m_logicEngine.saveToFile("will_not_be_written.logic"));
         EXPECT_EQ(2u, m_logicEngine.getErrors().size());
-        EXPECT_EQ("Ramses appearance 'test appearance' is from scene with id:2 but other objects are from scene with id:1!", m_logicEngine.getErrors()[0].message);
+        EXPECT_EQ("Ramses appearance 'test appearance' is from scene with id:1 but other objects are from scene with id:2!", m_logicEngine.getErrors()[0].message);
         EXPECT_EQ(appBinding, m_logicEngine.getErrors()[0].node);
         EXPECT_EQ("Can't save a logic engine to file while it has references to more than one Ramses scene!", m_logicEngine.getErrors()[1].message);
         EXPECT_EQ(nullptr, m_logicEngine.getErrors()[1].node);
@@ -419,9 +410,6 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Serialization, ProducesNoErrorIfDeserilizedSuccessfully)
     {
-        RamsesTestSetup testSetup;
-        ramses::Scene* scene = testSetup.createScene();
-
         {
             LogicEngine logicEngine;
             logicEngine.createLuaScriptFromSource(R"(
@@ -432,17 +420,15 @@ namespace rlogic::internal
                 end
             )", "luascript");
 
-            auto appearanceBinding = logicEngine.createRamsesAppearanceBinding("appearancebinding");
-            appearanceBinding->setRamsesAppearance(&RamsesTestSetup::CreateTrivialTestAppearance(*scene));
+            logicEngine.createRamsesAppearanceBinding(*m_appearance, "appearancebinding");
 
-            logicEngine.createRamsesNodeBinding("nodebinding");
-            auto cameraBinding = logicEngine.createRamsesCameraBinding("camerabinding");
-            cameraBinding->setRamsesCamera(scene->createPerspectiveCamera());
+            logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
+            logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
 
             logicEngine.saveToFile("LogicEngine.bin");
         }
         {
-            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", scene));
+            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
@@ -497,7 +483,7 @@ namespace rlogic::internal
                 end
             )", "luascript");
 
-            logicEngine.createRamsesNodeBinding("binding");
+            logicEngine.createRamsesNodeBinding(*m_node, "binding");
             logicEngine.saveToFile("LogicEngine.bin");
         }
         {
@@ -509,8 +495,8 @@ namespace rlogic::internal
                 end
             )", "luascript2");
 
-            m_logicEngine.createRamsesNodeBinding("binding2");
-            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+            m_logicEngine.createRamsesNodeBinding(*m_node, "binding2");
+            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
             {
@@ -521,6 +507,7 @@ namespace rlogic::internal
                 ASSERT_NE(nullptr, script);
                 auto rNodeBinding = m_logicEngine.findNodeBinding("binding");
                 ASSERT_NE(nullptr, rNodeBinding);
+                EXPECT_EQ(m_node, &rNodeBinding->getRamsesNode());
             }
         }
     }

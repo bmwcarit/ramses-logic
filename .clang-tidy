@@ -223,6 +223,7 @@ Checks:
     cppcoreguidelines-pro-type-vararg,
     cppcoreguidelines-slicing,
     cppcoreguidelines-special-member-functions,
+    cppcoreguidelines-avoid-non-const-global-variables,
 
     # We are not using Darwin
     #darwin-*,

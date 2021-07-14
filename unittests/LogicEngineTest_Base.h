@@ -11,11 +11,16 @@
 #include "gtest/gtest.h"
 #include "gmock/gmock.h"
 
+#include "RamsesTestUtils.h"
+
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-client-api/OrthographicCamera.h"
+#include "ramses-client-api/Appearance.h"
+#include "ramses-utils.h"
 
 namespace rlogic
 {
@@ -23,6 +28,11 @@ namespace rlogic
     {
     protected:
         LogicEngine m_logicEngine;
+        RamsesTestSetup m_ramses;
+        ramses::Scene* m_scene = { m_ramses.createScene() };
+        ramses::Node* m_node = { m_scene->createNode() };
+        ramses::OrthographicCamera* m_camera = { m_scene->createOrthographicCamera() };
+        ramses::Appearance* m_appearance = { &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene) };
 
         const std::string_view m_valid_empty_script = R"(
             function interface()
@@ -33,5 +43,24 @@ namespace rlogic
 
         const std::string_view m_invalid_empty_script = R"(
         )";
+
+        void recreate(bool skipAppearance = false)
+        {
+            const ramses::sceneId_t sceneId = m_scene->getSceneId();
+
+            m_ramses.destroyScene(*m_scene);
+            m_scene = m_ramses.createScene(sceneId);
+            m_node = m_scene->createNode();
+            m_camera = m_scene->createOrthographicCamera();
+            if (skipAppearance)
+            {
+                m_appearance = nullptr;
+            }
+            else
+            {
+                m_appearance = &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene);
+            }
+        }
+
     };
 }

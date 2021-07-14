@@ -28,17 +28,23 @@
 #include "ramses-client-api/Camera.h"
 #include "ramses-framework-api/RamsesVersion.h"
 
-#include "generated/logicengine_gen.h"
+#include "generated/ApiObjectsGen.h"
+#include "generated/RamsesAppearanceBindingGen.h"
+#include "generated/RamsesBindingGen.h"
+#include "generated/RamsesCameraBindingGen.h"
+#include "generated/RamsesNodeBindingGen.h"
+#include "generated/LinkGen.h"
+
 #include "fmt/format.h"
 
 namespace rlogic::internal
 {
     LuaScript* ApiObjects::createLuaScript(SolState& solState, std::string_view source, std::string_view filename, std::string_view scriptName, ErrorReporting& errorReporting)
     {
-        std::unique_ptr<LuaScriptImpl> scriptImpl = LuaScriptImpl::Create(solState, source, scriptName, filename, errorReporting);
-        if (scriptImpl)
+        std::optional<CompiledScript> compiledScript = LuaScriptImpl::Compile(solState, source, scriptName, filename, errorReporting);
+        if (compiledScript)
         {
-            m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(scriptImpl)));
+            m_scripts.emplace_back(std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(*compiledScript))));
             LuaScript* script = m_scripts.back().get();
             registerLogicNode(*script);
             return script;
@@ -47,25 +53,25 @@ namespace rlogic::internal
         return nullptr;
     }
 
-    RamsesNodeBinding* ApiObjects::createRamsesNodeBinding(std::string_view name)
+    RamsesNodeBinding* ApiObjects::createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name)
     {
-        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(name)));
+        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(ramsesNode, name)));
         RamsesNodeBinding* binding = m_ramsesNodeBindings.back().get();
         registerLogicNode(*binding);
         return binding;
     }
 
-    RamsesAppearanceBinding* ApiObjects::createRamsesAppearanceBinding(std::string_view name)
+    RamsesAppearanceBinding* ApiObjects::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
     {
-        m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::make_unique<RamsesAppearanceBindingImpl>(name)));
+        m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::make_unique<RamsesAppearanceBindingImpl>(ramsesAppearance, name)));
         RamsesAppearanceBinding* binding = m_ramsesAppearanceBindings.back().get();
         registerLogicNode(*binding);
         return binding;
     }
 
-    RamsesCameraBinding* ApiObjects::createRamsesCameraBinding(std::string_view name)
+    RamsesCameraBinding* ApiObjects::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
-        m_ramsesCameraBindings.emplace_back(std::make_unique<RamsesCameraBinding>(std::make_unique<RamsesCameraBindingImpl>(name)));
+        m_ramsesCameraBindings.emplace_back(std::make_unique<RamsesCameraBinding>(std::make_unique<RamsesCameraBindingImpl>(ramsesCamera, name)));
         RamsesCameraBinding* binding = m_ramsesCameraBindings.back().get();
         registerLogicNode(*binding);
         return binding;
@@ -208,61 +214,52 @@ namespace rlogic::internal
 
         for (const auto& binding : m_ramsesNodeBindings)
         {
-            const ramses::Node* node = binding->m_nodeBinding->getRamsesNode();
-            if (node)
+            const ramses::Node& node = binding->m_nodeBinding->getRamsesNode();
+            const ramses::sceneId_t nodeSceneId = node.getSceneId();
+            if (!sceneId)
             {
-                const ramses::sceneId_t nodeSceneId = node->getSceneId();
-                if (!sceneId)
-                {
-                    sceneId = nodeSceneId;
-                }
+                sceneId = nodeSceneId;
+            }
 
-                if (*sceneId != nodeSceneId)
-                {
-                    errorReporting.add(fmt::format("Ramses node '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                        node->getName(), nodeSceneId.getValue(), sceneId->getValue()), *binding);
-                    return false;
-                }
+            if (*sceneId != nodeSceneId)
+            {
+                errorReporting.add(fmt::format("Ramses node '{}' is from scene with id:{} but other objects are from scene with id:{}!",
+                    node.getName(), nodeSceneId.getValue(), sceneId->getValue()), *binding);
+                return false;
             }
         }
 
         for (const auto& binding : m_ramsesAppearanceBindings)
         {
-            const ramses::Appearance* appearance = binding->m_appearanceBinding->getRamsesAppearance();
-            if (appearance)
+            const ramses::Appearance& appearance = binding->m_appearanceBinding->getRamsesAppearance();
+            const ramses::sceneId_t appearanceSceneId = appearance.getSceneId();
+            if (!sceneId)
             {
-                const ramses::sceneId_t appearanceSceneId = appearance->getSceneId();
-                if (!sceneId)
-                {
-                    sceneId = appearanceSceneId;
-                }
+                sceneId = appearanceSceneId;
+            }
 
-                if (*sceneId != appearanceSceneId)
-                {
-                    errorReporting.add(fmt::format("Ramses appearance '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                        appearance->getName(), appearanceSceneId.getValue(), sceneId->getValue()), *binding);
-                    return false;
-                }
+            if (*sceneId != appearanceSceneId)
+            {
+                errorReporting.add(fmt::format("Ramses appearance '{}' is from scene with id:{} but other objects are from scene with id:{}!",
+                    appearance.getName(), appearanceSceneId.getValue(), sceneId->getValue()), *binding);
+                return false;
             }
         }
 
         for (const auto& binding : m_ramsesCameraBindings)
         {
-            const ramses::Camera* camera = binding->m_cameraBinding->getRamsesCamera();
-            if (camera)
+            const ramses::Camera& camera = binding->m_cameraBinding->getRamsesCamera();
+            const ramses::sceneId_t cameraSceneId = camera.getSceneId();
+            if (!sceneId)
             {
-                const ramses::sceneId_t cameraSceneId = camera->getSceneId();
-                if (!sceneId)
-                {
-                    sceneId = cameraSceneId;
-                }
+                sceneId = cameraSceneId;
+            }
 
-                if (*sceneId != cameraSceneId)
-                {
-                    errorReporting.add(fmt::format("Ramses camera '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                        camera->getName(), cameraSceneId.getValue(), sceneId->getValue()), *binding);
-                    return false;
-                }
+            if (*sceneId != cameraSceneId)
+            {
+                errorReporting.add(fmt::format("Ramses camera '{}' is from scene with id:{} but other objects are from scene with id:{}!",
+                    camera.getName(), cameraSceneId.getValue(), sceneId->getValue()), *binding);
+                return false;
             }
         }
 
@@ -331,13 +328,17 @@ namespace rlogic::internal
         return m_reverseImplMapping;
     }
 
-    void ApiObjects::Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder)
+    flatbuffers::Offset<rlogic_serialization::ApiObjects> ApiObjects::Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder)
     {
+        SerializationMap serializationMap;
+
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> luascripts;
         luascripts.reserve(apiObjects.m_scripts.size());
 
         std::transform(apiObjects.m_scripts.begin(), apiObjects.m_scripts.end(), std::back_inserter(luascripts),
-            [&builder](const std::vector<std::unique_ptr<LuaScript>>::value_type& it) { return LuaScriptImpl::Serialize(*it->m_script, builder); });
+            [&builder, &serializationMap](const std::vector<std::unique_ptr<LuaScript>>::value_type& it) {
+                return LuaScriptImpl::Serialize(*it->m_script, builder, serializationMap);
+            });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> ramsesnodebindings;
         ramsesnodebindings.reserve(apiObjects.m_ramsesNodeBindings.size());
@@ -345,7 +346,9 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesNodeBindings.begin(),
             apiObjects.m_ramsesNodeBindings.end(),
             std::back_inserter(ramsesnodebindings),
-            [&builder](const std::vector<std::unique_ptr<RamsesNodeBinding>>::value_type& it) { return RamsesNodeBindingImpl::Serialize(*it->m_nodeBinding, builder); });
+            [&builder, &serializationMap](const std::vector<std::unique_ptr<RamsesNodeBinding>>::value_type& it) {
+                return RamsesNodeBindingImpl::Serialize(*it->m_nodeBinding, builder, serializationMap);
+            });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> ramsesappearancebindings;
         ramsesappearancebindings.reserve(apiObjects.m_ramsesAppearanceBindings.size());
@@ -353,7 +356,9 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesAppearanceBindings.begin(),
             apiObjects.m_ramsesAppearanceBindings.end(),
             std::back_inserter(ramsesappearancebindings),
-            [&builder](const std::vector<std::unique_ptr<RamsesAppearanceBinding>>::value_type& it) { return RamsesAppearanceBindingImpl::Serialize(*it->m_appearanceBinding, builder); });
+            [&builder, &serializationMap](const std::vector<std::unique_ptr<RamsesAppearanceBinding>>::value_type& it) {
+                return RamsesAppearanceBindingImpl::Serialize(*it->m_appearanceBinding, builder, serializationMap);
+            });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> ramsescamerabindings;
         ramsescamerabindings.reserve(apiObjects.m_ramsesCameraBindings.size());
@@ -361,77 +366,9 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesCameraBindings.begin(),
             apiObjects.m_ramsesCameraBindings.end(),
             std::back_inserter(ramsescamerabindings),
-            [&builder](const std::vector<std::unique_ptr<RamsesCameraBinding>>::value_type& it) { return RamsesCameraBindingImpl::Serialize(*it->m_cameraBinding, builder); });
-
-        // TODO Violin this code needs some redesign... Re-visit once we catch all errors and rewrite it
-        // Ideas: keep at least some of the relationship infos (we need them for error checking anyway)
-        // and don't traverse everything recursively to collect the data here
-        // Or: add and use object IDs, like in ramses
-
-        // TODO Violin move this part of the serialization to LogicNodeDependencies
-
-        struct PropertyLocation
-        {
-            rlogic_serialization::ELogicNodeType parentLogicNodeType = rlogic_serialization::ELogicNodeType::Script;
-            uint32_t owningLogicNodeIndex = 0;
-            std::vector<uint32_t> cascadedChildIndex;
-        };
-
-        std::unordered_map<const PropertyImpl*, PropertyLocation> propertyLocation;
-
-        std::function<void(const PropertyImpl&)> collectPropertyChildrenMetadata =
-            [&propertyLocation, &collectPropertyChildrenMetadata]
-        (const PropertyImpl& parentProperty)
-        {
-            const PropertyLocation parentMetadata = propertyLocation[&parentProperty];
-
-            for (uint32_t childIdx = 0; childIdx < parentProperty.getChildCount(); ++childIdx)
-            {
-                const PropertyImpl& childProperty = *parentProperty.getChild(childIdx)->m_impl;
-                PropertyLocation childMetadata = parentMetadata;
-                assert(propertyLocation.end() == propertyLocation.find(&childProperty));
-                childMetadata.cascadedChildIndex.push_back(childIdx);
-
-                propertyLocation[&childProperty] = childMetadata;
-                if (childProperty.getChildCount() != 0)
-                {
-                    collectPropertyChildrenMetadata(childProperty);
-                }
-            }
-        };
-
-        for (uint32_t scriptIndex = 0; scriptIndex < apiObjects.m_scripts.size(); ++scriptIndex)
-        {
-            const PropertyImpl* inputs = apiObjects.m_scripts[scriptIndex]->getInputs()->m_impl.get();
-            propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::Script, scriptIndex, {} };
-            collectPropertyChildrenMetadata(*inputs);
-
-            const PropertyImpl* outputs = apiObjects.m_scripts[scriptIndex]->getOutputs()->m_impl.get();
-            propertyLocation[outputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::Script, scriptIndex, {} };
-            collectPropertyChildrenMetadata(*outputs);
-
-        }
-
-        for (uint32_t nbIndex = 0; nbIndex < apiObjects.m_ramsesNodeBindings.size(); ++nbIndex)
-        {
-            const PropertyImpl* inputs = apiObjects.m_ramsesNodeBindings[nbIndex]->getInputs()->m_impl.get();
-            propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::RamsesNodeBinding, nbIndex, {} };
-            collectPropertyChildrenMetadata(*inputs);
-        }
-
-        for (uint32_t abIndex = 0; abIndex < apiObjects.m_ramsesAppearanceBindings.size(); ++abIndex)
-        {
-            const PropertyImpl* inputs = apiObjects.m_ramsesAppearanceBindings[abIndex]->getInputs()->m_impl.get();
-            propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::RamsesAppearanceBinding, abIndex, {} };
-            collectPropertyChildrenMetadata(*inputs);
-        }
-
-        for (uint32_t cbIndex = 0; cbIndex < apiObjects.m_ramsesCameraBindings.size(); ++cbIndex)
-        {
-            const PropertyImpl* inputs = apiObjects.m_ramsesCameraBindings[cbIndex]->getInputs()->m_impl.get();
-            propertyLocation[inputs] = PropertyLocation{ rlogic_serialization::ELogicNodeType::RamsesCameraBinding, cbIndex, {} };
-            collectPropertyChildrenMetadata(*inputs);
-        }
+            [&builder, &serializationMap](const std::vector<std::unique_ptr<RamsesCameraBinding>>::value_type& it) {
+                return RamsesCameraBindingImpl::Serialize(*it->m_cameraBinding, builder, serializationMap);
+            });
 
         const LinksMap& allLinks = apiObjects.m_logicNodeDependencies.getLinks();
 
@@ -440,37 +377,13 @@ namespace rlogic::internal
 
         for (const auto& link : allLinks)
         {
-            const PropertyLocation& srcProperty = propertyLocation[link.second];
-            const PropertyLocation& targetProperty = propertyLocation[link.first];
-
-            auto offset = rlogic_serialization::CreateLink(builder,
-                srcProperty.parentLogicNodeType,
-                targetProperty.parentLogicNodeType,
-                srcProperty.owningLogicNodeIndex,
-                targetProperty.owningLogicNodeIndex,
-                builder.CreateVector(srcProperty.cascadedChildIndex),
-                builder.CreateVector(targetProperty.cascadedChildIndex));
-            links.emplace_back(offset);
+            links.emplace_back(rlogic_serialization::CreateLink(builder,
+                serializationMap.resolvePropertyOffset(*link.second),
+                serializationMap.resolvePropertyOffset(*link.first)));
         }
 
-        ramses::RamsesVersion ramsesVersion = ramses::GetRamsesVersion();
-
-        auto ramsesVersionOffset = rlogic_serialization::CreateVersion(builder,
-            ramsesVersion.major,
-            ramsesVersion.minor,
-            ramsesVersion.patch,
-            builder.CreateString(ramsesVersion.string));
-
-        auto ramsesLogicVersionOffset = rlogic_serialization::CreateVersion(builder,
-            g_PROJECT_VERSION_MAJOR,
-            g_PROJECT_VERSION_MINOR,
-            g_PROJECT_VERSION_PATCH,
-            builder.CreateString(g_PROJECT_VERSION));
-
-        auto logicEngine = rlogic_serialization::CreateLogicEngine(
+        const auto logicEngine = rlogic_serialization::CreateApiObjects(
             builder,
-            ramsesVersionOffset,
-            ramsesLogicVersionOffset,
             builder.CreateVector(luascripts),
             builder.CreateVector(ramsesnodebindings),
             builder.CreateVector(ramsesappearancebindings),
@@ -479,215 +392,192 @@ namespace rlogic::internal
         );
 
         builder.Finish(logicEngine);
+
+        return logicEngine;
     }
 
     std::optional<ApiObjects> ApiObjects::Deserialize(
         SolState& solState,
-        const rlogic_serialization::LogicEngine& logicEngineData,
+        const rlogic_serialization::ApiObjects& apiObjects,
         const IRamsesObjectResolver& ramsesResolver,
         const std::string& dataSourceDescription,
         ErrorReporting& errorReporting)
     {
         // Collect data here, only return if no error occurred
-        ApiObjects apiObjects;
+        ApiObjects deserialized;
 
-        // TODO Violin handle this fatal error gracefully
-        // Also, traverse the entire deserialization and handle errors gracefully everywhere - it's not much work, and is a better way of dealing with file corruption
-        assert(nullptr != logicEngineData.luascripts());
-        assert(nullptr != logicEngineData.ramsesnodebindings());
-        assert(nullptr != logicEngineData.ramsesappearancebindings());
-        assert(nullptr != logicEngineData.ramsescamerabindings());
+        // Collect deserialized object mappings to resolve dependencies
+        DeserializationMap deserializationMap;
 
-        const auto luascripts = logicEngineData.luascripts();
-        assert(nullptr != luascripts);
-
-        if (luascripts->size() != 0)
+        if (!apiObjects.luaScripts())
         {
-            apiObjects.m_scripts.reserve(luascripts->size());
+            errorReporting.add("Fatal error during loading from serialized data: missing scripts container!");
+            return std::nullopt;
         }
 
-        for (auto script : *luascripts)
+        if (!apiObjects.nodeBindings())
         {
-            // script can't be null. Already handled by flatbuffers
-            assert(nullptr != script);
-            auto newScript = LuaScriptImpl::Deserialize(solState, *script);
-            assert (nullptr != newScript);
-            apiObjects.m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(newScript)));
-            apiObjects.registerLogicNode(*apiObjects.m_scripts.back());
+            errorReporting.add("Fatal error during loading from serialized data: missing node bindings container!");
+            return std::nullopt;
         }
 
-        const auto ramsesnodebindings = logicEngineData.ramsesnodebindings();
-        assert(nullptr != ramsesnodebindings);
-
-        if (ramsesnodebindings->size() != 0)
+        if (!apiObjects.appearanceBindings())
         {
-            apiObjects.m_ramsesNodeBindings.reserve(ramsesnodebindings->size());
+            errorReporting.add("Fatal error during loading from serialized data: missing appearance bindings container!");
+            return std::nullopt;
         }
 
-        for (auto rNodeBinding : *ramsesnodebindings)
+        if (!apiObjects.cameraBindings())
         {
-            assert(nullptr != rNodeBinding);
-            ramses::Node* ramsesNode = nullptr;
-            ramses::sceneObjectId_t objectId(rNodeBinding->ramsesNode());
+            errorReporting.add("Fatal error during loading from serialized data: missing camera bindings container!");
+            return std::nullopt;
+        }
 
-            if (objectId.isValid())
+        if (!apiObjects.links())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing links container!");
+            return std::nullopt;
+        }
+
+        const auto& luascripts = *apiObjects.luaScripts();
+        deserialized.m_scripts.reserve(luascripts.size());
+
+        for (const auto* script : luascripts)
+        {
+            // TODO Violin find ways to unit-test this case - also for other container types
+            // Ideas: see if verifier catches it; or: disable flatbuffer's internal asserts if possible
+            assert (script);
+            std::unique_ptr<LuaScriptImpl> deserializedScript = LuaScriptImpl::Deserialize(solState, *script, errorReporting, deserializationMap);
+
+            if (deserializedScript)
             {
-                ramsesNode = ramsesResolver.findRamsesNodeInScene(rNodeBinding->logicnode()->name()->string_view(), objectId);
-                if (!ramsesNode)
-                {
-                    return std::nullopt;
-                }
+                deserialized.m_scripts.emplace_back(std::make_unique<LuaScript>(std::move(deserializedScript)));
+                deserialized.registerLogicNode(*deserialized.m_scripts.back());
             }
-            apiObjects.m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(RamsesNodeBindingImpl::Deserialize(*rNodeBinding, ramsesNode)));
-            apiObjects.registerLogicNode(*apiObjects.m_ramsesNodeBindings.back());
-        }
-
-        const auto ramsesappearancebindings = logicEngineData.ramsesappearancebindings();
-
-        if (ramsesappearancebindings->size() != 0)
-        {
-            apiObjects.m_ramsesAppearanceBindings.reserve(ramsesappearancebindings->size());
-        }
-
-        for (auto rAppearanceBinding : *ramsesappearancebindings)
-        {
-            assert(nullptr != rAppearanceBinding);
-            ramses::Appearance* ramsesAppearance = nullptr;
-            ramses::sceneObjectId_t objectId(rAppearanceBinding->ramsesAppearance());
-
-            if (objectId.isValid())
-            {
-                ramsesAppearance = ramsesResolver.findRamsesAppearanceInScene(rAppearanceBinding->logicnode()->name()->string_view(), objectId);
-                if (!ramsesAppearance)
-                {
-                    return std::nullopt;
-                }
-            }
-
-            auto newBinding = RamsesAppearanceBindingImpl::Deserialize(*rAppearanceBinding, ramsesAppearance, errorReporting);
-            if (nullptr == newBinding)
+            else
             {
                 return std::nullopt;
             }
-
-            apiObjects.m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::move(newBinding)));
-            apiObjects.registerLogicNode(*apiObjects.m_ramsesAppearanceBindings.back());
         }
 
-        const auto ramsescamerabindings = logicEngineData.ramsescamerabindings();
+        const auto& ramsesNodeBindings = *apiObjects.nodeBindings();
 
-        if (ramsescamerabindings->size() != 0)
+        deserialized.m_ramsesNodeBindings.reserve(ramsesNodeBindings.size());
+
+        for (const auto* binding : ramsesNodeBindings)
         {
-            apiObjects.m_ramsesCameraBindings.reserve(ramsescamerabindings->size());
-        }
+            assert (binding);
+            std::unique_ptr<RamsesNodeBindingImpl> deserializedBinding = RamsesNodeBindingImpl::Deserialize(*binding, ramsesResolver, errorReporting, deserializationMap);
 
-        for (auto rCameraBinding : *ramsescamerabindings)
-        {
-            assert(nullptr != rCameraBinding);
-
-            ramses::Camera* ramsesCamera = nullptr;
-            ramses::sceneObjectId_t objectId(rCameraBinding->ramsesCamera());
-
-            if (objectId.isValid())
+            if (deserializedBinding)
             {
-                ramsesCamera = ramsesResolver.findRamsesCameraInScene(rCameraBinding->logicnode()->name()->string_view(), objectId);
-                if (!ramsesCamera)
-                {
-                    return std::nullopt;
-                }
+                deserialized.m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::move(deserializedBinding)));
+                deserialized.registerLogicNode(*deserialized.m_ramsesNodeBindings.back());
             }
-
-            auto newBinding = RamsesCameraBindingImpl::Deserialize(*rCameraBinding, ramsesCamera);
-            if (nullptr == newBinding)
+            else
             {
                 return std::nullopt;
             }
-
-            apiObjects.m_ramsesCameraBindings.emplace_back(std::make_unique<RamsesCameraBinding>(std::move(newBinding)));
-            apiObjects.registerLogicNode(*apiObjects.m_ramsesCameraBindings.back());
         }
 
-        assert(logicEngineData.links());
-        const auto& links = *logicEngineData.links();
+        const auto& ramsesAppearanceBindings = *apiObjects.appearanceBindings();
 
-        // TODO Violin open discussion if we want to handle errors differently here
-        for (const auto rLink : links)
+        deserialized.m_ramsesAppearanceBindings.reserve(ramsesAppearanceBindings.size());
+
+        for (const auto* binding : ramsesAppearanceBindings)
         {
-            assert(nullptr != rLink);
+            assert(binding);
+            std::unique_ptr<RamsesAppearanceBindingImpl> deserializedBinding = RamsesAppearanceBindingImpl::Deserialize(*binding, ramsesResolver, errorReporting, deserializationMap);
 
-            const LogicNode* srcLogicNode = nullptr;
-            switch (rLink->sourceLogicNodeType())
+            if (deserializedBinding)
             {
-            case rlogic_serialization::ELogicNodeType::Script:
-                assert(rLink->sourceLogicNodeId() < apiObjects.m_scripts.size());
-                srcLogicNode = apiObjects.m_scripts[rLink->sourceLogicNodeId()].get();
-                break;
-            case rlogic_serialization::ELogicNodeType::RamsesNodeBinding:
-            case rlogic_serialization::ELogicNodeType::RamsesAppearanceBinding:
-            case rlogic_serialization::ELogicNodeType::RamsesCameraBinding:
-                assert(false && "Bindings can't be the source node of a link!");
+                deserialized.m_ramsesAppearanceBindings.emplace_back(std::make_unique<RamsesAppearanceBinding>(std::move(deserializedBinding)));
+                deserialized.registerLogicNode(*deserialized.m_ramsesAppearanceBindings.back());
             }
-            assert(srcLogicNode != nullptr);
-
-            const LogicNode* tgtLogicNode = nullptr;
-            switch (rLink->targetLogicNodeType())
+            else
             {
-            case rlogic_serialization::ELogicNodeType::Script:
-                assert(rLink->targetLogicNodeId() < apiObjects.m_scripts.size());
-                tgtLogicNode = apiObjects.m_scripts[rLink->targetLogicNodeId()].get();
-                break;
-            case rlogic_serialization::ELogicNodeType::RamsesNodeBinding:
-                assert(rLink->targetLogicNodeId() < apiObjects.m_ramsesNodeBindings.size());
-                tgtLogicNode = apiObjects.m_ramsesNodeBindings[rLink->targetLogicNodeId()].get();
-                break;
-            case rlogic_serialization::ELogicNodeType::RamsesAppearanceBinding:
-                assert(rLink->targetLogicNodeId() < apiObjects.m_ramsesAppearanceBindings.size());
-                tgtLogicNode = apiObjects.m_ramsesAppearanceBindings[rLink->targetLogicNodeId()].get();
-                break;
-            case rlogic_serialization::ELogicNodeType::RamsesCameraBinding:
-                assert(rLink->targetLogicNodeId() < apiObjects.m_ramsesCameraBindings.size());
-                tgtLogicNode = apiObjects.m_ramsesCameraBindings[rLink->targetLogicNodeId()].get();
-                break;
+                return std::nullopt;
             }
-            assert(tgtLogicNode != nullptr);
-            assert(tgtLogicNode != srcLogicNode);
+        }
 
-            const auto* indicesSrc = rLink->sourcePropertyNestedIndex();
-            assert(indicesSrc != nullptr);
-            const Property* sourceProperty = srcLogicNode->getOutputs();
-            assert(sourceProperty);
-            for (auto idx : *indicesSrc)
+        const auto& ramsesCameraBindings = *apiObjects.cameraBindings();
+
+        deserialized.m_ramsesCameraBindings.reserve(ramsesCameraBindings.size());
+
+        for (const auto* binding : ramsesCameraBindings)
+        {
+            assert(binding);
+            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(*binding, ramsesResolver, errorReporting, deserializationMap);
+
+            if (deserializedBinding)
             {
-                sourceProperty = sourceProperty->getChild(idx);
-                assert(sourceProperty);
+                deserialized.m_ramsesCameraBindings.emplace_back(std::make_unique<RamsesCameraBinding>(std::move(deserializedBinding)));
+                deserialized.registerLogicNode(*deserialized.m_ramsesCameraBindings.back());
+            }
+            else
+            {
+                return std::nullopt;
+            }
+        }
+
+        const auto& links = *apiObjects.links();
+
+        // TODO Violin move this code (serialization parts too) to LogicNodeDependencies
+        for (const auto* rLink : links)
+        {
+            assert(rLink);
+
+            if (!rLink->sourceProperty())
+            {
+                errorReporting.add("Fatal error during loading from serialized data: missing link source property!");
+                return std::nullopt;
             }
 
-            const auto* indicesTgt = rLink->targetPropertyNestedIndex();
-            assert(indicesTgt != nullptr);
-            const Property* targetProperty = tgtLogicNode->getInputs();
-            assert(targetProperty != nullptr);
-            for (auto idx : *indicesTgt)
+            if (!rLink->targetProperty())
             {
-                targetProperty = targetProperty->getChild(idx);
-                assert(targetProperty != nullptr);
+                errorReporting.add("Fatal error during loading from serialized data: missing link target property!");
+                return std::nullopt;
             }
 
-            const bool success = apiObjects.m_logicNodeDependencies.link(*sourceProperty->m_impl, *targetProperty->m_impl, errorReporting);
+            const rlogic_serialization::Property* sourceProp = rLink->sourceProperty();
+            const rlogic_serialization::Property* targetProp = rLink->targetProperty();
+
+            const bool success = deserialized.m_logicNodeDependencies.link(
+                deserializationMap.resolvePropertyImpl(*sourceProp),
+                deserializationMap.resolvePropertyImpl(*targetProp),
+                errorReporting);
+            // TODO Violin handle (and unit test!) this error properly. Consider these error cases:
+            // - maliciously forged properties (not attached to any node anywhere)
+            // - cycles! (we check this on serialization, but Murphy's law says if something can break, it will break)
             if (!success)
             {
                 errorReporting.add(
-                    fmt::format("Fatal error during loading from {}! Could not link property '{}' (from LogicNode {}) to property '{}' (from LogicNode {})!",
+                    fmt::format("Fatal error during loading from {}! Could not link property '{}' to property '{}'!",
                         dataSourceDescription,
-                        sourceProperty->getName(),
-                        srcLogicNode->getName(),
-                        targetProperty->getName(),
-                        tgtLogicNode->getName()
+                        sourceProp->name()->string_view(),
+                        targetProp->name()->string_view()
                     ));
                 return std::nullopt;
             }
         }
 
         // This syntax is compatible with GCC7 (c++11 converts automatically)
-        return std::make_optional(std::move(apiObjects));
+        return std::make_optional(std::move(deserialized));
+    }
+
+    bool ApiObjects::isDirty() const
+    {
+        // TODO Violin improve internal management of logic nodes so that we don't have to loop over three
+        // different containers below which all call a method on LogicNode
+        return std::any_of(m_scripts.cbegin(), m_scripts.cend(), [](const auto& s) { return s->m_impl.get().isDirty(); })
+            || bindingsDirty();
+    }
+
+    bool ApiObjects::bindingsDirty() const
+    {
+        return
+            std::any_of(m_ramsesNodeBindings.cbegin(), m_ramsesNodeBindings.cend(), [](const auto& b) { return b->m_impl.get().isDirty(); }) ||
+            std::any_of(m_ramsesAppearanceBindings.cbegin(), m_ramsesAppearanceBindings.cend(), [](const auto& b) { return b->m_impl.get().isDirty(); }) ||
+            std::any_of(m_ramsesCameraBindings.cbegin(), m_ramsesCameraBindings.cend(), [](const auto& b) { return b->m_impl.get().isDirty(); });
     }
 }

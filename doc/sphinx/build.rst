@@ -122,11 +122,6 @@ things can be enabled using following CMake options:
     * default: OFF
     * enables clang's options to generate code coverage from test executables
 
-* -Dramses-logic_BUILD_DOCS
-    * options: ON/OFF
-    * default: OFF
-    * builds these documentation pages. Requires `sphinx <https://www.sphinx-doc.org/>`_, `breathe <https://breathe.readthedocs.io/>`_ and the `rtd documentation theme <https://github.com/readthedocs/sphinx_rtd_theme>`_ by sphinx.
-
 * -Dramses-logic_BUILD_WITH_LTO
     * options: ON/OFF
     * default: OFF

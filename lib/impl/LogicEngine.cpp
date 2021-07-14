@@ -116,9 +116,9 @@ namespace rlogic
         return m_impl->createLuaScriptFromSource(source, scriptName);
     }
 
-    RamsesNodeBinding* LogicEngine::createRamsesNodeBinding(std::string_view name)
+    RamsesNodeBinding* LogicEngine::createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name)
     {
-        return m_impl->createRamsesNodeBinding(name);
+        return m_impl->createRamsesNodeBinding(ramsesNode, name);
     }
 
     bool LogicEngine::destroy(LogicNode& logicNode)
@@ -126,14 +126,14 @@ namespace rlogic
         return m_impl->destroy(logicNode);
     }
 
-    RamsesAppearanceBinding* LogicEngine::createRamsesAppearanceBinding(std::string_view name)
+    RamsesAppearanceBinding* LogicEngine::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
     {
-        return m_impl->createRamsesAppearanceBinding(name);
+        return m_impl->createRamsesAppearanceBinding(ramsesAppearance, name);
     }
 
-    RamsesCameraBinding* LogicEngine::createRamsesCameraBinding(std::string_view name)
+    RamsesCameraBinding* LogicEngine::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
-        return m_impl->createRamsesCameraBinding(name);
+        return m_impl->createRamsesCameraBinding(ramsesCamera, name);
     }
 
     const std::vector<ErrorData>& LogicEngine::getErrors() const

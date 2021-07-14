@@ -19,6 +19,9 @@
 namespace ramses
 {
     class Scene;
+    class Node;
+    class Appearance;
+    class Camera;
 }
 
 namespace rlogic::internal
@@ -144,52 +147,43 @@ namespace rlogic
         RLOGIC_API LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName = "");
 
         /**
-        * Destroys a #rlogic::LogicNode instance. If any links are connected to this #rlogic::LogicNode, they will
-        * be destroyed too. Note that after this call, the execution order of #rlogic::LogicNode may change! See the
-        * docs of #link and #unlink for more information.
-        *
-         * Attention! This method clears all previous errors! See also docs of #getErrors()
-         *
-        * @param logicNode the logic node instance to destroy
-        * @return true if logicNode destroyed, false otherwise. Call #getErrors() for error details upon failure.
-        */
-        RLOGIC_API bool destroy(LogicNode& logicNode);
-
-        /**
          * Creates a new #rlogic::RamsesNodeBinding which can be used to set the properties of a Ramses Node object.
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
+         * @param ramsesNode the ramses::Node object to control with the binding.
          * @param name a name for the new #rlogic::RamsesNodeBinding.
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The binding can be destroyed by calling the #destroy method
          */
-        RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(std::string_view name = "");
+        RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name = "");
 
         /**
          * Creates a new #rlogic::RamsesAppearanceBinding which can be used to set the properties of a Ramses Appearance object.
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
+         * @param ramsesAppearance the ramses::Appearance object to control with the binding.
          * @param name a name for the the new #rlogic::RamsesAppearanceBinding.
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The binding can be destroyed by calling the #destroy method
          */
-        RLOGIC_API RamsesAppearanceBinding* createRamsesAppearanceBinding(std::string_view name = "");
+        RLOGIC_API RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name = "");
 
         /**
          * Creates a new #rlogic::RamsesCameraBinding which can be used to set the properties of a Ramses Camera object.
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
+         * @param ramsesCamera the ramses::Camera object to control with the binding.
          * @param name a name for the the new #rlogic::RamsesCameraBinding.
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The binding can be destroyed by calling the #destroy method
          */
-        RLOGIC_API RamsesCameraBinding* createRamsesCameraBinding(std::string_view name ="");
+        RLOGIC_API RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name ="");
 
         /**
          * Updates all #rlogic::LogicNode's which were created by this #LogicEngine instance.
@@ -278,6 +272,18 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API const std::vector<ErrorData>& getErrors() const;
 
         /**
+        * Destroys a #rlogic::LogicNode instance. If any links are connected to this #rlogic::LogicNode, they will
+        * be destroyed too. Note that after this call, the execution order of #rlogic::LogicNode may change! See the
+        * docs of #link and #unlink for more information.
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param logicNode the logic node instance to destroy
+        * @return true if logicNode destroyed, false otherwise. Call #getErrors() for error details upon failure.
+        */
+        RLOGIC_API bool destroy(LogicNode& logicNode);
+
+        /**
          * Writes the whole #LogicEngine and all of its objects to a binary file with the given filename. The RAMSES scene
          * potentially referenced by #rlogic::RamsesBinding objects is not saved - that is left to the application.
          * #LogicEngine saves the references to those object, and restores them after loading.
@@ -309,7 +315,7 @@ namespace rlogic
          * Otherwise, the call to #loadFromFile will fail with an error. In case of errors, the #LogicEngine
          * may be left in an inconsistent state.
          * For more in-depth information regarding saving and loading, refer to the online documentation at
-         * https://ramses-logic.readthedocs.io/en/latest/api.html#save-load-to-file
+         * https://ramses-logic.readthedocs.io/en/latest/api.html#saving-loading-from-file
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *

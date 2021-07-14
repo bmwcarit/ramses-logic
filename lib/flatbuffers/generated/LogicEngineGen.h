@@ -6,13 +6,15 @@
 
 #include "flatbuffers/flatbuffers.h"
 
-#include "link_gen.h"
-#include "logicnode_gen.h"
-#include "luascript_gen.h"
-#include "property_gen.h"
-#include "ramsesappearancebinding_gen.h"
-#include "ramsescamerabinding_gen.h"
-#include "ramsesnodebinding_gen.h"
+#include "ApiObjectsGen.h"
+#include "LinkGen.h"
+#include "LuaScriptGen.h"
+#include "PropertyGen.h"
+#include "RamsesAppearanceBindingGen.h"
+#include "RamsesBindingGen.h"
+#include "RamsesCameraBindingGen.h"
+#include "RamsesNodeBindingGen.h"
+#include "RamsesReferenceGen.h"
 
 namespace rlogic_serialization {
 
@@ -122,11 +124,7 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_RAMSESVERSION = 4,
     VT_RLOGICVERSION = 6,
-    VT_LUASCRIPTS = 8,
-    VT_RAMSESNODEBINDINGS = 10,
-    VT_RAMSESAPPEARANCEBINDINGS = 12,
-    VT_RAMSESCAMERABINDINGS = 14,
-    VT_LINKS = 16
+    VT_APIOBJECTS = 8
   };
   const rlogic_serialization::Version *ramsesVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RAMSESVERSION);
@@ -134,42 +132,17 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::Version *rlogicVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RLOGICVERSION);
   }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luascripts() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *>(VT_LUASCRIPTS);
-  }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *ramsesnodebindings() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *>(VT_RAMSESNODEBINDINGS);
-  }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *ramsesappearancebindings() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *>(VT_RAMSESAPPEARANCEBINDINGS);
-  }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *ramsescamerabindings() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *>(VT_RAMSESCAMERABINDINGS);
-  }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *links() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *>(VT_LINKS);
+  const rlogic_serialization::ApiObjects *apiObjects() const {
+    return GetPointer<const rlogic_serialization::ApiObjects *>(VT_APIOBJECTS);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_RAMSESVERSION) &&
+           VerifyOffsetRequired(verifier, VT_RAMSESVERSION) &&
            verifier.VerifyTable(ramsesVersion()) &&
-           VerifyOffset(verifier, VT_RLOGICVERSION) &&
+           VerifyOffsetRequired(verifier, VT_RLOGICVERSION) &&
            verifier.VerifyTable(rlogicVersion()) &&
-           VerifyOffset(verifier, VT_LUASCRIPTS) &&
-           verifier.VerifyVector(luascripts()) &&
-           verifier.VerifyVectorOfTables(luascripts()) &&
-           VerifyOffset(verifier, VT_RAMSESNODEBINDINGS) &&
-           verifier.VerifyVector(ramsesnodebindings()) &&
-           verifier.VerifyVectorOfTables(ramsesnodebindings()) &&
-           VerifyOffset(verifier, VT_RAMSESAPPEARANCEBINDINGS) &&
-           verifier.VerifyVector(ramsesappearancebindings()) &&
-           verifier.VerifyVectorOfTables(ramsesappearancebindings()) &&
-           VerifyOffset(verifier, VT_RAMSESCAMERABINDINGS) &&
-           verifier.VerifyVector(ramsescamerabindings()) &&
-           verifier.VerifyVectorOfTables(ramsescamerabindings()) &&
-           VerifyOffset(verifier, VT_LINKS) &&
-           verifier.VerifyVector(links()) &&
-           verifier.VerifyVectorOfTables(links()) &&
+           VerifyOffset(verifier, VT_APIOBJECTS) &&
+           verifier.VerifyTable(apiObjects()) &&
            verifier.EndTable();
   }
 };
@@ -184,20 +157,8 @@ struct LogicEngineBuilder {
   void add_rlogicVersion(flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion) {
     fbb_.AddOffset(LogicEngine::VT_RLOGICVERSION, rlogicVersion);
   }
-  void add_luascripts(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>> luascripts) {
-    fbb_.AddOffset(LogicEngine::VT_LUASCRIPTS, luascripts);
-  }
-  void add_ramsesnodebindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>> ramsesnodebindings) {
-    fbb_.AddOffset(LogicEngine::VT_RAMSESNODEBINDINGS, ramsesnodebindings);
-  }
-  void add_ramsesappearancebindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>> ramsesappearancebindings) {
-    fbb_.AddOffset(LogicEngine::VT_RAMSESAPPEARANCEBINDINGS, ramsesappearancebindings);
-  }
-  void add_ramsescamerabindings(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>> ramsescamerabindings) {
-    fbb_.AddOffset(LogicEngine::VT_RAMSESCAMERABINDINGS, ramsescamerabindings);
-  }
-  void add_links(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links) {
-    fbb_.AddOffset(LogicEngine::VT_LINKS, links);
+  void add_apiObjects(flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects) {
+    fbb_.AddOffset(LogicEngine::VT_APIOBJECTS, apiObjects);
   }
   explicit LogicEngineBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -207,6 +168,8 @@ struct LogicEngineBuilder {
   flatbuffers::Offset<LogicEngine> Finish() {
     const auto end = fbb_.EndTable(start_);
     auto o = flatbuffers::Offset<LogicEngine>(end);
+    fbb_.Required(o, LogicEngine::VT_RAMSESVERSION);
+    fbb_.Required(o, LogicEngine::VT_RLOGICVERSION);
     return o;
   }
 };
@@ -215,17 +178,9 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
     flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>> luascripts = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>> ramsesnodebindings = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>> ramsesappearancebindings = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>> ramsescamerabindings = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links = 0) {
+    flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects = 0) {
   LogicEngineBuilder builder_(_fbb);
-  builder_.add_links(links);
-  builder_.add_ramsescamerabindings(ramsescamerabindings);
-  builder_.add_ramsesappearancebindings(ramsesappearancebindings);
-  builder_.add_ramsesnodebindings(ramsesnodebindings);
-  builder_.add_luascripts(luascripts);
+  builder_.add_apiObjects(apiObjects);
   builder_.add_rlogicVersion(rlogicVersion);
   builder_.add_ramsesVersion(ramsesVersion);
   return builder_.Finish();
@@ -235,31 +190,6 @@ struct LogicEngine::Traits {
   using type = LogicEngine;
   static auto constexpr Create = CreateLogicEngine;
 };
-
-inline flatbuffers::Offset<LogicEngine> CreateLogicEngineDirect(
-    flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
-    flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luascripts = nullptr,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> *ramsesnodebindings = nullptr,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> *ramsesappearancebindings = nullptr,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *ramsescamerabindings = nullptr,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::Link>> *links = nullptr) {
-  auto luascripts__ = luascripts ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaScript>>(*luascripts) : 0;
-  auto ramsesnodebindings__ = ramsesnodebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>(*ramsesnodebindings) : 0;
-  auto ramsesappearancebindings__ = ramsesappearancebindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>(*ramsesappearancebindings) : 0;
-  auto ramsescamerabindings__ = ramsescamerabindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>(*ramsescamerabindings) : 0;
-  auto links__ = links ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Link>>(*links) : 0;
-  return rlogic_serialization::CreateLogicEngine(
-      _fbb,
-      ramsesVersion,
-      rlogicVersion,
-      luascripts__,
-      ramsesnodebindings__,
-      ramsesappearancebindings__,
-      ramsescamerabindings__,
-      links__);
-}
 
 inline const rlogic_serialization::LogicEngine *GetLogicEngine(const void *buf) {
   return flatbuffers::GetRoot<rlogic_serialization::LogicEngine>(buf);

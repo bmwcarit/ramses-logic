@@ -30,14 +30,14 @@ namespace rlogic::internal
         static void        NewIndex(LuaScriptPropertyHandler& data, const sol::object& index, const sol::object& rhs);
         static sol::object Index(LuaScriptPropertyHandler& data, const sol::object& index);
 
-        size_t size() const;
+        [[nodiscard]] size_t size() const;
 
-        sol::object getChildPropertyAsSolObject(std::string_view childName);
+        [[nodiscard]] sol::object getChildPropertyAsSolObject(std::string_view childName);
 
         [[nodiscard]] const PropertyImpl& getPropertyImpl() const;
 
         // TODO Violin remove this exposure
-        SolState& getSolState();
+        [[nodiscard]] SolState& getSolState();
 
     private:
         SolState& m_solState;
@@ -48,15 +48,14 @@ namespace rlogic::internal
 
         sol::object getChildPropertyAsSolObject(const sol::object& index);
 
-        Property* getStructProperty(const sol::object& propertyIndex);
-        Property* getStructProperty(std::string_view propertyName);
-        Property* getArrayProperty(const sol::object& propertyIndex);
+        [[nodiscard]] Property* getStructProperty(const sol::object& propertyIndex);
+        [[nodiscard]] Property* getStructProperty(std::string_view propertyName);
+        [[nodiscard]] Property* getArrayProperty(const sol::object& propertyIndex);
 
+        // TODO Violin this method is not needed and can be optimized away
         template <typename T> sol::object convertPropertyToSolObject(PropertyImpl& property)
         {
-            auto value = property.get<T>();
-            assert (value && "Lua type mismatch while converting object!");
-            return m_solState.createUserObject(*value);
+            return m_solState.createUserObject(property.getValueAs<T>());
         }
     };
 }

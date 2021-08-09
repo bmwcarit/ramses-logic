@@ -396,6 +396,18 @@ such pointers after loading from file.
     graceful handling of deserialization errors, but for now we suggest discarding a :class:`rlogic::LogicEngine` object which failed to load.
 
 --------------------------------------------------
+File compatibility
+--------------------------------------------------
+
+Since version ``0.7.0``, Ramses Logic binary files are backwards and forwards compatible.
+This means that a newer version of the runtime can be used to load an older binary file and vice-versa.
+For the exact compatibility info, see the `version matrix <https://ramses-logic.readthedocs.io/en/latest/readme_ref.html#version-matrix>`_.
+There are some limitations:
+
+* Loading a file older than v0.7.0 will result in an error with a runtime equal or newer than v0.7.0
+* Adding new features will still break the format and require re-export. We will explicitly list such breaking changes in the version matrix.
+
+--------------------------------------------------
 Saving and loading together with a Ramses scene
 --------------------------------------------------
 
@@ -559,43 +571,3 @@ List of all examples
     examples/05_serialization
     examples/06_override_print
     examples/07_links
-
-=========================
-Class Index
-=========================
-
-Top-level API classes:
-
-* :class:`rlogic::LogicEngine`
-* :class:`rlogic::LuaScript`
-* :class:`rlogic::RamsesNodeBinding`
-* :class:`rlogic::RamsesAppearanceBinding`
-* :class:`rlogic::RamsesCameraBinding`
-* :class:`rlogic::Property`
-
-Base classes:
-
-* :class:`rlogic::LogicNode` (base for almost everything)
-* :class:`rlogic::RamsesBinding` (base for all bindings)
-
-Iterators:
-
-* :class:`rlogic::Iterator`
-* :class:`rlogic::Collection`
-
-Free functions:
-
-* :func:`rlogic::GetRamsesLogicVersion`
-* :func:`rlogic::Logger::SetLogHandler`
-* :func:`rlogic::Logger::SetDefaultLogging`
-
-Type traits:
-
-* :struct:`rlogic::PropertyTypeToEnum`
-* :struct:`rlogic::IsPrimitiveProperty`
-
-Error information:
-
-* :struct:`rlogic::ErrorData`
-
-.. doxygenindex::

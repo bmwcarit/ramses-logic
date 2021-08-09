@@ -58,6 +58,37 @@ reside in which part of the source tree:
     /cmake, /external and the root CMakeLists.txt file.
 
 -----------------------------------------------------
+API, ABI and file format changes
+-----------------------------------------------------
+
+The ``Logic Engine`` public API resides in the ``include`` folder of the project. Any change there
+should be considered a possible API or ABI change. File format schemas are stored in the ``lib/flatbuffers``
+folder - changes there can break existing binary files. All of those changes should be combined with
+corresponding entry in the CHANGELOG and considered for a non-patchfix bump when creating a new release.
+
+Version bump rules generally comply with `semver <https://semver.org/>`_ semantics. Listing some examples here:
+
+* Changing existing API or breaking serialization format results in major version bump. Read the flatbuffers
+  `article on writing schemas <https://google.github.io/flatbuffers/flatbuffers_guide_writing_schema.html>`_
+  has useful hints how to write forward-and-backwards compatible schemas and code
+* Changing Lua syntax which may break existing scripts' results in major version bump
+* One exception to this rule is handling Lua errors which would otherwise introduce undefined behavior in the scripts.
+  We consider these fixes non-breaking, but always mention them explicitly in the CHANGELOG
+* Adding a new method or class which can compile with existing code results in minor version bump
+* Changing internal functionality with no user visibility results in a patchfix bump.
+
+.. note::
+    The ``Logic Engine`` is currently in a state of active feature development, thus it has a major version ``0``
+    until we feel we can commit to a stable API and formats. For the time being, minor versions may break existing
+    code if we feel the change provides major benefit to users. That being said, we are very careful to keep code
+    compatible and avoid unnecessary refactoring.
+
+.. note::
+    Practical hint for developers: all ``flatbuffer`` fields are by default optional. Adding a new field
+    at the end of a table and checking for its existence in code when loading a file makes the file format change by
+    default forward-and-backwards compatible.
+
+-----------------------------------------------------
 I want to understand the code, where do I start?
 -----------------------------------------------------
 

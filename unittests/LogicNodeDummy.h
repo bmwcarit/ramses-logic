@@ -22,31 +22,9 @@ namespace rlogic::internal
         explicit LogicNodeDummyImpl(std::string_view name, bool createNestedProperties = false)
             : LogicNodeImpl(name)
         {
-            auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput));
-            auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
-
-            inputs->m_impl->addChild(std::make_unique<PropertyImpl>("input1", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-            inputs->m_impl->addChild(std::make_unique<PropertyImpl>("input2", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-
-            outputs->m_impl->addChild(std::make_unique<PropertyImpl>("output1", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
-            outputs->m_impl->addChild(std::make_unique<PropertyImpl>("output2", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
-
-            if (createNestedProperties)
-            {
-                inputs->m_impl->addChild(std::make_unique<PropertyImpl>("inputStruct", EPropertyType::Struct, EPropertySemantics::ScriptInput));
-                inputs->getChild("inputStruct")->m_impl->addChild(std::make_unique<PropertyImpl>("nested", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-
-                outputs->m_impl->addChild(std::make_unique<PropertyImpl>("outputStruct", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
-                outputs->getChild("outputStruct")->m_impl->addChild(std::make_unique<PropertyImpl>("nested", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
-
-                inputs->m_impl->addChild(std::make_unique<PropertyImpl>("inputArray", EPropertyType::Array, EPropertySemantics::ScriptInput));
-                inputs->getChild("inputArray")->m_impl->addChild(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-
-                outputs->m_impl->addChild(std::make_unique<PropertyImpl>("outputArray", EPropertyType::Array, EPropertySemantics::ScriptOutput));
-                outputs->getChild("outputArray")->m_impl->addChild(std::make_unique<PropertyImpl>("", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
-            }
-
-            setRootProperties(std::move(inputs), std::move(outputs));
+            setRootProperties(
+                std::make_unique<Property>(std::make_unique<PropertyImpl>(CreateTestInputsType(createNestedProperties), EPropertySemantics::ScriptInput)),
+                std::make_unique<Property>(std::make_unique<PropertyImpl>(CreateTestOutputsType(createNestedProperties), EPropertySemantics::ScriptOutput)));
         }
 
         std::optional<LogicNodeRuntimeError> update() override
@@ -55,21 +33,56 @@ namespace rlogic::internal
         }
 
     private:
-    };
+        static HierarchicalTypeData CreateTestInputsType(bool createNestedProperties)
+        {
+            HierarchicalTypeData inputsStruct = MakeStruct("IN", {
+                {"input1", EPropertyType::Int32},
+                {"input2", EPropertyType::Int32},
+                });
 
+            if (createNestedProperties)
+            {
+                inputsStruct.children.emplace_back(MakeStruct("inputStruct", { {"nested", EPropertyType::Int32} }));
+                inputsStruct.children.emplace_back(MakeArray("inputArray", 1, EPropertyType::Int32));
+            }
+
+            return inputsStruct;
+        }
+
+        static HierarchicalTypeData CreateTestOutputsType(bool createNestedProperties)
+        {
+            HierarchicalTypeData outputsStruct = MakeStruct("OUT", {
+                {"output1", EPropertyType::Int32},
+                {"output2", EPropertyType::Int32},
+                });
+
+            if (createNestedProperties)
+            {
+                outputsStruct.children.emplace_back(MakeStruct("outputStruct", { {"nested", EPropertyType::Int32} }));
+                outputsStruct.children.emplace_back(MakeArray("outputArray", 1, EPropertyType::Int32));
+            }
+
+            return outputsStruct;
+        }
+    };
+}
+
+// TODO Violin delete this class, not needed for tests - should be able to test with impl only
+namespace rlogic
+{
     class LogicNodeDummy : public LogicNode
     {
     public:
-        explicit LogicNodeDummy(std::unique_ptr<LogicNodeDummyImpl> impl)
-            : LogicNode(std::ref(static_cast<LogicNodeImpl&>(*impl)))
+        explicit LogicNodeDummy(std::unique_ptr<internal::LogicNodeDummyImpl> impl)
+            : LogicNode(std::ref(static_cast<internal::LogicNodeImpl&>(*impl)))
             , m_node(std::move(impl))
         {
         }
         static std::unique_ptr<LogicNodeDummy> Create(std::string_view name)
         {
-            return std::make_unique<LogicNodeDummy>(std::make_unique<LogicNodeDummyImpl>(name));
+            return std::make_unique<LogicNodeDummy>(std::make_unique<internal::LogicNodeDummyImpl>(name));
         }
 
-        std::unique_ptr<LogicNodeDummyImpl> m_node;
+        std::unique_ptr<internal::LogicNodeDummyImpl> m_node;
     };
 }

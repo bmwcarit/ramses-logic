@@ -17,16 +17,19 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/Logger.h"
+#include "ramses-logic/RamsesLogicVersion.h"
 
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/Effect.h"
 #include "ramses-client-api/Scene.h"
 #include "ramses-client-api/PerspectiveCamera.h"
+#include "ramses-client-api/UniformInput.h"
 #include "ramses-framework-api/RamsesVersion.h"
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LogicEngineImpl.h"
 #include "internals/FileUtils.h"
+#include "internals/FileFormatVersions.h"
 #include "LogTestUtils.h"
 
 #include "generated/LogicEngineGen.h"
@@ -72,61 +75,6 @@ namespace rlogic::internal
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Failed to load file 'invalid'"));
     }
 
-    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongRamsesVersion)
-    {
-        flatbuffers::FlatBufferBuilder builder;
-        auto logicEngine = rlogic_serialization::CreateLogicEngine(
-            builder,
-            rlogic_serialization::CreateVersion(builder,
-                10, 20, 900, builder.CreateString("10.20.900-suffix")),
-            rlogic_serialization::CreateVersion(builder,
-                100, 200, 9000, builder.CreateString("100.200.9000-suffix"))
-        );
-
-        builder.Finish(logicEngine);
-        ASSERT_TRUE(FileUtils::SaveBinary("wrong_ramses_version.bin", builder.GetBufferPointer(), builder.GetSize()));
-
-        EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_ramses_version.bin"));
-        auto errors = m_logicEngine.getErrors();
-        ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading file 'wrong_ramses_version.bin' (size: "));
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Expected Ramses version {}.x.x but found 10.20.900-suffix", ramses::GetRamsesVersion().major)));
-
-        //Also test with buffer version of the API
-        EXPECT_FALSE(m_logicEngine.loadFromBuffer(builder.GetBufferPointer(), builder.GetSize()));
-        errors = m_logicEngine.getErrors();
-        ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading data buffer"));
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("(size: 124)! Expected Ramses version 27.x.x but found 10.20.900-suffix"));
-    }
-
-    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithWrongVersion)
-    {
-        {
-            ramses::RamsesVersion ramsesVersion = ramses::GetRamsesVersion();
-            flatbuffers::FlatBufferBuilder builder;
-            auto logicEngine = rlogic_serialization::CreateLogicEngine(
-                builder,
-                rlogic_serialization::CreateVersion(builder,
-                    ramsesVersion.major,
-                    ramsesVersion.minor,
-                    ramsesVersion.patch,
-                    builder.CreateString(ramsesVersion.string)),
-                rlogic_serialization::CreateVersion(builder,
-                    100, 200, 9000, builder.CreateString("100.200.9000-suffix"))
-            );
-
-            builder.Finish(logicEngine);
-            ASSERT_TRUE(FileUtils::SaveBinary("wrong_version.bin", builder.GetBufferPointer(), builder.GetSize()));
-        }
-
-        EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_version.bin"));
-        const auto& errors = m_logicEngine.getErrors();
-        ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading file 'wrong_version.bin' (size: "));
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Expected version {}.{}.x but found 100.200.9000-suffix", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR)));
-    }
-
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserilizedFromFileWithoutApiObjects)
     {
         {
@@ -143,7 +91,8 @@ namespace rlogic::internal
                     g_PROJECT_VERSION_MAJOR,
                     g_PROJECT_VERSION_MINOR,
                     g_PROJECT_VERSION_PATCH,
-                    builder.CreateString(g_PROJECT_VERSION)),
+                    builder.CreateString(g_PROJECT_VERSION),
+                    g_FileFormatVersion),
                 0
             );
 
@@ -606,6 +555,225 @@ namespace rlogic::internal
         EXPECT_EQ(2u, (*internalNodeDependencies.getTopologicallySortedNodes()).size());
         EXPECT_TRUE(m_logicEngine.update());
         EXPECT_EQ(2u, (*internalNodeDependencies.getTopologicallySortedNodes()).size());
+    }
+
+    class ALogicEngine_Serialization_Compatibility : public ALogicEngine
+    {
+    protected:
+        void saveTestLogicContentToFile(std::string_view fileName) const
+        {
+            LogicEngine logicEngine;
+            LuaScript* script1 = logicEngine.createLuaScriptFromSource(R"(
+                function interface()
+                    IN.floatInput = FLOAT
+                    OUT.floatOutput = FLOAT
+                    OUT.nodeTranslation = VEC3F
+                end
+                function run()
+                    OUT.floatOutput = IN.floatInput
+                    OUT.nodeTranslation = {IN.floatInput, 2, 3}
+                end
+            )", "script1");
+            LuaScript* script2 = logicEngine.createLuaScriptFromSource(R"(
+                function interface()
+                    IN.floatInput = FLOAT
+
+                    OUT.cameraViewport = {
+                        offsetX = INT,
+                        offsetY = INT,
+                        width = INT,
+                        height = INT
+                    }
+                    OUT.floatUniform = FLOAT
+                end
+                function run()
+                    OUT.floatUniform = IN.floatInput + 5.0
+                    local roundedFloat = math.ceil(IN.floatInput)
+                    OUT.cameraViewport = {
+                        offsetX = 2 + roundedFloat,
+                        offsetY = 4 + roundedFloat,
+                        width = 100 + roundedFloat,
+                        height = 200 + roundedFloat
+                    }
+                end
+            )", "script2");
+
+
+            RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
+            RamsesCameraBinding* camBinding = logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+            RamsesAppearanceBinding* appBinding = logicEngine.createRamsesAppearanceBinding(*m_appearance, "appearancebinding");
+
+            logicEngine.link(*script1->getOutputs()->getChild("floatOutput"), *script2->getInputs()->getChild("floatInput"));
+            logicEngine.link(*script1->getOutputs()->getChild("nodeTranslation"), *nodeBinding->getInputs()->getChild("translation"));
+            logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"), *camBinding->getInputs()->getChild("viewport")->getChild("offsetX"));
+            logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetY"), *camBinding->getInputs()->getChild("viewport")->getChild("offsetY"));
+            logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("width"), *camBinding->getInputs()->getChild("viewport")->getChild("width"));
+            logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("height"), *camBinding->getInputs()->getChild("viewport")->getChild("height"));
+            logicEngine.link(*script2->getOutputs()->getChild("floatUniform"), *appBinding->getInputs()->getChild("floatUniform"));
+
+            logicEngine.update();
+            logicEngine.saveToFile(fileName);
+        }
+
+        void createFlatLogicEngineData_v07()
+        {
+            ramses::RamsesVersion ramses105{ "27.0.105", 27, 0, 105 };
+            RamsesLogicVersion logic07{ "0.7.0", 0, 7, 0 };
+            // Had no explicit file version numbers yet -> simulate by providing 0 (default value)
+            createFlatLogicEngineData(ramses105, logic07, 0u);
+        }
+
+        void createFlatLogicEngineData_v062()
+        {
+            ramses::RamsesVersion ramses105{ "27.0.105", 27, 0, 105 };
+            RamsesLogicVersion logic062{ "0.6.2", 0, 6, 2 };
+            // Had no explicit file version numbers yet -> simulate by providing 0 (default value)
+            createFlatLogicEngineData(ramses105, logic062, 0u);
+        }
+
+        void createFlatLogicEngineData(ramses::RamsesVersion ramsesVersion, rlogic::RamsesLogicVersion logicVersion, uint32_t fileFormatVersion)
+        {
+            ApiObjects emptyApiObjects;
+
+            auto logicEngine = rlogic_serialization::CreateLogicEngine(
+                m_fbBuilder,
+                rlogic_serialization::CreateVersion(m_fbBuilder,
+                    ramsesVersion.major, ramsesVersion.minor, ramsesVersion.patch, m_fbBuilder.CreateString(ramsesVersion.string)),
+                rlogic_serialization::CreateVersion(m_fbBuilder,
+                    logicVersion.major, logicVersion.minor, logicVersion.patch, m_fbBuilder.CreateString(logicVersion.string),
+                    fileFormatVersion),
+                ApiObjects::Serialize(emptyApiObjects, m_fbBuilder)
+            );
+
+            m_fbBuilder.Finish(logicEngine);
+        }
+
+        static ramses::RamsesVersion FakeRamsesVersion()
+        {
+            ramses::RamsesVersion version{
+                "10.20.900-suffix",
+                10,
+                20,
+                900
+            };
+            return version;
+        }
+
+        flatbuffers::FlatBufferBuilder m_fbBuilder;
+    };
+
+    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromFileReferencingIncompatibleRamsesVersion)
+    {
+        const uint32_t fileVersionDoesNotMatter = 0;
+        createFlatLogicEngineData(FakeRamsesVersion(), GetRamsesLogicVersion(), fileVersionDoesNotMatter);
+
+        ASSERT_TRUE(FileUtils::SaveBinary("wrong_ramses_version.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("wrong_ramses_version.bin"));
+        auto errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading file 'wrong_ramses_version.bin' (size: "));
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Expected Ramses version {}.x.x but found 10.20.900-suffix", ramses::GetRamsesVersion().major)));
+
+        //Also test with buffer version of the API
+        EXPECT_FALSE(m_logicEngine.loadFromBuffer(m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+        errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading data buffer"));
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Expected Ramses version 27.x.x but found 10.20.900-suffix"));
+    }
+
+    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromFileVersionFromTheFuture)
+    {
+        // Format was changed
+        constexpr uint32_t versionFromFuture = g_FileFormatVersion + 1;
+        createFlatLogicEngineData(ramses::GetRamsesVersion(), GetRamsesLogicVersion(), versionFromFuture);
+
+        ASSERT_TRUE(FileUtils::SaveBinary("compatible_logic_version_from_future.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("compatible_logic_version_from_future.bin"));
+        auto errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("is too new! Expected runtime version 2 but loaded with 1"));
+    }
+
+    // We can remove this test once we stop supporting version 0.7.0
+    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesDebugMessageIfDeserilizedFromFileVersion070InCompatibilityMode)
+    {
+        createFlatLogicEngineData_v07();
+
+        ASSERT_TRUE(FileUtils::SaveBinary("logic_version_before_07.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+
+        std::string debugMessage;
+        ScopedLogContextLevel scopedLogs(ELogMessageType::Debug, [&debugMessage](ELogMessageType type, std::string_view message) {
+            debugMessage = message;
+            (void)type;
+            });
+
+        EXPECT_TRUE(m_logicEngine.loadFromFile("logic_version_before_07.bin"));
+
+        EXPECT_EQ("Loading file version exported with Logic Engine '0.7.0' using runtime version '0.8.0' in compatibility mode", debugMessage);
+    }
+
+    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromFilePriorVersion070)
+    {
+        createFlatLogicEngineData_v062();
+
+        ASSERT_TRUE(FileUtils::SaveBinary("logic_version_before_07.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("logic_version_before_07.bin"));
+        const auto& errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Version mismatch while loading file 'logic_version_before_07.bin' (size: "));
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Expected version 0.7.x but found 0.6.2", g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR)));
+    }
+
+    TEST_F(ALogicEngine_Serialization_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine)
+    {
+        // Uncomment to re-export with newer version on file breaking changes
+        // Then copy the result to /res/unittests folder
+        //saveTestLogicContentToFile("binary_file.bin");
+
+        {
+            // Load and update works
+            ASSERT_TRUE(m_logicEngine.loadFromFile("res/unittests/binary_file.bin", m_scene));
+
+            // Contains objects and their input/outputs
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script1")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script1")->getOutputs()->getChild("floatOutput"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script1")->getOutputs()->getChild("nodeTranslation"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetX"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetY"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("width"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("height"));
+            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("floatUniform"));
+
+            EXPECT_NE(nullptr, m_logicEngine.findNodeBinding("nodebinding"));
+            EXPECT_NE(nullptr, m_logicEngine.findCameraBinding("camerabinding"));
+            EXPECT_NE(nullptr, m_logicEngine.findAppearanceBinding("appearancebinding"));
+
+            // Can set new value and update()
+            m_logicEngine.findScript("script1")->getInputs()->getChild("floatInput")->set<float>(42.5f);
+            EXPECT_TRUE(m_logicEngine.update());
+
+            // Values on Ramses are updated according to expectations
+            vec3f translation;
+            m_node->getTranslation(translation[0], translation[1], translation[2]);
+            EXPECT_THAT(translation, ::testing::ElementsAre(42.5f, 2.f, 3.f));
+
+            EXPECT_EQ(m_camera->getViewportX(), 45);
+            EXPECT_EQ(m_camera->getViewportY(), 47);
+            EXPECT_EQ(m_camera->getViewportWidth(), 143u);
+            EXPECT_EQ(m_camera->getViewportHeight(), 243u);
+
+            ramses::UniformInput uniform;
+            m_appearance->getEffect().getUniformInput(0, uniform);
+            float floatValue = 0.f;
+            m_appearance->getInputValueFloat(uniform, floatValue);
+            EXPECT_FLOAT_EQ(floatValue, 47.5);
+        }
     }
 }
 

@@ -37,3 +37,6 @@ target_include_directories(ramses-logic-test
 
 MakeTestFromTarget(ramses-logic-test)
 folderize_target(ramses-logic-test "ramses-logic")
+
+add_custom_command(TARGET ramses-logic-test PRE_BUILD
+                   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res/ ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/res/unittests)

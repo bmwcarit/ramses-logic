@@ -12,6 +12,7 @@
 #include "impl/LoggerImpl.h"
 #include "internals/FileUtils.h"
 #include "internals/TypeUtils.h"
+#include "internals/FileFormatVersions.h"
 #include "internals/RamsesObjectResolver.h"
 
 // TODO Violin remove these header dependencies
@@ -156,14 +157,47 @@ namespace rlogic::internal
         return m_errors.getErrors();
     }
 
-    bool LogicEngineImpl::CheckLogicVersionFromFile(const rlogic_serialization::Version& version)
+    bool LogicEngineImpl::checkLogicVersionFromFile(std::string_view dataSourceDescription, const rlogic_serialization::Version& fileVersion)
     {
-        // TODO Violin/Tobias/Sven should discuss to what do we couple the serialization
-        // compatibility check and when do we mandate version bump
-        // For now, to be safe, any non-patch version change results in incompatibility
-        return
-            version.v_major() == g_PROJECT_VERSION_MAJOR &&
-            version.v_minor() == g_PROJECT_VERSION_MINOR;
+        // We can remove this whole function once we don't support version 0.7.0 anymore and can rely on integers to check versions
+        static_assert(g_FileFormatVersion == 1u);
+
+        // Special case where file version is 0.7.x
+        // We check based on SemVer because file version was not exported yet
+        if (fileVersion.v_minor() == 7)
+        {
+            static_assert(g_FileFormatVersion == 1);
+            LOG_DEBUG("Loading file version exported with Logic Engine '{}' using runtime version '{}' in compatibility mode", fileVersion.v_string()->string_view(), g_PROJECT_VERSION);
+            return true;
+        }
+
+        m_errors.add(fmt::format("Version mismatch while loading {}! Expected version 0.7.x but found {}",
+            dataSourceDescription,
+            fileVersion.v_string()->string_view()));
+        return false;
+    }
+
+    bool LogicEngineImpl::checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion)
+    {
+        // Backwards compatibility check
+        if (fileVersion < g_FileFormatVersion)
+        {
+            // TODO Violin write unit test for this case once we have a breaking change in the serialization format
+            // Currently not possible because 1 is the first version and 0 has special semantic (== version not set)
+            m_errors.add(fmt::format("Version of data source '{}' is too old! Expected file version {} but found {}",
+                dataSourceDescription, g_FileFormatVersion, fileVersion));
+            return false;
+        }
+
+        // Forward compatibility check
+        if (fileVersion > g_FileFormatVersion)
+        {
+            m_errors.add(fmt::format("Version of data source '{}' is too new! Expected runtime version {} but loaded with {}",
+                dataSourceDescription, fileVersion, g_FileFormatVersion));
+            return false;
+        }
+
+        return true;
     }
 
     bool LogicEngineImpl::CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion)
@@ -226,12 +260,21 @@ namespace rlogic::internal
         }
 
         const auto& rlogicVersion = *logicEngine->rlogicVersion();
-        if (!CheckLogicVersionFromFile(rlogicVersion))
+        // File version not set -> assume version 0.7.0 or older, use logic version to check
+        // TODO Violin remove this the next time we break serialization format (and make file version required)
+        if (0u == rlogicVersion.v_fileFormatVersion())
         {
-            m_errors.add(fmt::format("Version mismatch while loading {}! Expected version {}.{}.x but found {}",
-                dataSourceDescription, g_PROJECT_VERSION_MAJOR, g_PROJECT_VERSION_MINOR,
-                rlogicVersion.v_string()->string_view()));
-            return false;
+            if(!checkLogicVersionFromFile(dataSourceDescription, rlogicVersion))
+            {
+                return false;
+            }
+        }
+        else
+        {
+            if (!checkLogicVersionFromFile(dataSourceDescription, rlogicVersion.v_fileFormatVersion()))
+            {
+                return false;
+            }
         }
 
         if (nullptr == logicEngine->apiObjects())
@@ -292,7 +335,8 @@ namespace rlogic::internal
             g_PROJECT_VERSION_MAJOR,
             g_PROJECT_VERSION_MINOR,
             g_PROJECT_VERSION_PATCH,
-            builder.CreateString(g_PROJECT_VERSION));
+            builder.CreateString(g_PROJECT_VERSION),
+            g_FileFormatVersion);
         builder.Finish(ramsesLogicVersionOffset);
 
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,

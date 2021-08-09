@@ -23,10 +23,8 @@ namespace rlogic::internal
         {
         }
 
-        void takeOwnershipOfProperties(std::unique_ptr<Property> inputs, std::unique_ptr<Property> outputs)
-        {
-            setRootProperties(std::move(inputs), std::move(outputs));
-        }
+        // Expose protected method for testing
+        using LogicNodeImpl::setRootProperties;
 
         MOCK_METHOD(std::optional<LogicNodeRuntimeError>, update, (), (override, final));
     };
@@ -65,14 +63,14 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeImpl, TakesOwnershipOfGivenProperties)
     {
+        auto inputType = MakeStruct("IN", { TypeData{"subProperty", EPropertyType::Int32} });
+        auto outputType = MakeStruct("OUT", { TypeData{"subProperty", EPropertyType::Int32} });
         // These usually come from subclasses deserialization code
-        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput));
-        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("subProperty", EPropertyType::Int32, EPropertySemantics::ScriptInput));
-        auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput));
-        outputs->m_impl->addChild(std::make_unique<PropertyImpl>("subProperty", EPropertyType::Int32, EPropertySemantics::ScriptOutput));
+        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputType, EPropertySemantics::ScriptInput));
+        auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(outputType, EPropertySemantics::ScriptOutput));
 
         LogicNodeImplMock logicNode("");
-        logicNode.takeOwnershipOfProperties(std::move(inputs), std::move(outputs));
+        logicNode.setRootProperties(std::move(inputs), std::move(outputs));
 
         EXPECT_EQ(logicNode.getInputs()->getName(), "IN");
         EXPECT_EQ(&logicNode.getInputs()->m_impl->getLogicNode(), &logicNode);

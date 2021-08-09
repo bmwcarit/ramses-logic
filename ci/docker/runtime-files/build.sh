@@ -188,7 +188,7 @@ elif [ "$TARGET" == "THREAD_SANITIZER" ] || [ "$TARGET" == "ADDRESS_SANITIZER" ]
         $RL_SRC
 
     cmake --build $BUILD_DIR --config $CONFIG --target all
-    export UBSAN_OPTIONS=report_error_type=1:symbolize=1:print_stacktrace=1:suppressions=$RL_SRC/ci/scripts/config/ubsan_suppressions
+    export UBSAN_OPTIONS=report_error_type=1:symbolize=1:print_stacktrace=1
     export ASAN_OPTIONS=symbolize=1:alloc_dealloc_mismatch=0
     export LSAN_OPTIONS=symbolize=1:print_stacktrace=1
     ctest --os test -V

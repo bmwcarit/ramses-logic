@@ -43,7 +43,7 @@ namespace rlogic
      * The RamsesNodeBinding class has no output properties (thus getOutputs() will return nullptr) because
      * the outputs are implicitly the properties of the bound Ramses node.
      *
-    * \rst
+     * \rst
     .. note::
 
         In case no values were set (because the user neither set a value explicitly

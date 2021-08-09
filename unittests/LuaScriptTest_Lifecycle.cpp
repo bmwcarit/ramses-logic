@@ -69,7 +69,7 @@ namespace rlogic::internal
                     "\t[string \"script.lua\"]:3: in function <[string \"script.lua\"]:2>");
     }
 
-    TEST_F(ALuaScript_Lifecycle, KeepsGlobalScopeSymbolsDuringInterfaceAndRunMethods)
+    TEST_F(ALuaScript_Lifecycle, KeepsGlobalScopeSymbolsDuringRunMethod)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
             -- 'Local' symbols in the global space are global too
@@ -81,16 +81,11 @@ namespace rlogic::internal
             end
 
             function interface()
-                -- global symbols are available in interface
-                if global1 == "global1" and global2 == "global2" then
-                    OUT.result = STRING
-                else
-                    error("Expected global symbols were not found!")
-                end
+                OUT.result = STRING
             end
 
             function run()
-                -- global symbols are available here too
+                -- global symbols are available here
                 if global1 == "global1" and global2 == "global2" then
                     OUT.result = getGlobalString()
                 else

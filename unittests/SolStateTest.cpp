@@ -62,9 +62,9 @@ namespace rlogic::internal
         EXPECT_TRUE(env["print"].valid());
         EXPECT_TRUE(env["math"].valid());
 
-        // Our defined symbols
-        EXPECT_TRUE(env["INT"].valid());
-        EXPECT_TRUE(env["STRING"].valid());
+        // Should be only available during interface, not in the global scope defined symbols
+        EXPECT_FALSE(env["INT"].valid());
+        EXPECT_FALSE(env["STRING"].valid());
     }
 
     // Those are created at a later point of the script lifecycle

@@ -50,66 +50,59 @@ namespace rlogic
         return Collection<RamsesCameraBinding>(m_impl->getApiObjects().getCameraBindings());
     }
 
-    LuaScript* LogicEngine::findScript(std::string_view name) const
+    template <typename T>
+    const T* findObject(const std::vector<std::unique_ptr<T>>& container, std::string_view name)
     {
-        auto scriptIter = std::find_if(scripts().begin(), scripts().end(),
-            [name](const LuaScript* script)
-            {
-                return script->getName() == name;
-            }
-        );
-        if (scriptIter == scripts().end())
-        {
-            return nullptr;
-        }
-        return *scriptIter;
+        const auto it = std::find_if(container.cbegin(), container.cend(), [name](const auto& o) {
+            return o->getName() == name; });
+
+        return (it == container.cend() ? nullptr : it->get());
     }
 
-    RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name) const
+    template <typename T>
+    T* findObject(std::vector<std::unique_ptr<T>>& container, std::string_view name)
     {
-        auto bindingIter = std::find_if(ramsesNodeBindings().begin(), ramsesNodeBindings().end(),
-            [name](const RamsesNodeBinding* binding)
-            {
-                return binding->getName() == name;
-            }
-        );
-        if (bindingIter == ramsesNodeBindings().end())
-        {
-            return nullptr;
-        }
-        return *bindingIter;
+        const auto it = std::find_if(container.begin(), container.end(), [name](const auto& o) {
+            return o->getName() == name; });
+
+        return (it == container.end() ? nullptr : it->get());
     }
 
-    RamsesAppearanceBinding* LogicEngine::findAppearanceBinding(std::string_view name) const
+    const LuaScript* LogicEngine::findScript(std::string_view name) const
     {
-        auto bindingIter = std::find_if(ramsesAppearanceBindings().begin(), ramsesAppearanceBindings().end(),
-            [name](const RamsesAppearanceBinding* binding)
-            {
-                return binding->getName() == name;
-            }
-        );
-        if (bindingIter == ramsesAppearanceBindings().end())
-        {
-            return nullptr;
-        }
-        return *bindingIter;
+        return findObject(m_impl->getApiObjects().getScripts(), name);
+    }
+    LuaScript* LogicEngine::findScript(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getScripts(), name);
     }
 
-    RamsesCameraBinding* LogicEngine::findCameraBinding(std::string_view name) const
+    const RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name) const
     {
-        auto bindingIter = std::find_if(ramsesCameraBindings().begin(), ramsesCameraBindings().end(),
-            [name](const RamsesCameraBinding* binding)
-        {
-            return binding->getName() == name;
-        }
-        );
-        if (bindingIter == ramsesCameraBindings().end())
-        {
-            return nullptr;
-        }
-        return *bindingIter;
+        return findObject(m_impl->getApiObjects().getNodeBindings(), name);
+    }
+    RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getNodeBindings(), name);
     }
 
+    const RamsesAppearanceBinding* LogicEngine::findAppearanceBinding(std::string_view name) const
+    {
+        return findObject(m_impl->getApiObjects().getAppearanceBindings(), name);
+    }
+    RamsesAppearanceBinding* LogicEngine::findAppearanceBinding(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getAppearanceBindings(), name);
+    }
+
+    const RamsesCameraBinding* LogicEngine::findCameraBinding(std::string_view name) const
+    {
+        return findObject(m_impl->getApiObjects().getCameraBindings(), name);
+    }
+    RamsesCameraBinding* LogicEngine::findCameraBinding(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getCameraBindings(), name);
+    }
 
     LuaScript* LogicEngine::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
     {

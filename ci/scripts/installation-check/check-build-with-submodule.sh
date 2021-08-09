@@ -38,7 +38,7 @@ echo "++++ building and executing test binary ++++"
 # Build with cmake
 mkdir build
 cd build
-cmake -DCMAKE_PREFIX_PATH=$RAMSES_INSTALL ../
+cmake -GNinja -DCMAKE_PREFIX_PATH=$RAMSES_INSTALL ../
 cmake --build . --target run-all
 
 echo "++++ build check done for static submodule build ++++"

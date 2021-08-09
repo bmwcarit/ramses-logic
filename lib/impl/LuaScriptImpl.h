@@ -13,6 +13,7 @@
 #include "internals/SolWrapper.h"
 #include "internals/SerializationMap.h"
 #include "internals/DeserializationMap.h"
+#include "internals/WrappedLuaProperty.h"
 
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LuaScript.h"
@@ -91,9 +92,10 @@ namespace rlogic::internal
     private:
         std::string                             m_filename;
         std::string                             m_source;
-        std::reference_wrapper<SolState>        m_state;
-        sol::protected_function                 m_solFunction;
         LuaPrintFunction                        m_luaPrintFunction;
+        WrappedLuaProperty                      m_wrappedRootInput;
+        WrappedLuaProperty                      m_wrappedRootOutput;
+        sol::protected_function                 m_solFunction;
 
         static std::string BuildChunkName(std::string_view scriptName, std::string_view fileName);
 

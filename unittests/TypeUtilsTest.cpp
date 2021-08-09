@@ -19,13 +19,8 @@ namespace rlogic::internal
     protected:
         std::unique_ptr<PropertyImpl> createArrayProperty(size_t size, EPropertyType type)
         {
-            auto property = std::make_unique<PropertyImpl>("", EPropertyType::Array, EPropertySemantics::BindingInput);
+            auto property = std::make_unique<PropertyImpl>(MakeArray("", size, type), EPropertySemantics::BindingInput);
             property->setLogicNode(dummyNode);
-
-            for (size_t i = 0; i < size; ++i)
-            {
-                property->addChild(std::make_unique<PropertyImpl>("", type, EPropertySemantics::BindingInput));
-            }
 
             return property;
         }
@@ -33,7 +28,6 @@ namespace rlogic::internal
         LogicNodeDummyImpl dummyNode{ "DummyNode" };
     };
 
-    // Property types are being (de)serialized from/to files and from lua, need to test against invalid values
     TEST_F(ATypeUtils, DistinguishesValidTypeEnumsFromInvalidOnes)
     {
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Bool));
@@ -49,11 +43,8 @@ namespace rlogic::internal
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Struct));
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Array));
 
-        auto tooLarge(static_cast<EPropertyType>(10000));
-        EXPECT_FALSE(TypeUtils::IsValidType(tooLarge));
-
-        auto negative(static_cast<EPropertyType>(-1));
-        EXPECT_FALSE(TypeUtils::IsValidType(negative));
+        auto invalidType(static_cast<EPropertyType>(10000));
+        EXPECT_FALSE(TypeUtils::IsValidType(invalidType));
     }
 
     TEST_F(ATypeUtils, ReportsPropertyTypeTraits)
@@ -73,6 +64,23 @@ namespace rlogic::internal
 
         EXPECT_FALSE(TypeUtils::CanHaveChildren(EPropertyType::Bool));
         EXPECT_FALSE(TypeUtils::CanHaveChildren(EPropertyType::Vec2i));
+    }
+
+    TEST_F(ATypeUtils, DsitinguishesBetweenVectorAndNonVectorTypes)
+    {
+        EXPECT_TRUE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Vec2i));
+        EXPECT_TRUE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Vec3i));
+        EXPECT_TRUE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Vec4i));
+        EXPECT_TRUE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Vec2f));
+        EXPECT_TRUE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Vec3f));
+        EXPECT_TRUE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Vec4f));
+
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Bool));
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Int32));
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Float));
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::String));
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Struct));
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Array));
     }
 
     TEST_F(ATypeUtils, FlattensVec2iArrayToRamsesCompatibleArray)

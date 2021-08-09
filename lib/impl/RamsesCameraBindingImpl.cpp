@@ -29,43 +29,49 @@ namespace rlogic::internal
         : RamsesBindingImpl(name)
         , m_ramsesCamera(ramsesCamera)
     {
-        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput));
-
-        // Attention! This order is important - it has to match the indices in ECameraViewportPropertyStaticIndex
-        std::unique_ptr<PropertyImpl> viewPortProperty = std::make_unique<PropertyImpl>("viewport", EPropertyType::Struct, EPropertySemantics::BindingInput);
-        viewPortProperty->addChild(std::make_unique<PropertyImpl>("offsetX", EPropertyType::Int32, EPropertySemantics::BindingInput));
-        viewPortProperty->addChild(std::make_unique<PropertyImpl>("offsetY", EPropertyType::Int32, EPropertySemantics::BindingInput));
-        viewPortProperty->addChild(std::make_unique<PropertyImpl>("width", EPropertyType::Int32, EPropertySemantics::BindingInput));
-        viewPortProperty->addChild(std::make_unique<PropertyImpl>("height", EPropertyType::Int32, EPropertySemantics::BindingInput));
-
-        // Add frustum struct
-        std::unique_ptr<PropertyImpl> frustumProperty = std::make_unique<PropertyImpl>("frustum", EPropertyType::Struct, EPropertySemantics::BindingInput);
-        frustumProperty->addChild(std::make_unique<PropertyImpl>("nearPlane", EPropertyType::Float, EPropertySemantics::BindingInput));
-        frustumProperty->addChild(std::make_unique<PropertyImpl>("farPlane", EPropertyType::Float, EPropertySemantics::BindingInput));
+        std::vector<TypeData> frustumPlanes = {
+            TypeData{ "nearPlane", EPropertyType::Float },
+            TypeData{ "farPlane", EPropertyType::Float },
+        };
         switch (m_ramsesCamera.get().getType())
         {
         case ramses::ERamsesObjectType::ERamsesObjectType_PerspectiveCamera:
             // Attention! This order is important - it has to match the indices in EPerspectiveCameraFrustumPropertyStaticIndex
-            frustumProperty->addChild(std::make_unique<PropertyImpl>("fieldOfView", EPropertyType::Float, EPropertySemantics::BindingInput));
-            frustumProperty->addChild(std::make_unique<PropertyImpl>("aspectRatio", EPropertyType::Float, EPropertySemantics::BindingInput));
+            frustumPlanes.emplace_back("fieldOfView", EPropertyType::Float);
+            frustumPlanes.emplace_back("aspectRatio", EPropertyType::Float);
             break;
         case ramses::ERamsesObjectType::ERamsesObjectType_OrthographicCamera:
             // Attention! This order is important - it has to match the indices in EOrthographicCameraFrustumPropertyStaticIndex
-            frustumProperty->addChild(std::make_unique<PropertyImpl>("leftPlane", EPropertyType::Float, EPropertySemantics::BindingInput));
-            frustumProperty->addChild(std::make_unique<PropertyImpl>("rightPlane", EPropertyType::Float, EPropertySemantics::BindingInput));
-            frustumProperty->addChild(std::make_unique<PropertyImpl>("bottomPlane", EPropertyType::Float, EPropertySemantics::BindingInput));
-            frustumProperty->addChild(std::make_unique<PropertyImpl>("topPlane", EPropertyType::Float, EPropertySemantics::BindingInput));
+            frustumPlanes.emplace_back("leftPlane", EPropertyType::Float);
+            frustumPlanes.emplace_back("rightPlane", EPropertyType::Float);
+            frustumPlanes.emplace_back("bottomPlane", EPropertyType::Float);
+            frustumPlanes.emplace_back("topPlane", EPropertyType::Float);
             break;
         default:
             assert(false && "This should never happen");
             break;
         }
 
-        // Attention! This order is important - it has to match the indices in ECameraPropertyStructStaticIndex
-        inputs->m_impl->addChild(std::move(viewPortProperty));
-        inputs->m_impl->addChild(std::move(frustumProperty));
+        HierarchicalTypeData cameraBindingInputs(
+            TypeData{"IN", EPropertyType::Struct},
+            {
+                MakeStruct("viewport",
+                    {
+                        // Attention! This order is important - it has to match the indices in ECameraViewportPropertyStaticIndex
+                        TypeData{"offsetX", EPropertyType::Int32},
+                        TypeData{"offsetY", EPropertyType::Int32},
+                        TypeData{"width", EPropertyType::Int32},
+                        TypeData{"height", EPropertyType::Int32}
+                    }
+                ),
+                MakeStruct("frustum", frustumPlanes),
+            }
+        );
 
-        setRootProperties(std::move(inputs), {});
+        setRootProperties(
+            std::make_unique<Property>(std::make_unique<PropertyImpl>(cameraBindingInputs, EPropertySemantics::BindingInput)),
+            {} // No outputs
+        );
 
         ApplyRamsesValuesToInputProperties(*this, ramsesCamera);
     }

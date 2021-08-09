@@ -95,7 +95,9 @@ namespace rlogic::internal
 
         void updateLinksRecursive(Property& inputProperty);
 
-        static bool CheckLogicVersionFromFile(const rlogic_serialization::Version& version);
+        // TODO Violin remove this method next time we break serialization format
+        bool checkLogicVersionFromFile(std::string_view dataSourceDescription, const rlogic_serialization::Version& fileVersion);
+        bool checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
         [[nodiscard]] bool updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking);

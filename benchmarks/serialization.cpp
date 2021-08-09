@@ -53,7 +53,7 @@ namespace rlogic
         fileStream.seekg(0, std::ios::end);
         std::vector<char> byteBuffer(static_cast<size_t>(fileStream.tellg()));
         fileStream.seekg(0, std::ios::beg);
-        fileStream.read(byteBuffer.data(), byteBuffer.size());
+        fileStream.read(byteBuffer.data(), static_cast<std::streamsize>(byteBuffer.size()));
         return byteBuffer;
     }
 

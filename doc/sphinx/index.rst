@@ -28,6 +28,12 @@ Ramses Logic documentation
 
 .. toctree::
     :maxdepth: 3
+    :caption: Class Index
+
+    classes/index
+
+.. toctree::
+    :maxdepth: 3
     :caption: ChangeLog
 
     changelog_ref

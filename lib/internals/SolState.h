@@ -27,17 +27,11 @@ namespace rlogic::internal
         SolState& operator=(const SolState& other) = delete;
 
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
+        sol::environment& getInterfaceExtractionEnvironment();
         sol::environment createEnvironment();
-
-        template <typename T> sol::object createUserObject(const T& instance);
 
     private:
         sol::state m_solState;
-
+        sol::environment m_interfaceExtractionEnvironment;
     };
-
-    template <typename T> inline sol::object SolState::createUserObject(const T& instance)
-    {
-        return sol::object(m_solState, sol::in_place_type<T>, instance);
-    }
 }

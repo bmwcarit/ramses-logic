@@ -159,7 +159,7 @@ namespace rlogic::internal
 
             if (!maybeValue)
             {
-                sol_helper::throwSolException("Unexpected type {} at array element # {}!", sol_helper::GetSolTypeName(tableEntry.get_type()), i);
+                sol_helper::throwSolException("Unexpected value (type: '{}') at array element # {}!", sol_helper::GetSolTypeName(tableEntry.get_type()), i);
             }
 
             data[i-1] = *maybeValue;

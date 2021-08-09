@@ -10,6 +10,7 @@ include "ApiObjects.fbs";
 
 namespace rlogic_serialization;
 
+// TODO Violin make all fields required on next breaking file format change
 table Version
 {
     // Uses v_ prefix because major/minor collides with system header symbols
@@ -17,6 +18,7 @@ table Version
     v_minor:uint32;
     v_patch:uint32;
     v_string:string;
+    v_fileFormatVersion:uint32 = 0; // default=0 means version was not being exported yet
 }
 
 table LogicEngine

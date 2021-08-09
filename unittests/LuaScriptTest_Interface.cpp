@@ -40,15 +40,31 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in interface() function!!");
     }
 
+    TEST_F(ALuaScript_Interface, GlobalSymbolsNotAvailable)
+    {
+        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+            globalVar = "not visible"
+
+            function interface()
+                if globalVar == nil then
+                    error("globalVar is not available!")
+                end
+            end
+
+            function run()
+            end
+        )", "noGlobalSymbols");
+
+        ASSERT_EQ(nullptr, script);
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("globalVar is not available!"));
+    }
+
     TEST_F(ALuaScript_Interface, ProducesErrorsIfARuntimeErrorOccursInInterface)
     {
         auto script = m_logicEngine.createLuaScriptFromSource(R"(
-            function mul(a,b)
-                return a*b
-            end
-
             function interface()
-                mul(42)
+                error("emits error")
             end
 
             function run()
@@ -58,178 +74,11 @@ namespace rlogic
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message,
-                    "[errorInInterface] Error while loading script. Lua stack trace:\n"
-                    "[string \"errorInInterface\"]:3: attempt to perform arithmetic on local 'b' (a nil value)\nstack traceback:\n"
-                    "\t[string \"errorInInterface\"]:3: in function 'mul'\n"
-                    "\t[string \"errorInInterface\"]:7: in function <[string \"errorInInterface\"]:6>");
-    }
-
-    TEST_F(ALuaScript_Interface, ProducesErrorIfTryingToAccessUnexistingPropertyInInterface)
-    {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
-            function interface()
-                local this_will_fail = IN.this_does_not_exist
-            end
-
-            function run()
-            end
-        )");
-
-        EXPECT_EQ(nullptr, script);
-
-        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Trying to access not available property this_does_not_exist in interface!"));
-    }
-
-    TEST_F(ALuaScript_Interface, ProducesErrorWhenTryingToCreateInterfacePropertiesWithNonStringIndexAtInterfaceTime)
-    {
-        const std::vector<std::string> wrongIndexTypes = {"[1]", "[true]", "[{x=5}]", "[nil]"};
-
-        const std::string expectedErrorMessage = "Only strings supported as table key type!";
-
-        std::vector<LuaTestError> allErrorCases;
-        for (const auto& errorType : wrongIndexTypes)
-        {
-            allErrorCases.emplace_back(LuaTestError{"IN" + errorType + " = INT", expectedErrorMessage});
-            allErrorCases.emplace_back(LuaTestError{"OUT" + errorType + " = INT", expectedErrorMessage});
-        }
-
-        for (const auto& singleCase : allErrorCases)
-        {
-            auto script = m_logicEngine.createLuaScriptFromSource("function interface()\n" + singleCase.errorCode +
-                                                                  "\n"
-                                                                  "end\n"
-                                                                  "function run()\n"
-                                                                  "end\n");
-
-            EXPECT_EQ(nullptr, script);
-
-            ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
-        }
-    }
-
-    TEST_F(ALuaScript_Interface, ProducesErrorWhenTryingToAccessInterfacePropertiesWithNonStringIndexAtInterfaceTime)
-    {
-        const std::vector<std::string> wrongIndexTypes = {"[1]", "[true]", "[{x=5}]", "[nil]"};
-
-        const std::string expectedErrorMessage = "Only strings supported as table key type!";
-
-        std::vector<LuaTestError> allErrorCases;
-        for (const auto& errorType : wrongIndexTypes)
-        {
-            allErrorCases.emplace_back(LuaTestError{"IN = IN" + errorType, expectedErrorMessage});
-            allErrorCases.emplace_back(LuaTestError{"OUT = OUT" + errorType, expectedErrorMessage});
-        }
-
-        for (const auto& singleCase : allErrorCases)
-        {
-            auto script = m_logicEngine.createLuaScriptFromSource("function interface()\n" + singleCase.errorCode +
-                                                                  "\n"
-                                                                  "end\n"
-                                                                  "function run()\n"
-                                                                  "end\n");
-
-            EXPECT_EQ(nullptr, script);
-
-            ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
-        }
-    }
-
-    TEST_F(ALuaScript_Interface, ProducesErrorWhenTryingToCreateFieldsWithInvalidTypeAtInterfaceTime)
-    {
-        const std::vector<LuaTestError> allCases = {
-            {"IN.not_a_type_0 = nil",
-            "Field 'not_a_type_0' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.not_a_type_1 = 'not a type'",
-            "Field 'not_a_type_1' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.not_a_type_2 = true",
-            "Field 'not_a_type_2' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.not_a_type_3 = {nested_input_problem = 15000}",
-            "Field 'nested_input_problem' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.not_a_type_4 = 150000",
-            "Field 'not_a_type_4' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"OUT.not_a_type_1 = 'not a type'",
-            "Field 'not_a_type_1' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"OUT.not_a_type_2 = true",
-            "Field 'not_a_type_2' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"OUT.not_a_type_3 = {nested_output_problem = \"this_should_not_be_string\"}",
-            "Field 'nested_output_problem' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"OUT.not_a_type_4 = 150000",
-            "Field 'not_a_type_4' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"OUT.no_nested_name = { INT }",
-            "Only strings supported as table key type!"},
-            {"OUT.no_nested_name2 = { 5 }",
-            "Only strings supported as table key type!"},
-            {"OUT.no_nested_type = { correct_key = 'but wrong type' }",
-            "Field 'correct_key' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.very_wrong = IN"                , "Field 'very_wrong' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.very_wrong = OUT"               , "Field 'very_wrong' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"},
-            {"IN.array = ARRAY()"                , "ARRAY() invoked with invalid size parameter (must be the first parameter)!"},
-            {"IN.array = ARRAY('not a number')"  , "ARRAY() invoked with invalid size parameter (must be the first parameter)!"},
-            {"IN.array = ARRAY(5)"               , "ARRAY() invoked with invalid type parameter (must be the second parameter)!"},
-            {"IN.array = ARRAY(5, 9000)"         , "Unsupported type id '9000' for array property 'array'!"},
-            {"IN.array = ARRAY(0, INT)"          , "ARRAY() invoked with invalid size parameter (must be in the range [1, 255])!"},
-            {"IN.array = ARRAY(256, INT)"        , "ARRAY() invoked with invalid size parameter (must be in the range [1, 255])!"},
-            {"IN.array = ARRAY(-5, INT)"         , "ARRAY() invoked with invalid size parameter (must be in the range [1, 255])!"},
-            {"IN.array = ARRAY(5, IN)"           , "Unsupported type 'userdata' for array property 'array'!"},
-            {"IN.array = ARRAY(5, OUT)"          , "Unsupported type 'userdata' for array property 'array'!"},
-            {"IN.array = ARRAY(5, ARRAY(1, INT))", "Unsupported type 'userdata' for array property 'array'!"},
-        };
-
-        for (const auto& singleCase : allCases)
-        {
-            auto script = m_logicEngine.createLuaScriptFromSource(
-                "function interface()\n" +
-                singleCase.errorCode + "\n"
-                "end\n"
-                "function run()\n"
-                "end\n"
-            );
-
-            EXPECT_EQ(nullptr, script);
-            ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(singleCase.expectedErrorMessage));
-        }
-    }
-
-    TEST_F(ALuaScript_Interface, ProducesErrorIfSamePropertyIsDefinedTwice)
-    {
-        const std::vector<std::string> declarations =
-        {
-            "IN.prop = INT",
-            "IN.prop = FLOAT",
-            "IN.prop = BOOL",
-            "IN.prop = STRING",
-            "IN.prop = {field = INT}",
-            "IN.prop = {}",
-            "OUT.prop = INT",
-            "OUT.prop = FLOAT",
-            "OUT.prop = BOOL",
-            "OUT.prop = STRING",
-            "OUT.prop = {field = INT}",
-            "OUT.prop = {}",
-        };
-
-        for(const auto& declaration : declarations)
-        {
-            auto scriptSource = std::string("function interface()\n");
-            scriptSource += declaration;
-            scriptSource += "\n";
-            scriptSource += declaration;
-            scriptSource += "\n"
-                "end\n"
-                "function run()\n"
-                "end\n";
-
-            auto script = m_logicEngine.createLuaScriptFromSource(scriptSource);
-
-            EXPECT_EQ(nullptr, script);
-
-            ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Property 'prop' already exists! Can't declare the same property twice!"));
-        }
+            "[errorInInterface] Error while loading script. Lua stack trace:\n"
+            "[string \"errorInInterface\"]:3: emits error\n"
+            "stack traceback:\n"
+            "\t[C]: in function 'error'\n"
+            "\t[string \"errorInInterface\"]:3: in function <[string \"errorInInterface\"]:2>");
     }
 
     TEST_F(ALuaScript_Interface, ReturnsItsTopLevelOutputsByIndex_OrderedLexicographically)

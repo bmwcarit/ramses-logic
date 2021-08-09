@@ -32,12 +32,14 @@ Prefer to learn by example? Have a look at our [self-contained example snippets]
 
 # Version matrix
 
-|Logic    | Included Ramses version       | Minimum required Ramses version    |
-|---------|-------------------------------|------------------------------------|
-|0.6.2    | 27.0.105                      | same as 0.6.0                      |
-|0.6.1    | 27.0.103 (includes 27.0.11)   | same as 0.6.0                      |
-|0.6.0    | 27.0.102 (includes 27.0.10)   | 27.0.100                           |
-|0.5.3    | 27.0.101                      | 27.0.100                           |
+|Logic    | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
+|---------|-------------------------------|------------------------------------|------------------------------|
+|0.8.0    | 27.0.110                      | same as 0.6.0                      | 0.7.x or later               |
+|0.7.0    | 27.0.105                      | same as 0.6.0                      | 0.7.x                        |
+|0.6.2    | 27.0.105                      | same as 0.6.0                      | 0.6.x                        |
+|0.6.1    | 27.0.103 (includes 27.0.11)   | same as 0.6.0                      | 0.6.x                        |
+|0.6.0    | 27.0.102 (includes 27.0.10)   | 27.0.100                           | 0.6.x                        |
+|0.5.3    | 27.0.101                      | 27.0.100                           | 0.5.x                        |
 
 # License
 

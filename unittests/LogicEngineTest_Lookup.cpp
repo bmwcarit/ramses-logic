@@ -27,6 +27,20 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, m_logicEngine.findCameraBinding("camerabinding"));
     }
 
+    TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_Const)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "nodebinding");
+        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+
+        const LogicEngine& immutableLogicEngine = m_logicEngine;
+        EXPECT_EQ(script, immutableLogicEngine.findScript("script"));
+        EXPECT_EQ(nodeBinding, immutableLogicEngine.findNodeBinding("nodebinding"));
+        EXPECT_EQ(appearanceBinding, immutableLogicEngine.findAppearanceBinding("appbinding"));
+        EXPECT_EQ(cameraBinding, immutableLogicEngine.findCameraBinding("camerabinding"));
+    }
+
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CutsNameAtNullTermination)
     {
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");

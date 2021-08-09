@@ -92,7 +92,9 @@ namespace rlogic
          * @param name the name of the script to search for
          * @return a pointer to the script, or nullptr if none was found
          */
-        [[nodiscard]] RLOGIC_API LuaScript* findScript(std::string_view name) const;
+        [[nodiscard]] RLOGIC_API const LuaScript* findScript(std::string_view name) const;
+        /// @copydoc findScript(std::string_view) const
+        [[nodiscard]] RLOGIC_API LuaScript* findScript(std::string_view name);
 
         /**
          * Returns a pointer to the first occurrence of a node binding with a given \p name if such exists, and nullptr otherwise.
@@ -100,7 +102,9 @@ namespace rlogic
          * @param name the name of the node binding to search for
          * @return a pointer to the node binding, or nullptr if none was found
          */
-        [[nodiscard]] RLOGIC_API RamsesNodeBinding* findNodeBinding(std::string_view name) const;
+        [[nodiscard]] RLOGIC_API const RamsesNodeBinding* findNodeBinding(std::string_view name) const;
+        /// @copydoc findNodeBinding(std::string_view) const
+        [[nodiscard]] RLOGIC_API RamsesNodeBinding* findNodeBinding(std::string_view name);
 
         /**
          * Returns a pointer to the first occurrence of an appearance binding with a given \p name if such exists, and nullptr otherwise.
@@ -108,7 +112,9 @@ namespace rlogic
          * @param name the name of the appearance binding to search for
          * @return a pointer to the appearance binding, or nullptr if none was found
          */
-        [[nodiscard]] RLOGIC_API RamsesAppearanceBinding* findAppearanceBinding(std::string_view name) const;
+        [[nodiscard]] RLOGIC_API const RamsesAppearanceBinding* findAppearanceBinding(std::string_view name) const;
+        /// @copydoc findAppearanceBinding(std::string_view) const
+        [[nodiscard]] RLOGIC_API RamsesAppearanceBinding* findAppearanceBinding(std::string_view name);
 
         /**
          * Returns a pointer to the first occurrence of a camera binding with a given \p name if such exists, and nullptr otherwise.
@@ -116,7 +122,9 @@ namespace rlogic
          * @param name the name of the camera binding to search for
          * @return a pointer to the camera binding, or nullptr if none was found
          */
-        [[nodiscard]] RLOGIC_API RamsesCameraBinding* findCameraBinding(std::string_view name) const;
+        [[nodiscard]] RLOGIC_API const RamsesCameraBinding* findCameraBinding(std::string_view name) const;
+        /// @copydoc findCameraBinding(std::string_view) const
+        [[nodiscard]] RLOGIC_API RamsesCameraBinding* findCameraBinding(std::string_view name);
 
         /**
          * Creates a new #rlogic::LuaScript from an existing Lua source file. Refer to the #rlogic::LuaScript class documentation
@@ -291,7 +299,7 @@ namespace rlogic
          * will result in errors if the Logic Engine is loaded from the file again. Note that it is not sufficient
          * to have objects with the same name, they have to be the exact same objects as during saving!
          * For more in-depth information regarding saving and loading, refer to the online documentation at
-         * https://ramses-logic.readthedocs.io/en/latest/api.html#save-load-to-file
+         * https://ramses-logic.readthedocs.io/en/latest/api.html#saving-loading-from-file
          *
          * Note: The method reports error and aborts if the #rlogic::RamsesBinding objects reference more than one
          * Ramses scene (this is acceptable during runtime, but not for saving to file).

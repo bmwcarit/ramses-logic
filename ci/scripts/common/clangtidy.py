@@ -63,6 +63,18 @@ class ClangTidyIssue:
         return self._text
 
     @property
+    def is_in_project(self):
+        if not self._compdb_entry or not self._compdb_entry.project_root:
+            raise RuntimeError('project_root not available')
+        return Path(self._compdb_entry.project_root) in Path(self._file).parents
+
+    @property
+    def is_in_build_dir(self):
+        if not self._compdb_entry:
+            raise RuntimeError('compdb not available')
+        return Path(self._compdb_entry.directory) in Path(self._file).parents
+
+    @property
     def key(self):
         return (self.file, self.line, self.column, self.check)
 

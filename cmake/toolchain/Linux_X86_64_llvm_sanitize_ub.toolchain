@@ -10,8 +10,7 @@ SET(CMAKE_C_COMPILER   clang)
 SET(CMAKE_CXX_COMPILER clang++)
 SET(CMAKE_LINKER       llvm-link)
 
-# Could add "null", but lua code has problems with it
-SET(STRICT_UNDEFINED_SANITIZER_CHECKS "vptr,alignment,function,bool,bounds,enum,float-divide-by-zero,integer-divide-by-zero,nonnull-attribute,object-size,return,returns-nonnull-attribute,shift,signed-integer-overflow,vla-bound,float-cast-overflow")
+SET(STRICT_UNDEFINED_SANITIZER_CHECKS "null,vptr,alignment,function,bool,bounds,enum,float-divide-by-zero,integer-divide-by-zero,nonnull-attribute,object-size,return,returns-nonnull-attribute,shift,signed-integer-overflow,vla-bound,float-cast-overflow")
 
 SET(FLAGS_COMMON  "-m64 -fno-omit-frame-pointer -fsanitize=undefined -fno-sanitize-recover=${STRICT_UNDEFINED_SANITIZER_CHECKS}")
 

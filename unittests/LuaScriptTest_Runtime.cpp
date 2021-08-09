@@ -119,6 +119,72 @@ namespace rlogic
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
     }
 
+    TEST_F(ALuaScript_Runtime, AppliesNumericChecksToNumericAssignments)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                OUT.float = FLOAT
+                OUT.int = INT
+            end
+            function run()
+                {}
+            end
+        )");
+
+        const std::vector<std::string> invalidStatements
+        {
+            "OUT.float = 1000000000000000000000000000000000000000.0",
+            "OUT.int = 1000000000000000000000000000000000000000",
+        };
+
+        for (const auto& invalidStatement : invalidStatements)
+        {
+            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, invalidStatement));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Implicit rounding during assignment"));
+            m_logicEngine.destroy(*script);
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, AppliesNumericChecksToNumericArrayAssignments)
+    {
+        const std::string_view scriptTemplate = (R"(
+            function interface()
+                OUT.vec2f = VEC2F
+                OUT.a_vec2f = ARRAY(2, VEC2F)
+                OUT.vec2i = VEC2I
+                OUT.a_vec2i = ARRAY(2, VEC2I)
+            end
+            function run()
+                {}
+            end
+        )");
+
+        const std::vector<std::string> invalidStatements
+        {
+            "OUT.vec2f = {1000000000000000000000000000000000000000.0, 0}",
+            "OUT.a_vec2f = {{0, 0}, {1000000000000000000000000000000000000000.0, 0}}",
+            "OUT.vec2i = {1000000000000000000000000000000000000000, 0}",
+            "OUT.a_vec2i = {{0, 0}, {1000000000000000000000000000000000000000, 0}}",
+        };
+
+        for (const auto& invalidStatement : invalidStatements)
+        {
+            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, invalidStatement));
+
+            ASSERT_NE(nullptr, script);
+            EXPECT_FALSE(m_logicEngine.update());
+
+            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Unexpected value (type: 'number') at array element # 1"));
+            m_logicEngine.destroy(*script);
+        }
+    }
+
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToAccessPropertiesWithNonStringIndexAtRunTime)
     {
         const std::vector<std::string> wrongIndexTypes = {"[1]", "[true]", "[{x=5}]", "[nil]"};
@@ -561,7 +627,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning 'INT' to string output 'field2'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning string to 'INT' output 'field2'!"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -844,20 +910,18 @@ namespace rlogic
             {"OUT.array_int = {1}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 1"},
             {"OUT.array_int = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 3"},
             {"OUT.array_int = {1, 2.2}", "Implicit rounding during assignment of integer output"},
-            {"OUT.array_int = {1, true}", "Assigning boolean to 'INT' output"},
+            {"OUT.array_int = {1, true}", "Assigning bool to 'INT' output ''"},
             {"OUT.array_int = {nil, 1, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 1"},
             {"OUT.array_int = {1, nil, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 2"},
             // TODO Violin the messages below are a bit misleading now ... They could contain info which array field failed to be assigned. Need to refactor the code and fix them
-            {"OUT.array_string = {'somestring', 2}", "Assigning wrong type (number) to output ''"},
-            {"OUT.array_string = {'somestring', {}}", "Assigning a table to property '' of type 'STRING'"},
-            {"OUT.array_string = {'somestring', OUT.array_int}", "Type mismatch while assigning property ''! Expected STRING but received ARRAY"},
-            {"OUT.array_vec2f = {1, 2}", "Assigning wrong type (number) to output ''"},
+            {"OUT.array_string = {'somestring', 2}", "Assigning number to 'STRING' output ''"},
+            {"OUT.array_string = {'somestring', {}}", "Assigning table to 'STRING' output ''"},
+            {"OUT.array_string = {'somestring', OUT.array_int}", "Can't assign property 'array_int' (type ARRAY) to property '' (type STRING)"},
+            {"OUT.array_vec2f = {1, 2}", "Assigning wrong type (number) to output VEC2 property ''"},
             {"OUT.array_vec2f = {{1, 2}, {5}}", "Expected 2 array components in table but got 1 instead"},
             {"OUT.array_vec2f = {{1, 2}, {}}", "Expected 2 array components in table but got 0 instead"},
-            {"OUT.array_int = OUT", "Type mismatch while assigning property 'array_int'! Expected ARRAY but received STRUCT"},
-            {"OUT.array_int = IN", "Type mismatch while assigning property 'array_int'! Expected ARRAY but received STRUCT"},
-            // TODO Violin can we make this error more concrete? Maybe have our own type-name conversion util for errors?
-            {"OUT.array_int = ARRAY(2, INT)", "Unexpected object type assigned to property 'array_int'"},
+            {"OUT.array_int = OUT", "Can't assign property 'OUT' (type STRUCT) to property 'array_int' (type ARRAY)"},
+            {"OUT.array_int = IN", "Can't assign property 'IN' (type STRUCT) to property 'array_int' (type ARRAY)"},
         };
 
         for (const auto& singleCase : allErrorCases)
@@ -985,9 +1049,9 @@ namespace rlogic
 
         const std::vector<LuaTestError> allCases =
         {
-            {"OUT.array_float3 = IN.array_float2", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 2"},
-            {"OUT.array_float3 = IN.array_float4", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 4"},
-            {"OUT.array_float3 = IN.array_vec3f", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 1"},
+            {"OUT.array_float3 = IN.array_float2", "Can't assign property 'array_float2' (#fields=2) to property 'array_float3' (#fields=3)"},
+            {"OUT.array_float3 = IN.array_float4", "Can't assign property 'array_float4' (#fields=4) to property 'array_float3' (#fields=3)!"},
+            {"OUT.array_float3 = IN.array_vec3f", "Can't assign property 'array_vec3f' (#fields=1) to property 'array_float3' (#fields=3)"},
             {"OUT.array_float3 = {0.1, 0.2}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 2"},
             {"OUT.array_float3 = {0.1, 0.2, 0.3, 0.4}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 4"},
             {"OUT.array_float3 = {}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 0"},
@@ -1023,9 +1087,9 @@ namespace rlogic
 
         const std::vector<LuaTestError> allCases =
         {
-            {"OUT.array_int = IN.array_float", "Array element type mismatch (expected INT but received FLOAT)!"},
-            {"OUT.array_int = IN.array_vec2f", "Array element type mismatch (expected INT but received VEC2F)!"},
-            {"OUT.array_int = IN.array_vec2i", "Array element type mismatch (expected INT but received VEC2I)!"},
+            {"OUT.array_int = IN.array_float", "Can't assign property '' (type FLOAT) to property '' (type INT)!"},
+            {"OUT.array_int = IN.array_vec2f", "Can't assign property '' (type VEC2F) to property '' (type INT)!"},
+            {"OUT.array_int = IN.array_vec2i", "Can't assign property '' (type VEC2I) to property '' (type INT)!"},
         };
 
         for (const auto& aCase : allCases)
@@ -1083,7 +1147,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to INT output 'int'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to 'INT' output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
@@ -1100,7 +1164,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning boolean to 'INT' output 'int' !"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'INT' output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
@@ -1118,7 +1182,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning boolean to 'STRING' output 'str' !"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'STRING' output 'str'!"));
         EXPECT_EQ("this is quite ok", *script->getOutputs()->getChild("str")->get<std::string>());
     }
 
@@ -1135,7 +1199,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning wrong type (number) to output 'str'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning number to 'STRING' output 'str'!"));
     }
 
     TEST_F(ALuaScript_Runtime, SupportsMultipleLevelsOfNestedInputs_confidenceTest)

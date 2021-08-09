@@ -40,22 +40,22 @@ RUN if [ -n "${HTTP_PROXY}" ]; then \
         graphviz\
         gosu\
     && add-apt-repository ppa:ubuntu-toolchain-r/test \
-    && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main\ndeb-src http://apt.llvm.org/bionic/ llvm-toolchain-bionic-10 main\n" >> /etc/apt/sources.list \
+    && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-12 main\ndeb-src http://apt.llvm.org/bionic/ llvm-toolchain-bionic-12 main\n" >> /etc/apt/sources.list \
     && sh -c "curl -o - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -" \
     && apt-get update \
     && env DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
         gcc-9 g++-9 \
-        clang-10 clang-tidy-10 llvm-10\
+        clang-12 clang-tidy-12 llvm-12\
     && apt-get purge -y software-properties-common \
     && apt-get autoremove -y \
     && apt-get autoclean \
     && rm -rf /var/lib/apt/lists/* \
     && rm -rf /usr/share/man/* /usr/share/info/* /usr/share/doc/* /usr/share/lintian/* \
-    && ln -s /usr/bin/clang-10 /usr/bin/clang \
-    && ln -s /usr/bin/clang++-10 /usr/bin/clang++ \
-    && ln -s /usr/bin/clang-tidy-10 /usr/bin/clang-tidy \
-    && ln -s /usr/bin/llvm-profdata-10 /usr/bin/llvm-profdata \
-    && ln -s /usr/bin/llvm-cov-10 /usr/bin/llvm-cov
+    && ln -s /usr/bin/clang-12 /usr/bin/clang \
+    && ln -s /usr/bin/clang++-12 /usr/bin/clang++ \
+    && ln -s /usr/bin/clang-tidy-12 /usr/bin/clang-tidy \
+    && ln -s /usr/bin/llvm-profdata-12 /usr/bin/llvm-profdata \
+    && ln -s /usr/bin/llvm-cov-12 /usr/bin/llvm-cov
 
 # use gcc-9 by default
 RUN update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-7 700 --slave /usr/bin/g++ g++ /usr/bin/g++-7 \

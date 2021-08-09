@@ -28,3 +28,16 @@ def get_git_files(path, *, including_submodules, relative_to_path=True, make_abs
         base = path if relative_to_path else get_sdkroot(path)
         files = [os.path.join(base, f) for f in files]
     return files
+
+
+def get_revision_hash(rev='HEAD', repo=None):
+    return subprocess.check_output(['git', 'rev-parse', rev], cwd=(repo or get_sdkroot())).decode('utf-8').strip()
+
+
+def get_commit_count(rev='HEAD', repo=None):
+    return subprocess.check_output(['git', 'rev-list', '--count', rev], cwd=(repo or get_sdkroot())).decode('utf-8').strip()
+
+
+def describe(pattern=None, rev='HEAD', repo=None):
+    return subprocess.check_output(['git', 'describe', '--tags', '--match', pattern or '*[0-9].[0-9]*', rev],
+                                   cwd=(repo or get_sdkroot())).decode('utf-8').strip()

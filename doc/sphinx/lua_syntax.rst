@@ -179,6 +179,11 @@ The examples above demonstrate how structs can be nested in other structs or in 
 have a primitive type (e.g. ``INT``) or a complex type (a struct) which can have arbitrary properties, also nested ones. It is not possible to have arrays of arrays
 (multidimensional arrays). Also, array size is limited to 255 elements currently.
 
+.. note::
+
+    Global symbols (symbols declared outside of the scope of functions) are **not** visible in the ``interface()`` function.
+    This restriction makes sure that scripts are stateless and not execution-dependent.
+
 ==================================================
 Indexing inside Lua
 ==================================================

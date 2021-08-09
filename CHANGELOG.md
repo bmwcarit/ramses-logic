@@ -1,5 +1,24 @@
 # master
 
+# v0.8.0
+
+**API Changes**
+
+* Fixed constness of LogicEngine::find* methods
+
+**Features**
+
+* Allow file compatibility loading, i.e. loading binary file exported with v0.7.0 using runtime v0.8.0
+* Added missing size() method for object collections
+* Update ramses to 27.0.110
+
+**Bugfixes**
+
+* Numeric checks are applied correctly to primitive types (FLOAT, INT)
+* Sol Lua numeric safeties are always active (also in non-debug builds). This ensures consistent behavior for user
+* Can't access ARRAY() from within the run() method in Lua anymore
+* Can't access global symbols from the interface() function anymore (this blocks the implementation of modules)
+
 # v0.7.0
 
 **Features**
@@ -19,7 +38,7 @@
     * Binding input values are initialized with the values from the bound ramses object (all except appearance)
     * See reworked documentation for more details
 * Renamed Camera binding inputs to have shorter names
-    * See class docs for new names: https://ramses-logic.readthedocs.io/en/latest/api.html#_CPPv4N6rlogic19RamsesCameraBindingE
+    * See [class docs](https://ramses-logic.readthedocs.io/en/latest/api.html#_CPPv4N6rlogic19RamsesCameraBindingE) for new names
     * Reason: shorter strings are faster to resolve and easier to read
 * Bindings receive their input values from Ramses (after construction and after loading from file/memory)
     * This is more consistent and eliminates data race conditions

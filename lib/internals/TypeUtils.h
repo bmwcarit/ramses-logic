@@ -66,6 +66,30 @@ namespace rlogic::internal
             }
         }
 
+        static bool IsPrimitiveVectorType(EPropertyType type)
+        {
+            assert(IsValidType(type));
+
+            switch (type)
+            {
+            case EPropertyType::Vec2f:
+            case EPropertyType::Vec3f:
+            case EPropertyType::Vec4f:
+            case EPropertyType::Vec2i:
+            case EPropertyType::Vec3i:
+            case EPropertyType::Vec4i:
+                return true;
+            case EPropertyType::Float:
+            case EPropertyType::Int32:
+            case EPropertyType::String:
+            case EPropertyType::Bool:
+            case EPropertyType::Struct:
+            case EPropertyType::Array:
+            default:
+                return false;
+            }
+        }
+
         // This method is for better readability in code
         static bool CanHaveChildren(EPropertyType type)
         {

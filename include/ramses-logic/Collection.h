@@ -64,6 +64,15 @@ namespace rlogic
         using reference = typename iterator::reference;
 
         /**
+        * Return number of elements in the collection
+        * @return number of elements in the collection
+        */
+        [[nodiscard]] size_t size() const
+        {
+            return m_container.get().size();
+        }
+
+        /**
          * Return an iterator to the start of the collection
          * @return iterator to the start of the collection
          */

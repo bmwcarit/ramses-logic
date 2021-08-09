@@ -52,6 +52,11 @@ namespace rlogic
         TestCollectionType m_testCollection;
     };
 
+    TEST_F(ACollection, ReturnsSize)
+    {
+        EXPECT_EQ(3u, m_testCollection.size());
+    }
+
     TEST_F(ACollection, CanBeIteratedInRangeLoops)
     {
         size_t id = 1;

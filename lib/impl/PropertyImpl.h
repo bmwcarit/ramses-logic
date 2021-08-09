@@ -12,6 +12,7 @@
 #include "internals/EPropertySemantics.h"
 #include "internals/SerializationMap.h"
 #include "internals/DeserializationMap.h"
+#include "internals/TypeData.h"
 
 #include <cassert>
 #include <string>
@@ -42,12 +43,13 @@ namespace rlogic::internal
     class ErrorReporting;
 
     using PropertyValue = std::variant<int32_t, float, bool, std::string, vec2f, vec3f, vec4f, vec2i, vec3i, vec4i>;
+    using PropertyList = std::vector<std::unique_ptr<Property>>;
 
     class PropertyImpl
     {
     public:
-        PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics);
-        PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics, PropertyValue initialValue);
+        PropertyImpl(HierarchicalTypeData type, EPropertySemantics semantics);
+        PropertyImpl(HierarchicalTypeData type, EPropertySemantics semantics, PropertyValue initialValue);
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> Serialize(
             const PropertyImpl& prop,
@@ -68,9 +70,6 @@ namespace rlogic::internal
         PropertyImpl& operator=(const PropertyImpl& other) = delete;
         PropertyImpl(const PropertyImpl& other) = delete;
 
-        // Creates a data copy of itself and its children on new memory
-        [[nodiscard]] std::unique_ptr<PropertyImpl> deepCopy() const;
-
         [[nodiscard]] size_t getChildCount() const;
         [[nodiscard]] EPropertyType getType() const;
         [[nodiscard]] std::string_view getName() const;
@@ -87,17 +86,13 @@ namespace rlogic::internal
 
         [[nodiscard]] Property* getChild(size_t index);
         [[nodiscard]] Property* getChild(std::string_view name);
+        [[nodiscard]] const Property* getChild(std::string_view name) const;
         [[nodiscard]] bool hasChild(std::string_view name) const;
-
-        void addChild(std::unique_ptr<PropertyImpl> child, bool sortChildrenLexicographically = false);
 
         // Public API access - only ever called by user, full error check and logs
         template <typename T>
         [[nodiscard]] std::optional<T> getValue_PublicApi() const;
         [[nodiscard]] bool setValue_PublicApi(PropertyValue value);
-
-        // Access from inside Lua scripts
-        void setOutputValue_FromScript(PropertyValue value);
 
         // Generic setter. Can optionally skip dirty-check
         void setValue(PropertyValue value, bool checkDirty = true);
@@ -117,10 +112,9 @@ namespace rlogic::internal
         [[nodiscard]] LogicNodeImpl& getLogicNode();
 
     private:
-        std::string                                     m_name;
-        EPropertyType                                   m_type;
-        std::vector<std::unique_ptr<Property>>          m_children;
-        PropertyValue                                   m_value;
+        TypeData        m_typeData;
+        PropertyList    m_children;
+        PropertyValue   m_value;
 
         // TODO Violin/Sven consider solving this more elegantly
         LogicNodeImpl*                                  m_logicNode = nullptr;

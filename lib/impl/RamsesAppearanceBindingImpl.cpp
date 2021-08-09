@@ -31,12 +31,12 @@ namespace rlogic::internal
         : RamsesBindingImpl(name)
         , m_ramsesAppearance(ramsesAppearance)
     {
-        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput));
-        PropertyImpl& inputsImpl = *inputs->m_impl;
         const auto& effect = m_ramsesAppearance.get().getEffect();
         const uint32_t uniformCount = effect.getUniformInputCount();
-        m_uniformIndices.clear();
         m_uniformIndices.reserve(uniformCount);
+
+        std::vector<HierarchicalTypeData> bindingInputs;
+        bindingInputs.reserve(uniformCount);
 
         for (uint32_t i = 0; i < uniformCount; ++i)
         {
@@ -51,32 +51,27 @@ namespace rlogic::internal
             // TODO Violin handle all types eventually (need some more breaking ramses features for that)
             if (convertedType)
             {
-                std::unique_ptr<PropertyImpl> childInput;
                 // Non-array case
                 if (uniformInput.getElementCount() == 1)
                 {
-                    childInput = std::make_unique<PropertyImpl>(uniformInput.getName(), *convertedType, EPropertySemantics::BindingInput);
+                    bindingInputs.emplace_back(MakeType(uniformInput.getName(), *convertedType));
                 }
                 // Array case
                 else
                 {
-                    childInput = std::make_unique<PropertyImpl>(uniformInput.getName(), EPropertyType::Array, EPropertySemantics::BindingInput);
-                    const size_t arraySize = uniformInput.getElementCount();
-
-                    for (size_t arrayElem = 0; arrayElem < arraySize; ++arrayElem)
-                    {
-                        childInput->addChild(std::make_unique<PropertyImpl>("", *convertedType, EPropertySemantics::BindingInput));
-                    }
+                    bindingInputs.emplace_back(MakeArray(uniformInput.getName(), uniformInput.getElementCount(), *convertedType));
                 }
 
                 m_uniformIndices.push_back(i);
-                // Don't sort appearance binding properties lexicographically. They are ordered by ramses already
-                // based on their occurrance in the shader - logic keeps the same ordering
-                inputsImpl.addChild(std::move(childInput));
             }
         }
 
-        setRootProperties(std::move(inputs), {});
+        HierarchicalTypeData bindingInputsType (TypeData{"IN", EPropertyType::Struct}, bindingInputs);
+
+        setRootProperties(
+            std::make_unique<Property>(std::make_unique<PropertyImpl>(bindingInputsType, EPropertySemantics::BindingInput)),
+            {} // No outputs
+        );
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> RamsesAppearanceBindingImpl::Serialize(

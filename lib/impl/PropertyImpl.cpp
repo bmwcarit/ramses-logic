@@ -23,53 +23,63 @@
 
 namespace rlogic::internal
 {
-    PropertyImpl::PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics)
-        : m_name(name)
-        , m_type(type)
+    PropertyImpl::PropertyImpl(HierarchicalTypeData type, EPropertySemantics semantics)
+        : m_typeData(std::move(type.typeData))
         , m_semantics(semantics)
     {
-        switch (type)
+        if (TypeUtils::IsPrimitiveType(m_typeData.type))
         {
-        case EPropertyType::Float:
-            m_value = 0.0f;
-            break;
-        case EPropertyType::Vec2f:
-            m_value = vec2f{ 0.0f, 0.0f };
-            break;
-        case EPropertyType::Vec3f:
-            m_value = vec3f{ 0.0f, 0.0f, 0.0f };
-            break;
-        case EPropertyType::Vec4f:
-            m_value = vec4f{ 0.0f, 0.0f, 0.0f, 0.0f };
-            break;
-        case EPropertyType::Int32:
-            m_value = 0;
-            break;
-        case EPropertyType::Vec2i:
-            m_value = vec2i{ 0, 0 };
-            break;
-        case EPropertyType::Vec3i:
-            m_value = vec3i{ 0, 0, 0 };
-            break;
-        case EPropertyType::Vec4i:
-            m_value = vec4i{ 0, 0, 0, 0 };
-            break;
-        case EPropertyType::String:
-            m_value = std::string("");
-            break;
-        case EPropertyType::Bool:
-            m_value = false;
-            break;
-        case EPropertyType::Array:
-        case EPropertyType::Struct:
-            break;
+            switch (m_typeData.type)
+            {
+            case EPropertyType::Float:
+                m_value = 0.0f;
+                break;
+            case EPropertyType::Vec2f:
+                m_value = vec2f{ 0.0f, 0.0f };
+                break;
+            case EPropertyType::Vec3f:
+                m_value = vec3f{ 0.0f, 0.0f, 0.0f };
+                break;
+            case EPropertyType::Vec4f:
+                m_value = vec4f{ 0.0f, 0.0f, 0.0f, 0.0f };
+                break;
+            case EPropertyType::Int32:
+                m_value = 0;
+                break;
+            case EPropertyType::Vec2i:
+                m_value = vec2i{ 0, 0 };
+                break;
+            case EPropertyType::Vec3i:
+                m_value = vec3i{ 0, 0, 0 };
+                break;
+            case EPropertyType::Vec4i:
+                m_value = vec4i{ 0, 0, 0, 0 };
+                break;
+            case EPropertyType::String:
+                m_value = std::string("");
+                break;
+            case EPropertyType::Bool:
+                m_value = false;
+                break;
+            case EPropertyType::Array:
+            case EPropertyType::Struct:
+                assert(false);
+                break;
+            }
+        }
+        else
+        {
+            for (const auto& childType : type.children)
+            {
+                m_children.emplace_back(std::make_unique<Property>(std::make_unique<PropertyImpl>(childType, semantics)));
+            }
         }
     }
 
-    PropertyImpl::PropertyImpl(std::string_view name, EPropertyType type, EPropertySemantics semantics, PropertyValue initialValue)
-        : PropertyImpl(name, type, semantics)
+    PropertyImpl::PropertyImpl(HierarchicalTypeData type, EPropertySemantics semantics, PropertyValue initialValue)
+        : PropertyImpl(std::move(type), semantics)
     {
-        assert(TypeUtils::IsPrimitiveType(type) && "Don't use this constructor with non-primitive types!");
+        assert(TypeUtils::IsPrimitiveType(m_typeData.type) && "Don't use this constructor with non-primitive types!");
         m_value = std::move(initialValue);
     }
 
@@ -92,12 +102,12 @@ namespace rlogic::internal
             return SerializeRecursive(*child->m_impl, builder, serializationMap);
             });
 
-        // Assume primitive property, override only for struct/arrays based on m_type
+        // Assume primitive property, override only for structs/arrays based on m_typeData.type
         rlogic_serialization::EPropertyRootType propertyRootType = rlogic_serialization::EPropertyRootType::Primitive;
         rlogic_serialization::PropertyValue valueType = rlogic_serialization::PropertyValue::NONE;
         flatbuffers::Offset<void> valueOffset;
 
-        switch (prop.m_type)
+        switch (prop.m_typeData.type)
         {
         case EPropertyType::Bool:
         {
@@ -183,7 +193,7 @@ namespace rlogic::internal
         }
 
         auto propertyFB = rlogic_serialization::CreateProperty(builder,
-            builder.CreateString(prop.m_name),
+            builder.CreateString(prop.m_typeData.name),
             propertyRootType,
             builder.CreateVector(child_vector),
             valueType,
@@ -208,7 +218,6 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        const std::string_view propName = prop.name()->string_view();
         const std::optional convertedType = ConvertSerializationTypeToEPropertyType(prop.rootType(), prop.value_type());
 
         if (!convertedType)
@@ -217,7 +226,7 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        std::unique_ptr<PropertyImpl> impl(new PropertyImpl(propName, *convertedType, semantics));
+        std::unique_ptr<PropertyImpl> impl(new PropertyImpl(MakeType(std::string(prop.name()->string_view()), *convertedType), semantics));
 
         // If primitive: set value; otherwise load children
         if (prop.rootType() == rlogic_serialization::EPropertyRootType::Primitive)
@@ -357,7 +366,7 @@ namespace rlogic::internal
                     return nullptr;
                 }
 
-                impl->addChild(std::move(deserializedChild));
+                impl->m_children.emplace_back(std::make_unique<Property>(std::move(deserializedChild)));
             }
         }
 
@@ -373,12 +382,12 @@ namespace rlogic::internal
 
     EPropertyType PropertyImpl::getType() const
     {
-        return m_type;
+        return m_typeData.type;
     }
 
     std::string_view PropertyImpl::getName() const
     {
-        return m_name;
+        return m_typeData.name;
     }
 
     Property* PropertyImpl::getChild(size_t index)
@@ -388,7 +397,7 @@ namespace rlogic::internal
             return m_children[index].get();
         }
 
-        LOG_ERROR("No child property with index '{}' found in '{}'", index, m_name);
+        LOG_ERROR("No child property with index '{}' found in '{}'", index, m_typeData.name);
         return nullptr;
     }
 
@@ -399,11 +408,17 @@ namespace rlogic::internal
             return m_children[index].get();
         }
 
-        LOG_ERROR("No child property with index '{}' found in '{}'", index, m_name);
+        LOG_ERROR("No child property with index '{}' found in '{}'", index, m_typeData.name);
         return nullptr;
     }
 
     Property* PropertyImpl::getChild(std::string_view name)
+    {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) non-const version of getChild cast to its const version to avoid duplicating code
+        return const_cast<Property*>((const_cast<const PropertyImpl&>(*this)).getChild(name));
+    }
+
+    const Property* PropertyImpl::getChild(std::string_view name) const
     {
         auto it = std::find_if(m_children.begin(), m_children.end(), [&name](const std::vector<std::unique_ptr<Property>>::value_type& property) {
             return property->getName() == name;
@@ -412,7 +427,7 @@ namespace rlogic::internal
         {
             return it->get();
         }
-        LOG_ERROR("No child property with name '{}' found in '{}'", name, m_name);
+        LOG_ERROR("No child property with name '{}' found in '{}'", name, m_typeData.name);
         return nullptr;
     }
 
@@ -423,36 +438,16 @@ namespace rlogic::internal
             });
     }
 
-    // TODO Violin replace this method with setChildren() and sort outside
-    void PropertyImpl::addChild(std::unique_ptr<PropertyImpl> newChild, bool sortChildrenLexicographically /* = false */)
-    {
-        assert(nullptr != newChild);
-        assert(m_semantics == newChild->m_semantics);
-        assert(TypeUtils::CanHaveChildren(m_type));
-        newChild->setLogicNode(*m_logicNode);
-
-        m_children.emplace_back(std::make_unique<Property>(std::move(newChild)));
-
-        if (sortChildrenLexicographically)
-        {
-            std::sort(m_children.begin(), m_children.end(), [](const std::unique_ptr<Property>& child1, const std::unique_ptr<Property>& child2)
-                {
-                    assert(!child1->getName().empty() && !child2->getName().empty());
-                    return child1->getName() < child2->getName();
-                });
-        }
-    }
-
     template <typename T> std::optional<T> PropertyImpl::getValue_PublicApi() const
     {
-        if (PropertyTypeToEnum<T>::TYPE == m_type)
+        if (PropertyTypeToEnum<T>::TYPE == m_typeData.type)
         {
             const T* value = std::get_if<T>(&m_value);
             assert(value);
             return {*value};
         }
         LOG_ERROR("Invalid type '{}' when accessing property '{}', correct type is '{}'",
-            GetLuaPrimitiveTypeName(PropertyTypeToEnum<T>::TYPE), m_name, GetLuaPrimitiveTypeName(m_type));
+            GetLuaPrimitiveTypeName(PropertyTypeToEnum<T>::TYPE), m_typeData.name, GetLuaPrimitiveTypeName(m_typeData.type));
         return std::nullopt;
     }
 
@@ -471,25 +466,25 @@ namespace rlogic::internal
     {
         if (m_semantics == EPropertySemantics::ScriptOutput)
         {
-            LOG_ERROR(fmt::format("Cannot set property '{}' which is an output.", m_name));
+            LOG_ERROR(fmt::format("Cannot set property '{}' which is an output.", m_typeData.name));
             return false;
         }
 
         if (m_isLinkedInput)
         {
-            LOG_ERROR(fmt::format("Property '{}' is currently linked. Unlink it first before setting its value!", m_name));
+            LOG_ERROR(fmt::format("Property '{}' is currently linked. Unlink it first before setting its value!", m_typeData.name));
             return false;
         }
 
-        if (!TypeUtils::IsPrimitiveType(m_type))
+        if (!TypeUtils::IsPrimitiveType(m_typeData.type))
         {
-            LOG_ERROR(fmt::format("Property '{}' is not a primitive type, can't set its value directly!", m_name));
+            LOG_ERROR(fmt::format("Property '{}' is not a primitive type, can't set its value directly!", m_typeData.name));
             return false;
         }
 
         if (value.index() != m_value.index())
         {
-            LOG_ERROR("Invalid type when setting property '{}', correct type is '{}'", m_name, GetLuaPrimitiveTypeName(m_type));
+            LOG_ERROR("Invalid type when setting property '{}', correct type is '{}'", m_typeData.name, GetLuaPrimitiveTypeName(m_typeData.type));
             return false;
         }
 
@@ -515,7 +510,7 @@ namespace rlogic::internal
     void PropertyImpl::setValue(PropertyValue value, bool checkDirty)
     {
         assert(m_value.index() == value.index());
-        assert(TypeUtils::IsPrimitiveType(m_type));
+        assert(TypeUtils::IsPrimitiveType(m_typeData.type));
 
         if (checkDirty)
         {
@@ -537,15 +532,6 @@ namespace rlogic::internal
         {
             m_value = std::move(value);
         }
-    }
-
-    void  PropertyImpl::setOutputValue_FromScript(PropertyValue value)
-    {
-        assert(m_semantics == EPropertySemantics::ScriptOutput && "Property has to be a ScriptOutput");
-        assert(TypeUtils::IsPrimitiveType(m_type) && "Type check should be performed before setting values");
-        // TODO Violin we should shift the logic which marks nodes dirty here, so that we only ever update
-        // nodes which had their inputs set, NOT all nodes which have any dependency to a dirty node
-        setValue(std::move(value), false);
     }
 
     void PropertyImpl::setIsLinkedInput(bool isLinkedInput)
@@ -582,18 +568,6 @@ namespace rlogic::internal
     EPropertySemantics PropertyImpl::getPropertySemantics() const
     {
         return m_semantics;
-    }
-
-    std::unique_ptr<PropertyImpl> PropertyImpl::deepCopy() const
-    {
-        assert(!m_bindingInputHasNewValue && !m_logicNode && "Deep copy supported only before setting values and attaching to property tree, as means to supplement type expansion only");
-        auto deepCopy = std::make_unique<PropertyImpl>(m_name, m_type, m_semantics);
-
-        for (const auto& child : m_children)
-        {
-            deepCopy->addChild(child->m_impl->deepCopy());
-        }
-        return deepCopy;
     }
 
     const PropertyValue& PropertyImpl::getValue() const

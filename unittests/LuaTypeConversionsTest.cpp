@@ -461,7 +461,7 @@ namespace rlogic::internal
         }
 
         // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected type number at array element # 3!"));
+        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsException_WhenImplicitlyRoundingFloats_WhileExtractingIntegerArray)
@@ -482,7 +482,7 @@ namespace rlogic::internal
         }
 
         // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected type number at array element # 3!"));
+        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsException_WhenNegativeFloatFound_WhileExtractingIntegerArray)
@@ -503,7 +503,7 @@ namespace rlogic::internal
         }
 
         // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected type number at array element # 3!"));
+        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsException_WhenNarrowing_WhileExtractingFloatArray)
@@ -526,6 +526,6 @@ namespace rlogic::internal
         }
 
         // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected type number at array element # 3!"));
+        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
     }
 }

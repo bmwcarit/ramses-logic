@@ -132,7 +132,7 @@ if(NOT TARGET sol2)
     add_subdirectory(sol)
 
     # Ensure sol is expecting c++ compiled lua
-    target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALWAYS_UNSAFE=1)
+    target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALWAYS_UNSAFE=1 SOL_SAFE_NUMERICS=1)
 endif()
 
 ################################################

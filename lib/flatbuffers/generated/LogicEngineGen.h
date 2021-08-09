@@ -31,7 +31,8 @@ struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_V_MAJOR = 4,
     VT_V_MINOR = 6,
     VT_V_PATCH = 8,
-    VT_V_STRING = 10
+    VT_V_STRING = 10,
+    VT_V_FILEFORMATVERSION = 12
   };
   uint32_t v_major() const {
     return GetField<uint32_t>(VT_V_MAJOR, 0);
@@ -45,6 +46,9 @@ struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const flatbuffers::String *v_string() const {
     return GetPointer<const flatbuffers::String *>(VT_V_STRING);
   }
+  uint32_t v_fileFormatVersion() const {
+    return GetField<uint32_t>(VT_V_FILEFORMATVERSION, 0);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint32_t>(verifier, VT_V_MAJOR) &&
@@ -52,6 +56,7 @@ struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyField<uint32_t>(verifier, VT_V_PATCH) &&
            VerifyOffset(verifier, VT_V_STRING) &&
            verifier.VerifyString(v_string()) &&
+           VerifyField<uint32_t>(verifier, VT_V_FILEFORMATVERSION) &&
            verifier.EndTable();
   }
 };
@@ -72,6 +77,9 @@ struct VersionBuilder {
   void add_v_string(flatbuffers::Offset<flatbuffers::String> v_string) {
     fbb_.AddOffset(Version::VT_V_STRING, v_string);
   }
+  void add_v_fileFormatVersion(uint32_t v_fileFormatVersion) {
+    fbb_.AddElement<uint32_t>(Version::VT_V_FILEFORMATVERSION, v_fileFormatVersion, 0);
+  }
   explicit VersionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -89,8 +97,10 @@ inline flatbuffers::Offset<Version> CreateVersion(
     uint32_t v_major = 0,
     uint32_t v_minor = 0,
     uint32_t v_patch = 0,
-    flatbuffers::Offset<flatbuffers::String> v_string = 0) {
+    flatbuffers::Offset<flatbuffers::String> v_string = 0,
+    uint32_t v_fileFormatVersion = 0) {
   VersionBuilder builder_(_fbb);
+  builder_.add_v_fileFormatVersion(v_fileFormatVersion);
   builder_.add_v_string(v_string);
   builder_.add_v_patch(v_patch);
   builder_.add_v_minor(v_minor);
@@ -108,14 +118,16 @@ inline flatbuffers::Offset<Version> CreateVersionDirect(
     uint32_t v_major = 0,
     uint32_t v_minor = 0,
     uint32_t v_patch = 0,
-    const char *v_string = nullptr) {
+    const char *v_string = nullptr,
+    uint32_t v_fileFormatVersion = 0) {
   auto v_string__ = v_string ? _fbb.CreateString(v_string) : 0;
   return rlogic_serialization::CreateVersion(
       _fbb,
       v_major,
       v_minor,
       v_patch,
-      v_string__);
+      v_string__,
+      v_fileFormatVersion);
 }
 
 struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {

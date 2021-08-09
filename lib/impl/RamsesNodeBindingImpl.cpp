@@ -23,14 +23,14 @@ namespace rlogic::internal
         : RamsesBindingImpl(name)
         , m_ramsesNode(ramsesNode)
     {
-        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::BindingInput));
-
         // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
-        // Set default values equivalent to those of Ramses
-        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("visibility", EPropertyType::Bool, EPropertySemantics::BindingInput));
-        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("rotation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
-        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("translation", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
-        inputs->m_impl->addChild(std::make_unique<PropertyImpl>("scaling", EPropertyType::Vec3f, EPropertySemantics::BindingInput));
+        auto inputsType = MakeStruct("IN", {
+                TypeData{"visibility", EPropertyType::Bool},
+                TypeData{"rotation", EPropertyType::Vec3f},
+                TypeData{"translation", EPropertyType::Vec3f},
+                TypeData{"scaling", EPropertyType::Vec3f},
+            });
+        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsType, EPropertySemantics::BindingInput));
 
         setRootProperties(std::move(inputs), {});
 

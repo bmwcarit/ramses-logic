@@ -19,7 +19,7 @@ namespace rlogic::internal
         {
             return false;
         }
-        fileStream.write(static_cast<const char*>(binaryBuffer), bufferLength);
+        fileStream.write(static_cast<const char*>(binaryBuffer), static_cast<std::streamsize>(bufferLength));
         return !fileStream.bad();
     }
 
@@ -39,7 +39,7 @@ namespace rlogic::internal
         fileStream.seekg(0, std::ios::end);
         std::vector<char> byteBuffer(static_cast<size_t>(fileStream.tellg()));
         fileStream.seekg(0, std::ios::beg);
-        fileStream.read(byteBuffer.data(), byteBuffer.size());
+        fileStream.read(byteBuffer.data(), static_cast<std::streamsize>(byteBuffer.size()));
         if (fileStream.bad())
         {
             return std::nullopt;

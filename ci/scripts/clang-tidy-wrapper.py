@@ -31,6 +31,7 @@ CONFIG_SCHEMA = {
             'type': 'array',
             'items': {'type': 'string'},
         },
+
         'sort-order': {
             'type': 'array',
             'items': {
@@ -42,6 +43,45 @@ CONFIG_SCHEMA = {
                 'additionalProperties': False,
             },
         },
+
+        'check-filter': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'check': {
+                        'anyOf': [
+                            {'type': 'string'},
+                            {
+                                'type': 'array',
+                                'items': {'type': 'string'},
+                            },
+                        ],
+                    },
+                    'include': {
+                        'anyOf': [
+                            {'type': 'string'},
+                            {
+                                'type': 'array',
+                                'items': {'type': 'string'},
+                            },
+                        ],
+                    },
+                    'exclude': {
+                        'anyOf': [
+                            {'type': 'string'},
+                            {
+                                'type': 'array',
+                                'items': {'type': 'string'},
+                            },
+                        ],
+                    },
+                },
+                'required': ['check'],
+                'additionalProperties': False,
+            },
+        },
+
         'remove-duplicate-sources': {'type': 'boolean'},
         'remove-duplicate-reports': {'type': 'boolean'},
         'filter-headers': {'type': 'boolean'},
@@ -53,6 +93,7 @@ CONFIG_DEFAULTS = {
     'include': ['.*'],
     'exclude': [],
     'sort-order': [],
+    'check-filter': [],
     'remove-duplicate-sources': True,
     'remove-duplicate-reports': True,
     'filter-headers': True,
@@ -74,6 +115,9 @@ def process_compdb_entries(entries, config, includes_filter):
 
 def filter_result_issues(issues, config, unique_issues):
     if config['filter-headers']:
+        # ignore files outside project or in build dir
+        issues = [issue for issue in issues if issue.is_in_project and not issue.is_in_build_dir]
+
         issues = lists.filter_includes_excludes(issues,
                                                 includes=config['include'],
                                                 excludes=config['exclude'],
@@ -82,6 +126,34 @@ def filter_result_issues(issues, config, unique_issues):
     for issue in issues:
         if not config['remove-duplicate-reports'] or issue.key not in unique_issues:
             unique_issues[issue.key] = issue
+            result.append(issue)
+    return result
+
+
+def filter_issues_by_checks(issues, config):
+    result = []
+
+    def ensure_list(inp):
+        return inp if isinstance(inp, list) else [inp]
+
+    for issue in issues:
+        keep_issue = True
+        for check_filter in config['check-filter']:
+            # skip if check does not match
+            if not lists.filter_includes_excludes(issue.all_checks, includes=ensure_list(check_filter['check'])):
+                continue
+
+            # keep issue if it passes file filter
+            file_includes = ensure_list(check_filter['include']) if 'include' in check_filter else ['.*']
+            file_excludes = ensure_list(check_filter['exclude']) if 'exclude' in check_filter else []
+            if lists.filter_includes_excludes([issue.relative_file], includes=file_includes, excludes=file_excludes):
+                continue
+
+            # matched by exclude if gets here: discard issue and do not try other checks
+            keep_issue = False
+            break
+
+        if keep_issue:
             result.append(issue)
     return result
 
@@ -103,8 +175,8 @@ def print_slowest_entries(entries, timing_selection):
         print(f'{format_dt(e.runtime):>10}  {e.compdb_entry.relative_file}')
 
 
-def print_overall_runtime(entries, num_threads, start_time, *, end_time=time.time()):
-    wallclock_runtime = end_time - start_time
+def print_overall_runtime(entries, num_threads, start_time, *, end_time=None):
+    wallclock_runtime = (end_time or time.monotonic()) - start_time
     total_cpu_runtime = sum([e.runtime for e in entries])
     cpu_usage = ((total_cpu_runtime / num_threads) / wallclock_runtime) * 100
     print(f'Wallclock runtime {format_dt(wallclock_runtime)}, total thread runtime {format_dt(total_cpu_runtime)}, '
@@ -124,7 +196,7 @@ def main():
                         help='Path to configuration file')
     args = parser.parse_args()
 
-    start_time = time.time()
+    start_time = time.monotonic()
     config = yamlconfig.read_config_with_defaults(args.config, CONFIG_SCHEMA, CONFIG_DEFAULTS)
     entries = compilationdb.load_from_file(args.compdb, repo.get_sdkroot())
     print(f'Loaded {len(entries)} entries from {args.compdb}')
@@ -132,15 +204,19 @@ def main():
     entries = process_compdb_entries(entries, config, args.filter)
     print(f'Check {len(entries)} remaining entries with {args.threads} threads\n')
 
-    result_entries = []
-    unique_issues = {}
+    unique_filtered_issues = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=args.threads) as executor:
+        result_entries = []
+        unique_issues = {}
         result_futures = map(lambda e: executor.submit(clangtidy.run_on_file, e), entries)
         for f_result in concurrent.futures.as_completed(result_futures):
             e = f_result.result()
             result_entries.append(e)
 
-            for issue in filter_result_issues(e.issues, config, unique_issues):
+            issues = filter_result_issues(e.issues, config, unique_issues)
+            issues = filter_issues_by_checks(issues, config)
+            for issue in issues:
+                unique_filtered_issues[issue.key] = issue
                 print(issue.text, flush=True)
 
     if args.timing:
@@ -149,12 +225,12 @@ def main():
 
     print_overall_runtime(result_entries, args.threads, start_time)
 
-    if len(unique_issues) == 0:
+    if len(unique_filtered_issues) == 0:
         print('Done without issues')
         return 0
     else:
-        issue_files = set([i.file for i in unique_issues.values()])
-        print(f'Done with {len(unique_issues)} unique issues in {len(issue_files)} files')
+        issue_files = set([i.file for i in unique_filtered_issues.values()])
+        print(f'Done with {len(unique_filtered_issues)} unique issues in {len(issue_files)} files')
         return 1
 
 

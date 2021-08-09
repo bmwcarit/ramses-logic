@@ -11,6 +11,7 @@
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 
+#include "fmt/format.h"
 
 namespace rlogic
 {
@@ -172,11 +173,11 @@ namespace rlogic
 
                     if (i < 0)
                     {
-                        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
+                        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Bad index (type: number). Only non-negative integers supported as array index type!"));
                     }
                     else
                     {
-                        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Index out of range!"));
+                        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(fmt::format("Bad index '{}', expected 1 <= i <= {}", i, componentCount)));
                     }
 
                     EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("scriptOOR"));
@@ -389,7 +390,7 @@ namespace rlogic
             },
             {
                 "OUT.vec3i = {1, 2, {}}         -- extra nested table",
-                "lua: error: Unexpected type table at array element # 3!"
+                "lua: error: Unexpected value (type: 'table') at array element # 3!"
             },
             {
                 "OUT.vec4i = {1, 2, nil, 4}     -- wrong size, nil in-between",
@@ -397,7 +398,7 @@ namespace rlogic
             },
             {
                 "OUT.vec4i = {1, 2, nil, 3, 4}     -- correct size, nil in-between",
-                "lua: error: Unexpected type nil at array element # 3!"
+                "lua: error: Unexpected value (type: 'nil') at array element # 3!"
             },
         };
 

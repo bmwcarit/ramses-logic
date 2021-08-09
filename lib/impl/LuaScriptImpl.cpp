@@ -11,8 +11,8 @@
 #include "internals/SolState.h"
 #include "impl/PropertyImpl.h"
 
-#include "internals/LuaScriptPropertyExtractor.h"
-#include "internals/LuaScriptPropertyHandler.h"
+#include "internals/PropertyTypeExtractor.h"
+#include "internals/WrappedLuaProperty.h"
 #include "internals/SolHelper.h"
 #include "internals/ErrorReporting.h"
 
@@ -63,13 +63,19 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
-        auto inputsImpl = std::make_unique<PropertyImpl>("IN", EPropertyType::Struct, EPropertySemantics::ScriptInput);
-        auto outputsImpl = std::make_unique<PropertyImpl>("OUT", EPropertyType::Struct, EPropertySemantics::ScriptOutput);
+        PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
+        PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
 
-        env["IN"]  = solState.createUserObject(LuaScriptPropertyExtractor(*inputsImpl));
-        env["OUT"] = solState.createUserObject(LuaScriptPropertyExtractor(*outputsImpl));
+        sol::environment& interfaceEnvironment = solState.getInterfaceExtractionEnvironment();
 
+        interfaceEnvironment["IN"]  = std::ref(inputsExtractor);
+        interfaceEnvironment["OUT"] = std::ref(outputsExtractor);
+
+        interfaceEnvironment.set_on(intf);
         sol::protected_function_result intfResult = intf();
+
+        interfaceEnvironment["IN"] = sol::lua_nil;
+        interfaceEnvironment["OUT"] = sol::lua_nil;
 
         if (!intfResult.valid())
         {
@@ -84,8 +90,8 @@ namespace rlogic::internal
             filename,
             solState,
             std::move(load_result),
-            std::make_unique<Property>(std::move(inputsImpl)),
-            std::make_unique<Property>(std::move(outputsImpl))
+            std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptInput)),
+            std::make_unique<Property>(std::make_unique<PropertyImpl>(outputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptOutput))
         };
     }
 
@@ -93,16 +99,17 @@ namespace rlogic::internal
         : LogicNodeImpl(compiledScript.scriptName)
         , m_filename(compiledScript.fileName)
         , m_source(compiledScript.sourceCode)
-        , m_state(compiledScript.solState)
-        , m_solFunction(std::move(compiledScript.mainFunction))
         , m_luaPrintFunction(&LuaScriptImpl::DefaultLuaPrintFunction)
+        , m_wrappedRootInput(*compiledScript.rootInput->m_impl)
+        , m_wrappedRootOutput(*compiledScript.rootOutput->m_impl)
+        , m_solFunction(std::move(compiledScript.mainFunction))
     {
         setRootProperties(std::move(compiledScript.rootInput), std::move(compiledScript.rootOutput));
 
         sol::environment env = sol::get_environment(m_solFunction);
 
-        env["IN"] = m_state.get().createUserObject(LuaScriptPropertyHandler(m_state, *getInputs()->m_impl));
-        env["OUT"] = m_state.get().createUserObject(LuaScriptPropertyHandler(m_state, *getOutputs()->m_impl));
+        env["IN"] = std::ref(m_wrappedRootInput);
+        env["OUT"] = std::ref(m_wrappedRootOutput);
         // override the lua print function to handle it by ourselves
         env.set_function("print", &LuaScriptImpl::luaPrint, this);
     }

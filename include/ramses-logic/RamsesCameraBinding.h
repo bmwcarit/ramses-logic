@@ -34,12 +34,13 @@ namespace rlogic
      *
      * There are two types of ramses::Camera:
      *  - ramses::PerspectiveCamera
-     *  - ramses::OrthographicCamera.
+     *  - ramses::OrthographicCamera
+     *
      * Both camera types are defined through their viewport and their frustum properties. These are represented as two separate property structs
      * in the RamsesCameraBinding. Be aware if you set one or more values to one of the structs on the binding and update the LogicEngine it will lead
      * to all properties of this struct being set on the actual ramses::Camera.
-     * For example if you only set the Viewport/OffsetX of the Camera per linked script or directly on the binding it will set
-     * Viewport/OffsetX, Viewport/OffsetY, Viewport/Width and Viewport/Height to whatever the state of the properties is at that moment.
+     * For example if you only set the 'offsetX' of the Camera viewport it will set
+     * all other viewport properties as well (offsetY, width and height) to whatever their state is at that moment.
      * The values of the #RamsesCameraBinding inputs are initialized with the values of the provided ramses::Camera during creation.
      * The frustum values of the ramses::Camera are not affected when setting viewport values, and vice-versa.
      * Check the ramses::Camera API to see which values belong together.
@@ -47,14 +48,15 @@ namespace rlogic
      * (either by link or by setting them directly). This way unwanted behavior can be avoided.
      *
      * Since the RamsesCameraBinding derives from #rlogic::RamsesBinding, it also provides the #rlogic::LogicNode::getInputs
-     * and #rlogic::LogicNode::getOutputs method. For this particular implementation, the methods behave as follows:
-     *  - #rlogic::LogicNode::getInputs: returns an empty struct with no child properties if no ramses::Camera is currently assigned
+     * and #rlogic::LogicNode::getOutputs method. For this class, the methods behave as follows:
      *  - #rlogic::LogicNode::getInputs: returns inputs struct with two child properties: viewport and frustum.
      *                                   Their child properties in turn vary for the two available camera types (ramses::PerspectiveCamera and ramses::OrthographicCamera)
-     *      - Perspective Camera:  viewport --> offsetX, offsetY, width, height
-     *                             frustum  --> fieldOfView, aspectRatio, nearPlane, farPlane
-     *      - Orthographic Camera: viewport --> same as for Perspective Camera
-     *                             frustum  --> leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane
+     *      - Perspective Camera
+     *          - viewport: offsetX, offsetY, width, height
+     *          - frustum: fieldOfView, aspectRatio, nearPlane, farPlane
+     *      - Orthographic Camera
+     *          - viewport: same as for Perspective Camera
+     *          - frustum: leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane
      *  - #rlogic::LogicNode::getOutputs: returns always nullptr, because a #RamsesCameraBinding does not have outputs,
      *    it implicitly controls the ramses Camera
      */

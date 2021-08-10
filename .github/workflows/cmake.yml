@@ -23,22 +23,6 @@ jobs:
     steps:
     - uses: actions/checkout@v2
 
-    - name: Fetch submodules windows
-      # Recursively checkout submodules
-      # TODO Violin use ssh and shallow clone to save resources
-      run: |
-        git submodule update --init --recursive
-      if: ${{ matrix.os == 'windows-latest' }}
-
-    - name: Fetch submodules linux
-      # Recursively checkout submodules
-      # TODO Violin use ssh and shallow clone to save resources
-      run: |
-        auth_header="$(git config --local --get http.https://github.com/.extraheader)"
-        git submodule sync --recursive
-        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive
-      if: ${{ matrix.os == 'ubuntu-latest' }}
-
     - name: Install clang and clang-tidy
       run: |
         set -x

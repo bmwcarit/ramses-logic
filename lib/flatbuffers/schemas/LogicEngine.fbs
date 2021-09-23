@@ -10,7 +10,6 @@ include "ApiObjects.fbs";
 
 namespace rlogic_serialization;
 
-// TODO Violin make all fields required on next breaking file format change
 table Version
 {
     // Uses v_ prefix because major/minor collides with system header symbols

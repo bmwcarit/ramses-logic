@@ -1,5 +1,44 @@
 # master
 
+# v0.9.0
+
+Summary:
+* New major feature (Animations)
+* Not backwards compatible
+    * binary files need re-export
+    * minimal API changes (see note on RamsesNodeBinding below)
+* More small fixes and quality of life changes
+
+**API Changes**
+
+* Added AnimationNode, a logic node that can animate properties
+    * Added new entity DataArray for storage of various types of immutable data arrays used in AnimationNode
+* RamsesNodeBinding accepts a new enum value which configures how rotations should work
+    * Supports multiple Euler angle conventions (a subset of the ones offered by Ramses)
+    * Has an option for Quaternion. In this case, the 'rotation' property input is of type vec4f, not vec3f
+    * Rotation convention is statically configured in RamsesNodeBinding and can't be changed dynamically any more
+    * Rotation values in RamsesNodeBinding are imported from the bound Ramses node if the conventions match, otherwise
+        initialized with zero and a warning is issued. Quaternions are always initialized with zero
+    * Default rotation convention is Euler XYZ rotation (corresponds to ramses::ERotationConvention::ZYX)
+* Added a base class LogicObject for all rlogic objects that can be created from LogicEngine
+    * ErrorData now holds pointer to LogicObject, not LogicNode, so that more errors can be reported with pointer to the error object
+
+**Improvements**
+
+* LogicEngine can be move constructed and move assigned using std::move semantics now
+* Added the function Property::hasChild that checks whether the Property has a child with the given name
+* Can check if property input is linked to an output (new method Property::isLinked)
+
+**Bugfixes**
+
+* Improve error message when trying to assign individual components of Lua script output vector types (VEC3F etc.)
+
+# v0.8.1
+
+**Features**
+
+* Internal Release
+
 # v0.8.0
 
 **API Changes**

@@ -9,12 +9,18 @@
 #pragma once
 
 #include "generated/PropertyGen.h"
-
+#include "generated/DataArrayGen.h"
 #include <unordered_map>
 
 namespace rlogic_serialization
 {
     struct Property;
+    struct DataArray;
+}
+
+namespace rlogic
+{
+    class DataArray;
 }
 
 namespace rlogic::internal
@@ -38,8 +44,22 @@ namespace rlogic::internal
             return iter->second;
         }
 
+        void storeDataArray(const DataArray& dataArray, flatbuffers::Offset<rlogic_serialization::DataArray> offset)
+        {
+            assert(m_dataArrayIndices.count(&dataArray) == 0 && "one time store only");
+            m_dataArrayIndices.insert({ &dataArray, offset });
+        }
+
+        flatbuffers::Offset<rlogic_serialization::DataArray> resolveDataArrayOffset(const DataArray& dataArray) const
+        {
+            const auto it = m_dataArrayIndices.find(&dataArray);
+            assert(it != m_dataArrayIndices.cend());
+            return it->second;
+        }
+
     private:
         std::unordered_map<const PropertyImpl*, flatbuffers::Offset<rlogic_serialization::Property>> m_properties;
+        std::unordered_map<const DataArray*, flatbuffers::Offset<rlogic_serialization::DataArray>> m_dataArrayIndices;
     };
 
 }

@@ -99,6 +99,6 @@ namespace rlogic
         /**
          * Implementation detail of RamsesAppearanceBinding
          */
-        std::unique_ptr<internal::RamsesAppearanceBindingImpl> m_appearanceBinding;
+        internal::RamsesAppearanceBindingImpl& m_appearanceBinding;
     };
 }

@@ -108,14 +108,14 @@ namespace rlogic::internal
     {
         if (!appearanceBinding.base())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing base class info!");
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing base class info!", nullptr);
             return nullptr;
         }
 
         // TODO Violin make optional - no need to always serialize string if not used
         if (!appearanceBinding.base()->name())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name!");
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name!", nullptr);
             return nullptr;
         }
 
@@ -123,7 +123,7 @@ namespace rlogic::internal
 
         if (!appearanceBinding.base()->rootInput())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing root input!");
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing root input!", nullptr);
             return nullptr;
         }
 
@@ -137,14 +137,14 @@ namespace rlogic::internal
         // TODO Violin don't serialize these inputs -> get rid of the check
         if (deserializedRootInput->getName() != "IN" || deserializedRootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: root input has unexpected name or type!");
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: root input has unexpected name or type!", nullptr);
             return nullptr;
         }
 
         const auto* boundObject = appearanceBinding.base()->boundRamsesObject();
         if (!boundObject)
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: no reference to appearance!");
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: no reference to appearance!", nullptr);
             return nullptr;
         }
 
@@ -160,7 +160,7 @@ namespace rlogic::internal
         const ramses::resourceId_t effectResourceId = effect.getResourceId();
         if (effectResourceId.lowPart != appearanceBinding.parentEffectId()->resourceIdLow() || effectResourceId.highPart != appearanceBinding.parentEffectId()->resourceIdHigh())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: effect signature doesn't match after loading!");
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: effect signature doesn't match after loading!", nullptr);
             return nullptr;
         }
 

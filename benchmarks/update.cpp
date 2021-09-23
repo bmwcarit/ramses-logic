@@ -122,6 +122,75 @@ namespace rlogic
 
     // Same as BM_Update_AssignProperty, but with arrays
     BENCHMARK(BM_Update_AssignArray)->Arg(1)->Arg(10)->Arg(100)->Arg(1000)->Unit(benchmark::kMicrosecond);
+
+    // Test that update is faster when fewer scripts have to be updated (i.e. the dirty handling works
+    // as expected). This benchmark creates a static list of linearly linked scripts so that if the
+    // first in the list has its 'dirty_trigger' value changed, all scripts in the change will be
+    // triggered for re-execution, whereas setting the trigger on the last script will only have the
+    // last script executed
+    // Read the results like this: the higher the arg (0 .. 99) the faster the update should be, ideally
+    // when the arg is close to 99, the time to update should be close to zero
+    static void BM_Update_IsFasterWithFewerDirtyScripts(benchmark::State& state)
+    {
+        LogicEngine logicEngine;
+
+        const int64_t scriptToSetDirty = state.range(0);
+        constexpr int64_t scriptCount = 100;
+
+        const std::string scriptSrc = R"(
+            function interface()
+                IN.dirty_trigger = INT
+                IN.lots_of_data = {}
+                OUT.lots_of_data = {}
+                for i = 0,10,1 do
+                    IN.lots_of_data["arr"..tostring(i)] = ARRAY(10, INT)
+                    OUT.lots_of_data["arr"..tostring(i)] = ARRAY(10, INT)
+                end
+            end
+            function run()
+                -- heavy data operation (deep copy of struct of arrays)
+                OUT.lots_of_data = IN.lots_of_data
+                -- trigger the dirty mechanism by updating one of the values based on the 'dirty trigger'
+                OUT.lots_of_data.arr0[1] = IN.lots_of_data.arr0[1] + IN.dirty_trigger
+            end
+        )";
+
+        // To make sure there were no API errors
+        bool success = false;
+        (void)success;
+        std::vector<LuaScript*> scripts(scriptCount);
+        for (int64_t i = 0; i < scriptCount; ++i)
+        {
+            scripts[i] = logicEngine.createLuaScriptFromSource(scriptSrc, fmt::format("script{}", i));
+
+            if (i >= 1)
+            {
+                for (int64_t link = 0; link < 10; ++link)
+                {
+                    auto target = scripts[i]->getInputs()->getChild("lots_of_data")->getChild(fmt::format("arr{}", link));
+                    auto src = scripts[i - 1]->getOutputs()->getChild("lots_of_data")->getChild(fmt::format("arr{}", link));
+
+                    for (int64_t array_element = 0; array_element < 10; ++array_element)
+                    {
+                        success = logicEngine.link(*src->getChild(array_element), *target->getChild(array_element));
+                        assert(success);
+                    }
+                }
+            }
+        }
+
+        Property* dirtyTrigger = scripts[scriptToSetDirty]->getInputs()->getChild("dirty_trigger");
+        int32_t valueForDirtyTriggering = 1;
+        for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
+        {
+            success = dirtyTrigger->set<int32_t>(valueForDirtyTriggering++);
+            assert(success);
+            success = logicEngine.update();
+            assert(success);
+        }
+    }
+
+    BENCHMARK(BM_Update_IsFasterWithFewerDirtyScripts)->Arg(0)->Arg(49)->Arg(99)->Unit(benchmark::kMillisecond);
 }
 
 

@@ -11,6 +11,8 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/DataArray.h"
+#include "ramses-logic/AnimationNode.h"
 
 #include "impl/LogicEngineImpl.h"
 
@@ -24,6 +26,10 @@ namespace rlogic
     }
 
     LogicEngine::~LogicEngine() noexcept = default;
+
+    LogicEngine::LogicEngine(LogicEngine&& other) noexcept = default;
+
+    LogicEngine& LogicEngine::operator=(LogicEngine&& other) noexcept = default;
 
     LuaScript* LogicEngine::createLuaScriptFromFile(std::string_view filename, std::string_view scriptName)
     {
@@ -48,6 +54,16 @@ namespace rlogic
     Collection<RamsesCameraBinding> LogicEngine::ramsesCameraBindings() const
     {
         return Collection<RamsesCameraBinding>(m_impl->getApiObjects().getCameraBindings());
+    }
+
+    Collection<DataArray> LogicEngine::dataArrays() const
+    {
+        return Collection<DataArray>(m_impl->getApiObjects().getDataArrays());
+    }
+
+    Collection<rlogic::AnimationNode> LogicEngine::animationNodes() const
+    {
+        return Collection<AnimationNode>(m_impl->getApiObjects().getAnimationNodes());
     }
 
     template <typename T>
@@ -104,19 +120,37 @@ namespace rlogic
         return findObject(m_impl->getApiObjects().getCameraBindings(), name);
     }
 
+    const DataArray* LogicEngine::findDataArray(std::string_view name) const
+    {
+        return findObject(m_impl->getApiObjects().getDataArrays(), name);
+    }
+    DataArray* LogicEngine::findDataArray(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getDataArrays(), name);
+    }
+
+    const AnimationNode* LogicEngine::findAnimationNode(std::string_view name) const
+    {
+        return findObject(m_impl->getApiObjects().getAnimationNodes(), name);
+    }
+    AnimationNode* LogicEngine::findAnimationNode(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getAnimationNodes(), name);
+    }
+
     LuaScript* LogicEngine::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
     {
         return m_impl->createLuaScriptFromSource(source, scriptName);
     }
 
-    RamsesNodeBinding* LogicEngine::createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name)
+    RamsesNodeBinding* LogicEngine::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType /* = ERotationType::Euler_XYZ*/, std::string_view name)
     {
-        return m_impl->createRamsesNodeBinding(ramsesNode, name);
+        return m_impl->createRamsesNodeBinding(ramsesNode, rotationType, name);
     }
 
-    bool LogicEngine::destroy(LogicNode& logicNode)
+    bool LogicEngine::destroy(LogicObject& object)
     {
-        return m_impl->destroy(logicNode);
+        return m_impl->destroy(object);
     }
 
     RamsesAppearanceBinding* LogicEngine::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
@@ -127,6 +161,18 @@ namespace rlogic
     RamsesCameraBinding* LogicEngine::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
         return m_impl->createRamsesCameraBinding(ramsesCamera, name);
+    }
+
+    template <typename T>
+    DataArray* LogicEngine::createDataArrayInternal(const std::vector<T>& data, std::string_view name)
+    {
+        static_assert(IsPrimitiveProperty<T>::value && CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
+        return m_impl->createDataArray(data, name);
+    }
+
+    AnimationNode* LogicEngine::createAnimationNode(const AnimationChannels& channels, std::string_view name)
+    {
+        return m_impl->createAnimationNode(channels, name);
     }
 
     const std::vector<ErrorData>& LogicEngine::getErrors() const
@@ -168,4 +214,13 @@ namespace rlogic
     {
         return m_impl->isLinked(logicNode);
     }
+
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<float>(const std::vector<float>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec2f>(const std::vector<vec2f>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec3f>(const std::vector<vec3f>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec4f>(const std::vector<vec4f>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<int32_t>(const std::vector<int32_t>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec2i>(const std::vector<vec2i>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec3i>(const std::vector<vec3i>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec4i>(const std::vector<vec4i>&, std::string_view);
 }

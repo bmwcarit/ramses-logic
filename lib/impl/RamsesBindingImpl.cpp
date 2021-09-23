@@ -6,11 +6,8 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-
 #include "impl/RamsesBindingImpl.h"
-
 #include "ramses-client-api/SceneObject.h"
-
 #include "generated/RamsesReferenceGen.h"
 
 namespace rlogic::internal
@@ -33,5 +30,4 @@ namespace rlogic::internal
 
         return ramsesRef;
     }
-
 }

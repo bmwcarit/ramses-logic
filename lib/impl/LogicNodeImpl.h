@@ -9,6 +9,7 @@
 
 #pragma once
 
+#include "impl/LogicObjectImpl.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -25,12 +26,13 @@ namespace rlogic::internal
 
     struct LogicNodeRuntimeError { std::string message; };
 
-    class LogicNodeImpl
+    class LogicNodeImpl : public LogicObjectImpl
     {
     public:
-        // Deleted methods must be public (other lifecycle methods are protected, this is a base class)
+        explicit LogicNodeImpl(std::string_view name) noexcept;
         LogicNodeImpl(const LogicNodeImpl& other) = delete;
         LogicNodeImpl& operator=(const LogicNodeImpl& other) = delete;
+        ~LogicNodeImpl() noexcept override;
 
         [[nodiscard]] Property*       getInputs();
         [[nodiscard]] const Property* getInputs() const;
@@ -40,26 +42,15 @@ namespace rlogic::internal
 
         virtual std::optional<LogicNodeRuntimeError> update() = 0;
 
-        [[nodiscard]] std::string_view getName() const;
-        void setName(std::string_view name);
-
         void setDirty(bool dirty);
         [[nodiscard]] bool isDirty() const;
 
     protected:
-        // Move-able (noexcept); Not copy-able
-        explicit LogicNodeImpl(std::string_view name) noexcept;
-        virtual ~LogicNodeImpl() noexcept;
-        LogicNodeImpl(LogicNodeImpl&& other) noexcept = default;
-        LogicNodeImpl& operator=(LogicNodeImpl && other) noexcept = default;
-
         void setRootProperties(std::unique_ptr<Property> rootInput, std::unique_ptr<Property> rootOutput);
 
     private:
-        std::string               m_name;
         std::unique_ptr<Property> m_inputs;
         std::unique_ptr<Property> m_outputs;
         bool                      m_dirty = true;
-
     };
 }

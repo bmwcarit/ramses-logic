@@ -8,11 +8,9 @@
 
 #pragma once
 
-#include "ramses-logic/APIExport.h"
+#include "ramses-logic/LogicObject.h"
 
-#include <vector>
-#include <string>
-#include <functional>
+#include <memory>
 
 namespace rlogic::internal
 {
@@ -32,10 +30,9 @@ namespace rlogic
      * Appearance belongs). In those cases, #getInputs()/#getOutputs() will return a #rlogic::Property
      * which represents an empty struct (type Struct, but no child properties).
      */
-    class LogicNode
+    class LogicNode : public LogicObject
     {
     public:
-
         /**
          * Returns a property of type Struct which holds the inputs of the #LogicNode.
          *
@@ -62,23 +59,9 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API const Property* getOutputs() const;
 
         /**
-         * Returns the name of this #LogicNode.
-         *
-         * @return the name of the LogicNode
-         */
-        [[nodiscard]] RLOGIC_API std::string_view getName() const;
-
-        /**
-        * Sets the name of this #LogicNode.
-        *
-        * @param name new name of the #LogicNode
-        */
-        RLOGIC_API void setName(std::string_view name);
-
-        /**
         * Destructor of #LogicNode
         */
-        virtual ~LogicNode() noexcept;
+        ~LogicNode() noexcept override;
 
         /**
         * Copy Constructor of LogicNode is deleted because LogicNodes are not supposed to be copied
@@ -109,17 +92,16 @@ namespace rlogic
         LogicNode& operator=(LogicNode&& other) = delete;
 
         /**
-         * Implementation detail of LuaScript
+         * Implementation detail of LogicNode
          */
-        std::reference_wrapper<internal::LogicNodeImpl> m_impl;
-    protected:
+        internal::LogicNodeImpl& m_impl;
 
+    protected:
         /**
          * Constructor of LogicNode. User is not supposed to call this - LogcNodes are created by subclasses
          *
          * @param impl implementation details of the LogicNode
          */
-        explicit LogicNode(std::reference_wrapper<internal::LogicNodeImpl> impl) noexcept;
-
+        explicit LogicNode(std::unique_ptr<internal::LogicNodeImpl> impl) noexcept;
     };
 }

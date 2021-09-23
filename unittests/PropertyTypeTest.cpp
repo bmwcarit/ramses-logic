@@ -81,4 +81,41 @@ namespace rlogic
         EXPECT_STREQ("STRUCT", GetLuaPrimitiveTypeName(EPropertyType::Struct));
         EXPECT_STREQ("ARRAY", GetLuaPrimitiveTypeName(EPropertyType::Array));
     }
+
+    TEST(PropertyTypeCheck, ChecksPropertyTypeToBeStoredInDataArray)
+    {
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Float));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec2f));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec3f));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec4f));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Int32));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec2i));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec3i));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec4i));
+
+        EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Bool));
+        EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Struct));
+        EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::String));
+        EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Array));
+
+        auto invalidType(static_cast<EPropertyType>(10000));
+        EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(invalidType));
+    }
+
+    TEST(PropertyTypeCheck, ChecksPropertyTypeToBeAnimatable)
+    {
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Float));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec2f));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec3f));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec4f));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Int32));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec2i));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec3i));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec4i));
+
+        EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Bool));
+        EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Struct));
+        EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::String));
+        EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Array));
+    }
 }

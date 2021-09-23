@@ -19,15 +19,20 @@ struct RamsesNodeBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef RamsesNodeBindingBuilder Builder;
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_BASE = 4
+    VT_BASE = 4,
+    VT_ROTATIONTYPE = 6
   };
   const rlogic_serialization::RamsesBinding *base() const {
     return GetPointer<const rlogic_serialization::RamsesBinding *>(VT_BASE);
+  }
+  uint8_t rotationType() const {
+    return GetField<uint8_t>(VT_ROTATIONTYPE, 0);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_BASE) &&
            verifier.VerifyTable(base()) &&
+           VerifyField<uint8_t>(verifier, VT_ROTATIONTYPE) &&
            verifier.EndTable();
   }
 };
@@ -38,6 +43,9 @@ struct RamsesNodeBindingBuilder {
   flatbuffers::uoffset_t start_;
   void add_base(flatbuffers::Offset<rlogic_serialization::RamsesBinding> base) {
     fbb_.AddOffset(RamsesNodeBinding::VT_BASE, base);
+  }
+  void add_rotationType(uint8_t rotationType) {
+    fbb_.AddElement<uint8_t>(RamsesNodeBinding::VT_ROTATIONTYPE, rotationType, 0);
   }
   explicit RamsesNodeBindingBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -53,9 +61,11 @@ struct RamsesNodeBindingBuilder {
 
 inline flatbuffers::Offset<RamsesNodeBinding> CreateRamsesNodeBinding(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<rlogic_serialization::RamsesBinding> base = 0) {
+    flatbuffers::Offset<rlogic_serialization::RamsesBinding> base = 0,
+    uint8_t rotationType = 0) {
   RamsesNodeBindingBuilder builder_(_fbb);
   builder_.add_base(base);
+  builder_.add_rotationType(rotationType);
   return builder_.Finish();
 }
 

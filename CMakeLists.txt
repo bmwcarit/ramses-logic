@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 8)
+set(RLOGIC_VERSION_MINOR 9)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
@@ -39,12 +39,17 @@ set(ramses-logic_FOLDER_PREFIX "" CACHE
 set(ramses-logic_BUILD_RAMSES_RENDERER false CACHE BOOL "Set whether the ramses renderer will be built as part of this build. If this option is set to ON, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
 option(ramses-logic_BUILD_ANDROID "Enable/disable Android build" OFF)
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
+option(ramses-logic_FIND_RAMSES_FROM_SYSTEM "Set this to ON if you want to use an existing installation or package of Ramses (find_package)" OFF)
+set(ramses-logic_PLATFORM "" CACHE
+    STRING "Use this in conjunction with ramses-logic_FIND_RAMSES_FROM_SYSTEM to search for a specific Ramses platform")
 option(ramses-logic_BUILD_SHARED_LIB "Enable/disable build of Ramses Logic shared lib target" ON)
 option(ramses-logic_BUILD_STATIC_LIB "Enable/disable build of Ramses Logic static lib target" OFF)
 option(ramses-logic_ENABLE_INSTALL "Enable/disable installation of Ramses Logic" ON)
 option(ramses-logic_BUILD_WITH_LTO "Build all targets with link time optimization enabled (not supported on all platforms)" OFF)
 option(ramses-logic_WARNINGS_AS_ERRORS "Treat warnings as errors when compiling" ON)
 option(ramses-logic_FORCE_BUILD_TESTS "Force build tests, even if built as a submodule" OFF)
+option(ramses-logic_FORCE_OFF_TESTS "Fully disable tests" OFF)
+option(ramses-logic_BUILD_DOCUMENTATION "Enable building documentation when dependencies available" ON)
 option(ramses-logic_FORCE_BUILD_DOCS "Abort build if documentation dependencies not found(doxygen, sphinx, breathe and the rtd theme for sphinx)" OFF)
 option(ramses-logic_BUILD_EXAMPLES "Build examples" ON)
 option(ramses-logic_ENABLE_FLATBUFFERS_GENERATION "Create target to generate flatbuffers serialization files (ON/OFF)" ON)
@@ -54,6 +59,14 @@ option(ramses-logic_USE_CCACHE "Enable ccache for build" OFF)
 
 if(NOT ramses-logic_BUILD_STATIC_LIB AND NOT ramses-logic_BUILD_SHARED_LIB)
     message(FATAL_ERROR "One of the ramses-logic_BUILD_SHARED_LIB/ramses-logic_BUILD_STATIC_LIB options must be enabled!")
+endif()
+
+if(ramses-logic_FIND_RAMSES_FROM_SYSTEM AND ramses-logic_ALLOW_RAMSES_BUILD)
+    message(FATAL_ERROR "Can't have both ramses-logic_FIND_RAMSES_FROM_SYSTEM and ramses-logic_ALLOW_RAMSES_BUILD options enabled!")
+endif()
+
+if(ramses-logic_FIND_RAMSES_FROM_SYSTEM AND ramses-logic_BUILD_RAMSES_RENDERER)
+    message(FATAL_ERROR "Can't have both ramses-logic_FIND_RAMSES_FROM_SYSTEM and ramses-logic_BUILD_RAMSES_RENDERER options enabled!")
 endif()
 
 #==========================================================================
@@ -85,7 +98,7 @@ endif()
 set(CMAKE_DEBUG_POSTFIX "") # no debug suffix in this project
 
 # Looks weird, but this is how CTest recommends enabling testing in libraries
-if(ramses-logic_FORCE_BUILD_TESTS OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME)
+if(NOT ramses-logic_FORCE_OFF_TESTS AND (ramses-logic_FORCE_BUILD_TESTS OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME))
     set(ramses-logic_BUILD_TESTS ON)
 endif()
 
@@ -147,7 +160,7 @@ target_link_libraries(ramses-logic-obj
         lua::lua
         rlogic::flatbuffers
         fmt::fmt
-        ${ramses-logic_RAMSES_TARGET}
+        ${RAMSES_TARGET}
 )
 
 # Link required Android dependencies if found
@@ -233,13 +246,15 @@ endif()
 # build and install documentation
 #==========================================================================
 
-add_subdirectory(doc)
+if (ramses-logic_BUILD_DOCUMENTATION)
+    add_subdirectory(doc)
 
-if(ramses-logic_ENABLE_INSTALL)
-    install(FILES       README.md CHANGELOG.md LICENSE.txt
-            DESTINATION share/doc/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
-            COMPONENT   ${PROJECT_NAME}-${PROJECT_VERSION}
-        )
+    if(ramses-logic_ENABLE_INSTALL)
+        install(FILES       README.md CHANGELOG.md LICENSE.txt
+                DESTINATION share/doc/${PROJECT_NAME}-${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}
+                COMPONENT   ${PROJECT_NAME}-${PROJECT_VERSION}
+            )
+    endif()
 endif()
 
 #==========================================================================

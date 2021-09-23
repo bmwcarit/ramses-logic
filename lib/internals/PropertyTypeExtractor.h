@@ -14,9 +14,6 @@
 
 namespace rlogic::internal
 {
-    class PropertyImpl;
-    class SolState;
-
     class PropertyTypeExtractor
     {
     public:

@@ -8,12 +8,13 @@
 
 #include "ramses-logic/LogicNode.h"
 #include "impl/LogicNodeImpl.h"
-#include "ramses-logic/Property.h"
 
 namespace rlogic
 {
-    LogicNode::LogicNode(std::reference_wrapper<internal::LogicNodeImpl> impl) noexcept
-        : m_impl(impl)
+    LogicNode::LogicNode(std::unique_ptr<internal::LogicNodeImpl> impl) noexcept
+        : LogicObject(std::move(impl))
+        /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) */
+        , m_impl{ static_cast<internal::LogicNodeImpl&>(*LogicObject::m_impl) }
     {
     }
 
@@ -21,27 +22,16 @@ namespace rlogic
 
     Property* LogicNode::getInputs()
     {
-        return m_impl.get().getInputs();
+        return m_impl.getInputs();
     }
 
     const Property* LogicNode::getInputs() const
     {
-        return m_impl.get().getInputs();
+        return m_impl.getInputs();
     }
 
     const Property* LogicNode::getOutputs() const
     {
-        return m_impl.get().getOutputs();
+        return m_impl.getOutputs();
     }
-
-    std::string_view LogicNode::getName() const
-    {
-        return m_impl.get().getName();
-    }
-
-    void LogicNode::setName(std::string_view name)
-    {
-        m_impl.get().setName(name);
-    }
-
 }

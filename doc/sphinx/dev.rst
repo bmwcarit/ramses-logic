@@ -1,3 +1,12 @@
+..
+    -------------------------------------------------------------------------
+    Copyright (C) 2020 BMW AG
+    -------------------------------------------------------------------------
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    -------------------------------------------------------------------------
+
 .. _developer-docs:
 
 The following sections are aimed at ``RAMSES Logic`` developers and contributors. If you simply
@@ -114,8 +123,9 @@ The following list documents the design decisions behind the ``RAMSES Logic`` pr
 inverse-chronological order (latest decisions come on top).
 
 * Do we support animations?
-    Yes, but they are not implemented yet.
-    TODO (Violin/Sven) document this once we have fully decided
+    Yes. After brainstorming different options, we decided animations belong to the
+    logic/scripting runtime rather than the Ramses scene API. As a result, animations
+    will be removed from Ramses in a future release and only maintained in the Logic Engine.
 * How to implement serialization?
     Serialization is implemented using Flatbuffers - a library which allows binary optimizations
     when loading objects which are flat in memory.

@@ -25,7 +25,7 @@ namespace rlogic::internal
     protected:
         std::unique_ptr<LuaScriptImpl> createTestScript(std::string_view source, std::string_view scriptName = "", std::string_view filename = "")
         {
-            return std::make_unique<LuaScriptImpl>(*LuaScriptImpl::Compile(m_solState, source, scriptName, filename, m_errorReporting));
+            return std::make_unique<LuaScriptImpl>(*LuaCompilationUtils::Compile(m_solState, std::string{ source }, scriptName, std::string{ filename }, m_errorReporting), scriptName);
         }
 
         std::string_view m_minimalScript = R"(

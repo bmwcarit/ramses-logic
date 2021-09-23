@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
      * Create a binding object which serves as a bridge between logic scripts and animations on one end
      * and a Ramses scene on the other end
      */
-    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*triangleNode, "binding to triangle mesh node");
+    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*triangleNode, rlogic::ERotationType::Euler_XYZ, "binding to triangle mesh node");
 
     /**
      * Create a simple script which takes the current time in milliseconds

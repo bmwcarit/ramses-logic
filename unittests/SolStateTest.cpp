@@ -103,6 +103,53 @@ namespace rlogic::internal
         EXPECT_EQ(data2, "env2");
     }
 
+    TEST_F(ASolState, NewlyCreatedEnvironment_HasNoAccessToPreviouslyDeclaredGlobalSymbols)
+    {
+        const std::string_view script = R"(
+            global= "this is global"
+            function func()
+                return global
+            end
+            return func
+        )";
+
+        // Execute the script and obtain the func pointer 'func'
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        sol::function func = loadedScript();
+
+        // Apply fresh environment to func
+        sol::environment env = m_solState.createEnvironment();
+        ASSERT_TRUE(env.valid());
+        env.set_on(func);
+
+        // Func has no access to 'global' because it was defined _before_ applying the new environment
+        sol::object result = func();
+        EXPECT_EQ(result, sol::nil);
+    }
+
+    // Similar to NewlyCreatedEnvironment_HasNoAccessToPreviouslyDeclaredGlobalSymbols
+    // But here the environment is applied before global symbols are declared -> access to those is available
+    TEST_F(ASolState, NewlyCreatedEnvironment_HasAccessToGlobalSymbols_DeclaredAfterApplyingTheEnvironment)
+    {
+        const std::string_view script = R"(
+            global = "this is global"
+            function func()
+                return global
+            end
+            return func
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+
+        // Apply a fresh environments to loaded script _before_ executing it
+        sol::environment env = m_solState.createEnvironment();
+        env.set_on(loadedScript);
+        sol::function func = loadedScript();
+
+        // Can access global symbol, because it lives in the new environment
+        const std::string result = func();
+        EXPECT_EQ(result, "this is global");
+    }
 
     TEST_F(ASolState, NewEnvironment_OverridesEnvironmentOfScript_AfterAppliedOnIt)
     {

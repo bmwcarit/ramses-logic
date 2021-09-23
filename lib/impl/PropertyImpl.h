@@ -108,6 +108,7 @@ namespace rlogic::internal
 
         // Design smells (can fix by changing class design and topology)
         void setIsLinkedInput(bool isLinkedInput);
+        [[nodiscard]] bool isLinkedInput() const;
         void setLogicNode(LogicNodeImpl& logicNode);
         [[nodiscard]] LogicNodeImpl& getLogicNode();
 

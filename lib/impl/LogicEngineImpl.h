@@ -13,6 +13,7 @@
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
 #include "internals/ApiObjects.h"
+#include "ramses-logic/AnimationTypes.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 
@@ -35,6 +36,8 @@ namespace rlogic
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
+    class DataArray;
+    class AnimationNode;
     class LuaScript;
     class LogicNode;
     class Property;
@@ -56,8 +59,8 @@ namespace rlogic::internal
         // Move-able (noexcept); Not copy-able
 
         // can't be noexcept anymore because constructor of std::unordered_map can throw
-        LogicEngineImpl() = default;
-        ~LogicEngineImpl() noexcept = default;
+        LogicEngineImpl();
+        ~LogicEngineImpl() noexcept;
 
         LogicEngineImpl(LogicEngineImpl&& other) noexcept = default;
         LogicEngineImpl& operator=(LogicEngineImpl&& other) noexcept = default;
@@ -67,11 +70,14 @@ namespace rlogic::internal
         // Public API
         LuaScript* createLuaScriptFromFile(std::string_view filename, std::string_view scriptName);
         LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName);
-        RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name);
+        RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
+        template <typename T>
+        DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
+        AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name);
 
-        bool destroy(LogicNode& logicNode);
+        bool destroy(LogicObject& object);
 
         bool                            update(bool disableDirtyTracking = false);
         const std::vector<ErrorData>&   getErrors() const;
@@ -89,14 +95,12 @@ namespace rlogic::internal
         [[nodiscard]] const ApiObjects& getApiObjects() const;
 
     private:
-        SolState m_luaState;
+        std::unique_ptr<SolState> m_luaState;
         ApiObjects m_apiObjects;
         ErrorReporting m_errors;
 
         void updateLinksRecursive(Property& inputProperty);
 
-        // TODO Violin remove this method next time we break serialization format
-        bool checkLogicVersionFromFile(std::string_view dataSourceDescription, const rlogic_serialization::Version& fileVersion);
         bool checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 

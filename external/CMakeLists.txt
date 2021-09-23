@@ -178,69 +178,95 @@ endif()
 ################################################
 ################     Ramses   ##################
 ################################################
+if(ramses-logic_FIND_RAMSES_FROM_SYSTEM)
+    if(ramses-logic_PLATFORM)
+        set(RAMSES_LIB "ramses-shared-lib")
+        set(RAMSES_TARGET "ramses::ramses")
+    else()
+        set(RAMSES_LIB "ramses-shared-lib-client-only")
+        set(RAMSES_TARGET "ramses::client-only")
+    endif()
 
+    find_package(${RAMSES_LIB} REQUIRED COMPONENTS ${ramses-logic_PLATFORM})
 
-if(ramses-logic_RAMSES_TARGET AND TARGET ${ramses-logic_RAMSES_TARGET})
-    message(STATUS " + Using existing ramses target '${ramses-logic_RAMSES_TARGET}'")
+    if(NOT TARGET ramses::ramses AND NOT TARGET ramses::client-only)
+        message(FATAL_ERROR "Could not find requested ramses version on system! Target: ${RAMSES_LIB} Platform: ${ramses-logic_PLATFORM}")
+    endif()
 else()
-    if(ramses-logic_ALLOW_RAMSES_BUILD)
-        message(STATUS " + Building ramses from source and using target '${ramses-logic_RAMSES_TARGET}'")
+    if(ramses-logic_RAMSES_TARGET AND TARGET ${ramses-logic_RAMSES_TARGET})
+        message(STATUS " + Using existing ramses target '${ramses-logic_RAMSES_TARGET}'")
+        # Set to target provided by parent project
+        set(RAMSES_TARGET ${ramses-logic_RAMSES_TARGET})
+    else()
+        if(ramses-logic_ALLOW_RAMSES_BUILD)
+            message(STATUS " + Building ramses from source")
 
-        set(ramses-sdk_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_IVI_TEST_APPS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_DEMO_ECM OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_SMOKE_TESTS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_ENABLE_DLT OFF CACHE BOOL "" FORCE)
-        set(ramses-sdk_FORCE_OFF_SOMEIP_HU ON CACHE BOOL "" FORCE)
-        set(ramses-sdk_FORCE_OFF_SOMEIP_IC ON CACHE BOOL "" FORCE)
+            set(ramses-sdk_WARNINGS_AS_ERRORS OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_TOOLS OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_IVI_TEST_APPS OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_DEMOS OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_DEMO_ECM OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_SMOKE_TESTS OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_ENABLE_DLT OFF CACHE BOOL "" FORCE)
+            set(ramses-sdk_FORCE_OFF_SOMEIP_HU ON CACHE BOOL "" FORCE)
+            set(ramses-sdk_FORCE_OFF_SOMEIP_IC ON CACHE BOOL "" FORCE)
 
-        # Disable some things which don't have a CMake option
-        set(ramses-sdk_ramses-daemon          OFF CACHE BOOL "" FORCE)
+            # Disable some things which don't have a CMake option
+            set(ramses-sdk_ramses-daemon          OFF CACHE BOOL "" FORCE)
 
-        ensure_submodule_exists(ramses)
+            ensure_submodule_exists(ramses)
 
-        #TODO Daniel find a better way to configure ramses renderer
-        if(ramses-logic_BUILD_RAMSES_RENDERER)
-            set(ramses-sdk_BUILD_FULL_SHARED_LIB ON CACHE BOOL "" FORCE)
-            set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB OFF CACHE BOOL "" FORCE)
+            #TODO Daniel find a better way to configure ramses renderer
+            if(ramses-logic_BUILD_RAMSES_RENDERER)
+                set(RAMSES_TARGET ${ramses-logic_RAMSES_TARGET})
+                message(STATUS " + Building ramses from source with renderer, using target ${ramses-logic_RAMSES_TARGET}")
+                set(ramses-sdk_BUILD_FULL_SHARED_LIB ON CACHE BOOL "" FORCE)
+                set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB OFF CACHE BOOL "" FORCE)
 
-            add_subdirectory(ramses)
-            if ((NOT TARGET ${ramses-logic_RAMSES_TARGET})
-                OR (${ramses-logic_RAMSES_TARGET} MATCHES "ramses-shared-lib-client-only")
-                OR (NOT ${ramses-logic_RAMSES_TARGET} MATCHES "ramses-shared-lib-"))
-                message(FATAL_ERROR "Invalid Ramses target '${ramses-logic_RAMSES_TARGET}'. If ramses-logic_BUILD_RAMSES_RENDERER is set, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
+                add_subdirectory(ramses)
+
+                if ((NOT TARGET ${RAMSES_TARGET})
+                    OR (${RAMSES_TARGET} MATCHES "ramses-shared-lib-client-only")
+                    OR (NOT ${RAMSES_TARGET} MATCHES "ramses-shared-lib-"))
+                    message(FATAL_ERROR "Invalid Ramses target '${RAMSES_TARGET}'. If ramses-logic_BUILD_RAMSES_RENDERER is set, \
+                        ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a \
+                        renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
+                endif()
+            else()
+                message(STATUS " + Building ramses from source, using target ramses-shared-lib-client-only")
+                set(ramses-sdk_BUILD_FULL_SHARED_LIB OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB ON CACHE BOOL "" FORCE)
+                # Disable some things which don't have a CMake option
+                set(ramses-sdk_ramses-renderer-lib    OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_RendererLib   OFF CACHE BOOL "" FORCE)
+
+                add_subdirectory(ramses)
+
+                set(RAMSES_TARGET "ramses-shared-lib-client-only")
+            endif()
+
+            # This is kind of an assert - if this fails, there is a version mismatch with ramses
+            if(NOT TARGET ${RAMSES_TARGET})
+                message(FATAL_ERROR "Invalid Ramses target '${RAMSES_TARGET}'")
             endif()
         else()
-            set(ramses-sdk_BUILD_FULL_SHARED_LIB OFF CACHE BOOL "" FORCE)
-            set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB ON CACHE BOOL "" FORCE)
-            # Disable some things which don't have a CMake option
-            set(ramses-sdk_ramses-renderer-lib    OFF CACHE BOOL "" FORCE)
-            set(ramses-sdk_renderer_RendererLib   OFF CACHE BOOL "" FORCE)
-
-            add_subdirectory(ramses)
-
-            set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE STRING "" FORCE)
+            message(FATAL_ERROR "Must either provide a valid ramses target (current value: '${ramses-logic_RAMSES_TARGET}') or set ramses-logic_ALLOW_RAMSES_BUILD=ON")
         endif()
-
-        # This is kind of an assert - if this fails, there is a version mismatch with ramses
-        if(NOT TARGET ${ramses-logic_RAMSES_TARGET})
-            message(FATAL_ERROR "Invalid Ramses target '${ramses-logic_RAMSES_TARGET}'")
-        endif()
-    else()
-        message(FATAL_ERROR "Must either provide a valid ramses target (current value: '${ramses-logic_RAMSES_TARGET}') or set ramses-logic_ALLOW_RAMSES_BUILD=ON")
     endif()
 endif()
+
 
 # Requires >= 27.0.1 because we use new rotation API of R27 and it was implemented in patch version
 # Version less than 28 because not tested with 28 yet
 set(RAMSES_VERSION_GE 27.0.1)
 set(RAMSES_VERSION_LT 28)
 if(${ramses-sdk_VERSION} VERSION_GREATER_EQUAL ${RAMSES_VERSION_GE} AND ${ramses-sdk_VERSION} VERSION_LESS ${RAMSES_VERSION_LT})
-    message(STATUS "Using ramses target '${ramses-logic_RAMSES_TARGET}' in version '${ramses-sdk_VERSION}' (for ramses logic)")
+    message(STATUS "Using ramses target '${RAMSES_TARGET}' in version '${ramses-sdk_VERSION}' (for ramses logic)")
 else()
     message(FATAL_ERROR "Using incompatible ramses version '${ramses-sdk_VERSION}'. Expected >= ${RAMSES_VERSION_GE} and < ${RAMSES_VERSION_LT}")
 endif()
+
+# Propagate to parent scope so that other modules can depend on the correct ramses target
+SET(RAMSES_TARGET ${RAMSES_TARGET} PARENT_SCOPE)

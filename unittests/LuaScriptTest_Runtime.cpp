@@ -52,6 +52,24 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in run() function!!");
     }
 
+    TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningVectorComponentsIndividually)
+    {
+        m_logicEngine.createLuaScriptFromSource(R"(
+            function interface()
+                OUT.vec3f = VEC3F
+            end
+
+            function run()
+                OUT.vec3f[1] = 1.0
+            end
+        )");
+
+        m_logicEngine.update();
+
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Error while writing to 'vec3f'. Can't assign individual components of vector types, must assign the whole vector"));
+    }
+
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedInputIsUsedInRun)
     {
         auto script = m_logicEngine.createLuaScriptFromSource(R"(
@@ -98,7 +116,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("this causes an error"));
-        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToWriteInputValues)
@@ -116,7 +134,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
 
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("lua: error: Error while writing to 'value'. Writing input values is not allowed, only outputs!"));
-        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
     TEST_F(ALuaScript_Runtime, AppliesNumericChecksToNumericAssignments)
@@ -1806,7 +1824,7 @@ namespace rlogic
         auto ramsesAppearance = ramsesScene->createAppearance(*ramsesEffect);
         ramses::PerspectiveCamera* camera = ramsesScene->createPerspectiveCamera();
 
-        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*ramsesAppearance, "AppearanceBinding");
         auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*camera, "CameraBinding");
 

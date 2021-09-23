@@ -109,7 +109,7 @@ namespace rlogic
             "stack traceback:\n"
             "\t[C]: in function 'error'\n"
             "\t[string \"scriptWithErrorInRun\"]:6: in function <[string \"scriptWithErrorInRun\"]:5>"));
-        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorWhenIndexingVectorPropertiesOutOfRange)
@@ -181,7 +181,7 @@ namespace rlogic
                     }
 
                     EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("scriptOOR"));
-                    EXPECT_EQ(m_logicEngine.getErrors()[0].node, script);
+                    EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
                 }
                 else
                 {
@@ -311,7 +311,7 @@ namespace rlogic
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("attempt to get length of field 'notArray' (a number value)"));
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("invalidArraySizeAccess"));
-        EXPECT_EQ(m_logicEngine.getErrors()[0].node, script);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
     }
 
     TEST_F(ALuaScript_Syntax, ProdocesErrorWhenIndexingVectorWithNonIntegerIndices)
@@ -364,7 +364,7 @@ namespace rlogic
             EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::AnyOf(::testing::HasSubstr("Only non-negative integers supported as array index type!"),
                                                                        ::testing::HasSubstr("not a numeric type")));
             EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("invalidIndexingScript"));
-            EXPECT_EQ(m_logicEngine.getErrors()[0].node, script);
+            EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
         }
     }
 
@@ -431,7 +431,7 @@ namespace rlogic
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
             EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(errorCase.expectedErrorMessage));
             EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("mismatchedVecSizes"));
-            EXPECT_EQ(m_logicEngine.getErrors()[0].node, script);
+            EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
 
             EXPECT_TRUE(m_logicEngine.destroy(*script));
         }

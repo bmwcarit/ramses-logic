@@ -6,20 +6,15 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "impl/RamsesCameraBindingImpl.h"
-
 #include "ramses-logic/RamsesCameraBinding.h"
-#include "ramses-logic/Property.h"
-
-#include "impl/RamsesBindingImpl.h"
+#include "impl/RamsesCameraBindingImpl.h"
 
 namespace rlogic
 {
     RamsesCameraBinding::RamsesCameraBinding(std::unique_ptr<internal::RamsesCameraBindingImpl> impl) noexcept
-        // The impl pointer is owned by this class, but a reference to the data is passed to the base class
-        // TODO MSVC2017 fix for std::reference_wrapper with base class
-        : RamsesBinding(std::ref(static_cast<internal::RamsesBindingImpl&>(*impl)))
-        , m_cameraBinding(std::move(impl))
+        : RamsesBinding(std::move(impl))
+        /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) */
+        , m_cameraBinding{ static_cast<internal::RamsesCameraBindingImpl&>(RamsesBinding::m_impl) }
     {
     }
 
@@ -27,6 +22,6 @@ namespace rlogic
 
     ramses::Camera& RamsesCameraBinding::getRamsesCamera() const
     {
-        return m_cameraBinding->getRamsesCamera();
+        return m_cameraBinding.getRamsesCamera();
     }
 }

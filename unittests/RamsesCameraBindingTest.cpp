@@ -123,7 +123,7 @@ namespace rlogic::internal
     TEST_F(ARamsesCameraBinding, HasInvalidCameraTypeAfterCreation)
     {
         auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "");
-        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_OrthographicCamera, cameraBinding.m_cameraBinding->getCameraType());
+        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_OrthographicCamera, cameraBinding.m_cameraBinding.getCameraType());
     }
 
     TEST_F(ARamsesCameraBinding, HasNoOutputsAfterCreation)
@@ -135,13 +135,13 @@ namespace rlogic::internal
     TEST_F(ARamsesCameraBinding, ProducesNoErrorsDuringUpdate_IfNoRamsesCameraIsAssigned)
     {
         auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "");
-        EXPECT_EQ(std::nullopt, cameraBinding.m_impl.get().update());
+        EXPECT_EQ(std::nullopt, cameraBinding.m_impl.update());
     }
 
     TEST_F(ARamsesCameraBinding, ReturnsReferenceToRamsesCamera)
     {
         RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
-        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_PerspectiveCamera, cameraBinding.m_cameraBinding->getCameraType());
+        EXPECT_EQ(ramses::ERamsesObjectType::ERamsesObjectType_PerspectiveCamera, cameraBinding.m_cameraBinding.getCameraType());
         EXPECT_EQ(&m_perspectiveCam, &cameraBinding.getRamsesCamera());
     }
 
@@ -516,7 +516,7 @@ namespace rlogic::internal
         // Update not called yet -> still default values
         ExpectDefaultValues(m_perspectiveCam);
 
-        cameraBinding->m_cameraBinding->update();
+        cameraBinding->m_cameraBinding.update();
         // Only propagated vpOffsetX, the others have default values
         EXPECT_EQ(m_perspectiveCam.getViewportX(), newVpOffsetX);
         EXPECT_EQ(m_perspectiveCam.getViewportY(), 0);
@@ -543,7 +543,7 @@ namespace rlogic::internal
         frustum->getChild("aspectRatio")->set<float>(newAR);
         frustum->getChild("nearPlane")->set<float>(newNearPlane);
         frustum->getChild("farPlane")->set<float>(newFarPlane);
-        cameraBinding->m_cameraBinding->update();
+        cameraBinding->m_cameraBinding.update();
 
         EXPECT_EQ(m_perspectiveCam.getViewportX(), newVpOffsetX);
         EXPECT_EQ(m_perspectiveCam.getViewportY(), newVpOffsetY);
@@ -570,7 +570,7 @@ namespace rlogic::internal
         // Update not called yet -> still default values
         ExpectDefaultValues(m_orthoCam);
 
-        cameraBinding->m_cameraBinding->update();
+        cameraBinding->m_cameraBinding.update();
         // Only propagated vpOffsetX, the others have default values
         EXPECT_EQ(m_orthoCam.getViewportX(), newVpOffsetX);
         EXPECT_EQ(m_orthoCam.getViewportY(), 0);
@@ -601,7 +601,7 @@ namespace rlogic::internal
         frustum->getChild("topPlane")->set<float>(newTopPlane);
         frustum->getChild("nearPlane")->set<float>(newNearPlane);
         frustum->getChild("farPlane")->set<float>(newFarPlane);
-        cameraBinding->m_cameraBinding->update();
+        cameraBinding->m_cameraBinding.update();
 
         EXPECT_EQ(m_orthoCam.getViewportX(), newVpOffsetX);
         EXPECT_EQ(m_orthoCam.getViewportY(), newVpOffsetY);

@@ -26,6 +26,8 @@ content = [
         'Property',
         'LogicNode',
         'RamsesBinding',
+        'DataArray',
+        'AnimationNode',
         'Iterator',
         'Collection',
     ],
@@ -68,11 +70,30 @@ content = [
         'ErrorData',
     ]
     },
+    {
+    'directive': 'doxygenenum',
+    'TOC_caption': 'Enums',
+    'namespace_prefix': 'rlogic::',
+    'options': '',
+    'items': [
+        'EPropertyType',
+        'EInterpolationType',
+        'ELogMessageType',
+    ],
+    },
 ]
 
 
 class_template = textwrap.dedent(
-"""
+"""..
+    -------------------------------------------------------------------------
+    Copyright (C) 2021 BMW AG
+    -------------------------------------------------------------------------
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    -------------------------------------------------------------------------
+
 .. default-domain:: cpp
 .. highlight:: cpp
 
@@ -85,7 +106,15 @@ $options
 """)
 
 index_template = textwrap.dedent(
-"""
+"""..
+    -------------------------------------------------------------------------
+    Copyright (C) 2021 BMW AG
+    -------------------------------------------------------------------------
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    -------------------------------------------------------------------------
+
 =========================
 Class Index
 =========================

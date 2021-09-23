@@ -14,10 +14,9 @@
 namespace rlogic
 {
     LuaScript::LuaScript(std::unique_ptr<internal::LuaScriptImpl> impl) noexcept
-        // The impl pointer is owned by this class, but a reference to the data is passed to the base class
-        // TODO MSVC2017 fix for std::reference_wrapper with base class
-        : LogicNode(std::ref(static_cast<internal::LogicNodeImpl&>(*impl)))
-        , m_script(std::move(impl))
+        : LogicNode(std::move(impl))
+        /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) */
+        , m_script{ static_cast<internal::LuaScriptImpl&>(LogicNode::m_impl) }
     {
     }
 
@@ -25,11 +24,11 @@ namespace rlogic
 
     std::string_view LuaScript::getFilename() const
     {
-        return m_script->getFilename();
+        return m_script.getFilename();
     }
 
     void LuaScript::overrideLuaPrint(LuaPrintFunction luaPrintFunction)
     {
-        m_script->overrideLuaPrint(std::move(luaPrintFunction));
+        m_script.overrideLuaPrint(std::move(luaPrintFunction));
     }
 }

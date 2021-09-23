@@ -10,7 +10,7 @@ function(add_ramses_logic_target TARGET_NAME LIB_TYPE)
     add_library(${TARGET_NAME} ${LIB_TYPE})
     add_library(rlogic::${TARGET_NAME} ALIAS ${TARGET_NAME})
     target_link_libraries(${TARGET_NAME} PRIVATE ramses-logic-obj)
-    target_link_libraries(${TARGET_NAME} PUBLIC ${ramses-logic_RAMSES_TARGET})
+    target_link_libraries(${TARGET_NAME} PUBLIC ${RAMSES_TARGET})
     target_include_directories(${TARGET_NAME} PUBLIC include)
     set_target_properties(${TARGET_NAME} PROPERTIES
             PUBLIC_HEADER "${public_headers}"

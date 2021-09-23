@@ -6,6 +6,7 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
+add_subdirectory(testAssetProducer)
 
 file(GLOB ramses-logic-test_SRC *.cpp)
 file(GLOB ramses-logic-test_INC *.h)
@@ -24,7 +25,7 @@ target_link_libraries(ramses-logic-test
         lua::lua
         fmt::fmt
         rlogic::flatbuffers
-        ${ramses-logic_RAMSES_TARGET}
+        ${RAMSES_TARGET}
 
     )
 

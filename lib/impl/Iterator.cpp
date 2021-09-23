@@ -9,6 +9,8 @@
 #include "ramses-logic/Iterator.h"
 #include "ramses-logic/LuaScript.h"
 
+#include <vector>
+
 namespace rlogic
 {
     using IteratorTypeForStaticAsserts = Iterator<LuaScript, std::vector<std::unique_ptr<LuaScript>>, false>;

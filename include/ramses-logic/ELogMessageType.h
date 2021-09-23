@@ -18,12 +18,12 @@ namespace rlogic
      */
     enum class ELogMessageType : int
     {
-        Off = 0,
-        Fatal = 1,
-        Error = 2,
-        Warn = 3,
-        Info = 4,
-        Debug = 5,
-        Trace = 6
+        Off = 0,    ///< No logs shall be issues, no matter the severity
+        Fatal = 1,  ///< Log only fatal errors
+        Error = 2,  ///< Log all errors
+        Warn = 3,   ///< Log warnings + errors
+        Info = 4,   ///< Include general info logs in addition to warn + errors
+        Debug = 5,  ///< Debug logs - use this only for debugging
+        Trace = 6   ///< Verbose trace logs - use only for debugging and inspection
     };
 }

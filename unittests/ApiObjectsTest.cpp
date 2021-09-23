@@ -24,6 +24,8 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/DataArray.h"
+#include "ramses-logic/AnimationNode.h"
 #include "ramses-client-api/PerspectiveCamera.h"
 #include "ramses-client-api/Appearance.h"
 #include "RamsesTestUtils.h"
@@ -56,42 +58,45 @@ namespace rlogic::internal
             end
         )";
 
+        LuaScript* createScript()
+        {
+            return createScript(m_apiObjects, m_state, m_valid_empty_script);
+        }
+
+        LuaScript* createScript(ApiObjects& apiObjects, SolState& solState, std::string_view source)
+        {
+            auto compiledScript = LuaCompilationUtils::Compile(solState, std::string{ source }, "script", "", m_errorReporting);
+            EXPECT_TRUE(compiledScript);
+            auto script = apiObjects.createLuaScript(std::move(*compiledScript), "script");
+            EXPECT_NE(nullptr, script);
+            return script;
+        }
+
         // Silence logs, unless explicitly enabled, to reduce spam and speed up tests
         ScopedLogContextLevel m_silenceLogs{ ELogMessageType::Off };
     };
 
-    TEST_F(AnApiObjects, ProducesErrorWhenCreatingEmptyScript)
-    {
-        auto script = m_apiObjects.createLuaScript(m_state, "", "", "", m_errorReporting);
-        ASSERT_EQ(nullptr, script);
-        EXPECT_EQ(1u, m_errorReporting.getErrors().size());
-
-        EXPECT_TRUE(m_apiObjects.getReverseImplMapping().empty());
-    }
-
     TEST_F(AnApiObjects, CreatesScriptFromValidLuaWithoutErrors)
     {
-        LuaScript* script = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
-        ASSERT_TRUE(nullptr != script);
+        const LuaScript* script = createScript();
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
         EXPECT_EQ(script, m_apiObjects.getApiObject(script->m_impl));
     }
 
     TEST_F(AnApiObjects, DestroysScriptWithoutErrors)
     {
-        LuaScript* script = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
-        ASSERT_TRUE(script);
+        LuaScript* script = createScript();
         ASSERT_TRUE(m_apiObjects.destroy(*script, m_errorReporting));
     }
 
     TEST_F(AnApiObjects, ProducesErrorsWhenDestroyingScriptFromAnotherClassInstance)
     {
         ApiObjects otherInstance;
-        LuaScript* script = otherInstance.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
-        ASSERT_TRUE(script);
+        LuaScript* script = createScript(otherInstance, m_state, m_valid_empty_script);
         ASSERT_FALSE(m_apiObjects.destroy(*script, m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find script in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, script);
 
         // Did not affect existence in otherInstance!
         EXPECT_EQ(script, otherInstance.getApiObject(script->m_impl));
@@ -99,7 +104,7 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects, CreatesRamsesNodeBindingWithoutErrors)
     {
-        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, "NodeBinding");
+        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         EXPECT_NE(nullptr, ramsesNodeBinding);
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
         EXPECT_EQ(ramsesNodeBinding, m_apiObjects.getApiObject(ramsesNodeBinding->m_impl));
@@ -107,7 +112,7 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects, DestroysRamsesNodeBindingWithoutErrors)
     {
-        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, "NodeBinding");
+        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         ASSERT_NE(nullptr, ramsesNodeBinding);
         m_apiObjects.destroy(*ramsesNodeBinding, m_errorReporting);
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
@@ -116,11 +121,12 @@ namespace rlogic::internal
     TEST_F(AnApiObjects, ProducesErrorsWhenDestroyingRamsesNodeBindingFromAnotherClassInstance)
     {
         ApiObjects otherInstance;
-        RamsesNodeBinding* ramsesNodeBinding = otherInstance.createRamsesNodeBinding(*m_node, "NodeBinding");
+        RamsesNodeBinding* ramsesNodeBinding = otherInstance.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         ASSERT_TRUE(ramsesNodeBinding);
         ASSERT_FALSE(m_apiObjects.destroy(*ramsesNodeBinding, m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find RamsesNodeBinding in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, ramsesNodeBinding);
 
         // Did not affect existence in otherInstance!
         EXPECT_EQ(ramsesNodeBinding, otherInstance.getApiObject(ramsesNodeBinding->m_impl));
@@ -150,6 +156,7 @@ namespace rlogic::internal
         ASSERT_FALSE(m_apiObjects.destroy(*ramsesCameraBinding, m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find RamsesCameraBinding in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, ramsesCameraBinding);
 
         // Did not affect existence in otherInstance!
         EXPECT_EQ(ramsesCameraBinding, otherInstance.getApiObject(ramsesCameraBinding->m_impl));
@@ -170,15 +177,132 @@ namespace rlogic::internal
         ASSERT_FALSE(m_apiObjects.destroy(*binding, m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find RamsesAppearanceBinding in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, binding);
 
         // Did not affect existence in otherInstance!
         EXPECT_EQ(binding, otherInstance.getApiObject(binding->m_impl));
     }
 
+    TEST_F(AnApiObjects, CreatesDataArray)
+    {
+        const std::vector<float> data{ 1.f, 2.f, 3.f };
+        auto dataArray = m_apiObjects.createDataArray(data, "data");
+        EXPECT_NE(nullptr, dataArray);
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        ASSERT_EQ(1u, m_apiObjects.getDataArrays().size());
+        EXPECT_EQ(EPropertyType::Float, m_apiObjects.getDataArrays().front()->getDataType());
+        ASSERT_NE(nullptr, m_apiObjects.getDataArrays().front()->getData<float>());
+        EXPECT_EQ(data, *m_apiObjects.getDataArrays().front()->getData<float>());
+    }
+
+    TEST_F(AnApiObjects, DestroysDataArray)
+    {
+        auto dataArray = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
+        EXPECT_TRUE(m_apiObjects.destroy(*dataArray, m_errorReporting));
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        EXPECT_TRUE(m_apiObjects.getDataArrays().empty());
+    }
+
+    TEST_F(AnApiObjects, FailsToDestroysDataArrayIfUsedInAnimationNode)
+    {
+        auto dataArray1 = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data1");
+        auto dataArray2 = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data2");
+        auto dataArray3 = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data3");
+        auto dataArray4 = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data4");
+
+        auto animNode = m_apiObjects.createAnimationNode({
+            AnimationChannel{ "channel1", dataArray1, dataArray2 },
+            AnimationChannel{ "channel2", dataArray1, dataArray2, EInterpolationType::Cubic, dataArray3, dataArray4 } }, "animNode");
+
+        EXPECT_FALSE(m_apiObjects.destroy(*dataArray1, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Failed to destroy data array 'data1', it is used in animation node 'animNode' channel 'channel1'");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray1);
+        m_errorReporting.clear();
+
+        EXPECT_FALSE(m_apiObjects.destroy(*dataArray2, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Failed to destroy data array 'data2', it is used in animation node 'animNode' channel 'channel1'");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray2);
+        m_errorReporting.clear();
+
+        EXPECT_FALSE(m_apiObjects.destroy(*dataArray3, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Failed to destroy data array 'data3', it is used in animation node 'animNode' channel 'channel2'");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray3);
+        m_errorReporting.clear();
+
+        EXPECT_FALSE(m_apiObjects.destroy(*dataArray4, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Failed to destroy data array 'data4', it is used in animation node 'animNode' channel 'channel2'");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray4);
+        m_errorReporting.clear();
+
+        // succeeds after destroying animation node
+        EXPECT_TRUE(m_apiObjects.destroy(*animNode, m_errorReporting));
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        EXPECT_TRUE(m_apiObjects.destroy(*dataArray1, m_errorReporting));
+        EXPECT_TRUE(m_apiObjects.destroy(*dataArray2, m_errorReporting));
+        EXPECT_TRUE(m_apiObjects.destroy(*dataArray3, m_errorReporting));
+        EXPECT_TRUE(m_apiObjects.destroy(*dataArray4, m_errorReporting));
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+    }
+
+    TEST_F(AnApiObjects, FailsToDestroyDataArrayFromAnotherClassInstance)
+    {
+        ApiObjects otherInstance;
+        auto dataArray = otherInstance.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
+        ASSERT_NE(nullptr, dataArray);
+        EXPECT_FALSE(m_apiObjects.destroy(*dataArray, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find data array in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray);
+
+        // Did not affect existence in otherInstance!
+        EXPECT_TRUE(m_apiObjects.getDataArrays().empty());
+    }
+
+    TEST_F(AnApiObjects, CreatesAnimationNode)
+    {
+        auto dataArray = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
+        ASSERT_NE(nullptr, dataArray);
+        auto animNode = m_apiObjects.createAnimationNode({ AnimationChannel{ "channel", dataArray, dataArray, EInterpolationType::Linear } }, "animNode");
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        ASSERT_EQ(1u, m_apiObjects.getAnimationNodes().size());
+        EXPECT_EQ(animNode, m_apiObjects.getAnimationNodes().front().get());
+    }
+
+    TEST_F(AnApiObjects, DestroysAnimationNode)
+    {
+        auto dataArray = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
+        ASSERT_NE(nullptr, dataArray);
+        auto animNode = m_apiObjects.createAnimationNode({ AnimationChannel{ "channel", dataArray, dataArray, EInterpolationType::Linear } }, "animNode");
+        EXPECT_TRUE(m_apiObjects.destroy(*animNode, m_errorReporting));
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        EXPECT_TRUE(m_apiObjects.getAnimationNodes().empty());
+        // did not affect data array
+        EXPECT_TRUE(!m_apiObjects.getDataArrays().empty());
+    }
+
+    TEST_F(AnApiObjects, FailsToDestroyAnimationNodeFromAnotherClassInstance)
+    {
+        ApiObjects otherInstance;
+        auto dataArray = otherInstance.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
+        ASSERT_NE(nullptr, dataArray);
+        auto animNode = otherInstance.createAnimationNode({ AnimationChannel{ "channel", dataArray, dataArray, EInterpolationType::Linear } }, "animNode");
+        EXPECT_FALSE(m_apiObjects.destroy(*animNode, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find AnimationNode in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, animNode);
+
+        // Did not affect existence in otherInstance!
+        EXPECT_TRUE(m_apiObjects.getAnimationNodes().empty());
+    }
+
     TEST_F(AnApiObjects, CanBeMovedWithoutChangingObjectAddresses)
     {
-        LuaScript* script = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
-        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, "NodeBinding");
+        const LuaScript* script = createScript();
+        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         RamsesAppearanceBinding* appBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
         RamsesCameraBinding* camBinding = m_apiObjects.createRamsesCameraBinding(*m_camera, "CameraBinding");
 
@@ -217,7 +341,7 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects, ProvidesNonEmptyScriptCollection_WhenScriptsWereCreated)
     {
-        LuaScript* script = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
+        const LuaScript* script = createScript();
         ScriptsContainer& scripts = m_apiObjects.getScripts();
 
         EXPECT_EQ(scripts.begin()->get(), script);
@@ -231,7 +355,7 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects, ProvidesNonEmptyNodeBindingsCollection_WhenNodeBindingsWereCreated)
     {
-        RamsesNodeBinding* binding = m_apiObjects.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         NodeBindingsContainer& nodes = m_apiObjects.getNodeBindings();
 
         EXPECT_EQ(nodes.begin()->get(), binding);
@@ -281,35 +405,35 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects_SceneMismatch, recognizesNodeBindingsCarryNodesFromDifferentScenes)
     {
-        m_apiObjects.createRamsesNodeBinding(*scene1->createNode("node1"), "binding1");
-        RamsesNodeBinding* binding2 = m_apiObjects.createRamsesNodeBinding(*scene2->createNode("node2"), "binding2");
+        m_apiObjects.createRamsesNodeBinding(*scene1->createNode("node1"), ERotationType::Euler_XYZ, "binding1");
+        RamsesNodeBinding* binding2 = m_apiObjects.createRamsesNodeBinding(*scene2->createNode("node2"), ERotationType::Euler_XYZ, "binding2");
 
         EXPECT_FALSE(m_apiObjects.checkBindingsReferToSameRamsesScene(m_errorReporting));
         EXPECT_EQ(1u, m_errorReporting.getErrors().size());
         EXPECT_EQ("Ramses node 'node2' is from scene with id:2 but other objects are from scene with id:1!", m_errorReporting.getErrors()[0].message);
-        EXPECT_EQ(binding2, m_errorReporting.getErrors()[0].node);
+        EXPECT_EQ(binding2, m_errorReporting.getErrors()[0].object);
     }
 
     TEST_F(AnApiObjects_SceneMismatch, recognizesNodeBindingAndAppearanceBindingAreFromDifferentScenes)
     {
-        m_apiObjects.createRamsesNodeBinding(*scene1->createNode("node"), "node binding");
+        m_apiObjects.createRamsesNodeBinding(*scene1->createNode("node"), ERotationType::Euler_XYZ, "node binding");
         RamsesAppearanceBinding* appBinding = m_apiObjects.createRamsesAppearanceBinding(RamsesTestSetup::CreateTrivialTestAppearance(*scene2), "app binding");
 
         EXPECT_FALSE(m_apiObjects.checkBindingsReferToSameRamsesScene(m_errorReporting));
         EXPECT_EQ(1u, m_errorReporting.getErrors().size());
         EXPECT_EQ("Ramses appearance 'test appearance' is from scene with id:2 but other objects are from scene with id:1!", m_errorReporting.getErrors()[0].message);
-        EXPECT_EQ(appBinding, m_errorReporting.getErrors()[0].node);
+        EXPECT_EQ(appBinding, m_errorReporting.getErrors()[0].object);
     }
 
     TEST_F(AnApiObjects_SceneMismatch, recognizesNodeBindingAndCameraBindingAreFromDifferentScenes)
     {
-        m_apiObjects.createRamsesNodeBinding(*scene1->createNode("node"), "node binding");
+        m_apiObjects.createRamsesNodeBinding(*scene1->createNode("node"), ERotationType::Euler_XYZ, "node binding");
         RamsesCameraBinding* camBinding = m_apiObjects.createRamsesCameraBinding(*scene2->createPerspectiveCamera("test camera"), "cam binding");
 
         EXPECT_FALSE(m_apiObjects.checkBindingsReferToSameRamsesScene(m_errorReporting));
         EXPECT_EQ(1u, m_errorReporting.getErrors().size());
         EXPECT_EQ("Ramses camera 'test camera' is from scene with id:2 but other objects are from scene with id:1!", m_errorReporting.getErrors()[0].message);
-        EXPECT_EQ(camBinding, m_errorReporting.getErrors()[0].node);
+        EXPECT_EQ(camBinding, m_errorReporting.getErrors()[0].object);
     }
 
     class AnApiObjects_ImplMapping : public AnApiObjects
@@ -323,8 +447,8 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects_ImplMapping, DestroyingScriptDoesNotAffectOtherScript)
     {
-        LuaScript* script1 = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
-        LuaScript* script2 = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
+        auto script1 = createScript();
+        auto script2 = createScript();
 
         ASSERT_TRUE(m_apiObjects.destroy(*script1, m_errorReporting));
 
@@ -334,8 +458,8 @@ namespace rlogic::internal
 
     TEST_F(AnApiObjects_ImplMapping, DestroyingBindingDoesNotAffectScript)
     {
-        LuaScript* script = m_apiObjects.createLuaScript(m_state, m_valid_empty_script, "", "", m_errorReporting);
-        RamsesNodeBinding* binding = m_apiObjects.createRamsesNodeBinding(*m_node, "");
+        const LuaScript* script = createScript();
+        RamsesNodeBinding* binding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
         ASSERT_TRUE(m_apiObjects.destroy(*binding, m_errorReporting));
 
@@ -382,7 +506,7 @@ namespace rlogic::internal
         {
             SolState tempState;
             ApiObjects toSerialize;
-            toSerialize.createLuaScript(tempState, m_valid_empty_script, "", "script", m_errorReporting);
+            createScript(toSerialize, tempState, m_valid_empty_script);
             ApiObjects::Serialize(toSerialize, builder);
         }
 
@@ -402,7 +526,7 @@ namespace rlogic::internal
         {
             SolState tempState;
             ApiObjects toSerialize;
-            toSerialize.createRamsesNodeBinding(*m_node, "node");
+            toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "node");
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
             toSerialize.createRamsesCameraBinding(*m_camera, "camera");
             ApiObjects::Serialize(toSerialize, builder);
@@ -445,8 +569,8 @@ namespace rlogic::internal
                 end
             )";
 
-            LuaScript* script = toSerialize.createLuaScript(tempState, scriptWithOutput, "", "", m_errorReporting);
-            RamsesNodeBinding* nodeBinding = toSerialize.createRamsesNodeBinding(*m_node, "");
+            const LuaScript* script = createScript(toSerialize, tempState, scriptWithOutput);
+            RamsesNodeBinding* nodeBinding = toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
             ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
                 *script->getOutputs()->getChild("nested")->getChild("rotation")->m_impl,
                 *nodeBinding->getInputs()->getChild("rotation")->m_impl,
@@ -477,8 +601,8 @@ namespace rlogic::internal
         {
             SolState tempState;
             ApiObjects toSerialize;
-            toSerialize.createLuaScript(tempState, m_valid_empty_script, "", "script", m_errorReporting);
-            toSerialize.createRamsesNodeBinding(*m_node, "node");
+            createScript(toSerialize, tempState, m_valid_empty_script);
+            toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "node");
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
             toSerialize.createRamsesCameraBinding(*m_camera, "camera");
 
@@ -535,8 +659,8 @@ namespace rlogic::internal
                 end
             )";
 
-            LuaScript* script1 = toSerialize.createLuaScript(tempState, scriptForLinks, "", "", m_errorReporting);
-            LuaScript* script2 = toSerialize.createLuaScript(tempState, scriptForLinks, "", "", m_errorReporting);
+            auto script1 = createScript(toSerialize, tempState, scriptForLinks);
+            auto script2 = createScript(toSerialize, tempState, scriptForLinks);
             ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
                 *script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl,
                 *script2->getInputs()->getChild("integer")->m_impl,
@@ -574,7 +698,13 @@ namespace rlogic::internal
         {
             auto apiObjects = rlogic_serialization::CreateApiObjects(
                 m_flatBufferBuilder,
-                0// no scripts container
+                0, // no scripts container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
             );
             m_flatBufferBuilder.Finish(apiObjects);
         }
@@ -593,7 +723,12 @@ namespace rlogic::internal
             auto apiObjects = rlogic_serialization::CreateApiObjects(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
-                0 // no node bindings container
+                0, // no node bindings container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
             );
             m_flatBufferBuilder.Finish(apiObjects);
         }
@@ -613,7 +748,11 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
-                0 // no appearance bindings container
+                0, // no appearance bindings container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
             );
             m_flatBufferBuilder.Finish(apiObjects);
         }
@@ -634,7 +773,10 @@ namespace rlogic::internal
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
-                0 // no camera bindings container
+                0, // no camera bindings container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
             );
             m_flatBufferBuilder.Finish(apiObjects);
         }
@@ -656,6 +798,8 @@ namespace rlogic::internal
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
                 0 // no links container
             );
             m_flatBufferBuilder.Finish(apiObjects);
@@ -669,6 +813,54 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing links container!");
     }
 
+    TEST_F(AnApiObjects_Serialization, ErrorWhenDataArrayContainerMissing)
+    {
+        {
+            auto apiObjects = rlogic_serialization::CreateApiObjects(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                0, // no data array container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
+            );
+            m_flatBufferBuilder.Finish(apiObjects);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
+        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing data arrays container!");
+    }
+
+    TEST_F(AnApiObjects_Serialization, ErrorWhenAnimationNodeContainerMissing)
+    {
+        {
+            auto apiObjects = rlogic_serialization::CreateApiObjects(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                0, // no animation nodes container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
+            );
+            m_flatBufferBuilder.Finish(apiObjects);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
+        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing animation nodes container!");
+    }
+
     TEST_F(AnApiObjects_Serialization, ReportsErrorWhenScriptCouldNotBeDeserialized)
     {
         {
@@ -678,6 +870,8 @@ namespace rlogic::internal
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
             );
             m_flatBufferBuilder.Finish(apiObjects);

@@ -29,7 +29,7 @@ namespace rlogic
          *
          * @param impl implementation details of the RamsesBinding
          */
-        explicit RamsesBinding(std::reference_wrapper<internal::RamsesBindingImpl> impl) noexcept;
+        explicit RamsesBinding(std::unique_ptr<internal::RamsesBindingImpl> impl) noexcept;
 
         /**
          * Destructor of RamsesBinding.
@@ -63,6 +63,5 @@ namespace rlogic
          * @param other RamsesBindings to assign from
          */
         RamsesBinding& operator=(RamsesBinding&& other) = delete;
-
     };
 }

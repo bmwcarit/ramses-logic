@@ -13,4 +13,5 @@ namespace rlogic_serialization;
 table RamsesNodeBinding
 {
     base:RamsesBinding;
+    rotationType:uint8;
 }

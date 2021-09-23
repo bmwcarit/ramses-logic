@@ -12,6 +12,7 @@
 
 #include <string>
 #include <memory>
+#include <functional>
 
 namespace rlogic::internal
 {
@@ -122,6 +123,6 @@ namespace rlogic
         /**
         * Implementation detail of LuaScript
         */
-        std::unique_ptr<internal::LuaScriptImpl> m_script;
+        internal::LuaScriptImpl& m_script;
     };
 }

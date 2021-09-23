@@ -45,12 +45,62 @@ namespace rlogic::internal
 
     sol::environment SolState::createEnvironment()
     {
-        return sol::environment(m_solState, sol::create, m_solState.globals());
+        // No 'fallback' symbol table, the environment has no access to the
+        // global symbols of the default environment
+        sol::environment newEnv(m_solState, sol::create);
+
+        // Set itself as a global variable registry
+        newEnv["_G"] = newEnv;
+
+        const std::vector<std::string> safeBaseSymbols = {
+            "assert",
+            "error",
+            "ipairs",
+            "next",
+            "pairs",
+            "print",
+            "select",
+            "tonumber",
+            "tostring",
+            "type",
+            "unpack",
+            "pcall",
+            "xpcall",
+            "_VERSION",
+
+            // Potentially less safe, but allows for advanced Lua use cases
+            "rawequal",
+            "rawget",
+            "rawset",
+            "setmetatable",
+            "getmetatable",
+        };
+
+        for (const auto& name : safeBaseSymbols)
+        {
+            newEnv[name] = m_solState[name];
+        }
+
+        // TODO Violin when we implement modules, this list should be taken from the explicit lists of base + custom modules
+        const std::vector<std::string> baseLibs = { "string", "math", "table", "debug" };
+
+        for (const auto& name : baseLibs)
+        {
+            const sol::table& moduleAsTable = m_solState[name];
+            sol::table copy(m_solState, sol::create);
+            for (const auto& pair : moduleAsTable)
+            {
+                // first is the name of a function in module, second is the function
+                copy[pair.first] = pair.second;
+            }
+            newEnv[name] = std::move(copy);
+        }
+
+        return newEnv;
     }
 
     sol::environment& SolState::getInterfaceExtractionEnvironment()
     {
         return m_interfaceExtractionEnvironment;
     }
-
 }

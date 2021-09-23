@@ -54,7 +54,7 @@ namespace rlogic::internal
     TEST_F(ARamsesAppearanceBinding, ProducesNoErrorsDuringUpdate_IfNoRamsesAppearanceIsAssigned)
     {
         auto& appearanceBinding = *m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
-        EXPECT_EQ(std::nullopt, appearanceBinding.m_impl.get().update());
+        EXPECT_EQ(std::nullopt, appearanceBinding.m_impl.update());
     }
 
     // This fixture only contains serialization unit tests, for higher order tests see `ARamsesAppearanceBinding_WithRamses_AndFiles`
@@ -522,7 +522,7 @@ namespace rlogic::internal
         EXPECT_TRUE(inputs->getChild("vec4Array")->getChild(0)->set<vec4f>({ .41f, .42f, .43f, .44f }));
         EXPECT_TRUE(inputs->getChild("vec4Array")->getChild(1)->set<vec4f>({ .45f, .46f, .47f, .48f }));
 
-        EXPECT_EQ(std::nullopt, appearanceBinding.m_impl.get().update());
+        EXPECT_EQ(std::nullopt, appearanceBinding.m_impl.update());
 
         ramses::UniformInput uniform;
         {

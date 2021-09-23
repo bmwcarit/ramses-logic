@@ -12,7 +12,7 @@
 
 namespace rlogic
 {
-    class LogicNode;
+    class LogicObject;
 
     /**
      * Holds information about an error which occured during #rlogic::LogicEngine API calls
@@ -26,8 +26,8 @@ namespace rlogic
         std::string message;
 
         /**
-         * The #rlogic::LogicNode which caused the error. Can be nullptr if the error was not originating from a specific node.
+         * The #rlogic::LogicObject which caused the error. Can be nullptr if the error was not originating from a specific object.
          */
-        const LogicNode* node;
+        const LogicObject* object;
     };
 }

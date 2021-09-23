@@ -60,6 +60,14 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API size_t getChildCount() const;
 
         /**
+        * Return whether the #rlogic::Property has a child with the given name
+        *
+        * @param name the name of the child that should be checked for existence
+        * @return whether the child with the given name exists
+        */
+        [[nodiscard]] RLOGIC_API bool hasChild(std::string_view name) const;
+
+        /**
         * Returns the child property with the given \p index. \p index must be < #getChildCount().
         *
         * This method can be used to get nested properties of structs and arrays. For primitive types this will
@@ -120,6 +128,15 @@ namespace rlogic
         * @return true if setting the \p value was successful, false otherwise.
         */
         template <typename T> bool set(T value);
+
+        /**
+        * Checks if an input property is linked to an output property of another node. Setting values of linked inputs will result in errors,
+        * use this to check an input is not linked before setting it.
+        * Calling this method for properties which are not inputs will report an error and return false.
+        *
+        * @return true if the property is an input and is linked, false otherwise.
+        */
+        [[nodiscard]] bool isLinked() const;
 
         /**
         * Constructor of Property. User is not supposed to call this - properties are created by other factory classes

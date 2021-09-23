@@ -10,13 +10,13 @@
 
 #include "ramses-logic/APIExport.h"
 #include "ramses-logic/RamsesBinding.h"
+#include "ramses-logic/ERotationType.h"
 
 #include <memory>
 
 namespace ramses
 {
     class Node;
-    enum class ERotationConvention;
 }
 
 namespace rlogic::internal
@@ -33,12 +33,14 @@ namespace rlogic
      * The RamsesNodeBinding has a fixed set of inputs which correspond to properties of ramses::Node.
      * They have a fixed type and name:
      * 'visibility' (type bool)
-     * 'rotation' (type vec3f)
+     * 'rotation' (type vec3f, or vec4f in case of quaternion)
      * 'translation' (type vec3f)
      * 'scaling' (type vec3f)
      *
      * The default values of the input properties are taken from the bound ramses::Node provided during construction.
-     * The rotation convention is also taken from Ramses (see #rlogic::RamsesNodeBinding::setRotationConvention)..
+     * This also applies for rotations, if the rlogic::ERotationType and ramses::ERotationConvention values of the
+     * ramses node match (both are Euler, and both correspond to the same axis ordering). Otherwise a warning is
+     * issued and the rotation values are set to 0.
      *
      * The RamsesNodeBinding class has no output properties (thus getOutputs() will return nullptr) because
      * the outputs are implicitly the properties of the bound Ramses node.
@@ -73,20 +75,11 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API ramses::Node& getRamsesNode() const;
 
         /**
-        * Sets the rotation convention used to set the rotation values to a potentially bound ramses::Node. Default is
-        * the same as the ramses default. Use this to change the setting.
+        * Returns the statically configured rotation type for the node rotation property.
         *
-        * @param rotationConvention the rotation convention to use
-        * @return true if successful, false otherwise
+        * @return the currently used rotation type
         */
-        RLOGIC_API bool setRotationConvention(ramses::ERotationConvention rotationConvention);
-
-        /**
-        * Returns the currently used rotation convention for the node rotation property.
-        *
-        * @return the currently used rotation convention
-        */
-        [[nodiscard]] RLOGIC_API ramses::ERotationConvention getRotationConvention() const;
+        [[nodiscard]] RLOGIC_API ERotationType getRotationType() const;
 
         /**
         * Constructor of RamsesNodeBinding. User is not supposed to call this - RamsesNodeBindings are created by other factory classes
@@ -131,6 +124,6 @@ namespace rlogic
         /**
          * Implementation detail of RamsesNodeBinding
          */
-        std::unique_ptr<internal::RamsesNodeBindingImpl> m_nodeBinding;
+        internal::RamsesNodeBindingImpl& m_nodeBinding;
     };
 }

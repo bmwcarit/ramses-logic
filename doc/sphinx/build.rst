@@ -1,3 +1,12 @@
+..
+    -------------------------------------------------------------------------
+    Copyright (C) 2020 BMW AG
+    -------------------------------------------------------------------------
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    -------------------------------------------------------------------------
+
 .. _build-instructions:
 
 The following sections describe different build scenarios with detailed
@@ -86,6 +95,19 @@ things can be enabled using following CMake options:
       not a valid ramses target. This will disable the automatic fallback to building Ramses from source if the specified
       custom target is not available at generation time for some reason.
 
+* -Dramses-logic_FIND_RAMSES_FROM_SYSTEM
+    * options: ON/OFF
+    * default: OFF
+    * Set this to ON to find Ramses from system (using find_package) instead of building Ramses. Other build-related
+      CMake options must be disabled (ramses-logic_ALLOW_RAMSES_BUILD, ramses-logic_BUILD_RAMSES_RENDERER). The
+      target platform (x11, wayland etc.) is determined from the value of ${ramses-logic_PLATFORM} - if not set
+      will use the client-only version of Ramses.
+
+* -Dramses-logic_PLATFORM
+    * options: any of [LINUX-X11, LINUX-WAYLAND, WINDOWS, ANDROID, or empty/not set]
+    * default: not set (defaults to using client-only version of ramses)
+    * Use this in conjunction with 'ramses-logic_FIND_RAMSES_FROM_SYSTEM' to search for a specific Ramses platform on the system
+
 * -Dramses-logic_WARNINGS_AS_ERRORS
     * options: ON/OFF
     * default: ON
@@ -112,10 +134,20 @@ things can be enabled using following CMake options:
     * default: OFF
     * by default, tests are built only when RAMSES Logic is built as a standalone projects. Use this to force building them.
 
+* -Dramses-logic_FORCE_OFF_TESTS
+    * options: ON/OFF
+    * default: OFF
+    * Fully disable building tests
+
 * -Dramses-logic_BUILD_EXAMPLES
     * options: ON/OFF
     * default: ON
     * set to OFF if you don't need the examples and want to reduce building time
+
+* -Dramses-logic_BUILD_DOCUMENTATION
+    * options: ON/OFF
+    * default: ON
+    * enable building documentation when dependencies available
 
 * -Dramses-logic_ENABLE_TEST_COVERAGE
     * options: ON/OFF

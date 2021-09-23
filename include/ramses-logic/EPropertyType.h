@@ -11,6 +11,7 @@
 #include "ramses-logic/APIExport.h"
 #include <array>
 #include <string>
+#include <cassert>
 
 namespace rlogic
 {
@@ -20,18 +21,18 @@ namespace rlogic
     */
     enum class EPropertyType : int
     {
-        Float,
-        Vec2f,
-        Vec3f,
-        Vec4f,
-        Int32,
-        Vec2i,
-        Vec3i,
-        Vec4i,
-        Struct,
-        String,
-        Bool,
-        Array
+        Float,  ///< corresponds to float
+        Vec2f,  ///< corresponds to [float, float]
+        Vec3f,  ///< corresponds to [float, float, float]
+        Vec4f,  ///< corresponds to [float, float, float, float]
+        Int32,  ///< corresponds to int32_t
+        Vec2i,  ///< corresponds to [int32_t, int32_t]
+        Vec3i,  ///< corresponds to [int32_t, int32_t, int32_t]
+        Vec4i,  ///< corresponds to [int32_t, int32_t, int32_t, int32_t]
+        Struct, ///< Has no value itself, but can have named child properties
+        String, ///< corresponds to std::string
+        Bool,   ///< corresponds to bool
+        Array   ///< Has no value itself, but can have unnamed child properties of homogeneous types (primitive or structs)
     };
 
     using vec2f = std::array<float, 2>;
@@ -157,6 +158,41 @@ namespace rlogic
     {
         static const bool value = true;
     };
+
+    /**
+    * Helper to determine if given property type can be stored in a #rlogic::DataArray.
+    */
+    constexpr bool CanPropertyTypeBeStoredInDataArray(EPropertyType type)
+    {
+        switch (type)
+        {
+        case EPropertyType::Float:
+        case EPropertyType::Vec2f:
+        case EPropertyType::Vec3f:
+        case EPropertyType::Vec4f:
+        case EPropertyType::Int32:
+        case EPropertyType::Vec2i:
+        case EPropertyType::Vec3i:
+        case EPropertyType::Vec4i:
+            return true;
+        case EPropertyType::Bool:
+        case EPropertyType::Struct:
+        case EPropertyType::String:
+        case EPropertyType::Array:
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+    * Helper to determine if given property type can be animated using #rlogic::AnimationNode.
+    */
+    constexpr bool CanPropertyTypeBeAnimated(EPropertyType type)
+    {
+        // currently all types that can be stored in DataArray
+        return CanPropertyTypeBeStoredInDataArray(type);
+    }
 
     /**
     * Returns the string representation of a property type. This string corresponds to the syntax

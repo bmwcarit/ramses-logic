@@ -185,7 +185,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwice_RamsesBinding)
     {
-        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
+        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
         const auto visibilityProperty = ramsesBinding->getInputs()->getChild("visibility");
 
@@ -209,7 +209,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesNodeBinding)
     {
-        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
+        auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
         const auto visibilityProperty = ramsesBinding->getInputs()->getChild("visibility");
 
@@ -420,7 +420,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesBinding)
     {
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         const auto visibilityProperty = targetBinding->getInputs()->getChild("visibility");
         const auto unlinkedTargetProperty = targetBinding->getInputs()->getChild("translation");
 
@@ -1060,7 +1060,7 @@ namespace rlogic
 
         auto script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
         // TODO Violin add appearance binding here too, once test PR #305 is merged
-        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
         auto nestedOutput_bool = script->getOutputs()->getChild("nested")->getChild("bool");
         auto nestedOutput_vec3f = script->getOutputs()->getChild("nested")->getChild("vec3f");
@@ -1150,7 +1150,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, canDestroyBindingAfterUnlinkingFromScript)
     {
-        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
         auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
@@ -1182,7 +1182,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, WHEN_ScriptWasUnlinkedFromBindingAndMultipleLinksDestroyed_THEN_UpdateDoesNotOverwriteBindingInputsByDanglingLinks)
     {
-        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
         auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
             function interface()
@@ -1554,8 +1554,8 @@ namespace rlogic
             )";
 
             auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
-            auto nodeBinding1 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode1, "NodeBinding1");
-            auto nodeBinding2 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode2, "NodeBinding2");
+            auto nodeBinding1 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode1, ERotationType::Euler_XYZ, "NodeBinding1");
+            auto nodeBinding2 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode2, ERotationType::Euler_XYZ, "NodeBinding2");
 
             auto scriptOutputVec3f = script->getOutputs()->getChild("vec3f");
             auto scriptOutputBool = script->getOutputs()->getChild("visibility");
@@ -1824,7 +1824,7 @@ namespace rlogic
 
         auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
         auto middleScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "MiddleScript");
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
         auto sourceOutputBool = sourceScript->getOutputs()->getChild("output")->getChild("outBool");
         auto middleInputBool  = middleScript->getInputs()->getChild("input")->getChild("inBool");
@@ -1863,20 +1863,20 @@ namespace rlogic
         )";
 
         auto sourceScript  = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
         m_logicEngine.update();
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetBinding->m_impl.isDirty());
 
         auto output = sourceScript->getOutputs()->getChild("output");
         auto input  = targetBinding->getInputs()->getChild("visibility");
 
         m_logicEngine.link(*output, *input);
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_TRUE(targetBinding->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_TRUE(targetBinding->m_impl.isDirty());
     }
 
     TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinkingWithStructs)
@@ -1899,16 +1899,16 @@ namespace rlogic
 
         m_logicEngine.update();
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetScript->m_impl.isDirty());
 
         auto output = sourceScript->getOutputs()->getChild("struct")->getChild("outBool");
         auto input = targetScript->getInputs()->getChild("struct")->getChild("inBool");
 
         m_logicEngine.link(*output, *input);
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_TRUE(targetScript->m_impl.isDirty());
     }
 
     TEST_F(ALogicEngine_Linking, SetsNeitherTargetNodeNorSourceNodeToDirtyAfterUnlink)
@@ -1923,7 +1923,7 @@ namespace rlogic
         )";
 
         auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "RamsesBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
         auto output = sourceScript->getOutputs()->getChild("output");
         auto input  = targetBinding->getInputs()->getChild("visibility");
@@ -1932,13 +1932,13 @@ namespace rlogic
 
         m_logicEngine.update();
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetBinding->m_impl.isDirty());
 
         m_logicEngine.unlink(*output, *input);
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetBinding->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetBinding->m_impl.isDirty());
     }
 
     class ALogicEngine_Linking_Confidence : public ALogicEngine
@@ -2036,7 +2036,7 @@ namespace rlogic
     {
         LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
 
-        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         auto translationProperty = targetBinding->getInputs()->getChild("translation");
 
         const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild(0)->getChild("vec3f"));

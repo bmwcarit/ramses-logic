@@ -11,7 +11,6 @@
 #include "internals/SolState.h"
 #include "impl/PropertyImpl.h"
 
-#include "internals/PropertyTypeExtractor.h"
 #include "internals/WrappedLuaProperty.h"
 #include "internals/SolHelper.h"
 #include "internals/ErrorReporting.h"
@@ -22,83 +21,10 @@
 
 namespace rlogic::internal
 {
-    std::optional<CompiledScript> LuaScriptImpl::Compile(SolState& solState, std::string_view source, std::string_view scriptName, std::string_view filename, ErrorReporting& errorReporting)
-    {
-        const std::string chunkname = BuildChunkName(scriptName, filename);
-        sol::load_result load_result = solState.loadScript(source, chunkname);
-
-        if (!load_result.valid())
-        {
-            sol::error error = load_result;
-            errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()));
-            return std::nullopt;
-        }
-
-        sol::protected_function mainFunction = load_result;
-
-        sol::environment env = solState.createEnvironment();
-        env.set_on(mainFunction);
-
-        sol::protected_function_result main_result = mainFunction();
-        if (!main_result.valid())
-        {
-            sol::error error = main_result;
-            errorReporting.add(error.what());
-            return std::nullopt;
-        }
-
-        sol::protected_function intf = env["interface"];
-
-        if (!intf.valid())
-        {
-            errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname));
-            return std::nullopt;
-        }
-
-        sol::protected_function run = env["run"];
-
-        if (!run.valid())
-        {
-            errorReporting.add(fmt::format("[{}] No 'run' function defined!", chunkname));
-            return std::nullopt;
-        }
-
-        PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
-        PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
-
-        sol::environment& interfaceEnvironment = solState.getInterfaceExtractionEnvironment();
-
-        interfaceEnvironment["IN"]  = std::ref(inputsExtractor);
-        interfaceEnvironment["OUT"] = std::ref(outputsExtractor);
-
-        interfaceEnvironment.set_on(intf);
-        sol::protected_function_result intfResult = intf();
-
-        interfaceEnvironment["IN"] = sol::lua_nil;
-        interfaceEnvironment["OUT"] = sol::lua_nil;
-
-        if (!intfResult.valid())
-        {
-            sol::error error = intfResult;
-            errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()));
-            return std::nullopt;
-        }
-
-        return CompiledScript {
-            source,
-            scriptName,
-            filename,
-            solState,
-            std::move(load_result),
-            std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptInput)),
-            std::make_unique<Property>(std::make_unique<PropertyImpl>(outputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptOutput))
-        };
-    }
-
-    LuaScriptImpl::LuaScriptImpl(CompiledScript compiledScript)
-        : LogicNodeImpl(compiledScript.scriptName)
-        , m_filename(compiledScript.fileName)
-        , m_source(compiledScript.sourceCode)
+    LuaScriptImpl::LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name)
+        : LogicNodeImpl(name)
+        , m_filename(std::move(compiledScript.fileName))
+        , m_source(std::move(compiledScript.sourceCode))
         , m_luaPrintFunction(&LuaScriptImpl::DefaultLuaPrintFunction)
         , m_wrappedRootInput(*compiledScript.rootInput->m_impl)
         , m_wrappedRootOutput(*compiledScript.rootOutput->m_impl)
@@ -140,30 +66,30 @@ namespace rlogic::internal
         // TODO Violin make optional - no need to always serialize string if not used
         if (!luaScript.name())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing name!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing name!", nullptr);
             return nullptr;
         }
 
         if (!luaScript.filename())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing filename!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing filename!", nullptr);
             return nullptr;
         }
 
         const std::string_view name = luaScript.name()->string_view();
-        const std::string_view filename = luaScript.filename()->string_view();
+        std::string filename = luaScript.filename()->str();
 
         if (!luaScript.luaSourceCode())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!", nullptr);
             return nullptr;
         }
 
-        const std::string_view sourceCode = luaScript.luaSourceCode()->string_view();
+        std::string sourceCode = luaScript.luaSourceCode()->str();
 
         if (!luaScript.rootInput())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root input!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root input!", nullptr);
             return nullptr;
         }
 
@@ -175,7 +101,7 @@ namespace rlogic::internal
 
         if (!luaScript.rootOutput())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root output!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root output!", nullptr);
             return nullptr;
         }
 
@@ -187,13 +113,13 @@ namespace rlogic::internal
 
         if (rootInput->getName() != "IN" || rootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root input has unexpected name or type!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root input has unexpected name or type!", nullptr);
             return nullptr;
         }
 
         if (rootOutput->getName() != "OUT" || rootOutput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root output has unexpected name or type!");
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root output has unexpected name or type!", nullptr);
             return nullptr;
         }
 
@@ -202,7 +128,7 @@ namespace rlogic::internal
         if (!load_result.valid())
         {
             sol::error error = load_result;
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed parsing Lua source code:\n{}", name, error.what()));
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed parsing Lua source code:\n{}", name, error.what()), nullptr);
             return nullptr;
         }
 
@@ -214,44 +140,19 @@ namespace rlogic::internal
         if (!main_result.valid())
         {
             sol::error error = main_result;
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed executing script:\n{}!", name, error.what()));
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed executing script:\n{}!", name, error.what()), nullptr);
             return nullptr;
         }
 
         return std::make_unique<LuaScriptImpl>(
-            CompiledScript{
-                sourceCode,
-                name,
-                filename,
+            LuaCompiledScript{
+                std::move(sourceCode),
+                std::move(filename),
                 solState,
                 sol::protected_function(std::move(load_result)),
                 std::make_unique<Property>(std::move(rootInput)),
                 std::make_unique<Property>(std::move(rootOutput))
-            }
-            );
-    }
-
-    std::string LuaScriptImpl::BuildChunkName(std::string_view scriptName, std::string_view fileName)
-    {
-        std::string chunkname;
-        if (scriptName.empty())
-        {
-            chunkname = fileName.empty() ? "unknown" : fileName;
-        }
-        else
-        {
-            if (fileName.empty())
-            {
-                chunkname = scriptName;
-            }
-            else
-            {
-                chunkname = fileName;
-                chunkname.append(":");
-                chunkname.append(scriptName);
-            }
-        }
-        return chunkname;
+            }, name);
     }
 
     std::string_view LuaScriptImpl::getFilename() const

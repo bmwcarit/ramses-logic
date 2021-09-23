@@ -1,3 +1,12 @@
+..
+    -------------------------------------------------------------------------
+    Copyright (C) 2020 BMW AG
+    -------------------------------------------------------------------------
+    This Source Code Form is subject to the terms of the Mozilla Public
+    License, v. 2.0. If a copy of the MPL was not distributed with this
+    file, You can obtain one at https://mozilla.org/MPL/2.0/.
+    -------------------------------------------------------------------------
+
 .. default-domain:: cpp
 .. highlight:: cpp
 
@@ -269,6 +278,105 @@ bound Ramses objects are updated and when not.
     exception to this are Appearance bindings - extracting all data from Ramses Appearances would incur performance
     costs not worth the convenience.
 
+=========================
+Animations
+=========================
+
+Animations are central to any dynamic real-time scene. It is possible to implement simple animations with ``Lua`` scripts
+or even write your own ``C++`` wrapper which changes a value over time, linked to a ``Ramses`` object via :class:`rlogic::RamsesBinding`.
+However, such solution would not scale well for more complex animations with preauthored
+splines of keyframes and timestamps. :class:`rlogic::AnimationNode` and :class:`rlogic::DataArray` are designed to provide a good
+compromise between performance and a data-centric design which imports animation data from external sources or formats.
+
+The animation support in ``Ramses Logic`` is provided by the following two classes:
+
+* :class:`rlogic::DataArray` - contains the animation data (keyframes and time stamps)
+* :class:`rlogic::AnimationNode` - provides an interface to control and holds the current state of animations
+
+.. note::
+
+    Before implementing a solution for your animation, make sure you understand the nature of animations. Is it a simple easing in/out to/from a value
+    which might even change on the fly? Maybe a custom Lua script might do the job better. Is it a fixed animation or set of animations using splines
+    imported from a content creation tool? Then :class:`rlogic::AnimationNode` is probably better suited for it.
+
+-------------------------------
+Data Arrays
+-------------------------------
+
+:class:`rlogic::DataArray` is a simple data container with immutable data. Various data types and interpolation types are supported (see the
+class documentation for details). Data arrays by themselves have no meaning, they must be bundled in animation channels (:struct:`rlogic::AnimationChannel`).
+The contents of an animation channel depends on its type. For example, a simple linear animation only needs two data arrays - one for time stamps and
+one for key frames. A complex cubic animation channel also needs tangent arrays. It is possible to reuse the same data array in multiple channels - e.g.
+if multiple channels use the same time stamps (often the case for multi-channel animations).
+
+-------------------------------
+Animation Nodes
+-------------------------------
+
+:class:`rlogic::AnimationNode` holds the state of an animation and provides inputs to control it and outputs to check the
+output values or to link them to other scripts or directly to instances of :class:`rlogic::RamsesBinding`.
+To query input and output properties, use the corresponding methods in the base class :class:`rlogic::LogicNode`.
+Based on how many animation channels were provided when creating the :class:`rlogic::AnimationNode`
+has an output property of corresponding data type (matching the keyframes data type) for each channel.
+The value of these outputs is updated after every :func:`rlogic::LogicEngine::update` call and can be directly queried
+or it can be linked to any other logic node, e.g. :class:`rlogic::RamsesBinding`.
+
+:class:`rlogic::AnimationNode` has a set of control states, most important being ``play`` and ``timeDelta``. Whenever ``play`` is true, the animation
+(all its channels) will advance in time by exactly ``timeDelta`` period everytime update is executed. Animation always starts at time zero of all of its
+channels' timestamps, interpolates keyframes according to the interpolation type chosen for each channel and when the end is reached the value stays equal
+to last keyframe. Animation can be set to looping via ``loop`` or restarted via ``rewindOnStop`` inputs.
+
+-------------------------------
+Time Delta
+-------------------------------
+
+A typical application using ``Ramses logic`` has a main loop and in each iteration
+(among other things) user and system inputs are processed, logic network inputs are set and finally :func:`rlogic::LogicEngine::update` is called.
+Typically, logic nodes are stateless and only do something when an input value is changed/set. Animation nodes bring in a new implicit input - `time`.
+The ``Logic Engine`` allows (and therefore also requires) the application logic to update its time based on its own loop logic and requirements.
+This is done for each animation node separately over its ``timeDelta`` input property. This allows for two things:
+
+* simulating time
+* stopping time
+* doing the above for each animation node separately
+
+In a typical setup, ``timeDelta`` is a relative value representing the time period between the updates, `timeDelta = timeNow - timeLastUpdate`.
+Note that even if ``timeDelta`` has the same value in two consecutive frames, it still needs to be set if the animation node's logic is supposed to
+be updated. It is possible to set a value of 0 which will trigger an update of the animation node, but not progress the time (e.g. if you load
+a file with running animations and want to re-apply their current value without progressing the time).
+
+.. note::
+
+    There is intentionally no mention of time units when describing usage of ``timeDelta``, that is because ``Ramses logic`` is time unit agnostic
+    when it comes to animations. It is fully up to the application to define the time units passed to animations to match those in the animation timestamps.
+    The type of ``timeDelta`` is ``float`` in order to match default glTF semantics (time is represented in seconds with float precision for sub-second fractions).
+
+If you have a trivial time logic which applies a fixed time delta each frame, you can simply traverse all animations and apply a fixed value:
+
+.. code-block::
+    :linenos:
+
+    void doOneLoop()
+    {
+        ...
+
+        const auto timeNow = now();
+        const auto timeDelta = timeNow - lastUpdateTime;
+        lastUpdateTime = timeNow;
+
+        for (const auto& animNode : logicEngine.animationNodes())
+        {
+            // It may be a good idea to cache the timeDelta property for better performance
+            auto* timeDelta = animNode->getInputs()->getChild("timeDelta");
+            timeDelta->set(timeDelta);
+        }
+
+        logicEngine.update();
+    }
+
+This may seem like an overkill for simply progressing the time of all animations, but it allows for flexible time control
+and gives full power to the application code as to how and when to update animations at the cost of few lines of boilerplate
+code.
 
 =========================
 Error handling
@@ -571,3 +679,4 @@ List of all examples
     examples/05_serialization
     examples/06_override_print
     examples/07_links
+    examples/08_animation

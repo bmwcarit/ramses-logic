@@ -48,7 +48,7 @@ namespace rlogic
             end
         )", "Script");
 
-        auto        ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto        ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
         auto scriptInput  = luaScript->getInputs()->getChild("param");
         auto scriptOutput = luaScript->getOutputs()->getChild("param");
@@ -160,7 +160,7 @@ namespace rlogic
         auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("This will die"));
-        EXPECT_THAT(m_logicEngine.getErrors()[0].node, sourceScript);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].object, sourceScript);
     }
 
     TEST_F(ALogicEngine_Update, PropagatesValuesOnlyToConnectedLogicNodes)
@@ -182,7 +182,7 @@ namespace rlogic
         )";
 
         auto script            = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script");
-        auto nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
         auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
 
@@ -292,18 +292,18 @@ namespace rlogic
             messages.emplace_back(std::make_pair(scriptName, message));
         });
 
-        EXPECT_TRUE(sourceScript->m_impl.get().isDirty());
-        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+        EXPECT_TRUE(sourceScript->m_impl.isDirty());
+        EXPECT_TRUE(targetScript->m_impl.isDirty());
 
         m_logicEngine.link(*sourceOutput, *targetInput);
 
-        EXPECT_TRUE(sourceScript->m_impl.get().isDirty());
-        EXPECT_TRUE(targetScript->m_impl.get().isDirty());
+        EXPECT_TRUE(sourceScript->m_impl.isDirty());
+        EXPECT_TRUE(targetScript->m_impl.isDirty());
 
         m_logicEngine.update();
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetScript->m_impl.isDirty());
 
         // both scripts are updated, because its the first update
         ASSERT_EQ(2u, messages.size());
@@ -319,13 +319,13 @@ namespace rlogic
         targetInput->set(42.f);
 
         // targetScript is linked input and cannot be set manually so it is not dirty
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetScript->m_impl.isDirty());
 
         m_logicEngine.update();
 
-        EXPECT_FALSE(sourceScript->m_impl.get().isDirty());
-        EXPECT_FALSE(targetScript->m_impl.get().isDirty());
+        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_FALSE(targetScript->m_impl.isDirty());
 
         // Nothing is updated, because targetScript is linked input and cannot be set manually
         ASSERT_EQ(0u, messages.size());

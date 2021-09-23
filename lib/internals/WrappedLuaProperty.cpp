@@ -103,6 +103,11 @@ namespace rlogic::internal
 
     void WrappedLuaProperty::newIndex(const sol::object& index, const sol::object& rhs)
     {
+        if (TypeUtils::IsPrimitiveVectorType(m_wrappedProperty.get().getType()))
+        {
+            sol_helper::throwSolException("Error while writing to '{}'. Can't assign individual components of vector types, must assign the whole vector!", m_wrappedProperty.get().getName());
+        }
+
         const size_t childIndex = resolvePropertyIndex(index);
 
         if (m_wrappedProperty.get().getPropertySemantics() != EPropertySemantics::ScriptOutput)

@@ -491,7 +491,7 @@ CheckOptions:
         value: '1'
     # https://releases.llvm.org/9.0.0/tools/clang/tools/extra/docs/clang-tidy/checks/hicpp-multiway-paths-covered.html#cmdoption-arg-warnonmissingelse
       - key: hicpp-multiway-paths-covered.WarnOnMissingElse
-        value: '1'
+        value: '0'
     # https://releases.llvm.org/9.0.0/tools/clang/tools/extra/docs/clang-tidy/checks/readability-implicit-bool-conversion.html#cmdoption-arg-allowpointerconditions
       - key: readability-implicit-bool-conversion.AllowPointerConditions
         value: '1'

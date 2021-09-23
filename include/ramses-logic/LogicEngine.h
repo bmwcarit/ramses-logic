@@ -12,6 +12,9 @@
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Collection.h"
 #include "ramses-logic/ErrorData.h"
+#include "ramses-logic/EPropertyType.h"
+#include "ramses-logic/AnimationTypes.h"
+#include "ramses-logic/ERotationType.h"
 
 #include <vector>
 #include <string_view>
@@ -35,6 +38,8 @@ namespace rlogic
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
+    class DataArray;
+    class AnimationNode;
 
     /**
     * Central object which creates and manages the lifecycle and execution
@@ -87,6 +92,20 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API Collection<RamsesCameraBinding> ramsesCameraBindings() const;
 
         /**
+        * Returns an iterable #rlogic::Collection of all #rlogic::DataArray instances created by this LogicEngine.
+        *
+        * @return an iterable #rlogic::Collection with all #rlogic::DataArray created by this #LogicEngine
+        */
+        [[nodiscard]] RLOGIC_API Collection<DataArray> dataArrays() const;
+
+        /**
+        * Returns an iterable #rlogic::Collection of all #rlogic::AnimationNode instances created by this LogicEngine.
+        *
+        * @return an iterable #rlogic::Collection with all #rlogic::AnimationNode created by this #LogicEngine
+        */
+        [[nodiscard]] RLOGIC_API Collection<AnimationNode> animationNodes() const;
+
+        /**
          * Returns a pointer to the first occurrence of a script with a given \p name if such exists, and nullptr otherwise.
          *
          * @param name the name of the script to search for
@@ -127,6 +146,26 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API RamsesCameraBinding* findCameraBinding(std::string_view name);
 
         /**
+        * Returns a pointer to the first occurrence of a #rlogic::DataArray with a given \p name if such exists, and nullptr otherwise.
+        *
+        * @param name the name of the #rlogic::DataArray to search for
+        * @return a pointer to the #rlogic::DataArray, or nullptr if none was found
+        */
+        [[nodiscard]] RLOGIC_API const DataArray* findDataArray(std::string_view name) const;
+        /// @copydoc findDataArray(std::string_view) const
+        [[nodiscard]] RLOGIC_API DataArray* findDataArray(std::string_view name);
+
+        /**
+        * Returns a pointer to the first occurrence of an #rlogic::AnimationNode with a given \p name if such exists, and nullptr otherwise.
+        *
+        * @param name the name of the #rlogic::AnimationNode to search for
+        * @return a pointer to the #rlogic::AnimationNode, or nullptr if none was found
+        */
+        [[nodiscard]] RLOGIC_API const AnimationNode* findAnimationNode(std::string_view name) const;
+        /// @copydoc findAnimationNode(std::string_view) const
+        [[nodiscard]] RLOGIC_API AnimationNode* findAnimationNode(std::string_view name);
+
+        /**
          * Creates a new #rlogic::LuaScript from an existing Lua source file. Refer to the #rlogic::LuaScript class documentation
          * for requirements that Lua scripts must fulfill in order to be added to the #LogicEngine.
          *
@@ -156,16 +195,19 @@ namespace rlogic
 
         /**
          * Creates a new #rlogic::RamsesNodeBinding which can be used to set the properties of a Ramses Node object.
+         * The initial values of the binding's properties are loaded from the \p ramsesNode. Rotation values are
+         * taken over from the \p ramsesNode only if the conventions are compatible (see \ref rlogic::ERotationType).
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
          * @param ramsesNode the ramses::Node object to control with the binding.
+         * @param rotationType the type of rotation to use (will affect the 'rotation' property semantics and type).
          * @param name a name for the new #rlogic::RamsesNodeBinding.
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The binding can be destroyed by calling the #destroy method
          */
-        RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name = "");
+        RLOGIC_API RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType = ERotationType::Euler_XYZ, std::string_view name = "");
 
         /**
          * Creates a new #rlogic::RamsesAppearanceBinding which can be used to set the properties of a Ramses Appearance object.
@@ -192,6 +234,37 @@ namespace rlogic
          * The binding can be destroyed by calling the #destroy method
          */
         RLOGIC_API RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name ="");
+
+        /**
+        * Creates a new #rlogic::DataArray to store data which can be used with animations.
+        * Provided data must not be empty otherwise creation will fail.
+        * See #rlogic::CanPropertyTypeBeStoredInDataArray and #rlogic::PropertyTypeToEnum
+        * to determine supported types that can be used to create a #rlogic::DataArray.
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param data source data to move into #rlogic::DataArray, must not be empty.
+        * @param name a name for the the new #rlogic::DataArray.
+        * @return a pointer to the created object or nullptr if
+        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+        */
+        template <typename T>
+        DataArray* createDataArray(const std::vector<T>& data, std::string_view name ="");
+
+        /**
+        * Creates a new #rlogic::AnimationNode for animating properties.
+        * Refer to #rlogic::AnimationNode for more information about its use.
+        * There must be at least one channel provided, please see #rlogic::AnimationChannel
+        * requirements for all the data.
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param channels list of animation channels to be animated with this animation node.
+        * @param name a name for the the new #rlogic::AnimationNode.
+        * @return a pointer to the created object or nullptr if
+        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+        */
+        RLOGIC_API AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name = "");
 
         /**
          * Updates all #rlogic::LogicNode's which were created by this #LogicEngine instance.
@@ -280,16 +353,20 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API const std::vector<ErrorData>& getErrors() const;
 
         /**
-        * Destroys a #rlogic::LogicNode instance. If any links are connected to this #rlogic::LogicNode, they will
-        * be destroyed too. Note that after this call, the execution order of #rlogic::LogicNode may change! See the
+        * Destroys an instance of an object created with #LogicEngine.
+        * All objects created using #LogicEngine derive from a base class #rlogic::LogicObject
+        * and can be destroyed using this method.
+        * In case of a #rlogic::LogicNode and its derived classes, if any links are connected to this #rlogic::LogicNode,
+        * they will be destroyed too. Note that after this call, the execution order of #rlogic::LogicNode may change! See the
         * docs of #link and #unlink for more information.
+        * In case of a #rlogic::DataArray, destroy will fail it is used in any #rlogic::AnimationNode's #rlogic::AnimationChannel.
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
-        * @param logicNode the logic node instance to destroy
-        * @return true if logicNode destroyed, false otherwise. Call #getErrors() for error details upon failure.
+        * @param object the object instance to destroy
+        * @return true if object destroyed, false otherwise. Call #getErrors() for error details upon failure.
         */
-        RLOGIC_API bool destroy(LogicNode& logicNode);
+        RLOGIC_API bool destroy(LogicObject& object);
 
         /**
          * Writes the whole #LogicEngine and all of its objects to a binary file with the given filename. The RAMSES scene
@@ -361,12 +438,11 @@ namespace rlogic
         LogicEngine(const LogicEngine& other) = delete;
 
         /**
-        * Move Constructor of LogicEngine is deleted because because logic engine is not supposed to be moved
+        * Move Constructor of LogicEngine
         *
         * @param other logic engine to move from
         */
-        // TODO Violin consider making LogicEngine move-able, nothing speaks against it
-        LogicEngine(LogicEngine&& other) = delete;
+        LogicEngine(LogicEngine&& other) noexcept;
 
         /**
         * Assignment operator of LogicEngine is deleted because logic engines hold named resources and are not supposed to be copied
@@ -376,16 +452,34 @@ namespace rlogic
         LogicEngine& operator=(const LogicEngine& other) = delete;
 
         /**
-        * Move assignment operator of LogicEngine is deleted because logic engine is not supposed to be moved
+        * Move assignment operator of LogicEngine
         *
         * @param other logic engine to move from
         */
-        // TODO Violin consider making LogicEngine move-able, nothing speaks against it
-        LogicEngine& operator=(LogicEngine&& other) = delete;
+        LogicEngine& operator=(LogicEngine&& other) noexcept;
 
         /**
         * Implementation detail of LogicEngine
         */
         std::unique_ptr<internal::LogicEngineImpl> m_impl;
+
+    private:
+        /**
+        * Internal implementation of #createDataArray
+        *
+        * @param data source data
+        * @param name name
+        * @return a pointer to the created object or nullptr on error
+        */
+        template <typename T>
+        RLOGIC_API DataArray* createDataArrayInternal(const std::vector<T>& data, std::string_view name);
     };
+
+    template <typename T>
+    DataArray* LogicEngine::createDataArray(const std::vector<T>& data, std::string_view name)
+    {
+        static_assert(IsPrimitiveProperty<T>::value && CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE),
+            "Unsupported data type, see createDataArray API doc to see supported types.");
+        return createDataArrayInternal<T>(data, name);
+    }
 }

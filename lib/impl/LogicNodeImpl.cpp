@@ -14,7 +14,7 @@
 namespace rlogic::internal
 {
     LogicNodeImpl::LogicNodeImpl(std::string_view name) noexcept
-        : m_name(name)
+        : LogicObjectImpl(name)
     {
     }
 
@@ -38,16 +38,6 @@ namespace rlogic::internal
     Property* LogicNodeImpl::getOutputs()
     {
         return m_outputs.get();
-    }
-
-    std::string_view LogicNodeImpl::getName() const
-    {
-        return m_name;
-    }
-
-    void LogicNodeImpl::setName(std::string_view name)
-    {
-        m_name = name;
     }
 
     void LogicNodeImpl::setDirty(bool dirty)

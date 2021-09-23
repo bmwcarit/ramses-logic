@@ -21,8 +21,8 @@ namespace rlogic::internal
 
         // Move-able (noexcept); Not copy-able
         ~SolState() noexcept = default;
-        SolState(SolState&& other) noexcept = default;
-        SolState& operator=(SolState&& other) noexcept = default;
+        SolState(SolState&& other) noexcept = delete;
+        SolState& operator=(SolState&& other) noexcept = delete;
         SolState(const SolState& other) = delete;
         SolState& operator=(const SolState& other) = delete;
 

@@ -10,6 +10,11 @@
 
 #include "LogicNodeDependencies.h"
 
+#include "ramses-logic/AnimationTypes.h"
+#include "ramses-logic/ERotationType.h"
+
+#include "impl/LuaCompilationUtils.h"
+
 #include <vector>
 #include <memory>
 #include <string_view>
@@ -24,11 +29,14 @@ namespace ramses
 
 namespace rlogic
 {
+    class LogicObject;
     class LogicNode;
     class LuaScript;
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
+    class DataArray;
+    class AnimationNode;
 }
 
 namespace rlogic_serialization
@@ -51,13 +59,15 @@ namespace rlogic::internal
     using NodeBindingsContainer = std::vector<std::unique_ptr<RamsesNodeBinding>>;
     using AppearanceBindingsContainer = std::vector<std::unique_ptr<RamsesAppearanceBinding>>;
     using CameraBindingsContainer = std::vector<std::unique_ptr<RamsesCameraBinding>>;
+    using DataArrayContainer = std::vector<std::unique_ptr<DataArray>>;
+    using AnimationNodesContainer = std::vector<std::unique_ptr<AnimationNode>>;
 
     class ApiObjects
     {
     public:
         // Move-able and non-copyable
-        ApiObjects() = default;
-        ~ApiObjects() noexcept = default;
+        ApiObjects();
+        ~ApiObjects() noexcept;
         // TODO Violin try to find a way to make the class move-able without exceptions (and also the whole LogicEngine)
         // Currently not possible because MSVC2017 compiler forces copy on move: https://stackoverflow.com/questions/47604029/move-constructors-of-stl-containers-in-msvc-2017-are-not-marked-as-noexcept
         ApiObjects(ApiObjects&& other) = default;
@@ -75,11 +85,14 @@ namespace rlogic::internal
             ErrorReporting& errorReporting);
 
         // Create/destroy API objects
-        LuaScript* createLuaScript(SolState& solState, std::string_view source, std::string_view filename, std::string_view scriptName, ErrorReporting& errorReporting);
-        RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name);
+        LuaScript* createLuaScript(LuaCompiledScript compiledScript, std::string_view name);
+        RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
-        bool destroy(LogicNode& logicNode, ErrorReporting& errorReporting);
+        template <typename T>
+        DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
+        AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name);
+        bool destroy(LogicObject& object, ErrorReporting& errorReporting);
 
         // Invariance checks
         [[nodiscard]] bool checkBindingsReferToSameRamsesScene(ErrorReporting& errorReporting) const;
@@ -93,6 +106,10 @@ namespace rlogic::internal
         [[nodiscard]] const AppearanceBindingsContainer& getAppearanceBindings() const;
         [[nodiscard]] CameraBindingsContainer& getCameraBindings();
         [[nodiscard]] const CameraBindingsContainer& getCameraBindings() const;
+        [[nodiscard]] DataArrayContainer& getDataArrays();
+        [[nodiscard]] const DataArrayContainer& getDataArrays() const;
+        [[nodiscard]] AnimationNodesContainer& getAnimationNodes();
+        [[nodiscard]] const AnimationNodesContainer& getAnimationNodes() const;
 
         [[nodiscard]] const LogicNodeDependencies& getLogicNodeDependencies() const;
         [[nodiscard]] LogicNodeDependencies& getLogicNodeDependencies();
@@ -116,11 +133,15 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(LuaScript& luaScript, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(AnimationNode& node, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting);
 
         ScriptsContainer                    m_scripts;
         NodeBindingsContainer               m_ramsesNodeBindings;
         AppearanceBindingsContainer         m_ramsesAppearanceBindings;
         CameraBindingsContainer             m_ramsesCameraBindings;
+        DataArrayContainer                  m_dataArrays;
+        AnimationNodesContainer             m_animationNodes;
         LogicNodeDependencies               m_logicNodeDependencies;
 
         std::unordered_map<LogicNodeImpl*, LogicNode*> m_reverseImplMapping;

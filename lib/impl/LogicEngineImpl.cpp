@@ -19,6 +19,8 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/DataArray.h"
 
 #include "ramses-logic-build-config.h"
 #include "generated/LogicEngineGen.h"
@@ -33,33 +35,48 @@
 
 namespace rlogic::internal
 {
+    LogicEngineImpl::LogicEngineImpl()
+        : m_luaState(std::make_unique<SolState>())
+    {
+    }
+
+    LogicEngineImpl::~LogicEngineImpl() noexcept = default;
+
     LuaScript* LogicEngineImpl::createLuaScriptFromFile(std::string_view filename, std::string_view scriptName)
     {
         m_errors.clear();
 
+        std::string filenameStr{ filename };
         std::ifstream iStream;
-        // ifstream has no support for string_view
-        iStream.open(std::string(filename), std::ios_base::in);
+        iStream.open(filenameStr, std::ios_base::in);
         if (iStream.fail())
         {
-            m_errors.add("Failed opening file " + std::string(filename) + "!");
+            m_errors.add("Failed opening file " + filenameStr + "!", nullptr);
             return nullptr;
         }
 
         std::string source(std::istreambuf_iterator<char>(iStream), std::istreambuf_iterator<char>{});
-        return m_apiObjects.createLuaScript(m_luaState, source, filename, scriptName, m_errors);
+        std::optional<LuaCompiledScript> compiledScript = LuaCompilationUtils::Compile(*m_luaState, std::move(source), scriptName, std::move(filenameStr), m_errors);
+        if (!compiledScript)
+            return nullptr;
+
+        return m_apiObjects.createLuaScript(std::move(*compiledScript), scriptName);
     }
 
     LuaScript* LogicEngineImpl::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
     {
         m_errors.clear();
-        return m_apiObjects.createLuaScript(m_luaState, source, "", scriptName, m_errors);
+        std::optional<LuaCompiledScript> compiledScript = LuaCompilationUtils::Compile(*m_luaState, std::string{ source }, scriptName, "", m_errors);
+        if (!compiledScript)
+            return nullptr;
+
+        return m_apiObjects.createLuaScript(std::move(*compiledScript), scriptName);
     }
 
-    RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name)
+    RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesNodeBinding(ramsesNode, name);
+        return m_apiObjects.createRamsesNodeBinding(ramsesNode, rotationType,  name);
     }
 
     RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
@@ -74,10 +91,116 @@ namespace rlogic::internal
         return m_apiObjects.createRamsesCameraBinding(ramsesCamera, name);
     }
 
-    bool LogicEngineImpl::destroy(LogicNode& logicNode)
+    template <typename T>
+    DataArray* LogicEngineImpl::createDataArray(const std::vector<T>& data, std::string_view name)
+    {
+        static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
+        m_errors.clear();
+        if (data.empty())
+        {
+            m_errors.add(fmt::format("Cannot create DataArray '{}' with empty data.", name), nullptr);
+            return nullptr;
+        }
+
+        return m_apiObjects.createDataArray(data, name);
+    }
+
+    rlogic::AnimationNode* LogicEngineImpl::createAnimationNode(const AnimationChannels& channels, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.destroy(logicNode, m_errors);
+
+        auto containsDataArray = [this](const DataArray* da) {
+            const auto& dataArrays = m_apiObjects.getDataArrays();
+            const auto it = std::find_if(dataArrays.cbegin(), dataArrays.cend(),
+                [da](const auto& d) { return d.get() == da; });
+            return it != dataArrays.cend();
+        };
+
+        if (channels.empty())
+        {
+            m_errors.add(fmt::format("Failed to create AnimationNode '{}': must provide at least one channel.", name), nullptr);
+            return nullptr;
+        }
+        for (const auto& channel : channels)
+        {
+            if (!channel.timeStamps || !channel.keyframes)
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': every channel must provide timestamps and keyframes data.", name), nullptr);
+                return nullptr;
+            }
+            // Checked at channel creation type, can't fail here
+            assert(CanPropertyTypeBeAnimated(channel.keyframes->getDataType()));
+            if (channel.timeStamps->getDataType() != EPropertyType::Float)
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': all channel timestamps must be float type.", name), nullptr);
+                return nullptr;
+            }
+            if (channel.timeStamps->getNumElements() != channel.keyframes->getNumElements())
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': number of keyframes must be same as number of timestamps.", name), nullptr);
+                return nullptr;
+            }
+            const auto& timestamps = *channel.timeStamps->getData<float>();
+            if (std::adjacent_find(timestamps.cbegin(), timestamps.cend(), std::greater_equal<float>()) != timestamps.cend())
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': timestamps have to be strictly in ascending order.", name), nullptr);
+                return nullptr;
+            }
+
+            if (!containsDataArray(channel.timeStamps) ||
+                !containsDataArray(channel.keyframes))
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': timestamps or keyframes were not found in this logic instance.", name), nullptr);
+                return nullptr;
+            }
+
+            if ((channel.interpolationType == EInterpolationType::Linear_Quaternions || channel.interpolationType == EInterpolationType::Cubic_Quaternions) &&
+                channel.keyframes->getDataType() != EPropertyType::Vec4f)
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': quaternion animation requires the channel keyframes to be of type vec4f.", name), nullptr);
+                return nullptr;
+            }
+
+            if (channel.interpolationType == EInterpolationType::Cubic || channel.interpolationType == EInterpolationType::Cubic_Quaternions)
+            {
+                if (!channel.tangentsIn || !channel.tangentsOut)
+                {
+                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': cubic interpolation requires tangents to be provided.", name), nullptr);
+                    return nullptr;
+                }
+                if (channel.tangentsIn->getDataType() != channel.keyframes->getDataType() ||
+                    channel.tangentsOut->getDataType() != channel.keyframes->getDataType())
+                {
+                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents must be of same data type as keyframes.", name), nullptr);
+                    return nullptr;
+                }
+                if (channel.tangentsIn->getNumElements() != channel.keyframes->getNumElements() ||
+                    channel.tangentsOut->getNumElements() != channel.keyframes->getNumElements())
+                {
+                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': number of tangents in/out must be same as number of keyframes.", name), nullptr);
+                    return nullptr;
+                }
+                if (!containsDataArray(channel.tangentsIn) ||
+                    !containsDataArray(channel.tangentsOut))
+                {
+                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were not found in this logic instance.", name), nullptr);
+                    return nullptr;
+                }
+            }
+            else if (channel.tangentsIn || channel.tangentsOut)
+            {
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were provided for other than cubic interpolation type.", name), nullptr);
+                return nullptr;
+            }
+        }
+
+        return m_apiObjects.createAnimationNode(channels, name);
+    }
+
+    bool LogicEngineImpl::destroy(LogicObject& object)
+    {
+        m_errors.clear();
+        return m_apiObjects.destroy(object, m_errors);
     }
 
     bool LogicEngineImpl::isLinked(const LogicNode& logicNode) const
@@ -116,7 +239,7 @@ namespace rlogic::internal
         const std::optional<NodeVector> sortedNodes = m_apiObjects.getLogicNodeDependencies().getTopologicallySortedNodes();
         if (!sortedNodes)
         {
-            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!");
+            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!", nullptr);
             return false;
         }
 
@@ -140,7 +263,7 @@ namespace rlogic::internal
             const std::optional<LogicNodeRuntimeError> potentialError = node.update();
             if (potentialError)
             {
-                m_errors.add(potentialError->message, *m_apiObjects.getApiObject(node));
+                m_errors.add(potentialError->message, m_apiObjects.getApiObject(node));
                 return false;
             }
         }
@@ -157,26 +280,6 @@ namespace rlogic::internal
         return m_errors.getErrors();
     }
 
-    bool LogicEngineImpl::checkLogicVersionFromFile(std::string_view dataSourceDescription, const rlogic_serialization::Version& fileVersion)
-    {
-        // We can remove this whole function once we don't support version 0.7.0 anymore and can rely on integers to check versions
-        static_assert(g_FileFormatVersion == 1u);
-
-        // Special case where file version is 0.7.x
-        // We check based on SemVer because file version was not exported yet
-        if (fileVersion.v_minor() == 7)
-        {
-            static_assert(g_FileFormatVersion == 1);
-            LOG_DEBUG("Loading file version exported with Logic Engine '{}' using runtime version '{}' in compatibility mode", fileVersion.v_string()->string_view(), g_PROJECT_VERSION);
-            return true;
-        }
-
-        m_errors.add(fmt::format("Version mismatch while loading {}! Expected version 0.7.x but found {}",
-            dataSourceDescription,
-            fileVersion.v_string()->string_view()));
-        return false;
-    }
-
     bool LogicEngineImpl::checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion)
     {
         // Backwards compatibility check
@@ -185,15 +288,15 @@ namespace rlogic::internal
             // TODO Violin write unit test for this case once we have a breaking change in the serialization format
             // Currently not possible because 1 is the first version and 0 has special semantic (== version not set)
             m_errors.add(fmt::format("Version of data source '{}' is too old! Expected file version {} but found {}",
-                dataSourceDescription, g_FileFormatVersion, fileVersion));
+                dataSourceDescription, g_FileFormatVersion, fileVersion), nullptr);
             return false;
         }
 
         // Forward compatibility check
         if (fileVersion > g_FileFormatVersion)
         {
-            m_errors.add(fmt::format("Version of data source '{}' is too new! Expected runtime version {} but loaded with {}",
-                dataSourceDescription, fileVersion, g_FileFormatVersion));
+            m_errors.add(fmt::format("Version of data source '{}' is too new! Expected file version {} but found {}",
+                dataSourceDescription, g_FileFormatVersion, fileVersion), nullptr);
             return false;
         }
 
@@ -216,7 +319,7 @@ namespace rlogic::internal
         std::optional<std::vector<char>> maybeBytesFromFile = FileUtils::LoadBinary(std::string(filename));
         if (!maybeBytesFromFile)
         {
-            m_errors.add(fmt::format("Failed to load file '{}'", filename));
+            m_errors.add(fmt::format("Failed to load file '{}'", filename), nullptr);
             return false;
         }
 
@@ -237,7 +340,7 @@ namespace rlogic::internal
 
             if (!bufferOK)
             {
-                m_errors.add(fmt::format("{} contains corrupted data!", dataSourceDescription));
+                m_errors.add(fmt::format("{} contains corrupted data!", dataSourceDescription), nullptr);
                 return false;
             }
         }
@@ -246,47 +349,36 @@ namespace rlogic::internal
 
         if (nullptr == logicEngine)
         {
-            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSourceDescription));
+            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSourceDescription), nullptr);
             return false;
         }
 
         const auto& ramsesVersion = *logicEngine->ramsesVersion();
+        const auto& rlogicVersion = *logicEngine->rlogicVersion();
+
+        LOG_INFO("Loading logic engine contents from '{}' which was exported with Ramses {} and Logic Engine {}", dataSourceDescription, ramsesVersion.v_string()->string_view(), rlogicVersion.v_string()->string_view());
+
         if (!CheckRamsesVersionFromFile(ramsesVersion))
         {
             m_errors.add(fmt::format("Version mismatch while loading {}! Expected Ramses version {}.x.x but found {}",
                 dataSourceDescription, ramses::GetRamsesVersion().major,
-                ramsesVersion.v_string()->string_view()));
+                ramsesVersion.v_string()->string_view()), nullptr);
             return false;
         }
 
-        const auto& rlogicVersion = *logicEngine->rlogicVersion();
-        // File version not set -> assume version 0.7.0 or older, use logic version to check
-        // TODO Violin remove this the next time we break serialization format (and make file version required)
-        if (0u == rlogicVersion.v_fileFormatVersion())
-        {
-            if(!checkLogicVersionFromFile(dataSourceDescription, rlogicVersion))
-            {
-                return false;
-            }
-        }
-        else
-        {
-            if (!checkLogicVersionFromFile(dataSourceDescription, rlogicVersion.v_fileFormatVersion()))
-            {
-                return false;
-            }
-        }
+        if (!checkLogicVersionFromFile(dataSourceDescription, logicEngine->rlogicVersion()->v_fileFormatVersion()))
+            return false;
 
         if (nullptr == logicEngine->apiObjects())
         {
-            m_errors.add(fmt::format("Fatal error while loading {}: doesn't contain API objects!", dataSourceDescription));
+            m_errors.add(fmt::format("Fatal error while loading {}: doesn't contain API objects!", dataSourceDescription), nullptr);
             return false;
         }
 
         RamsesObjectResolver ramsesResolver(m_errors, scene);
 
         // TODO Violin also use fresh Lua environment, so that we don't pollute current one when loading failed
-        std::optional<ApiObjects> deserializedObjects = ApiObjects::Deserialize(m_luaState, *logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
+        std::optional<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*m_luaState, *logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
 
         if (!deserializedObjects)
         {
@@ -305,14 +397,14 @@ namespace rlogic::internal
 
         if (!m_apiObjects.checkBindingsReferToSameRamsesScene(m_errors))
         {
-            m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!");
+            m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!", nullptr);
             return false;
         }
 
         // Refuse save() if logic graph has loops
         if (!m_apiObjects.getLogicNodeDependencies().getTopologicallySortedNodes())
         {
-            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!");
+            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!", nullptr);
             return false;
         }
 
@@ -347,7 +439,7 @@ namespace rlogic::internal
 
         if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
         {
-            m_errors.add(fmt::format("Failed to save content to path '{}'!", filename));
+            m_errors.add(fmt::format("Failed to save content to path '{}'!", filename), nullptr);
             return false;
         }
 
@@ -377,4 +469,13 @@ namespace rlogic::internal
     {
         return m_apiObjects;
     }
+
+    template DataArray* LogicEngineImpl::createDataArray<float>(const std::vector<float>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<vec2f>(const std::vector<vec2f>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<vec3f>(const std::vector<vec3f>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<vec4f>(const std::vector<vec4f>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<int32_t>(const std::vector<int32_t>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<vec2i>(const std::vector<vec2i>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<vec3i>(const std::vector<vec3i>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<vec4i>(const std::vector<vec4i>&, std::string_view name);
 }

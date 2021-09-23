@@ -74,8 +74,9 @@ namespace rlogic
     {
     public:
         explicit LogicNodeDummy(std::unique_ptr<internal::LogicNodeDummyImpl> impl)
-            : LogicNode(std::ref(static_cast<internal::LogicNodeImpl&>(*impl)))
-            , m_node(std::move(impl))
+            : LogicNode(std::move(impl))
+            /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) */
+            , m_node(static_cast<internal::LogicNodeDummyImpl&>(LogicNode::m_impl))
         {
         }
         static std::unique_ptr<LogicNodeDummy> Create(std::string_view name)
@@ -83,6 +84,6 @@ namespace rlogic
             return std::make_unique<LogicNodeDummy>(std::make_unique<internal::LogicNodeDummyImpl>(name));
         }
 
-        std::unique_ptr<internal::LogicNodeDummyImpl> m_node;
+        internal::LogicNodeDummyImpl& m_node;
     };
 }

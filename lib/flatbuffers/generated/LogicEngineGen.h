@@ -6,7 +6,9 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "AnimationNodeGen.h"
 #include "ApiObjectsGen.h"
+#include "DataArrayGen.h"
 #include "LinkGen.h"
 #include "LuaScriptGen.h"
 #include "PropertyGen.h"

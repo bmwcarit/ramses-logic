@@ -13,6 +13,12 @@
 namespace rlogic_serialization
 {
     struct Property;
+    struct DataArray;
+}
+
+namespace rlogic
+{
+    class DataArray;
 }
 
 namespace rlogic::internal
@@ -36,8 +42,22 @@ namespace rlogic::internal
             return *iter->second;
         }
 
+        void storeDataArray(const rlogic_serialization::DataArray& flatbufferObject, const DataArray& dataArray)
+        {
+            assert(m_dataArrays.count(&flatbufferObject) == 0 && "one time store only");
+            m_dataArrays.insert({ &flatbufferObject, &dataArray });
+        }
+
+        const DataArray& resolveDataArray(const rlogic_serialization::DataArray& flatbufferObject) const
+        {
+            const auto it = m_dataArrays.find(&flatbufferObject);
+            assert(it != m_dataArrays.cend());
+            return *it->second;
+        }
+
     private:
         std::unordered_map<const rlogic_serialization::Property*, PropertyImpl*> m_properties;
+        std::unordered_map<const rlogic_serialization::DataArray*, const DataArray*> m_dataArrays;
     };
 
 }

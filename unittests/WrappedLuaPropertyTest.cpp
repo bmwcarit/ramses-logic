@@ -390,6 +390,24 @@ namespace rlogic::internal
         }
     }
 
+    TEST_F(AWrappedLuaProperty_Assignment, OfVectorComponentsCausesError)
+    {
+        for (auto fieldType : std::vector<EPropertyType>{ EPropertyType::Vec2f, EPropertyType::Vec3f, EPropertyType::Vec4f, EPropertyType::Vec2i, EPropertyType::Vec3i, EPropertyType::Vec4i })
+        {
+            PropertyImpl root(HierarchicalTypeData{ TypeData("IN", EPropertyType::Struct), {MakeType("vec", fieldType)} }, EPropertySemantics::ScriptOutput);
+            WrappedLuaProperty wrapped(root);
+            m_sol["IN"] = std::ref(wrapped);
+
+            const sol::protected_function_result result = run_WithResult(R"(
+                IN.vec[1] = 1
+            )");
+
+            ASSERT_FALSE(result.valid());
+            const sol::error err = result;
+            EXPECT_THAT(err.what(), ::testing::HasSubstr(fmt::format("Error while writing to 'vec'. Can't assign individual components of vector types, must assign the whole vector")));
+        }
+    }
+
     // Can't be triggered from user code, this is purely internal unit test
     TEST_F(AWrappedLuaProperty_Assignment, OfUnexpectedUsertypeCausesError)
     {

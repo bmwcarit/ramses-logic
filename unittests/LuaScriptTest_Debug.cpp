@@ -53,7 +53,7 @@ namespace rlogic
                   "\t[C]: in ?\n"
                   "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");
         // nullptr because no LogicNode was created
-        EXPECT_EQ(nullptr, m_logicEngine.getErrors()[0].node);
+        EXPECT_EQ(nullptr, m_logicEngine.getErrors()[0].object);
     }
 
     TEST_F(ALuaScript_Debug, ProducesErrorWithFullStackTrace_WhenRuntimeErrors)
@@ -68,7 +68,7 @@ namespace rlogic
             "stack traceback:\n"
             "\t[C]: in ?\n"
             "\t[string \"errorscript\"]:5: in function <[string \"errorscript\"]:4>");
-        EXPECT_EQ(script, m_logicEngine.getErrors()[0].node);
+        EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
     TEST_F(ALuaScript_Debug, ErrorMessageContainsFilenameAndScriptnameWithSemicolonWhenBothAvailable)
@@ -163,6 +163,6 @@ namespace rlogic
         const auto& errors = m_logicEngine.getErrors();
         EXPECT_EQ(1u, errors.size());
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Called 'print' with wrong argument type 'number'. Only string is allowed"));
-        EXPECT_EQ(script, errors[0].node);
+        EXPECT_EQ(script, errors[0].object);
     }
 }

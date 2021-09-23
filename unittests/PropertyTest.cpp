@@ -64,20 +64,68 @@ namespace rlogic::internal
 
     TEST_F(AProperty, HasANameAfterCreation)
     {
-        Property desc(CreateProperty(MakeType("PropertyName", EPropertyType::Float), EPropertySemantics::ScriptInput, true));
-        EXPECT_EQ("PropertyName", desc.getName());
+        Property property(CreateProperty(MakeType("PropertyName", EPropertyType::Float), EPropertySemantics::ScriptInput, true));
+        EXPECT_EQ("PropertyName", property.getName());
     }
 
     TEST_F(AProperty, HasATypeAfterCreation)
     {
-        Property desc(CreateInputProperty(EPropertyType::Float));
-        EXPECT_EQ(EPropertyType::Float, desc.getType());
+        Property property(CreateInputProperty(EPropertyType::Float));
+        EXPECT_EQ(EPropertyType::Float, property.getType());
+    }
+
+    TEST_F(AProperty, IsNotLinkedAfterCreation)
+    {
+        Property property(CreateInputProperty(EPropertyType::Float));
+        EXPECT_FALSE(property.isLinked());
+    }
+
+    TEST_F(AProperty, CanBeSetToLinkedStatus)
+    {
+        Property property(CreateInputProperty(EPropertyType::Float));
+        ASSERT_FALSE(property.isLinked());
+        property.m_impl->setIsLinkedInput(true);
+        EXPECT_TRUE(property.isLinked());
+        property.m_impl->setIsLinkedInput(false);
+        EXPECT_FALSE(property.isLinked());
+    }
+
+    TEST_F(AProperty, OutputIsNeverLinked_CheckReportsError)
+    {
+        Property property(CreateProperty(MakeType("output", EPropertyType::Float), EPropertySemantics::ScriptOutput, true));
+
+        ELogMessageType logType(ELogMessageType::Info);
+        std::string logMessage;
+
+        ScopedLogContextLevel logCollector{ ELogMessageType::Error, [&](ELogMessageType type, std::string_view message)
+            {
+                logType = type;
+                logMessage = message;
+        }
+        };
+
+        EXPECT_FALSE(property.isLinked());
+        EXPECT_EQ(logType, ELogMessageType::Error);
+        EXPECT_EQ(logMessage, "Property 'output' is not an input! Call 'Property::isLinked' only with input properties!");
     }
 
     TEST_F(AProperty, CanBeInitializedWithAValue)
     {
         PropertyImpl property(MakeType("", EPropertyType::Float), EPropertySemantics::ScriptInput, PropertyValue{0.5f});
         EXPECT_FLOAT_EQ(0.5f, property.getValueAs<float>());
+    }
+
+    TEST_F(AProperty, CanCheckIfPropertyHasChild)
+    {
+        const Property propertyWithChildren(CreateProperty(MakeStruct("IN", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, false));
+        ASSERT_EQ(2u, propertyWithChildren.getChildCount());
+
+        EXPECT_FALSE(propertyWithChildren.hasChild("invalidChildName"));
+        EXPECT_EQ(nullptr, propertyWithChildren.getChild("invalidChildName"));
+        EXPECT_TRUE(propertyWithChildren.hasChild("child1"));
+        EXPECT_NE(nullptr, propertyWithChildren.getChild("child1"));
+        EXPECT_TRUE(propertyWithChildren.hasChild("child2"));
+        EXPECT_NE(nullptr, propertyWithChildren.getChild("child2"));
     }
 
     TEST_F(AProperty, BindingInputHasNoUserValueBeforeSetExplicitly)

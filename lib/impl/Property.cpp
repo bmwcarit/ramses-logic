@@ -8,6 +8,7 @@
 
 #include "ramses-logic/Property.h"
 #include "impl/PropertyImpl.h"
+#include "impl/LoggerImpl.h"
 
 namespace rlogic
 {
@@ -21,6 +22,10 @@ namespace rlogic
     size_t Property::getChildCount() const
     {
         return m_impl->getChildCount();
+    }
+
+    bool Property::hasChild(std::string_view name) const {
+        return m_impl->hasChild(name);
     }
 
     EPropertyType Property::getType() const
@@ -89,4 +94,17 @@ namespace rlogic
     template RLOGIC_API bool Property::setInternal<vec4i>(vec4i /*value*/);
     template RLOGIC_API bool Property::setInternal<std::string>(std::string /*value*/);
     template RLOGIC_API bool Property::setInternal<bool>(bool /*value*/);
+
+
+    bool Property::isLinked() const
+    {
+        if (!m_impl->isInput())
+        {
+            LOG_ERROR("Property '{}' is not an input! Call 'Property::isLinked' only with input properties!", m_impl->getName());
+            return false;
+        }
+
+        return m_impl->isLinkedInput();
+    }
+
 }

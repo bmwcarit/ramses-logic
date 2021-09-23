@@ -16,12 +16,16 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/DataArray.h"
+#include "ramses-logic/AnimationNode.h"
 
 #include "impl/PropertyImpl.h"
 #include "impl/LuaScriptImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
 #include "impl/RamsesCameraBindingImpl.h"
+#include "impl/DataArrayImpl.h"
+#include "impl/AnimationNodeImpl.h"
 
 #include "ramses-client-api/Node.h"
 #include "ramses-client-api/Appearance.h"
@@ -34,28 +38,27 @@
 #include "generated/RamsesCameraBindingGen.h"
 #include "generated/RamsesNodeBindingGen.h"
 #include "generated/LinkGen.h"
+#include "generated/DataArrayGen.h"
+#include "generated/AnimationNodeGen.h"
 
 #include "fmt/format.h"
 
 namespace rlogic::internal
 {
-    LuaScript* ApiObjects::createLuaScript(SolState& solState, std::string_view source, std::string_view filename, std::string_view scriptName, ErrorReporting& errorReporting)
-    {
-        std::optional<CompiledScript> compiledScript = LuaScriptImpl::Compile(solState, source, scriptName, filename, errorReporting);
-        if (compiledScript)
-        {
-            m_scripts.emplace_back(std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(*compiledScript))));
-            LuaScript* script = m_scripts.back().get();
-            registerLogicNode(*script);
-            return script;
-        }
+    ApiObjects::ApiObjects() = default;
+    ApiObjects::~ApiObjects() noexcept = default;
 
-        return nullptr;
+    LuaScript* ApiObjects::createLuaScript(LuaCompiledScript compiledScript, std::string_view name)
+    {
+        m_scripts.emplace_back(std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(compiledScript), name)));
+        LuaScript* script = m_scripts.back().get();
+        registerLogicNode(*script);
+        return script;
     }
 
-    RamsesNodeBinding* ApiObjects::createRamsesNodeBinding(ramses::Node& ramsesNode, std::string_view name)
+    RamsesNodeBinding* ApiObjects::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
     {
-        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(ramsesNode, name)));
+        m_ramsesNodeBindings.emplace_back(std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(ramsesNode, rotationType, name)));
         RamsesNodeBinding* binding = m_ramsesNodeBindings.back().get();
         registerLogicNode(*binding);
         return binding;
@@ -77,9 +80,28 @@ namespace rlogic::internal
         return binding;
     }
 
+    template <typename T>
+    DataArray* ApiObjects::createDataArray(const std::vector<T>& data, std::string_view name)
+    {
+        static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
+        // make copy of users data and move into data array
+        std::vector<T> dataCopy = data;
+        auto impl = std::make_unique<DataArrayImpl>(std::move(dataCopy), name);
+        m_dataArrays.push_back(std::make_unique<DataArray>(std::move(impl)));
+        return m_dataArrays.back().get();
+    }
+
+    AnimationNode* ApiObjects::createAnimationNode(const AnimationChannels& channels, std::string_view name)
+    {
+        m_animationNodes.push_back(std::make_unique<AnimationNode>(std::make_unique<AnimationNodeImpl>(channels, name)));
+        auto* animation = m_animationNodes.back().get();
+        registerLogicNode(*animation);
+        return animation;
+    }
+
     void ApiObjects::registerLogicNode(LogicNode& logicNode)
     {
-        m_reverseImplMapping.emplace(std::make_pair(&logicNode.m_impl.get(), &logicNode));
+        m_reverseImplMapping.emplace(std::make_pair(&logicNode.m_impl, &logicNode));
         m_logicNodeDependencies.addNode(logicNode.m_impl);
     }
 
@@ -93,43 +115,64 @@ namespace rlogic::internal
         m_logicNodeDependencies.removeNode(logicNodeImpl);
     }
 
-    bool ApiObjects::destroy(LogicNode& logicNode, ErrorReporting& errorReporting)
+    bool ApiObjects::destroy(LogicObject& object, ErrorReporting& errorReporting)
     {
-        {
-            auto luaScript = dynamic_cast<LuaScript*>(&logicNode);
-            if (nullptr != luaScript)
-            {
-                return destroyInternal(*luaScript, errorReporting);
-            }
-        }
+        auto luaScript = dynamic_cast<LuaScript*>(&object);
+        if (luaScript)
+            return destroyInternal(*luaScript, errorReporting);
 
-        {
-            auto ramsesNodeBinding = dynamic_cast<RamsesNodeBinding*>(&logicNode);
-            if (nullptr != ramsesNodeBinding)
-            {
-                return destroyInternal(*ramsesNodeBinding, errorReporting);
-            }
-        }
+        auto ramsesNodeBinding = dynamic_cast<RamsesNodeBinding*>(&object);
+        if (ramsesNodeBinding)
+            return destroyInternal(*ramsesNodeBinding, errorReporting);
 
-        {
-            auto ramsesAppearanceBinding = dynamic_cast<RamsesAppearanceBinding*>(&logicNode);
-            if (nullptr != ramsesAppearanceBinding)
-            {
-                return destroyInternal(*ramsesAppearanceBinding, errorReporting);
-            }
-        }
+        auto ramsesAppearanceBinding = dynamic_cast<RamsesAppearanceBinding*>(&object);
+        if (ramsesAppearanceBinding)
+            return destroyInternal(*ramsesAppearanceBinding, errorReporting);
 
+        auto ramsesCameraBinding = dynamic_cast<RamsesCameraBinding*>(&object);
+        if (ramsesCameraBinding)
+            return destroyInternal(*ramsesCameraBinding, errorReporting);
 
-        {
-            auto ramsesCameraBinding = dynamic_cast<RamsesCameraBinding*>(&logicNode);
-            if (nullptr != ramsesCameraBinding)
-            {
-                return destroyInternal(*ramsesCameraBinding, errorReporting);
-            }
-        }
+        auto animNode = dynamic_cast<AnimationNode*>(&object);
+        if (animNode)
+            return destroyInternal(*animNode, errorReporting);
 
-        errorReporting.add(fmt::format("Tried to destroy object '{}' with unknown type", logicNode.getName()), logicNode);
+        auto dataArray = dynamic_cast<DataArray*>(&object);
+        if (dataArray)
+            return destroyInternal(*dataArray, errorReporting);
+
+        errorReporting.add(fmt::format("Tried to destroy object '{}' with unknown type", object.getName()), &object);
+
         return false;
+    }
+
+    bool ApiObjects::destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting)
+    {
+        const auto it = std::find_if(m_dataArrays.cbegin(), m_dataArrays.cend(), [&](const auto& d) {
+            return d.get() == &dataArray;
+        });
+        if (it == m_dataArrays.cend())
+        {
+            errorReporting.add("Can't find data array in logic engine!", &dataArray);
+            return false;
+        }
+        for (const auto& animNode : m_animationNodes)
+        {
+            for (const auto& channel : animNode->getChannels())
+            {
+                if (channel.timeStamps == &dataArray ||
+                    channel.keyframes == &dataArray ||
+                    channel.tangentsIn == &dataArray ||
+                    channel.tangentsOut == &dataArray)
+                {
+                    errorReporting.add(fmt::format("Failed to destroy data array '{}', it is used in animation node '{}' channel '{}'", dataArray.getName(), animNode->getName(), channel.name), &dataArray);
+                    return false;
+                }
+            }
+        }
+
+        m_dataArrays.erase(it);
+        return true;
     }
 
     bool ApiObjects::destroyInternal(LuaScript& luaScript, ErrorReporting& errorReporting)
@@ -139,11 +182,11 @@ namespace rlogic::internal
             });
         if (scriptIter == m_scripts.end())
         {
-            errorReporting.add("Can't find script in logic engine!");
+            errorReporting.add("Can't find script in logic engine!", &luaScript);
             return false;
         }
 
-        auto implIter = m_reverseImplMapping.find(&luaScript.m_impl.get());
+        auto implIter = m_reverseImplMapping.find(&luaScript.m_impl);
         assert(implIter != m_reverseImplMapping.end());
         m_reverseImplMapping.erase(implIter);
 
@@ -161,7 +204,7 @@ namespace rlogic::internal
 
         if (nodeIter == m_ramsesNodeBindings.end())
         {
-            errorReporting.add("Can't find RamsesNodeBinding in logic engine!");
+            errorReporting.add("Can't find RamsesNodeBinding in logic engine!", &ramsesNodeBinding);
             return false;
         }
 
@@ -179,7 +222,7 @@ namespace rlogic::internal
 
         if (appearanceIter == m_ramsesAppearanceBindings.end())
         {
-            errorReporting.add("Can't find RamsesAppearanceBinding in logic engine!");
+            errorReporting.add("Can't find RamsesAppearanceBinding in logic engine!", &ramsesAppearanceBinding);
             return false;
         }
 
@@ -197,12 +240,30 @@ namespace rlogic::internal
 
         if (cameraIter == m_ramsesCameraBindings.end())
         {
-            errorReporting.add("Can't find RamsesCameraBinding in logic engine!");
+            errorReporting.add("Can't find RamsesCameraBinding in logic engine!", &ramsesCameraBinding);
             return false;
         }
 
         unregisterLogicNode(ramsesCameraBinding);
         m_ramsesCameraBindings.erase(cameraIter);
+
+        return true;
+    }
+
+    bool ApiObjects::destroyInternal(AnimationNode& node, ErrorReporting& errorReporting)
+    {
+        auto nodeIt = find_if(m_animationNodes.begin(), m_animationNodes.end(), [&](const auto& n) {
+            return n.get() == &node;
+        });
+
+        if (nodeIt == m_animationNodes.end())
+        {
+            errorReporting.add("Can't find AnimationNode in logic engine!", &node);
+            return false;
+        }
+
+        unregisterLogicNode(node);
+        m_animationNodes.erase(nodeIt);
 
         return true;
     }
@@ -214,7 +275,7 @@ namespace rlogic::internal
 
         for (const auto& binding : m_ramsesNodeBindings)
         {
-            const ramses::Node& node = binding->m_nodeBinding->getRamsesNode();
+            const ramses::Node& node = binding->m_nodeBinding.getRamsesNode();
             const ramses::sceneId_t nodeSceneId = node.getSceneId();
             if (!sceneId)
             {
@@ -224,14 +285,14 @@ namespace rlogic::internal
             if (*sceneId != nodeSceneId)
             {
                 errorReporting.add(fmt::format("Ramses node '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                    node.getName(), nodeSceneId.getValue(), sceneId->getValue()), *binding);
+                    node.getName(), nodeSceneId.getValue(), sceneId->getValue()), binding.get());
                 return false;
             }
         }
 
         for (const auto& binding : m_ramsesAppearanceBindings)
         {
-            const ramses::Appearance& appearance = binding->m_appearanceBinding->getRamsesAppearance();
+            const ramses::Appearance& appearance = binding->m_appearanceBinding.getRamsesAppearance();
             const ramses::sceneId_t appearanceSceneId = appearance.getSceneId();
             if (!sceneId)
             {
@@ -241,14 +302,14 @@ namespace rlogic::internal
             if (*sceneId != appearanceSceneId)
             {
                 errorReporting.add(fmt::format("Ramses appearance '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                    appearance.getName(), appearanceSceneId.getValue(), sceneId->getValue()), *binding);
+                    appearance.getName(), appearanceSceneId.getValue(), sceneId->getValue()), binding.get());
                 return false;
             }
         }
 
         for (const auto& binding : m_ramsesCameraBindings)
         {
-            const ramses::Camera& camera = binding->m_cameraBinding->getRamsesCamera();
+            const ramses::Camera& camera = binding->m_cameraBinding.getRamsesCamera();
             const ramses::sceneId_t cameraSceneId = camera.getSceneId();
             if (!sceneId)
             {
@@ -258,7 +319,7 @@ namespace rlogic::internal
             if (*sceneId != cameraSceneId)
             {
                 errorReporting.add(fmt::format("Ramses camera '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                    camera.getName(), cameraSceneId.getValue(), sceneId->getValue()), *binding);
+                    camera.getName(), cameraSceneId.getValue(), sceneId->getValue()), binding.get());
                 return false;
             }
         }
@@ -306,6 +367,26 @@ namespace rlogic::internal
         return m_ramsesCameraBindings;
     }
 
+    DataArrayContainer& ApiObjects::getDataArrays()
+    {
+        return m_dataArrays;
+    }
+
+    const DataArrayContainer& ApiObjects::getDataArrays() const
+    {
+        return m_dataArrays;
+    }
+
+    AnimationNodesContainer& ApiObjects::getAnimationNodes()
+    {
+        return m_animationNodes;
+    }
+
+    const AnimationNodesContainer& ApiObjects::getAnimationNodes() const
+    {
+        return m_animationNodes;
+    }
+
     LogicNodeDependencies& ApiObjects::getLogicNodeDependencies()
     {
         return m_logicNodeDependencies;
@@ -334,47 +415,56 @@ namespace rlogic::internal
 
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> luascripts;
         luascripts.reserve(apiObjects.m_scripts.size());
-
         std::transform(apiObjects.m_scripts.begin(), apiObjects.m_scripts.end(), std::back_inserter(luascripts),
             [&builder, &serializationMap](const std::vector<std::unique_ptr<LuaScript>>::value_type& it) {
-                return LuaScriptImpl::Serialize(*it->m_script, builder, serializationMap);
+                return LuaScriptImpl::Serialize(it->m_script, builder, serializationMap);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> ramsesnodebindings;
         ramsesnodebindings.reserve(apiObjects.m_ramsesNodeBindings.size());
-
         std::transform(apiObjects.m_ramsesNodeBindings.begin(),
             apiObjects.m_ramsesNodeBindings.end(),
             std::back_inserter(ramsesnodebindings),
             [&builder, &serializationMap](const std::vector<std::unique_ptr<RamsesNodeBinding>>::value_type& it) {
-                return RamsesNodeBindingImpl::Serialize(*it->m_nodeBinding, builder, serializationMap);
+                return RamsesNodeBindingImpl::Serialize(it->m_nodeBinding, builder, serializationMap);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> ramsesappearancebindings;
         ramsesappearancebindings.reserve(apiObjects.m_ramsesAppearanceBindings.size());
-
         std::transform(apiObjects.m_ramsesAppearanceBindings.begin(),
             apiObjects.m_ramsesAppearanceBindings.end(),
             std::back_inserter(ramsesappearancebindings),
             [&builder, &serializationMap](const std::vector<std::unique_ptr<RamsesAppearanceBinding>>::value_type& it) {
-                return RamsesAppearanceBindingImpl::Serialize(*it->m_appearanceBinding, builder, serializationMap);
+                return RamsesAppearanceBindingImpl::Serialize(it->m_appearanceBinding, builder, serializationMap);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> ramsescamerabindings;
         ramsescamerabindings.reserve(apiObjects.m_ramsesCameraBindings.size());
-
         std::transform(apiObjects.m_ramsesCameraBindings.begin(),
             apiObjects.m_ramsesCameraBindings.end(),
             std::back_inserter(ramsescamerabindings),
             [&builder, &serializationMap](const std::vector<std::unique_ptr<RamsesCameraBinding>>::value_type& it) {
-                return RamsesCameraBindingImpl::Serialize(*it->m_cameraBinding, builder, serializationMap);
+                return RamsesCameraBindingImpl::Serialize(it->m_cameraBinding, builder, serializationMap);
             });
 
-        const LinksMap& allLinks = apiObjects.m_logicNodeDependencies.getLinks();
+        std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>> dataArrays;
+        dataArrays.reserve(apiObjects.m_dataArrays.size());
+        for (const auto& da : apiObjects.m_dataArrays)
+        {
+            dataArrays.push_back(DataArrayImpl::Serialize(da->m_impl, builder));
+            serializationMap.storeDataArray(*da, dataArrays.back());
+        }
 
+        // animation nodes must go after data arrays because they reference them
+        std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>> animationNodes;
+        animationNodes.reserve(apiObjects.m_animationNodes.size());
+        for (const auto& animNode : apiObjects.m_animationNodes)
+            animationNodes.push_back(AnimationNodeImpl::Serialize(animNode->m_animationNodeImpl, builder, serializationMap));
+
+        // links must go last due to dependency on serialized properties
+        const LinksMap& allLinks = apiObjects.m_logicNodeDependencies.getLinks();
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
         links.reserve(allLinks.size());
-
         for (const auto& link : allLinks)
         {
             links.emplace_back(rlogic_serialization::CreateLink(builder,
@@ -388,6 +478,8 @@ namespace rlogic::internal
             builder.CreateVector(ramsesnodebindings),
             builder.CreateVector(ramsesappearancebindings),
             builder.CreateVector(ramsescamerabindings),
+            builder.CreateVector(dataArrays),
+            builder.CreateVector(animationNodes),
             builder.CreateVector(links)
         );
 
@@ -411,37 +503,48 @@ namespace rlogic::internal
 
         if (!apiObjects.luaScripts())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing scripts container!");
+            errorReporting.add("Fatal error during loading from serialized data: missing scripts container!", nullptr);
             return std::nullopt;
         }
 
         if (!apiObjects.nodeBindings())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing node bindings container!");
+            errorReporting.add("Fatal error during loading from serialized data: missing node bindings container!", nullptr);
             return std::nullopt;
         }
 
         if (!apiObjects.appearanceBindings())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing appearance bindings container!");
+            errorReporting.add("Fatal error during loading from serialized data: missing appearance bindings container!", nullptr);
             return std::nullopt;
         }
 
         if (!apiObjects.cameraBindings())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing camera bindings container!");
+            errorReporting.add("Fatal error during loading from serialized data: missing camera bindings container!", nullptr);
             return std::nullopt;
         }
 
         if (!apiObjects.links())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing links container!");
+            errorReporting.add("Fatal error during loading from serialized data: missing links container!", nullptr);
+            return std::nullopt;
+        }
+
+        if (!apiObjects.dataArrays())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing data arrays container!", nullptr);
+            return std::nullopt;
+        }
+
+        if (!apiObjects.animationNodes())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing animation nodes container!", nullptr);
             return std::nullopt;
         }
 
         const auto& luascripts = *apiObjects.luaScripts();
         deserialized.m_scripts.reserve(luascripts.size());
-
         for (const auto* script : luascripts)
         {
             // TODO Violin find ways to unit-test this case - also for other container types
@@ -461,9 +564,7 @@ namespace rlogic::internal
         }
 
         const auto& ramsesNodeBindings = *apiObjects.nodeBindings();
-
         deserialized.m_ramsesNodeBindings.reserve(ramsesNodeBindings.size());
-
         for (const auto* binding : ramsesNodeBindings)
         {
             assert (binding);
@@ -481,9 +582,7 @@ namespace rlogic::internal
         }
 
         const auto& ramsesAppearanceBindings = *apiObjects.appearanceBindings();
-
         deserialized.m_ramsesAppearanceBindings.reserve(ramsesAppearanceBindings.size());
-
         for (const auto* binding : ramsesAppearanceBindings)
         {
             assert(binding);
@@ -501,9 +600,7 @@ namespace rlogic::internal
         }
 
         const auto& ramsesCameraBindings = *apiObjects.cameraBindings();
-
         deserialized.m_ramsesCameraBindings.reserve(ramsesCameraBindings.size());
-
         for (const auto* binding : ramsesCameraBindings)
         {
             assert(binding);
@@ -520,8 +617,35 @@ namespace rlogic::internal
             }
         }
 
-        const auto& links = *apiObjects.links();
+        const auto& dataArrays = *apiObjects.dataArrays();
+        deserialized.m_dataArrays.reserve(dataArrays.size());
+        for (const auto* fbData : dataArrays)
+        {
+            assert(fbData);
+            auto deserializedDataArray = DataArrayImpl::Deserialize(*fbData, errorReporting);
+            if (!deserializedDataArray)
+                return std::nullopt;
 
+            deserialized.m_dataArrays.push_back(std::make_unique<DataArray>(std::move(deserializedDataArray)));
+            deserializationMap.storeDataArray(*fbData, *deserialized.m_dataArrays.back());
+        }
+
+        // animation nodes must go after data arrays because they need to resolve references
+        const auto& animNodes = *apiObjects.animationNodes();
+        deserialized.m_animationNodes.reserve(animNodes.size());
+        for (const auto* fbData : animNodes)
+        {
+            assert(fbData);
+            auto deserializedAnimNode = AnimationNodeImpl::Deserialize(*fbData, errorReporting, deserializationMap);
+            if (!deserializedAnimNode)
+                return std::nullopt;
+
+            deserialized.m_animationNodes.push_back(std::make_unique<AnimationNode>(std::move(deserializedAnimNode)));
+            deserialized.registerLogicNode(*deserialized.m_animationNodes.back());
+        }
+
+        // links must go last due to dependency on deserialized properties
+        const auto& links = *apiObjects.links();
         // TODO Violin move this code (serialization parts too) to LogicNodeDependencies
         for (const auto* rLink : links)
         {
@@ -529,13 +653,13 @@ namespace rlogic::internal
 
             if (!rLink->sourceProperty())
             {
-                errorReporting.add("Fatal error during loading from serialized data: missing link source property!");
+                errorReporting.add("Fatal error during loading from serialized data: missing link source property!", nullptr);
                 return std::nullopt;
             }
 
             if (!rLink->targetProperty())
             {
-                errorReporting.add("Fatal error during loading from serialized data: missing link target property!");
+                errorReporting.add("Fatal error during loading from serialized data: missing link target property!", nullptr);
                 return std::nullopt;
             }
 
@@ -556,7 +680,7 @@ namespace rlogic::internal
                         dataSourceDescription,
                         sourceProp->name()->string_view(),
                         targetProp->name()->string_view()
-                    ));
+                    ), nullptr);
                 return std::nullopt;
             }
         }
@@ -569,15 +693,24 @@ namespace rlogic::internal
     {
         // TODO Violin improve internal management of logic nodes so that we don't have to loop over three
         // different containers below which all call a method on LogicNode
-        return std::any_of(m_scripts.cbegin(), m_scripts.cend(), [](const auto& s) { return s->m_impl.get().isDirty(); })
+        return std::any_of(m_scripts.cbegin(), m_scripts.cend(), [](const auto& s) { return s->m_impl.isDirty(); })
             || bindingsDirty();
     }
 
     bool ApiObjects::bindingsDirty() const
     {
         return
-            std::any_of(m_ramsesNodeBindings.cbegin(), m_ramsesNodeBindings.cend(), [](const auto& b) { return b->m_impl.get().isDirty(); }) ||
-            std::any_of(m_ramsesAppearanceBindings.cbegin(), m_ramsesAppearanceBindings.cend(), [](const auto& b) { return b->m_impl.get().isDirty(); }) ||
-            std::any_of(m_ramsesCameraBindings.cbegin(), m_ramsesCameraBindings.cend(), [](const auto& b) { return b->m_impl.get().isDirty(); });
+            std::any_of(m_ramsesNodeBindings.cbegin(), m_ramsesNodeBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
+            std::any_of(m_ramsesAppearanceBindings.cbegin(), m_ramsesAppearanceBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
+            std::any_of(m_ramsesCameraBindings.cbegin(), m_ramsesCameraBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); });
     }
+
+    template DataArray* ApiObjects::createDataArray<float>(const std::vector<float>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<vec2f>(const std::vector<vec2f>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<vec3f>(const std::vector<vec3f>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<vec4f>(const std::vector<vec4f>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<int32_t>(const std::vector<int32_t>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<vec2i>(const std::vector<vec2i>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<vec3i>(const std::vector<vec3i>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<vec4i>(const std::vector<vec4i>&, std::string_view);
 }

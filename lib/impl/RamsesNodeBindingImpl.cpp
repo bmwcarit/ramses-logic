@@ -7,7 +7,9 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/RamsesNodeBindingImpl.h"
+
 #include "impl/PropertyImpl.h"
+#include "impl/LoggerImpl.h"
 
 #include "ramses-logic/Property.h"
 
@@ -16,17 +18,19 @@
 #include "generated/RamsesNodeBindingGen.h"
 #include "internals/ErrorReporting.h"
 #include "internals/IRamsesObjectResolver.h"
+#include "internals/RotationUtils.h"
 
 namespace rlogic::internal
 {
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, std::string_view name)
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
         : RamsesBindingImpl(name)
         , m_ramsesNode(ramsesNode)
+        , m_rotationType(rotationType)
     {
         // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
         auto inputsType = MakeStruct("IN", {
                 TypeData{"visibility", EPropertyType::Bool},
-                TypeData{"rotation", EPropertyType::Vec3f},
+                TypeData{"rotation", rotationType == ERotationType::Quaternion ? EPropertyType::Vec4f : EPropertyType::Vec3f},
                 TypeData{"translation", EPropertyType::Vec3f},
                 TypeData{"scaling", EPropertyType::Vec3f},
             });
@@ -52,7 +56,8 @@ namespace rlogic::internal
         builder.Finish(ramsesBinding);
 
         auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
-            ramsesBinding
+            ramsesBinding,
+            static_cast<uint8_t>(nodeBinding.m_rotationType)
         );
         builder.Finish(ramsesNodeBinding);
 
@@ -67,14 +72,14 @@ namespace rlogic::internal
     {
         if (!nodeBinding.base())
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing base class info!");
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing base class info!", nullptr);
             return nullptr;
         }
 
         // TODO Violin make optional - no need to always serialize string if not used
         if (!nodeBinding.base()->name())
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing name!");
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing name!", nullptr);
             return nullptr;
         }
 
@@ -82,7 +87,7 @@ namespace rlogic::internal
 
         if (!nodeBinding.base()->rootInput())
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing root input!");
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing root input!", nullptr);
             return nullptr;
         }
 
@@ -96,14 +101,14 @@ namespace rlogic::internal
         // TODO Violin don't serialize these inputs -> get rid of the check
         if (deserializedRootInput->getName() != "IN" || deserializedRootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: root input has unexpected name or type!");
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: root input has unexpected name or type!", nullptr);
             return nullptr;
         }
 
         const auto* boundObject = nodeBinding.base()->boundRamsesObject();
         if (!boundObject)
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing ramses object reference!");
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing ramses object reference!", nullptr);
             return nullptr;
         }
 
@@ -118,11 +123,13 @@ namespace rlogic::internal
 
         if (ramsesNode->getType() != static_cast<int>(boundObject->objectType()))
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: loaded node type does not match referenced node type!");
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: loaded node type does not match referenced node type!", nullptr);
             return nullptr;
         }
 
-        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, name);
+        const auto rotationType (static_cast<ERotationType>(nodeBinding.rotationType()));
+
+        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name);
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         ApplyRamsesValuesToInputProperties(*binding, *ramsesNode);
@@ -155,8 +162,17 @@ namespace rlogic::internal
         PropertyImpl& rotation = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl;
         if (rotation.checkForBindingInputNewValueAndReset())
         {
-            const auto& value = rotation.getValueAs<vec3f>();
-            status = m_ramsesNode.get().setRotation(value[0], value[1], value[2], m_rotationConvention);
+            if (m_rotationType == ERotationType::Quaternion)
+            {
+                const auto& valuesQuat = rotation.getValueAs<vec4f>();
+                const vec3f eulerXYZ = RotationUtils::QuaternionToEulerXYZDegrees(valuesQuat);
+                status = m_ramsesNode.get().setRotation(eulerXYZ[0], eulerXYZ[1], eulerXYZ[2], ramses::ERotationConvention::ZYX);
+            }
+            else
+            {
+                const auto& valuesEuler = rotation.getValueAs<vec3f>();
+                status = m_ramsesNode.get().setRotation(valuesEuler[0], valuesEuler[1], valuesEuler[2], *RotationUtils::RotationTypeToRamsesRotationConvention(m_rotationType));
+            }
 
             if (status != ramses::StatusOK)
             {
@@ -196,15 +212,9 @@ namespace rlogic::internal
         return m_ramsesNode;
     }
 
-    bool RamsesNodeBindingImpl::setRotationConvention(ramses::ERotationConvention rotationConvention)
+    ERotationType RamsesNodeBindingImpl::getRotationType() const
     {
-        m_rotationConvention = rotationConvention;
-        return true;
-    }
-
-    ramses::ERotationConvention RamsesNodeBindingImpl::getRotationConvention() const
-    {
-        return m_rotationConvention;
+        return m_rotationType;
     }
 
     // Overwrites binding value cache silently (without triggering dirty check) - this code is only executed at initialization,
@@ -214,10 +224,6 @@ namespace rlogic::internal
         const bool visible = (ramsesNode.getVisibility() == ramses::EVisibilityMode::Visible);
         binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->setValue( PropertyValue{ visible }, false);
 
-        vec3f rotationValue;
-        ramsesNode.getRotation(rotationValue[0], rotationValue[1], rotationValue[2], binding.m_rotationConvention);
-        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->setValue( PropertyValue{ rotationValue }, false);
-
         vec3f translationValue;
         ramsesNode.getTranslation(translationValue[0], translationValue[1], translationValue[2]);
         binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl->setValue( PropertyValue{ translationValue }, false);
@@ -226,6 +232,25 @@ namespace rlogic::internal
         ramsesNode.getScaling(scalingValue[0], scalingValue[1], scalingValue[2]);
         binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->setValue( PropertyValue{ scalingValue }, false);
 
+        if (binding.m_rotationType == ERotationType::Quaternion)
+        {
+            binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->setValue(vec4f{0.f, 0.f, 0.f, 1.f}, false);
+        }
+        else
+        {
+            vec3f rotationValue;
+            ramses::ERotationConvention rotationConvention;
+            ramsesNode.getRotation(rotationValue[0], rotationValue[1], rotationValue[2], rotationConvention);
 
+            std::optional<ERotationType> convertedType = RotationUtils::RamsesRotationConventionToRotationType(rotationConvention);
+            if (!convertedType || binding.m_rotationType != *convertedType)
+            {
+                LOG_WARN("Initial rotation values for RamsesNodeBinding '{}' will not be imported from bound Ramses node due to mismatching rotation type.", binding.getName());
+            }
+            else
+            {
+                binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->setValue(PropertyValue{ rotationValue }, false);
+            }
+        }
     }
 }

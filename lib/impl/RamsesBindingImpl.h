@@ -31,19 +31,10 @@ namespace rlogic::internal
     class RamsesBindingImpl : public LogicNodeImpl
     {
     public:
-        // This is a base class, only deleted functions are public
-        RamsesBindingImpl(const RamsesBindingImpl& other) = delete;
-        RamsesBindingImpl& operator=(const RamsesBindingImpl& other) = delete;
-    protected:
-        // Move-able (noexcept); Not copy-able
         explicit RamsesBindingImpl(std::string_view name) noexcept;
-        ~RamsesBindingImpl() noexcept override                           = default;
-        RamsesBindingImpl(RamsesBindingImpl&& other) noexcept            = default;
-        RamsesBindingImpl& operator=(RamsesBindingImpl&& other) noexcept = default;
 
+    protected:
         // Used by subclasses to handle serialization
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesReference> SerializeRamsesReference(const ramses::SceneObject& object, flatbuffers::FlatBufferBuilder& builder);
-
-        // TODO Violin consider moving pointer(s) to ramses objects here and add templated getters for subclasses
     };
 }

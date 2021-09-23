@@ -26,6 +26,27 @@ namespace rlogic
         WithTempDirectory tempFolder;
     };
 
+    TEST_F(ALogicEngine_Factory, ProducesErrorWhenCreatingEmptyScript)
+    {
+        const LuaScript* script = m_logicEngine.createLuaScriptFromSource("", "");
+        ASSERT_EQ(nullptr, script);
+        EXPECT_FALSE(m_logicEngine.getErrors().empty());
+    }
+
+    TEST_F(ALogicEngine_Factory, CreatesScriptFromValidLuaWithoutErrors)
+    {
+        const LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "");
+        ASSERT_TRUE(nullptr != script);
+        EXPECT_TRUE(m_logicEngine.getErrors().empty());
+    }
+
+    TEST_F(ALogicEngine_Factory, DestroysScriptWithoutErrors)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "");
+        ASSERT_TRUE(script);
+        ASSERT_TRUE(m_logicEngine.destroy(*script));
+    }
+
     TEST_F(ALogicEngine_Factory, FailsToCreateScriptFromFile_WhenFileDoesNotExist)
     {
         auto script = m_logicEngine.createLuaScriptFromFile("somefile.txt");
@@ -73,7 +94,7 @@ namespace rlogic
     {
         LogicEngine otherLogicEngine;
 
-        auto ramsesNodeBinding = otherLogicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto ramsesNodeBinding = otherLogicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         ASSERT_TRUE(ramsesNodeBinding);
         ASSERT_FALSE(m_logicEngine.destroy(*ramsesNodeBinding));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -110,7 +131,7 @@ namespace rlogic
     TEST_F(ALogicEngine_Factory, RenamesObjectsAfterCreation)
     {
         auto script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "");
-        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, "NodeBinding");
+        auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         auto ramsesAppearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
         auto ramsesCameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
 
@@ -139,18 +160,42 @@ namespace rlogic
 
         struct UnknownObject : LogicNode
         {
-            explicit UnknownObject(UnknownObjectImpl& impl)
-                : LogicNode(impl)
+            explicit UnknownObject(std::unique_ptr<UnknownObjectImpl> impl)
+                : LogicNode(std::move(impl))
             {
             }
         };
 
-        UnknownObjectImpl unknownObjectImpl;
-        UnknownObject     unknownObject(unknownObjectImpl);
+        UnknownObject     unknownObject(std::make_unique<UnknownObjectImpl>());
         EXPECT_FALSE(m_logicEngine.destroy(unknownObject));
         const auto& errors = m_logicEngine.getErrors();
         EXPECT_EQ(1u, errors.size());
         EXPECT_EQ(errors[0].message, "Tried to destroy object 'name' with unknown type");
-        EXPECT_EQ(errors[0].node, &unknownObject);
+    }
+
+    TEST_F(ALogicEngine_Factory, CanBeMoved)
+    {
+        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "Script");
+        RamsesNodeBinding* ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
+        RamsesAppearanceBinding* appBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
+        RamsesCameraBinding* camBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
+
+        LogicEngine movedLogicEngine(std::move(m_logicEngine));
+        EXPECT_EQ(script, movedLogicEngine.findScript("Script"));
+        EXPECT_EQ(ramsesNodeBinding, movedLogicEngine.findNodeBinding("NodeBinding"));
+        EXPECT_EQ(appBinding, movedLogicEngine.findAppearanceBinding("AppearanceBinding"));
+        EXPECT_EQ(camBinding, movedLogicEngine.findCameraBinding("CameraBinding"));
+
+        movedLogicEngine.update();
+
+        LogicEngine moveAssignedLogicEngine;
+        moveAssignedLogicEngine = std::move(movedLogicEngine);
+
+        EXPECT_EQ(script, moveAssignedLogicEngine.findScript("Script"));
+        EXPECT_EQ(ramsesNodeBinding, moveAssignedLogicEngine.findNodeBinding("NodeBinding"));
+        EXPECT_EQ(appBinding, moveAssignedLogicEngine.findAppearanceBinding("AppearanceBinding"));
+        EXPECT_EQ(camBinding, moveAssignedLogicEngine.findCameraBinding("CameraBinding"));
+
+        moveAssignedLogicEngine.update();
     }
 }

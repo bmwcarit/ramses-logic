@@ -9,6 +9,8 @@
 #pragma once
 
 #include "impl/RamsesBindingImpl.h"
+#include "ramses-logic/ERotationType.h"
+#include "ramses-logic/EPropertyType.h"
 #include "internals/SerializationMap.h"
 #include "internals/DeserializationMap.h"
 #include "ramses-client-api/ERotationConvention.h"
@@ -49,11 +51,9 @@ namespace rlogic::internal
     {
     public:
         // Move-able (noexcept); Not copy-able
-        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, std::string_view name);
+        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
         ~RamsesNodeBindingImpl() noexcept override = default;
-        RamsesNodeBindingImpl(RamsesNodeBindingImpl&& other) noexcept = default;
-        RamsesNodeBindingImpl& operator=(RamsesNodeBindingImpl&& other) noexcept = default;
-        RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other)                = delete;
+        RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other) = delete;
         RamsesNodeBindingImpl& operator=(const RamsesNodeBindingImpl& other) = delete;
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> Serialize(
@@ -69,16 +69,14 @@ namespace rlogic::internal
 
         [[nodiscard]] ramses::Node& getRamsesNode() const;
 
-        bool setRotationConvention(ramses::ERotationConvention rotationConvention);
-        [[nodiscard]] ramses::ERotationConvention getRotationConvention() const;
+        [[nodiscard]] ERotationType getRotationType() const;
 
         std::optional<LogicNodeRuntimeError> update() override;
 
-
     private:
-        std::reference_wrapper<ramses::Node> m_ramsesNode;
-        ramses::ERotationConvention m_rotationConvention = ramses::ERotationConvention::XYZ;
-
         static void ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode);
+
+        std::reference_wrapper<ramses::Node> m_ramsesNode;
+        ERotationType m_rotationType;
     };
 }

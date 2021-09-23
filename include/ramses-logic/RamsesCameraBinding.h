@@ -112,6 +112,6 @@ namespace rlogic
         /**
          * Implementation detail of RamsesCameraBinding
          */
-        std::unique_ptr<internal::RamsesCameraBindingImpl> m_cameraBinding;
+        internal::RamsesCameraBindingImpl& m_cameraBinding;
     };
 }

@@ -181,7 +181,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
      * Create a temporary LogicEngine instance for creating and saving a simple script which references a ramses Node
      */
     rlogic::LogicEngine logicEngine;
-    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*meshNode, "link to triangle node");
+    rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*meshNode, rlogic::ERotationType::Euler_XYZ, "link to triangle node");
 
     /**
      * Create a simple script which sets the rotation values of a node based on simulated time

@@ -61,7 +61,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingNodeBinding)
     {
-        m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
@@ -80,7 +80,7 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_Dirtiness, NotDirty_AfterCreatingObjectsAndCallingUpdate)
     {
         m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
-        m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "");
         m_logicEngine.update();
@@ -113,7 +113,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, Dirty_WhenSettingBindingInputToDefaultValue)
     {
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.update();
 
         // zeroes is the default value
@@ -130,7 +130,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, Dirty_WhenSettingBindingInputToDifferentValue)
     {
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.update();
 
         // Set non-default value, and then set again to different value
@@ -283,7 +283,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, DirtyAfterCreatingNodeBinding)
     {
-        m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         EXPECT_TRUE(m_apiObjects.bindingsDirty());
     }
 
@@ -295,7 +295,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, NotDirty_AfterCreatingBindingsAndCallingUpdate)
     {
-        m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "");
         m_logicEngine.update();
@@ -304,7 +304,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenSettingBindingInputToDefaultValue)
     {
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.update();
 
         // zeroes is the default value
@@ -321,7 +321,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenSettingBindingInputToDifferentValue)
     {
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.update();
 
         // Set non-default value, and then set again to different value
@@ -335,7 +335,7 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenAddingLink)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.update();
 
         m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
@@ -349,7 +349,7 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_BindingDirtiness, NotDirty_WhenRemovingLink)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
         m_logicEngine.update();
 
@@ -366,7 +366,7 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenReAddingLink)
     {
         LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
-        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, "");
+        RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation")));
         m_logicEngine.update();
 

@@ -13,8 +13,8 @@
 
 namespace rlogic
 {
-    RamsesBinding::RamsesBinding(std::reference_wrapper<internal::RamsesBindingImpl> impl) noexcept
-        : LogicNode(std::ref<internal::LogicNodeImpl>(impl)) // this extra std::ref is only needed for GCC 7
+    RamsesBinding::RamsesBinding(std::unique_ptr<internal::RamsesBindingImpl> impl) noexcept
+        : LogicNode(std::move(impl))
     {
     }
 }

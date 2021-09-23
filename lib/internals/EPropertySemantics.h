@@ -16,6 +16,8 @@ namespace rlogic::internal
     {
         ScriptInput,
         BindingInput,
-        ScriptOutput
+        ScriptOutput,
+        AnimationInput,
+        AnimationOutput,
     };
 }

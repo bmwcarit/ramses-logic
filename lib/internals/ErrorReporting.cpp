@@ -12,16 +12,18 @@
 
 namespace rlogic::internal
 {
-    void ErrorReporting::add(std::string errorMessage)
+    void ErrorReporting::add(std::string errorMessage, LogicObject* logicObject)
     {
-        LOG_ERROR(errorMessage);
-        m_errors.emplace_back(ErrorData{std::move(errorMessage), nullptr});
-    }
+        if (logicObject)
+        {
+            LOG_ERROR("[{}] {}", logicObject->getName(), errorMessage);
+        }
+        else
+        {
+            LOG_ERROR(errorMessage);
+        }
 
-    void ErrorReporting::add(std::string errorMessage, LogicNode& logicNode)
-    {
-        LOG_ERROR("[{}] {}", logicNode.getName(), errorMessage);
-        m_errors.emplace_back(ErrorData{ std::move(errorMessage), &logicNode });
+        m_errors.emplace_back(ErrorData{ std::move(errorMessage), logicObject });
     }
 
     void ErrorReporting::clear()

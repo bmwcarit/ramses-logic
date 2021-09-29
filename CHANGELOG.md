@@ -1,5 +1,16 @@
 # master
 
+# v0.9.1
+
+Summary: update Ramses to version 27.0.111
+
+**Improvements**
+
+* Node scaling is applied before rotation in Ramses now (see Ramses 27.0.111 changelog)
+    * Attention: if your nodes combine scaling and rotations, upgrade to Ramses 27.0.111
+      in your runtime or use the built-in ramses shipped with v0.9.1. Otherwise the scene
+      may look wrong!
+
 # v0.9.0
 
 Summary:
@@ -77,7 +88,7 @@ Summary:
     * Binding input values are initialized with the values from the bound ramses object (all except appearance)
     * See reworked documentation for more details
 * Renamed Camera binding inputs to have shorter names
-    * See [class docs](https://ramses-logic.readthedocs.io/en/latest/api.html#_CPPv4N6rlogic19RamsesCameraBindingE) for new names
+    * See [class docs](https://ramses-logic.readthedocs.io/en/v0.7.0/api.html#_CPPv4N6rlogic19RamsesCameraBindingE) for new names
     * Reason: shorter strings are faster to resolve and easier to read
 * Bindings receive their input values from Ramses (after construction and after loading from file/memory)
     * This is more consistent and eliminates data race conditions

@@ -18,13 +18,15 @@ endif()
 find_package(Doxygen ${PACKAGE_FIND_MODE})
 
 if (NOT DOXYGEN_FOUND)
-    message(${DOCS_ERROR_TYPE} "Doxygen was not found on this system. Documentation generation was disabled.")
+    message(${DOCS_ERROR_TYPE} "Doxygen was not found on this system. Documentation generation was disabled. \
+        Please make the doxygen and the dot executables available on your system!")
     return()
 endif()
 
 find_package(Sphinx ${PACKAGE_FIND_MODE})
 if (NOT SPHINX_FOUND)
-    message(${DOCS_ERROR_TYPE} "Sphinx was not found on this system. Documentation generation was disabled.")
+    message(${DOCS_ERROR_TYPE} "Sphinx was not found on this system. Documentation generation was disabled. \
+        Please install python3 and do a pip3 install -r doc/sphinx/requirements.txt!")
     return()
 endif()
 
@@ -80,11 +82,13 @@ file(GLOB_RECURSE
     SPHINX_INPUT_LIST
     ${CMAKE_CURRENT_SOURCE_DIR}/sphinx/*)
 
+set(SPHINX_BUILDER "html") # Use 'linkcheck' to check for validity of links
+
 # Only regenerate Sphinx files when needed (either doxygen target or sphinx input files changed)
 add_custom_command(OUTPUT ${SPHINX_IDX_FILE}
                    COMMAND
                     ${SPHINX_EXECUTABLE}
-                        -b html
+                        -b ${SPHINX_BUILDER}
                         -Dbreathe_projects.ramses_logic=${DOXYGEN_TARGET_DIR}/xml
                         -Drelease=${RLOGIC_VERSION}
                         -W --keep-going

@@ -470,6 +470,70 @@ namespace rlogic::internal
         ExpectValues(*m_node, ENodePropertyStaticIndex::Rotation, vec3f{ 0.0f, 0.0f, 90.0f });
     }
 
+    // This is a confidence test that checks that no matter which rotation convention is used, the final result (matrix)
+    // is always the same as if each rotation/axis was put in its own node with the order given by the node hierarchy
+    TEST_F(ARamsesNodeBinding_RotationTypes, Confidence_ComplexEulerRotations_ProduceTheSameRotationResult_AsWithSeparateRamsesNodesWithSingleAxisRotations)
+    {
+        std::array<ramses::Node*, 3> threeNodes = {
+            m_scene->createNode(),
+            m_scene->createNode(),
+            m_scene->createNode(),
+        };
+
+        threeNodes[2]->setParent(*threeNodes[1]);
+        threeNodes[1]->setParent(*threeNodes[0]);
+
+        const std::vector<std::tuple<ramses::ERotationConvention, ERotationType, vec3i>> combinationsToTest =
+        {
+            {ramses::ERotationConvention::XYZ, ERotationType::Euler_ZYX, {2, 1, 0}},
+            {ramses::ERotationConvention::XZY, ERotationType::Euler_YZX, {1, 2, 0}},
+            {ramses::ERotationConvention::YXZ, ERotationType::Euler_ZXY, {2, 0, 1}},
+            {ramses::ERotationConvention::YZX, ERotationType::Euler_XZY, {0, 2, 1}},
+            {ramses::ERotationConvention::ZXY, ERotationType::Euler_YXZ, {1, 0, 2}},
+            {ramses::ERotationConvention::ZYX, ERotationType::Euler_XYZ, {0, 1, 2}},
+        };
+
+        for (const auto& [ramsesEnum, logicEnum, axesOrdering] : combinationsToTest)
+        {
+            // Set the rotations for all 3 nodes according to the convention, use the same rotation values always
+            for (size_t i = 0; i < 3; ++i)
+            {
+                const size_t axis = axesOrdering[i];
+                const size_t nodeIndex = 2-i;
+                if (axis == 0)
+                {
+                    threeNodes[nodeIndex]->setRotation(10, 0, 0, ramses::ERotationConvention::ZYX);
+                }
+                else if (axis == 1)
+                {
+                    threeNodes[nodeIndex]->setRotation(0, 20, 0, ramses::ERotationConvention::ZYX);
+                }
+                else
+                {
+                    threeNodes[nodeIndex]->setRotation(0, 0, 30, ramses::ERotationConvention::ZYX);
+                }
+            }
+
+            m_node->setRotation(0, 0, 0, ramsesEnum);
+            RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, logicEnum);
+            binding->getInputs()->getChild("rotation")->set<vec3f>({10, 20, 30});
+            EXPECT_TRUE(m_logicEngine.update());
+
+            float matFromLogic[16]; // NOLINT(modernize-avoid-c-arrays) Required by Ramses API
+            float matFromRamses[16]; // NOLINT(modernize-avoid-c-arrays) Required by Ramses API
+
+            m_node->getModelMatrix(matFromLogic);
+            threeNodes[2]->getModelMatrix(matFromRamses);
+
+            for (size_t i = 0u; i < 16; i++)
+            {
+                EXPECT_NEAR(matFromLogic[i], matFromRamses[i], 1.0e-6f);
+            }
+
+            m_logicEngine.destroy(*binding);
+        }
+    }
+
     // This fixture only contains serialization unit tests, for higher order tests see `ARamsesNodeBinding_SerializationWithFile`
     class ARamsesNodeBinding_SerializationLifecycle : public ARamsesNodeBinding
     {

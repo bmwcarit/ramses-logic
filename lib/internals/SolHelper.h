@@ -9,6 +9,7 @@
 #pragma once
 
 #include "fmt/format.h"
+#include "ramses-logic/EStandardModule.h"
 #include "internals/SolWrapper.h"
 
 #include <string_view>

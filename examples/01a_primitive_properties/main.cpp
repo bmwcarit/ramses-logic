@@ -7,7 +7,9 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
+
 #include <iostream>
 
 /**
@@ -18,7 +20,7 @@ int main()
     rlogic::LogicEngine logicEngine;
 
     // Create a simple script which multiplies two numbers and stores the result in a string
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* multiplyScript = logicEngine.createLuaScript(R"(
         function interface()
             IN.param1 = INT
             IN.param2 = FLOAT
@@ -29,14 +31,14 @@ int main()
         function run()
             OUT.result = "Calculated result is: " .. IN.param1 * IN.param2
         end
-    )", "MultiplyScript");
+    )");
 
     /**
      * Query the inputs of the script. The inputs are
      * stored in a "Property" instance and can be used to
      * get the information about available inputs and outputs
      */
-    rlogic::Property* inputs = script->getInputs();
+    rlogic::Property* inputs = multiplyScript->getInputs();
 
     for (size_t i = 0u; i < inputs->getChildCount(); ++i)
     {
@@ -45,7 +47,7 @@ int main()
     }
 
     // We can do the same with the outputs
-    const rlogic::Property* outputs = script->getOutputs();
+    const rlogic::Property* outputs = multiplyScript->getOutputs();
 
     for (size_t i = 0u; i < outputs->getChildCount(); ++i)
     {
@@ -72,7 +74,7 @@ int main()
     }
 
     // To delete the script call the destroy method on the LogicEngine instance
-    logicEngine.destroy(*script);
+    logicEngine.destroy(*multiplyScript);
 
     return 0;
 }

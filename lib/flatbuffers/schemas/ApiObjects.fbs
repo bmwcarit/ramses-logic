@@ -6,6 +6,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "LuaModule.fbs";
 include "LuaScript.fbs";
 include "RamsesNodeBinding.fbs";
 include "RamsesAppearanceBinding.fbs";
@@ -25,4 +26,5 @@ table ApiObjects
     dataArrays:[DataArray];
     animationNodes:[AnimationNode];
     links:[Link];
+    luaModules:[LuaModule];
 }

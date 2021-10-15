@@ -7,7 +7,9 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
+
 #include <iostream>
 
 /**
@@ -18,7 +20,7 @@ int main()
     rlogic::LogicEngine logicEngine;
 
     // Create a simple script which prints a debug message
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
             IN.debug_message = STRING
         end
@@ -26,7 +28,7 @@ int main()
         function run()
             print(IN.debug_message)
         end
-    )", "MyScript");
+    )");
 
     // Override Lua's print() function so that we can get the result in C++
     script->overrideLuaPrint(

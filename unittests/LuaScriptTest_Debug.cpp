@@ -42,7 +42,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Debug, ProducesErrorWithFullStackTrace_WhenErrorsInInterface)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_scriptWithInterfaceError, "errorscript");
+        LuaScript* script = m_logicEngine.createLuaScript(m_scriptWithInterfaceError, {}, "errorscript");
 
         ASSERT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -58,7 +58,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Debug, ProducesErrorWithFullStackTrace_WhenRuntimeErrors)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_scriptWithRuntimeError, "errorscript");
+        LuaScript* script = m_logicEngine.createLuaScript(m_scriptWithRuntimeError, {}, "errorscript");
 
         ASSERT_NE(nullptr, script);
         m_logicEngine.update();
@@ -71,25 +71,10 @@ namespace rlogic
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
-    TEST_F(ALuaScript_Debug, ErrorMessageContainsFilenameAndScriptnameWithSemicolonWhenBothAvailable)
-    {
-        WithTempDirectory tempFolder;
-
-        std::ofstream ofs;
-        ofs.open("script.lua", std::ofstream::out);
-        ofs << m_scriptWithInterfaceError;
-        ofs.close();
-
-        auto script = m_logicEngine.createLuaScriptFromFile("script.lua", "errorscript");
-        EXPECT_EQ(nullptr, script);
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("\t[string \"script.lua:errorscript\"]:3: in function <[string \"script.lua:errorscript\"]:2>"));
-    }
-
     TEST_F(ALuaScript_Debug, ErrorStackTraceContainsScriptName_WhenScriptWasNotLoadedFromFile)
     {
         // Script loaded from string, not file
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_scriptWithInterfaceError, "errorscript");
+        LuaScript* script = m_logicEngine.createLuaScript(m_scriptWithInterfaceError, {}, "errorscript");
 
         // Error message contains script name in the stack (file not known)
         EXPECT_EQ(nullptr, script);
@@ -105,13 +90,13 @@ namespace rlogic
     // Logic engine always overrides the print function internally - test that it doesn't cause crashes
     TEST_F(ALuaScript_Debug, DefaultOverrideOfLuaPrintFunctionDoesNotCrash)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
                 print("Nice message", "Another message")
             end
-        )", "PrintingScript");
+        )");
 
         ASSERT_NE(nullptr, script);
 
@@ -122,13 +107,13 @@ namespace rlogic
     {
         std::vector<std::string> messages;
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
                 print("Nice message", "Another message")
             end
-        )", "PrintingScript");
+        )", {}, "PrintingScript");
 
         ASSERT_NE(nullptr, script);
 
@@ -150,13 +135,13 @@ namespace rlogic
     {
         std::vector<std::string> messages;
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
                 print(42)
             end
-        )", "PrintingScript");
+        )");
 
         ASSERT_NE(nullptr, script);
         EXPECT_FALSE(m_logicEngine.update());

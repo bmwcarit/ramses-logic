@@ -25,7 +25,7 @@ namespace rlogic
     // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
     TEST_F(ALuaScript_Interface, DISABLED_GeneratesErrorWhenOverwritingInputsInInterfaceFunction)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN = {}
             end
@@ -42,7 +42,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, GlobalSymbolsNotAvailable)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             globalVar = "not visible"
 
             function interface()
@@ -53,7 +53,7 @@ namespace rlogic
 
             function run()
             end
-        )", "noGlobalSymbols");
+        )", WithStdModules({EStandardModule::Base}));
 
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -62,14 +62,14 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, ProducesErrorsIfARuntimeErrorOccursInInterface)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 error("emits error")
             end
 
             function run()
             end
-        )", "errorInInterface");
+        )", WithStdModules({EStandardModule::Base}), "errorInInterface");
 
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -83,7 +83,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, ReturnsItsTopLevelOutputsByIndex_OrderedLexicographically)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithOutputs);
 
         auto outputs = script->getOutputs();
 
@@ -114,7 +114,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, ReturnsNestedOutputsByIndex_OrderedLexicographically_whenDeclaredOneByOne)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.struct = {}
                 OUT.struct.field3 = {}
@@ -160,7 +160,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, CanDeclarePropertiesProgramatically)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.root = {}
                 local lastStruct = OUT.root
@@ -172,7 +172,7 @@ namespace rlogic
 
             function run()
             end
-        )");
+        )", WithStdModules({ EStandardModule::Base }));
 
         ASSERT_NE(nullptr, script);
 
@@ -199,7 +199,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, MarksInputsAsInput)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithInputs);
         auto  inputs = script->getInputs();
         const auto inputCount = inputs->getChildCount();
         for (size_t i = 0; i < inputCount; ++i)
@@ -210,7 +210,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, MarksOutputsAsOutput)
     {
-        auto*      script     = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
+        auto*      script     = m_logicEngine.createLuaScript(m_minimalScriptWithOutputs);
         auto       outputs     = script->getOutputs();
         const auto outputCount = outputs->getChildCount();
         for (size_t i = 0; i < outputCount; ++i)
@@ -221,7 +221,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToItsInputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithInputs);
         auto  inputs = script->getInputs();
 
         auto speedInt32 = inputs->getChild("speed");
@@ -249,7 +249,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToItsOutputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithOutputs);
         auto  outputs = script->getOutputs();
 
         auto speedInt32 = outputs->getChild("speed");
@@ -294,7 +294,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToArrays)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.array_int = ARRAY(3, INT)
                 IN.array_float = ARRAY(3, FLOAT)

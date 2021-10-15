@@ -637,7 +637,7 @@ namespace rlogic::internal
             end
         )";
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
 
         auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
 
@@ -684,7 +684,7 @@ namespace rlogic::internal
             end
         )";
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
 
         auto* cameraBinding = m_logicEngine.createRamsesCameraBinding(m_orthoCam, "");
 
@@ -1213,7 +1213,7 @@ namespace rlogic::internal
             end
             )";
 
-            LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+            LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
 
             RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
 
@@ -1366,7 +1366,7 @@ namespace rlogic::internal
         // Create camera and preset values
         m_perspectiveCam.setViewport(11, 12, 13u, 14u);
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
         RamsesCameraBinding& cameraBinding = *m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
         // set other values to artificially check that the binding won't override them
         m_perspectiveCam.setViewport(9, 8, 1u, 2u);

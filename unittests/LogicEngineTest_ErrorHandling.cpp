@@ -30,25 +30,25 @@ namespace rlogic
 
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnCreateNewLuaScript)
     {
-        auto script = m_logicEngine.createLuaScriptFromFile("somefile.txt");
+        auto script = m_logicEngine.createLuaScript("somefile.txt");
         ASSERT_EQ(nullptr, script);
         EXPECT_FALSE(m_logicEngine.getErrors().empty());
 
-        script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
+        script = m_logicEngine.createLuaScript(m_valid_empty_script);
         ASSERT_NE(nullptr, script);
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
     TEST_F(ALogicEngine_ErrorHandling, ReturnsOnFirstError)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(m_invalid_empty_script);
+        auto script = m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
     }
 
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnUpdate)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(m_invalid_empty_script);
+        auto script = m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
 
@@ -73,17 +73,17 @@ namespace rlogic
     {
         WithTempDirectory tempFolder;
 
-        m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
+        m_logicEngine.createLuaScript(m_valid_empty_script);
 
         // Generate error, so that we can test it's cleared by saveToFile()
-        m_logicEngine.createLuaScriptFromSource(m_invalid_empty_script);
+        m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
 
         EXPECT_TRUE(m_logicEngine.saveToFile("logic.bin"));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
 
         // Generate error, so that we can test it's cleared by loadFromFile()
-        m_logicEngine.createLuaScriptFromSource(m_invalid_empty_script);
+        m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("logic.bin"));
@@ -92,18 +92,18 @@ namespace rlogic
 
     TEST_F(ALogicEngine_ErrorHandling, ClearsErrorsOnLinkAndUnlink)
     {
-        LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_linkable_script);
-        LuaScript* script2 = m_logicEngine.createLuaScriptFromSource(m_linkable_script);
+        LuaScript* script1 = m_logicEngine.createLuaScript(m_linkable_script);
+        LuaScript* script2 = m_logicEngine.createLuaScript(m_linkable_script);
 
         // Generate error, so that we can test it's cleared by link()
-        m_logicEngine.createLuaScriptFromSource(m_invalid_empty_script);
+        m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
 
         EXPECT_TRUE(m_logicEngine.link(*script1->getOutputs()->getChild("output"), *script2->getInputs()->getChild("input")));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
 
         // Generate error, so that we can test it's cleared by unlink()
-        m_logicEngine.createLuaScriptFromSource(m_invalid_empty_script);
+        m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
 
         EXPECT_TRUE(m_logicEngine.unlink(*script1->getOutputs()->getChild("output"), *script2->getInputs()->getChild("input")));

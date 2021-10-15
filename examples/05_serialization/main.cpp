@@ -186,7 +186,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
     /**
      * Create a simple script which sets the rotation values of a node based on simulated time
      */
-    rlogic::LuaScript* simpleScript = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* simpleScript = logicEngine.createLuaScript(R"(
             function interface()
                 IN.time_msec = INT
                 OUT.rotationZ = VEC3F
@@ -196,7 +196,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
                 -- Rotate around Z axis with 100 degrees per second
                 OUT.rotationZ = {0, 0, IN.time_msec / 10}
             end
-        )", "simple rotation script");
+        )", {}, "simple rotation script");
 
     /**
      * Link the script output to the node binding input so that the value produced by the script is passed to the ramses node on update

@@ -290,7 +290,7 @@ namespace rlogic::internal
             end
         )";
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
 
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
@@ -990,7 +990,7 @@ namespace rlogic::internal
                 end
             )";
 
-            LuaScript* script = tempEngineForSaving.createLuaScriptFromSource(scriptSrc);
+            LuaScript* script = tempEngineForSaving.createLuaScript(scriptSrc);
 
             RamsesNodeBinding& nodeBinding = *tempEngineForSaving.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
@@ -1100,7 +1100,7 @@ namespace rlogic::internal
             end
         )";
 
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
         // Adding and removing link does not set anything in ramses

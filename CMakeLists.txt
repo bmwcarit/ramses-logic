@@ -14,8 +14,8 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 9)
-set(RLOGIC_VERSION_PATCH 1)
+set(RLOGIC_VERSION_MINOR 10)
+set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -37,7 +37,6 @@ set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE
 set(ramses-logic_FOLDER_PREFIX "" CACHE
     STRING "Set a custom prefix for target folders in Visual Studio. If not set, will be set based on project's relative path")
 set(ramses-logic_BUILD_RAMSES_RENDERER false CACHE BOOL "Set whether the ramses renderer will be built as part of this build. If this option is set to ON, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
-option(ramses-logic_BUILD_ANDROID "Enable/disable Android build" OFF)
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
 option(ramses-logic_FIND_RAMSES_FROM_SYSTEM "Set this to ON if you want to use an existing installation or package of Ramses (find_package)" OFF)
 set(ramses-logic_PLATFORM "" CACHE
@@ -233,14 +232,6 @@ if(ramses-logic_BUILD_EXAMPLES)
 endif()
 
 include(cmake/addCheckerTargets.cmake)
-
-# TODO implement public android build scripts
-if(ramses-logic_BUILD_ANDROID)
-    if(NOT IS_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/android")
-        message(FATAL_ERROR "Missing android build scripts. Please provide your own gradle scripts in android/")
-    endif()
-    add_subdirectory(android)
-endif()
 
 #==========================================================================
 # build and install documentation

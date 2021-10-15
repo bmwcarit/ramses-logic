@@ -9,8 +9,9 @@
 #pragma once
 
 #include "impl/LogicNodeImpl.h"
-#include "impl/LuaCompilationUtils.h"
+#include "impl/LuaConfigImpl.h"
 
+#include "internals/LuaCompilationUtils.h"
 #include "internals/SerializationMap.h"
 #include "internals/DeserializationMap.h"
 #include "internals/WrappedLuaProperty.h"
@@ -33,6 +34,11 @@ namespace flatbuffers
 namespace rlogic_serialization
 {
     struct LuaScript;
+}
+
+namespace rlogic
+{
+    class LuaModule;
 }
 
 namespace rlogic::internal
@@ -58,20 +64,21 @@ namespace rlogic::internal
             ErrorReporting& errorReporting,
             DeserializationMap& deserializationMap);
 
-        [[nodiscard]] std::string_view getFilename() const;
-
         std::optional<LogicNodeRuntimeError> update() override;
+
+        [[nodiscard]] const ModuleMapping& getModules() const;
 
         void luaPrint(sol::variadic_args args);
         void overrideLuaPrint(LuaPrintFunction luaPrintFunction);
 
     private:
-        std::string                             m_filename;
-        std::string                             m_source;
-        LuaPrintFunction                        m_luaPrintFunction;
-        WrappedLuaProperty                      m_wrappedRootInput;
-        WrappedLuaProperty                      m_wrappedRootOutput;
-        sol::protected_function                 m_solFunction;
+        std::string             m_source;
+        LuaPrintFunction        m_luaPrintFunction;
+        WrappedLuaProperty      m_wrappedRootInput;
+        WrappedLuaProperty      m_wrappedRootOutput;
+        sol::protected_function m_solFunction;
+        ModuleMapping           m_modules;
+        StandardModules         m_stdModules;
 
         static void DefaultLuaPrintFunction(std::string_view scriptName, std::string_view message);
     };

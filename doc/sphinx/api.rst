@@ -134,7 +134,7 @@ You can create scripts using the :class:`rlogic::LogicEngine` class like this:
     )"
 
     LogicEngine engine;
-    LuaScript* script = engine.createLuaScriptFromSource(source, "simple script");
+    LuaScript* script = engine.createLuaScript(source, "simple script");
     script->getInputs()->getChild("gear")->set<int32_t>(4);
 
     script->execute();
@@ -197,7 +197,7 @@ Here is a simple example how links are created:
     :linenos:
 
     LogicEngine logicEngine;
-    LuaScript* sourceScript = logicEngine.createLuaScriptFromSource(R"(
+    LuaScript* sourceScript = logicEngine.createLuaScript(R"(
         function interface()
             OUT.source = STRING
         end
@@ -206,7 +206,7 @@ Here is a simple example how links are created:
         end
     )");
 
-    LuaScript* destinationScript = logicEngine.createLuaScriptFromSource(R"(
+    LuaScript* destinationScript = logicEngine.createLuaScript(R"(
         function interface()
             IN.destination = STRING
         end
@@ -409,7 +409,7 @@ you own one like this:
     :linenos:
 
     LogicEngine logicEngine;
-    LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
         end
         function run()
@@ -680,3 +680,4 @@ List of all examples
     examples/06_override_print
     examples/07_links
     examples/08_animation
+    examples/09_modules

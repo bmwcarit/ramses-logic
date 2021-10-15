@@ -9,13 +9,14 @@
 #include "benchmark/benchmark.h"
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "fmt/format.h"
 
 namespace rlogic
 {
     static void CompileLua(LogicEngine& logicEngine, std::string_view src)
     {
-        LuaScript* script = logicEngine.createLuaScriptFromSource(src);
+        LuaScript* script = logicEngine.createLuaScript(src);
         logicEngine.destroy(*script);
     }
 

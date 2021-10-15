@@ -6,6 +6,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LuaModuleGen.h"
 #include "PropertyGen.h"
 
 namespace rlogic_serialization {
@@ -21,7 +22,9 @@ struct LuaScript FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_FILENAME = 6,
     VT_LUASOURCECODE = 8,
     VT_ROOTINPUT = 10,
-    VT_ROOTOUTPUT = 12
+    VT_ROOTOUTPUT = 12,
+    VT_DEPENDENCIES = 14,
+    VT_STANDARDMODULES = 16
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
@@ -38,6 +41,12 @@ struct LuaScript FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::Property *rootOutput() const {
     return GetPointer<const rlogic_serialization::Property *>(VT_ROOTOUTPUT);
   }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *>(VT_DEPENDENCIES);
+  }
+  const flatbuffers::Vector<uint8_t> *standardModules() const {
+    return GetPointer<const flatbuffers::Vector<uint8_t> *>(VT_STANDARDMODULES);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
@@ -50,6 +59,11 @@ struct LuaScript FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyTable(rootInput()) &&
            VerifyOffset(verifier, VT_ROOTOUTPUT) &&
            verifier.VerifyTable(rootOutput()) &&
+           VerifyOffset(verifier, VT_DEPENDENCIES) &&
+           verifier.VerifyVector(dependencies()) &&
+           verifier.VerifyVectorOfTables(dependencies()) &&
+           VerifyOffset(verifier, VT_STANDARDMODULES) &&
+           verifier.VerifyVector(standardModules()) &&
            verifier.EndTable();
   }
 };
@@ -73,6 +87,12 @@ struct LuaScriptBuilder {
   void add_rootOutput(flatbuffers::Offset<rlogic_serialization::Property> rootOutput) {
     fbb_.AddOffset(LuaScript::VT_ROOTOUTPUT, rootOutput);
   }
+  void add_dependencies(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies) {
+    fbb_.AddOffset(LuaScript::VT_DEPENDENCIES, dependencies);
+  }
+  void add_standardModules(flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules) {
+    fbb_.AddOffset(LuaScript::VT_STANDARDMODULES, standardModules);
+  }
   explicit LuaScriptBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -91,8 +111,12 @@ inline flatbuffers::Offset<LuaScript> CreateLuaScript(
     flatbuffers::Offset<flatbuffers::String> filename = 0,
     flatbuffers::Offset<flatbuffers::String> luaSourceCode = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
-    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
+    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies = 0,
+    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0) {
   LuaScriptBuilder builder_(_fbb);
+  builder_.add_standardModules(standardModules);
+  builder_.add_dependencies(dependencies);
   builder_.add_rootOutput(rootOutput);
   builder_.add_rootInput(rootInput);
   builder_.add_luaSourceCode(luaSourceCode);
@@ -112,17 +136,23 @@ inline flatbuffers::Offset<LuaScript> CreateLuaScriptDirect(
     const char *filename = nullptr,
     const char *luaSourceCode = nullptr,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
-    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
+    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies = nullptr,
+    const std::vector<uint8_t> *standardModules = nullptr) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   auto filename__ = filename ? _fbb.CreateString(filename) : 0;
   auto luaSourceCode__ = luaSourceCode ? _fbb.CreateString(luaSourceCode) : 0;
+  auto dependencies__ = dependencies ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>(*dependencies) : 0;
+  auto standardModules__ = standardModules ? _fbb.CreateVector<uint8_t>(*standardModules) : 0;
   return rlogic_serialization::CreateLuaScript(
       _fbb,
       name__,
       filename__,
       luaSourceCode__,
       rootInput,
-      rootOutput);
+      rootOutput,
+      dependencies__,
+      standardModules__);
 }
 
 }  // namespace rlogic_serialization

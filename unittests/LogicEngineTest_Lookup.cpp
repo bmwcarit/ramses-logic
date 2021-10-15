@@ -16,7 +16,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
@@ -33,7 +33,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_Const)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
@@ -57,7 +57,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsAfterRenaming_ByNewNameOnly)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
@@ -91,7 +91,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyIfTypeMatches)
     {
-        m_logicEngine.createLuaScriptFromSource(m_valid_empty_script, "script");
+        m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");

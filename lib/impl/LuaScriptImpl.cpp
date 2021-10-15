@@ -8,12 +8,15 @@
 
 #include "impl/LuaScriptImpl.h"
 
+#include "ramses-logic/LuaModule.h"
 #include "internals/SolState.h"
 #include "impl/PropertyImpl.h"
+#include "impl/LuaModuleImpl.h"
 
 #include "internals/WrappedLuaProperty.h"
 #include "internals/SolHelper.h"
 #include "internals/ErrorReporting.h"
+#include "internals/FileFormatVersions.h"
 
 #include "generated/LuaScriptGen.h"
 
@@ -23,12 +26,13 @@ namespace rlogic::internal
 {
     LuaScriptImpl::LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name)
         : LogicNodeImpl(name)
-        , m_filename(std::move(compiledScript.fileName))
-        , m_source(std::move(compiledScript.sourceCode))
+        , m_source(std::move(compiledScript.source.sourceCode))
         , m_luaPrintFunction(&LuaScriptImpl::DefaultLuaPrintFunction)
         , m_wrappedRootInput(*compiledScript.rootInput->m_impl)
         , m_wrappedRootOutput(*compiledScript.rootOutput->m_impl)
         , m_solFunction(std::move(compiledScript.mainFunction))
+        , m_modules(std::move(compiledScript.source.userModules))
+        , m_stdModules(std::move(compiledScript.source.stdModules))
     {
         setRootProperties(std::move(compiledScript.rootInput), std::move(compiledScript.rootOutput));
 
@@ -45,12 +49,37 @@ namespace rlogic::internal
         // TODO Violin investigate options to save byte code, instead of plain text, e.g.:
         //sol::bytecode scriptCode = m_solFunction.dump();
 
+        flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> modulesOffset = 0;
+        if (!luaScript.m_modules.empty())
+        {
+            std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> modulesFB;
+            modulesFB.reserve(luaScript.m_modules.size());
+            for (const auto& module : luaScript.m_modules)
+            {
+                modulesFB.push_back(
+                    rlogic_serialization::CreateLuaModuleUsage(builder,
+                        builder.CreateString(module.first),
+                        serializationMap.resolveLuaModuleOffset(*module.second)));
+            }
+
+            modulesOffset = builder.CreateVector(modulesFB);
+        }
+
+        std::vector<uint8_t> stdModules;
+        stdModules.reserve(luaScript.m_stdModules.size());
+        for (const EStandardModule stdModule : luaScript.m_stdModules)
+        {
+            stdModules.push_back(static_cast<uint8_t>(stdModule));
+        }
+
         auto script = rlogic_serialization::CreateLuaScript(builder,
             builder.CreateString(luaScript.getName()),
-            builder.CreateString(luaScript.getFilename()),
+            0,
             builder.CreateString(luaScript.m_source),
             PropertyImpl::Serialize(*luaScript.getInputs()->m_impl, builder, serializationMap),
-            PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap)
+            PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap),
+            modulesOffset,
+            builder.CreateVector(stdModules)
         );
         builder.Finish(script);
 
@@ -70,21 +99,15 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        if (!luaScript.filename())
-        {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing filename!", nullptr);
-            return nullptr;
-        }
+        static_assert(g_FileFormatVersion == 2, "Remove filename from schema - search for 'VersionBreak' in schema files");
 
         const std::string_view name = luaScript.name()->string_view();
-        std::string filename = luaScript.filename()->str();
 
         if (!luaScript.luaSourceCode())
         {
             errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!", nullptr);
             return nullptr;
         }
-
         std::string sourceCode = luaScript.luaSourceCode()->str();
 
         if (!luaScript.rootInput())
@@ -132,8 +155,41 @@ namespace rlogic::internal
             return nullptr;
         }
 
+        StandardModules stdModules;
+        if (luaScript.standardModules())
+        {
+            stdModules.reserve(luaScript.standardModules()->size());
+            for (const uint8_t stdModule : *luaScript.standardModules())
+            {
+                stdModules.push_back(static_cast<EStandardModule>(stdModule));
+            }
+        }
+        else
+        {
+            static_assert(g_FileFormatVersion == 2, "Remove this with next file version break; also consider making stdModules required");
+            stdModules = { EStandardModule::Base, EStandardModule::String, EStandardModule::Table, EStandardModule::Math, EStandardModule::Debug };
+        }
+
+        static_assert(g_FileFormatVersion == 2, "Consider making modules mandatory with next file version break");
+        ModuleMapping userModules;
+        if (luaScript.dependencies())
+        {
+            userModules.reserve(luaScript.dependencies()->size());
+            for (const auto* module : *luaScript.dependencies())
+            {
+                if (!module->name() || !module->module_())
+                {
+                    errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: missing name or module!", name), nullptr);
+                    return nullptr;
+                }
+                const LuaModule& moduleUsed = deserializationMap.resolveLuaModule(*module->module_());
+                userModules.emplace(module->name()->str(), &moduleUsed);
+            }
+        }
+
         sol::protected_function mainFunction = load_result;
-        sol::environment env = solState.createEnvironment();
+        sol::environment env = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Runtime);
+
         env.set_on(mainFunction);
 
         sol::protected_function_result main_result = mainFunction();
@@ -146,18 +202,17 @@ namespace rlogic::internal
 
         return std::make_unique<LuaScriptImpl>(
             LuaCompiledScript{
-                std::move(sourceCode),
-                std::move(filename),
-                solState,
+                LuaSource{
+                    std::move(sourceCode),
+                    solState,
+                    std::move(stdModules),
+                    std::move(userModules)
+                },
                 sol::protected_function(std::move(load_result)),
                 std::make_unique<Property>(std::move(rootInput)),
                 std::make_unique<Property>(std::move(rootOutput))
-            }, name);
-    }
-
-    std::string_view LuaScriptImpl::getFilename() const
-    {
-        return m_filename;
+            },
+            name);
     }
 
     std::optional<LogicNodeRuntimeError> LuaScriptImpl::update()
@@ -201,4 +256,8 @@ namespace rlogic::internal
         m_luaPrintFunction = std::move(luaPrintFunction);
     }
 
+    const ModuleMapping& LuaScriptImpl::getModules() const
+    {
+        return m_modules;
+    }
 }

@@ -9,6 +9,7 @@
 #include "AnimationNodeGen.h"
 #include "DataArrayGen.h"
 #include "LinkGen.h"
+#include "LuaModuleGen.h"
 #include "LuaScriptGen.h"
 #include "PropertyGen.h"
 #include "RamsesAppearanceBindingGen.h"
@@ -32,7 +33,8 @@ struct ApiObjects FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_CAMERABINDINGS = 10,
     VT_DATAARRAYS = 12,
     VT_ANIMATIONNODES = 14,
-    VT_LINKS = 16
+    VT_LINKS = 16,
+    VT_LUAMODULES = 18
   };
   const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *luaScripts() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> *>(VT_LUASCRIPTS);
@@ -54,6 +56,9 @@ struct ApiObjects FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *links() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>> *>(VT_LINKS);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModule>> *luaModules() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModule>> *>(VT_LUAMODULES);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -78,6 +83,9 @@ struct ApiObjects FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyOffset(verifier, VT_LINKS) &&
            verifier.VerifyVector(links()) &&
            verifier.VerifyVectorOfTables(links()) &&
+           VerifyOffset(verifier, VT_LUAMODULES) &&
+           verifier.VerifyVector(luaModules()) &&
+           verifier.VerifyVectorOfTables(luaModules()) &&
            verifier.EndTable();
   }
 };
@@ -107,6 +115,9 @@ struct ApiObjectsBuilder {
   void add_links(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links) {
     fbb_.AddOffset(ApiObjects::VT_LINKS, links);
   }
+  void add_luaModules(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>> luaModules) {
+    fbb_.AddOffset(ApiObjects::VT_LUAMODULES, luaModules);
+  }
   explicit ApiObjectsBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -127,8 +138,10 @@ inline flatbuffers::Offset<ApiObjects> CreateApiObjects(
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>> cameraBindings = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::DataArray>>> dataArrays = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>> animationNodes = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links = 0) {
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Link>>> links = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>> luaModules = 0) {
   ApiObjectsBuilder builder_(_fbb);
+  builder_.add_luaModules(luaModules);
   builder_.add_links(links);
   builder_.add_animationNodes(animationNodes);
   builder_.add_dataArrays(dataArrays);
@@ -152,7 +165,8 @@ inline flatbuffers::Offset<ApiObjects> CreateApiObjectsDirect(
     const std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> *cameraBindings = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>> *dataArrays = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>> *animationNodes = nullptr,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::Link>> *links = nullptr) {
+    const std::vector<flatbuffers::Offset<rlogic_serialization::Link>> *links = nullptr,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>> *luaModules = nullptr) {
   auto luaScripts__ = luaScripts ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaScript>>(*luaScripts) : 0;
   auto nodeBindings__ = nodeBindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>(*nodeBindings) : 0;
   auto appearanceBindings__ = appearanceBindings ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>(*appearanceBindings) : 0;
@@ -160,6 +174,7 @@ inline flatbuffers::Offset<ApiObjects> CreateApiObjectsDirect(
   auto dataArrays__ = dataArrays ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::DataArray>>(*dataArrays) : 0;
   auto animationNodes__ = animationNodes ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>(*animationNodes) : 0;
   auto links__ = links ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Link>>(*links) : 0;
+  auto luaModules__ = luaModules ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaModule>>(*luaModules) : 0;
   return rlogic_serialization::CreateApiObjects(
       _fbb,
       luaScripts__,
@@ -168,7 +183,8 @@ inline flatbuffers::Offset<ApiObjects> CreateApiObjectsDirect(
       cameraBindings__,
       dataArrays__,
       animationNodes__,
-      links__);
+      links__,
+      luaModules__);
 }
 
 }  // namespace rlogic_serialization

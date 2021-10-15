@@ -8,6 +8,7 @@
 
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaModule.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
@@ -15,6 +16,8 @@
 #include "ramses-logic/AnimationNode.h"
 
 #include "impl/LogicEngineImpl.h"
+#include "impl/LuaConfigImpl.h"
+#include "internals/ApiObjects.h"
 
 #include <string>
 
@@ -31,14 +34,14 @@ namespace rlogic
 
     LogicEngine& LogicEngine::operator=(LogicEngine&& other) noexcept = default;
 
-    LuaScript* LogicEngine::createLuaScriptFromFile(std::string_view filename, std::string_view scriptName)
-    {
-        return m_impl->createLuaScriptFromFile(filename, scriptName);
-    }
-
     Collection<LuaScript> LogicEngine::scripts() const
     {
         return Collection<LuaScript>(m_impl->getApiObjects().getScripts());
+    }
+
+    Collection<LuaModule> LogicEngine::luaModules() const
+    {
+        return Collection<LuaModule>(m_impl->getApiObjects().getLuaModules());
     }
 
     Collection<RamsesNodeBinding> LogicEngine::ramsesNodeBindings() const
@@ -93,6 +96,15 @@ namespace rlogic
         return findObject(m_impl->getApiObjects().getScripts(), name);
     }
 
+    const LuaModule* LogicEngine::findLuaModule(std::string_view name) const
+    {
+        return findObject(m_impl->getApiObjects().getLuaModules(), name);
+    }
+    LuaModule* LogicEngine::findLuaModule(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getLuaModules(), name);
+    }
+
     const RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name) const
     {
         return findObject(m_impl->getApiObjects().getNodeBindings(), name);
@@ -138,9 +150,19 @@ namespace rlogic
         return findObject(m_impl->getApiObjects().getAnimationNodes(), name);
     }
 
-    LuaScript* LogicEngine::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
+    LuaScript* LogicEngine::createLuaScript(std::string_view source, const LuaConfig& config, std::string_view scriptName)
     {
-        return m_impl->createLuaScriptFromSource(source, scriptName);
+        return m_impl->createLuaScript(source, *config.m_impl, scriptName);
+    }
+
+    LuaModule* LogicEngine::createLuaModule(std::string_view source, const LuaConfig& config, std::string_view moduleName)
+    {
+        return m_impl->createLuaModule(source, *config.m_impl, moduleName);
+    }
+
+    bool LogicEngine::extractLuaDependencies(std::string_view source, const std::function<void(const std::string&)>& callbackFunc)
+    {
+        return m_impl->extractLuaDependencies(source, callbackFunc);
     }
 
     RamsesNodeBinding* LogicEngine::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType /* = ERotationType::Euler_XYZ*/, std::string_view name)

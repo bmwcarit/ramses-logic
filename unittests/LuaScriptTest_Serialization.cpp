@@ -23,9 +23,11 @@ namespace rlogic::internal
     class ALuaScript_Serialization : public ::testing::Test
     {
     protected:
-        std::unique_ptr<LuaScriptImpl> createTestScript(std::string_view source, std::string_view scriptName = "", std::string_view filename = "")
+        std::unique_ptr<LuaScriptImpl> createTestScript(std::string_view source, std::string_view scriptName = "")
         {
-            return std::make_unique<LuaScriptImpl>(*LuaCompilationUtils::Compile(m_solState, std::string{ source }, scriptName, std::string{ filename }, m_errorReporting), scriptName);
+            return std::make_unique<LuaScriptImpl>(
+                *LuaCompilationUtils::CompileScript(m_solState, {}, {}, std::string{ source }, scriptName, m_errorReporting),
+                scriptName);
         }
 
         std::string_view m_minimalScript = R"(
@@ -49,7 +51,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "name", "filename");
+            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "name");
             (void)LuaScriptImpl::Serialize(*script, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -80,27 +82,10 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaScript_Serialization, RemembersFilename)
-    {
-        {
-            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "", "filename");
-            (void)LuaScriptImpl::Serialize(*script, m_flatBufferBuilder, m_serializationMap);
-        }
-
-        const auto& serializedScript = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
-        ASSERT_TRUE(serializedScript.filename());
-        EXPECT_EQ(serializedScript.filename()->string_view(), "filename");
-
-        {
-            std::unique_ptr<LuaScriptImpl> deserializedScript = LuaScriptImpl::Deserialize(m_solState, serializedScript, m_errorReporting, m_deserializationMap);
-            EXPECT_EQ(deserializedScript->getFilename(), "filename");
-        }
-    }
-
     TEST_F(ALuaScript_Serialization, SerializesLuaSourceCode)
     {
         {
-            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "", "");
+            std::unique_ptr<LuaScriptImpl> script = createTestScript(m_minimalScript, "");
             (void)LuaScriptImpl::Serialize(*script, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -127,25 +112,6 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing name!");
     }
 
-    TEST_F(ALuaScript_Serialization, ProducesErrorWhenFilenameMissing)
-    {
-        {
-            auto script = rlogic_serialization::CreateLuaScript(
-                m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                0 // no filename
-            );
-            m_flatBufferBuilder.Finish(script);
-        }
-
-        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
-        std::unique_ptr<LuaScriptImpl> deserialized = LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
-
-        EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing filename!");
-    }
-
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenLuaSourceCodeMissing)
     {
         {
@@ -165,6 +131,28 @@ namespace rlogic::internal
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing Lua source code!");
     }
+
+    // TODO VersionBreak enable test with next breaking change
+    //TEST_F(ALuaScript_Serialization, ProducesErrorWhenModulesMissing)
+    //{
+    //    {
+    //        auto script = rlogic_serialization::CreateLuaScript(
+    //            m_flatBufferBuilder,
+    //            m_flatBufferBuilder.CreateString("name"),
+    //            m_flatBufferBuilder.CreateString("some/file.lua"),
+    //            m_flatBufferBuilder.CreateString("lua source code"),
+    //            m_testUtils.serializeTestProperty("IN"),
+    //            m_testUtils.serializeTestProperty("OUT"),
+    //            0 // no modules
+    //        );
+    //        m_flatBufferBuilder.Finish(script);
+    //    }
+    //
+    //    const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
+    //    EXPECT_EQ(nullptr, LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap));
+    //    ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+    //    EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing Lua modules usage!");
+    //}
 
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenRootInputMissing)
     {

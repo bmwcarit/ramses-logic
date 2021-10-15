@@ -31,7 +31,7 @@ int main()
      * outputs of the script.
      * The run function contains the real code, which is executed during runtime
      */
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
             IN.rotate_x = FLOAT
             OUT.rotation = VEC3F

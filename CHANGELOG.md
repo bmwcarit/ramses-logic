@@ -1,5 +1,28 @@
 # master
 
+# v0.10.0
+
+**API Changes**
+
+* Added LuaModule that can be used to load Lua source code to be shared in one or more Lua scripts
+    * LogicEngine::createLuaScriptFromSource and LogicEngine::createLuaScriptFromFile have new optional argument
+        to provide list of module dependencies and access alias for each of them
+    * Modules can use other modules recursively
+* Reworked API for creating scripts (accepts an optional configuration object which can be used to refer to modules)
+    * Old API methods (createLuaScriptFromSource and createLuaScriptFromFile) are not available any more
+    * New API createLuaScript accepts Lua source code, and optionally configuration object and a name
+    * File handling is expected to be performed outside the Logic Engine
+        * Rationale: text file loading is not considered a core functionality of the logic engine
+    * Also removed corresponding LuaScript::getFilename() method
+    * Standard modules must be loaded explicitly via the LuaConfig object
+        * When loading older binary files, standard modules are implicitly loaded for compatibility
+        * New code should request standard modules explicitly and only where needed
+
+**Bugfixes**
+
+* Property::isLinked() is correctly exported in the shared library
+* LogicEngine move constructor and assignment are correctly exported in the shared library
+
 # v0.9.1
 
 Summary: update Ramses to version 27.0.111
@@ -10,6 +33,7 @@ Summary: update Ramses to version 27.0.111
     * Attention: if your nodes combine scaling and rotations, upgrade to Ramses 27.0.111
       in your runtime or use the built-in ramses shipped with v0.9.1. Otherwise the scene
       may look wrong!
+
 
 # v0.9.0
 

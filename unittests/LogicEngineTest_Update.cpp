@@ -38,7 +38,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Update, UpdatesRamsesNodeBindingValuesOnUpdate)
     {
-        auto        luaScript = m_logicEngine.createLuaScriptFromSource(R"(
+        auto        luaScript = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.param = BOOL
                 OUT.param = BOOL
@@ -46,7 +46,7 @@ namespace rlogic
             function run()
                 OUT.param = IN.param
             end
-        )", "Script");
+        )");
 
         auto        ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
@@ -68,7 +68,7 @@ namespace rlogic
         RamsesTestSetup testSetup;
         ramses::Scene* scene = testSetup.createScene();
 
-        auto        luaScript = m_logicEngine.createLuaScriptFromSource(R"(
+        auto        luaScript = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.param = INT
                 OUT.param = INT
@@ -76,7 +76,7 @@ namespace rlogic
             function run()
                 OUT.param = IN.param
             end
-        )", "Script");
+        )");
 
         auto ramsesCameraBinding = m_logicEngine.createRamsesCameraBinding(*scene->createPerspectiveCamera(), "CameraBinding");
 
@@ -147,8 +147,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "Source");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "Target");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource, WithStdModules({EStandardModule::Base}));
+        auto targetScript = m_logicEngine.createLuaScript(scriptSource, WithStdModules({EStandardModule::Base}));
 
         auto output = sourceScript->getOutputs()->getChild("param");
         auto input  = targetScript->getInputs()->getChild("param");
@@ -181,7 +181,7 @@ namespace rlogic
             end
         )";
 
-        auto script            = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script");
+        auto script            = m_logicEngine.createLuaScript(scriptSource);
         auto nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
         auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
@@ -277,8 +277,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
 
         auto sourceInput  = sourceScript->getInputs()->getChild("inFloat");
         auto sourceOutput = sourceScript->getOutputs()->getChild("outFloat");
@@ -357,7 +357,7 @@ namespace rlogic
         std::array<LuaScript*, 6> s = {};
         for (size_t i = 0; i < s.size(); ++i)
         {
-            s[i] = m_logicEngine.createLuaScriptFromSource(scriptSource, fmt::format("Script{}", i));
+            s[i] = m_logicEngine.createLuaScript(scriptSource, {}, fmt::format("Script{}", i));
         }
 
         auto in1S0  = s[0]->getInputs()->getChild("in1");
@@ -450,8 +450,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
 
         auto sourceInput  = sourceScript->getInputs()->getChild("inFloat");
         auto sourceOutput = sourceScript->getOutputs()->getChild("outFloat");

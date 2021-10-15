@@ -9,6 +9,7 @@
 #include "benchmark/benchmark.h"
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 
 #include "fmt/format.h"
@@ -34,7 +35,7 @@ namespace rlogic
         std::vector<LuaScript*> scripts(scriptCount);
         for (int64_t i = 0; i < scriptCount; ++i)
         {
-            scripts[i] = logicEngine.createLuaScriptFromSource(scriptSrc);
+            scripts[i] = logicEngine.createLuaScript(scriptSrc);
 
             if (i >= 1)
             {

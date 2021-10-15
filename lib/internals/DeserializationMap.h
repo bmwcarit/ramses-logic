@@ -14,11 +14,13 @@ namespace rlogic_serialization
 {
     struct Property;
     struct DataArray;
+    struct LuaModule;
 }
 
 namespace rlogic
 {
     class DataArray;
+    class LuaModule;
 }
 
 namespace rlogic::internal
@@ -55,9 +57,23 @@ namespace rlogic::internal
             return *it->second;
         }
 
+        void storeLuaModule(const rlogic_serialization::LuaModule& flatbufferObject, const LuaModule& luaModule)
+        {
+            assert(m_luaModules.count(&flatbufferObject) == 0 && "one time store only");
+            m_luaModules.insert({ &flatbufferObject, &luaModule });
+        }
+
+        const LuaModule& resolveLuaModule(const rlogic_serialization::LuaModule& flatbufferObject) const
+        {
+            const auto it = m_luaModules.find(&flatbufferObject);
+            assert(it != m_luaModules.cend());
+            return *it->second;
+        }
+
     private:
         std::unordered_map<const rlogic_serialization::Property*, PropertyImpl*> m_properties;
         std::unordered_map<const rlogic_serialization::DataArray*, const DataArray*> m_dataArrays;
+        std::unordered_map<const rlogic_serialization::LuaModule*, const LuaModule*> m_luaModules;
     };
 
 }

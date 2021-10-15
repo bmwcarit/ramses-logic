@@ -10,6 +10,8 @@
 
 #include "internals/SolState.h"
 #include "internals/SolWrapper.h"
+#include "internals/LuaCompilationUtils.h"
+#include "internals/ErrorReporting.h"
 
 namespace rlogic::internal
 {
@@ -47,22 +49,83 @@ namespace rlogic::internal
         EXPECT_THAT(error.what(), ::testing::HasSubstr("'<name>' expected near 'not'"));
     }
 
-    TEST_F(ASolState, CreatesNewEnvironment)
+    TEST_F(ASolState, CreatesNewRuntimeEnvironment)
     {
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         EXPECT_TRUE(env.valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_InheritsGlobals)
+    TEST_F(ASolState, CreatesNewInterfaceEnvironment)
     {
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Interface);
+        EXPECT_TRUE(env.valid());
+    }
+
+    TEST_F(ASolState, CreatesNewModuleEnvironment)
+    {
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Module);
+        EXPECT_TRUE(env.valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_HidesGlobalStandardModules)
+    {
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         ASSERT_TRUE(env.valid());
 
         // Libs
-        EXPECT_TRUE(env["print"].valid());
-        EXPECT_TRUE(env["math"].valid());
+        EXPECT_FALSE(env["print"].valid());
+        EXPECT_FALSE(env["math"].valid());
 
         // Should be only available during interface, not in the global scope defined symbols
+        EXPECT_FALSE(env["INT"].valid());
+        EXPECT_FALSE(env["STRING"].valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_ExposesRequestedGlobalStandardModules)
+    {
+        sol::environment env = m_solState.createEnvironment({EStandardModule::Math}, {}, EEnvironmentType::Runtime);
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_TRUE(env["math"].valid());
+
+        EXPECT_FALSE(env["print"].valid());
+        EXPECT_FALSE(env["debug"].valid());
+        EXPECT_FALSE(env["string"].valid());
+        EXPECT_FALSE(env["table"].valid());
+        EXPECT_FALSE(env["error"].valid());
+        EXPECT_FALSE(env["INT"].valid());
+        EXPECT_FALSE(env["STRING"].valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_ExposesRequestedGlobalStandardModules_TwoModules)
+    {
+        sol::environment env = m_solState.createEnvironment({ EStandardModule::String, EStandardModule::Table }, {}, EEnvironmentType::Runtime);
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_TRUE(env["string"].valid());
+        EXPECT_TRUE(env["table"].valid());
+
+        EXPECT_FALSE(env["math"].valid());
+        EXPECT_FALSE(env["print"].valid());
+        EXPECT_FALSE(env["debug"].valid());
+        EXPECT_FALSE(env["error"].valid());
+        EXPECT_FALSE(env["INT"].valid());
+        EXPECT_FALSE(env["STRING"].valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_ExposesRequestedGlobalStandardModules_BaseLib)
+    {
+        sol::environment env = m_solState.createEnvironment({ EStandardModule::Base }, {}, EEnvironmentType::Runtime);
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_TRUE(env["error"].valid());
+        EXPECT_TRUE(env["tostring"].valid());
+        EXPECT_TRUE(env["print"].valid());
+
+        EXPECT_FALSE(env["table"].valid());
+        EXPECT_FALSE(env["math"].valid());
+        EXPECT_FALSE(env["debug"].valid());
+        EXPECT_FALSE(env["string"].valid());
         EXPECT_FALSE(env["INT"].valid());
         EXPECT_FALSE(env["STRING"].valid());
     }
@@ -70,7 +133,7 @@ namespace rlogic::internal
     // Those are created at a later point of the script lifecycle
     TEST_F(ASolState, NewEnvironment_HasNo_IN_OUT_globalsYet)
     {
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         ASSERT_TRUE(env.valid());
 
         EXPECT_FALSE(env["IN"].valid());
@@ -79,7 +142,7 @@ namespace rlogic::internal
 
     TEST_F(ASolState, NewEnvironment_HasNoFunctionsExpectedByUserScript)
     {
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         ASSERT_TRUE(env.valid());
 
         EXPECT_FALSE(env["interface"].valid());
@@ -88,8 +151,8 @@ namespace rlogic::internal
 
     TEST_F(ASolState, NewEnvironment_TwoEnvironmentsShareNoData)
     {
-        sol::environment env1 = m_solState.createEnvironment();
-        sol::environment env2 = m_solState.createEnvironment();
+        sol::environment env1 = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
+        sol::environment env2 = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         ASSERT_TRUE(env1.valid());
         ASSERT_TRUE(env2.valid());
 
@@ -118,7 +181,7 @@ namespace rlogic::internal
         sol::function func = loadedScript();
 
         // Apply fresh environment to func
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         ASSERT_TRUE(env.valid());
         env.set_on(func);
 
@@ -142,7 +205,7 @@ namespace rlogic::internal
         sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
 
         // Apply a fresh environments to loaded script _before_ executing it
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         env.set_on(loadedScript);
         sol::function func = loadedScript();
 
@@ -166,7 +229,7 @@ namespace rlogic::internal
         std::string dataStatus = script();
         EXPECT_EQ(dataStatus, "no data");
 
-        sol::environment env = m_solState.createEnvironment();
+        sol::environment env = m_solState.createEnvironment({}, {}, EEnvironmentType::Runtime);
         ASSERT_TRUE(env.valid());
         env["data"] = "a lot of data!";
 

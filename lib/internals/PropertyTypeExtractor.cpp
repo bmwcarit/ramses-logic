@@ -149,7 +149,7 @@ namespace rlogic::internal
         return sol::object(state, sol::in_place_type<ArrayTypeInfo>, ArrayTypeInfo{arraySize, *arrayType});
     }
 
-    void PropertyTypeExtractor::RegisterTypesToEnvironment(sol::environment& environment)
+    void PropertyTypeExtractor::RegisterTypes(sol::environment& environment)
     {
         environment.new_usertype<ArrayTypeInfo>("ArrayTypeInfo");
         environment.new_usertype<PropertyTypeExtractor>("LuaScriptPropertyExtractor",

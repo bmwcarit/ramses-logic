@@ -75,7 +75,7 @@ int main(int argc, char* argv[])
      * Create a simple script which takes the current time in milliseconds
      * and rotates around the Z axis slowly based on how much time is passed
      */
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
             IN.time_msec = INT
             OUT.rotationZ = VEC3F

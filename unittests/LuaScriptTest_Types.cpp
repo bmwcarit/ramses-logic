@@ -19,7 +19,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, FailsToSetValueOfTopLevelInput_WhenTemplateDoesNotMatchDeclaredInputType)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithInputs);
         auto  inputs = script->getInputs();
 
         auto speedInt32  = inputs->getChild("speed");
@@ -47,7 +47,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, FailsToSetArrayDirectly)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.array_int = ARRAY(2, INT)
             end
@@ -65,7 +65,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, ProvidesIndexBasedAndNameBasedAccessToInputProperties)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithInputs);
         ASSERT_NE(nullptr, script);
         auto enabled_byIndex = script->getInputs()->getChild(0);
         EXPECT_NE(nullptr, enabled_byIndex);
@@ -77,7 +77,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, ProvidesIndexBasedAndNameBasedAccessToOutputProperties)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithOutputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithOutputs);
         ASSERT_NE(nullptr, script);
         auto enabled_byIndex = script->getOutputs()->getChild(0);
         EXPECT_NE(nullptr, enabled_byIndex);
@@ -89,7 +89,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, AssignsNameAndTypeToGlobalInputsStruct)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScript);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScript);
 
         auto inputs = script->getInputs();
 
@@ -100,7 +100,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, AssignsNameAndTypeToGlobalOutputsStruct)
     {
-        auto* script  = m_logicEngine.createLuaScriptFromSource(m_minimalScript);
+        auto* script  = m_logicEngine.createLuaScript(m_minimalScript);
         auto  outputs = script->getOutputs();
 
         ASSERT_EQ(0u, outputs->getChildCount());
@@ -110,7 +110,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Types, ReturnsItsTopLevelInputsByIndex_IndexEqualsLexicographicOrder)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithInputs);
 
         auto inputs = script->getInputs();
 
@@ -153,7 +153,7 @@ namespace rlogic
             end
         )";
 
-        auto* script = m_logicEngine.createLuaScriptFromSource(scriptWithArrays);
+        auto* script = m_logicEngine.createLuaScript(scriptWithArrays);
 
         std::initializer_list<const Property*> rootProperties = {script->getInputs(), script->getOutputs()};
 
@@ -211,7 +211,7 @@ namespace rlogic
             end
         )";
 
-        auto* script = m_logicEngine.createLuaScriptFromSource(scriptWithArrays);
+        auto* script = m_logicEngine.createLuaScript(scriptWithArrays);
 
         std::initializer_list<const Property*> rootProperties = { script->getInputs(), script->getOutputs() };
 

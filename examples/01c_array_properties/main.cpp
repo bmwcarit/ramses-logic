@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 
 #include <iostream>
@@ -21,7 +22,7 @@ int main()
     rlogic::LogicEngine logicEngine;
 
     // A script which demonstrates how to access vector and array properties
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
             IN.vec3f = VEC3F
 

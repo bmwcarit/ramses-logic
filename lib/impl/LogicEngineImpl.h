@@ -8,16 +8,14 @@
 
 #pragma once
 
-#include "internals/SolState.h"
-
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
-#include "internals/ApiObjects.h"
+#include "ramses-logic/ERotationType.h"
 #include "ramses-logic/AnimationTypes.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 
-#include <optional>
+#include <memory>
 #include <vector>
 #include <string>
 #include <string_view>
@@ -39,6 +37,7 @@ namespace rlogic
     class DataArray;
     class AnimationNode;
     class LuaScript;
+    class LuaModule;
     class LogicNode;
     class Property;
 }
@@ -50,8 +49,10 @@ namespace rlogic_serialization
 
 namespace rlogic::internal
 {
+    class LuaConfigImpl;
     class LogicNodeImpl;
     class RamsesBindingImpl;
+    class ApiObjects;
 
     class LogicEngineImpl
     {
@@ -68,8 +69,9 @@ namespace rlogic::internal
         LogicEngineImpl& operator=(const LogicEngineImpl& other) = delete;
 
         // Public API
-        LuaScript* createLuaScriptFromFile(std::string_view filename, std::string_view scriptName);
-        LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName);
+        LuaScript* createLuaScript(std::string_view source, const LuaConfigImpl& config, std::string_view scriptName);
+        LuaModule* createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName);
+        bool extractLuaDependencies(std::string_view source, const std::function<void(const std::string&)>& callbackFunc);
         RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
@@ -79,8 +81,8 @@ namespace rlogic::internal
 
         bool destroy(LogicObject& object);
 
-        bool                            update(bool disableDirtyTracking = false);
-        const std::vector<ErrorData>&   getErrors() const;
+        bool update(bool disableDirtyTracking = false);
+        [[nodiscard]] const std::vector<ErrorData>& getErrors() const;
 
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
@@ -92,11 +94,9 @@ namespace rlogic::internal
         [[nodiscard]] bool isLinked(const LogicNode& logicNode) const;
 
         [[nodiscard]] ApiObjects& getApiObjects();
-        [[nodiscard]] const ApiObjects& getApiObjects() const;
 
     private:
-        std::unique_ptr<SolState> m_luaState;
-        ApiObjects m_apiObjects;
+        std::unique_ptr<ApiObjects> m_apiObjects;
         ErrorReporting m_errors;
 
         void updateLinksRecursive(Property& inputProperty);

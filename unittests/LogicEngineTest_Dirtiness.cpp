@@ -13,6 +13,7 @@
 
 #include "LogicEngineTest_Base.h"
 #include "impl/LogicEngineImpl.h"
+#include "internals/ApiObjects.h"
 
 #include "RamsesTestUtils.h"
 
@@ -55,7 +56,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingScript)
     {
-        m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
+        m_logicEngine.createLuaScript(m_valid_empty_script);
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
@@ -79,7 +80,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, NotDirty_AfterCreatingObjectsAndCallingUpdate)
     {
-        m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
+        m_logicEngine.createLuaScript(m_valid_empty_script);
         m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "");
@@ -89,7 +90,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, Dirty_AfterSettingScriptInput)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
+        LuaScript* script = m_logicEngine.createLuaScript(m_minimal_script);
         m_logicEngine.update();
 
         script->getInputs()->getChild("data")->set<int32_t>(5);
@@ -101,7 +102,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, Dirty_AfterSettingNestedScriptInput)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_nested_properties_script);
+        LuaScript* script = m_logicEngine.createLuaScript(m_nested_properties_script);
         m_logicEngine.update();
 
         script->getInputs()->getChild("data")->getChild("nested")->set<int32_t>(5);
@@ -143,8 +144,8 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, Dirty_WhenAddingLink)
     {
-        LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
-        LuaScript* script2 = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
+        LuaScript* script1 = m_logicEngine.createLuaScript(m_minimal_script);
+        LuaScript* script2 = m_logicEngine.createLuaScript(m_minimal_script);
         m_logicEngine.update();
 
         m_logicEngine.link(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
@@ -155,8 +156,8 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, NotDirty_WhenRemovingLink)
     {
-        LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
-        LuaScript* script2 = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
+        LuaScript* script1 = m_logicEngine.createLuaScript(m_minimal_script);
+        LuaScript* script2 = m_logicEngine.createLuaScript(m_minimal_script);
         m_logicEngine.link(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
         m_logicEngine.update();
 
@@ -170,8 +171,8 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Dirtiness, NotDirty_WhenRemovingNestedLink)
     {
-        LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_nested_properties_script);
-        LuaScript* script2 = m_logicEngine.createLuaScriptFromSource(m_nested_properties_script);
+        LuaScript* script1 = m_logicEngine.createLuaScript(m_nested_properties_script);
+        LuaScript* script2 = m_logicEngine.createLuaScript(m_nested_properties_script);
         m_logicEngine.link(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
         m_logicEngine.update();
 
@@ -186,8 +187,8 @@ namespace rlogic::internal
     // Removing link does not mark things dirty, but setting value does
     TEST_F(ALogicEngine_Dirtiness, Dirty_WhenRemovingLink_AndSettingValueByCallingSetAfterwards)
     {
-        LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(m_nested_properties_script);
-        LuaScript* script2 = m_logicEngine.createLuaScriptFromSource(m_nested_properties_script);
+        LuaScript* script1 = m_logicEngine.createLuaScript(m_nested_properties_script);
+        LuaScript* script2 = m_logicEngine.createLuaScript(m_nested_properties_script);
         m_logicEngine.update();
 
         m_logicEngine.link(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
@@ -209,7 +210,7 @@ namespace rlogic::internal
             end
         )";
 
-        m_logicEngine.createLuaScriptFromSource(scriptWithError);
+        m_logicEngine.createLuaScript(scriptWithError);
         EXPECT_FALSE(m_logicEngine.update());
 
         EXPECT_TRUE(m_apiObjects.isDirty());
@@ -233,8 +234,8 @@ namespace rlogic::internal
             end
         )";
 
-        LuaScript* script1 = m_logicEngine.createLuaScriptFromSource(scriptWithFixableError);
-        LuaScript* script2 = m_logicEngine.createLuaScriptFromSource(m_minimal_script);
+        LuaScript* script1 = m_logicEngine.createLuaScript(scriptWithFixableError);
+        LuaScript* script2 = m_logicEngine.createLuaScript(m_minimal_script);
 
         // No error -> have normal run -> nothing is dirty
         script1->getInputs()->getChild("triggerError")->set<bool>(false);
@@ -277,7 +278,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, NotDirtyAfterCreatingScript)
     {
-        m_logicEngine.createLuaScriptFromSource(m_valid_empty_script);
+        m_logicEngine.createLuaScript(m_valid_empty_script);
         EXPECT_FALSE(m_apiObjects.bindingsDirty());
     }
 
@@ -334,7 +335,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenAddingLink)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
+        LuaScript* script = m_logicEngine.createLuaScript(m_bindningDataScript);
         RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.update();
 
@@ -348,7 +349,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_BindingDirtiness, NotDirty_WhenRemovingLink)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
+        LuaScript* script = m_logicEngine.createLuaScript(m_bindningDataScript);
         RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation"));
         m_logicEngine.update();
@@ -365,7 +366,7 @@ namespace rlogic::internal
     // executed when adding link, even if the link was just "re-added"
     TEST_F(ALogicEngine_BindingDirtiness, Dirty_WhenReAddingLink)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(m_bindningDataScript);
+        LuaScript* script = m_logicEngine.createLuaScript(m_bindningDataScript);
         RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("vec3f"), *binding->getInputs()->getChild("rotation")));
         m_logicEngine.update();

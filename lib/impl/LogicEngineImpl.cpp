@@ -7,13 +7,16 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/LogicEngineImpl.h"
-#include "impl/LuaScriptImpl.h"
-
+#include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
+#include "impl/LuaModuleImpl.h"
+#include "impl/LuaConfigImpl.h"
+
 #include "internals/FileUtils.h"
 #include "internals/TypeUtils.h"
 #include "internals/FileFormatVersions.h"
 #include "internals/RamsesObjectResolver.h"
+#include "internals/ApiObjects.h"
 
 // TODO Violin remove these header dependencies
 #include "ramses-logic/RamsesNodeBinding.h"
@@ -21,6 +24,8 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/DataArray.h"
+#include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaModule.h"
 
 #include "ramses-logic-build-config.h"
 #include "generated/LogicEngineGen.h"
@@ -36,59 +41,53 @@
 namespace rlogic::internal
 {
     LogicEngineImpl::LogicEngineImpl()
-        : m_luaState(std::make_unique<SolState>())
+        : m_apiObjects(std::make_unique<ApiObjects>())
     {
     }
 
     LogicEngineImpl::~LogicEngineImpl() noexcept = default;
 
-    LuaScript* LogicEngineImpl::createLuaScriptFromFile(std::string_view filename, std::string_view scriptName)
+    LuaScript* LogicEngineImpl::createLuaScript(std::string_view source, const LuaConfigImpl& config, std::string_view scriptName)
     {
         m_errors.clear();
-
-        std::string filenameStr{ filename };
-        std::ifstream iStream;
-        iStream.open(filenameStr, std::ios_base::in);
-        if (iStream.fail())
-        {
-            m_errors.add("Failed opening file " + filenameStr + "!", nullptr);
-            return nullptr;
-        }
-
-        std::string source(std::istreambuf_iterator<char>(iStream), std::istreambuf_iterator<char>{});
-        std::optional<LuaCompiledScript> compiledScript = LuaCompilationUtils::Compile(*m_luaState, std::move(source), scriptName, std::move(filenameStr), m_errors);
-        if (!compiledScript)
-            return nullptr;
-
-        return m_apiObjects.createLuaScript(std::move(*compiledScript), scriptName);
+        return m_apiObjects->createLuaScript(source, config, scriptName, m_errors);
     }
 
-    LuaScript* LogicEngineImpl::createLuaScriptFromSource(std::string_view source, std::string_view scriptName)
+    LuaModule* LogicEngineImpl::createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName)
     {
         m_errors.clear();
-        std::optional<LuaCompiledScript> compiledScript = LuaCompilationUtils::Compile(*m_luaState, std::string{ source }, scriptName, "", m_errors);
-        if (!compiledScript)
-            return nullptr;
+        return m_apiObjects->createLuaModule(source, config, moduleName, m_errors);
+    }
 
-        return m_apiObjects.createLuaScript(std::move(*compiledScript), scriptName);
+    bool LogicEngineImpl::extractLuaDependencies(std::string_view source, const std::function<void(const std::string&)>& callbackFunc)
+    {
+        m_errors.clear();
+        const std::optional<std::vector<std::string>> extractedDependencies = LuaCompilationUtils::ExtractModuleDependencies(source, m_errors);
+        if (!extractedDependencies)
+            return false;
+
+        for (const auto& dep : *extractedDependencies)
+            callbackFunc(dep);
+
+        return true;
     }
 
     RamsesNodeBinding* LogicEngineImpl::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesNodeBinding(ramsesNode, rotationType,  name);
+        return m_apiObjects->createRamsesNodeBinding(ramsesNode, rotationType,  name);
     }
 
     RamsesAppearanceBinding* LogicEngineImpl::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesAppearanceBinding(ramsesAppearance, name);
+        return m_apiObjects->createRamsesAppearanceBinding(ramsesAppearance, name);
     }
 
     RamsesCameraBinding* LogicEngineImpl::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects.createRamsesCameraBinding(ramsesCamera, name);
+        return m_apiObjects->createRamsesCameraBinding(ramsesCamera, name);
     }
 
     template <typename T>
@@ -102,7 +101,7 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        return m_apiObjects.createDataArray(data, name);
+        return m_apiObjects->createDataArray(data, name);
     }
 
     rlogic::AnimationNode* LogicEngineImpl::createAnimationNode(const AnimationChannels& channels, std::string_view name)
@@ -110,7 +109,7 @@ namespace rlogic::internal
         m_errors.clear();
 
         auto containsDataArray = [this](const DataArray* da) {
-            const auto& dataArrays = m_apiObjects.getDataArrays();
+            const auto& dataArrays = m_apiObjects->getDataArrays();
             const auto it = std::find_if(dataArrays.cbegin(), dataArrays.cend(),
                 [da](const auto& d) { return d.get() == da; });
             return it != dataArrays.cend();
@@ -194,18 +193,18 @@ namespace rlogic::internal
             }
         }
 
-        return m_apiObjects.createAnimationNode(channels, name);
+        return m_apiObjects->createAnimationNode(channels, name);
     }
 
     bool LogicEngineImpl::destroy(LogicObject& object)
     {
         m_errors.clear();
-        return m_apiObjects.destroy(object, m_errors);
+        return m_apiObjects->destroy(object, m_errors);
     }
 
     bool LogicEngineImpl::isLinked(const LogicNode& logicNode) const
     {
-        return m_apiObjects.getLogicNodeDependencies().isLinked(logicNode.m_impl);
+        return m_apiObjects->getLogicNodeDependencies().isLinked(logicNode.m_impl);
     }
 
     void LogicEngineImpl::updateLinksRecursive(Property& inputProperty)
@@ -222,7 +221,7 @@ namespace rlogic::internal
             }
             else
             {
-                const PropertyImpl* output = m_apiObjects.getLogicNodeDependencies().getLinkedOutput(*child.m_impl);
+                const PropertyImpl* output = m_apiObjects->getLogicNodeDependencies().getLinkedOutput(*child.m_impl);
                 if (nullptr != output)
                 {
                     child.m_impl->setValue(output->getValue(), true);
@@ -236,7 +235,7 @@ namespace rlogic::internal
         m_errors.clear();
         LOG_DEBUG("Begin update");
 
-        const std::optional<NodeVector> sortedNodes = m_apiObjects.getLogicNodeDependencies().getTopologicallySortedNodes();
+        const std::optional<NodeVector> sortedNodes = m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes();
         if (!sortedNodes)
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!", nullptr);
@@ -263,7 +262,7 @@ namespace rlogic::internal
             const std::optional<LogicNodeRuntimeError> potentialError = node.update();
             if (potentialError)
             {
-                m_errors.add(potentialError->message, m_apiObjects.getApiObject(node));
+                m_errors.add(potentialError->message, m_apiObjects->getApiObject(node));
                 return false;
             }
         }
@@ -377,8 +376,7 @@ namespace rlogic::internal
 
         RamsesObjectResolver ramsesResolver(m_errors, scene);
 
-        // TODO Violin also use fresh Lua environment, so that we don't pollute current one when loading failed
-        std::optional<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*m_luaState, *logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
+        std::unique_ptr<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
 
         if (!deserializedObjects)
         {
@@ -386,7 +384,7 @@ namespace rlogic::internal
         }
 
         // No errors -> move data into member
-        m_apiObjects = std::move(*deserializedObjects);
+        m_apiObjects = std::move(deserializedObjects);
 
         return true;
     }
@@ -395,20 +393,20 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
-        if (!m_apiObjects.checkBindingsReferToSameRamsesScene(m_errors))
+        if (!m_apiObjects->checkBindingsReferToSameRamsesScene(m_errors))
         {
             m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!", nullptr);
             return false;
         }
 
         // Refuse save() if logic graph has loops
-        if (!m_apiObjects.getLogicNodeDependencies().getTopologicallySortedNodes())
+        if (!m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes())
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!", nullptr);
             return false;
         }
 
-        if (m_apiObjects.bindingsDirty())
+        if (m_apiObjects->bindingsDirty())
         {
             LOG_WARN("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!");
         }
@@ -434,7 +432,7 @@ namespace rlogic::internal
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
             ramsesVersionOffset,
             ramsesLogicVersionOffset,
-            ApiObjects::Serialize(m_apiObjects, builder));
+            ApiObjects::Serialize(*m_apiObjects, builder));
         builder.Finish(logicEngine);
 
         if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
@@ -450,24 +448,19 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
-        return m_apiObjects.getLogicNodeDependencies().link(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
+        return m_apiObjects->getLogicNodeDependencies().link(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
     }
 
     bool LogicEngineImpl::unlink(const Property& sourceProperty, const Property& targetProperty)
     {
         m_errors.clear();
 
-        return m_apiObjects.getLogicNodeDependencies().unlink(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
+        return m_apiObjects->getLogicNodeDependencies().unlink(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
     }
 
     ApiObjects& LogicEngineImpl::getApiObjects()
     {
-        return m_apiObjects;
-    }
-
-    const ApiObjects& LogicEngineImpl::getApiObjects() const
-    {
-        return m_apiObjects;
+        return *m_apiObjects;
     }
 
     template DataArray* LogicEngineImpl::createDataArray<float>(const std::vector<float>&, std::string_view name);

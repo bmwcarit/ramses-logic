@@ -8,6 +8,7 @@
 
 #include "gtest/gtest.h"
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/Property.h"
@@ -102,12 +103,12 @@ namespace rlogic::internal
         end
         )";
 
-        const auto scriptMain = m_logicEngine.createLuaScriptFromSource(scriptMainSrc, "scriptMain");
-        const auto scriptDelayPlayAnim2 = m_logicEngine.createLuaScriptFromSource(scriptDelayPlaySrc, "scriptDelayPlayAnim2");
-        const auto scriptDelayPlayAnim3 = m_logicEngine.createLuaScriptFromSource(scriptDelayPlaySrc, "scriptDelayPlayAnim3");
-        const auto scriptScalarToVec1 = m_logicEngine.createLuaScriptFromSource(scriptScalarToVecSrc, "scriptScalarToVec1");
-        const auto scriptScalarToVec2 = m_logicEngine.createLuaScriptFromSource(scriptScalarToVecSrc, "scriptScalarToVec2");
-        const auto scriptScalarToVec3 = m_logicEngine.createLuaScriptFromSource(scriptScalarToVecSrc, "scriptScalarToVec3");
+        const auto scriptMain = m_logicEngine.createLuaScript(scriptMainSrc);
+        const auto scriptDelayPlayAnim2 = m_logicEngine.createLuaScript(scriptDelayPlaySrc);
+        const auto scriptDelayPlayAnim3 = m_logicEngine.createLuaScript(scriptDelayPlaySrc);
+        const auto scriptScalarToVec1 = m_logicEngine.createLuaScript(scriptScalarToVecSrc);
+        const auto scriptScalarToVec2 = m_logicEngine.createLuaScript(scriptScalarToVecSrc);
+        const auto scriptScalarToVec3 = m_logicEngine.createLuaScript(scriptScalarToVecSrc);
 
         const auto* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
 

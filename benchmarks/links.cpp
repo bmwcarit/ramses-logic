@@ -9,6 +9,7 @@
 #include "benchmark/benchmark.h"
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "impl/LogicEngineImpl.h"
 #include "ramses-logic/Property.h"
 
@@ -33,8 +34,8 @@ namespace rlogic
             end
         )", propertyCount);
 
-        LuaScript* srcScript = logicEngine.createLuaScriptFromSource(scriptSrc);
-        LuaScript* destScript = logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* srcScript = logicEngine.createLuaScript(scriptSrc);
+        LuaScript* destScript = logicEngine.createLuaScript(scriptSrc);
         const Property* from = srcScript->getOutputs()->getChild("src0");
         Property* to = destScript->getInputs()->getChild("target0");
 
@@ -72,7 +73,7 @@ namespace rlogic
         std::vector<LuaScript*> scripts(scriptCount);
         for (int64_t i = 0; i < scriptCount; ++i)
         {
-            scripts[i] = logicEngine.createLuaScriptFromSource(scriptSrc);
+            scripts[i] = logicEngine.createLuaScript(scriptSrc);
 
             if (i >= 1)
             {

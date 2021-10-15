@@ -12,7 +12,7 @@
 
 namespace rlogic::internal
 {
-    void ErrorReporting::add(std::string errorMessage, LogicObject* logicObject)
+    void ErrorReporting::add(std::string errorMessage, const LogicObject* logicObject)
     {
         if (logicObject)
         {

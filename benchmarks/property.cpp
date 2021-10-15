@@ -9,6 +9,7 @@
 #include "benchmark/benchmark.h"
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 
 #include "impl/LogicEngineImpl.h"
@@ -32,7 +33,7 @@ namespace rlogic
             end
         )", propertyCount);
 
-        LuaScript* script = logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = logicEngine.createLuaScript(scriptSrc);
         Property* property = script->getInputs()->getChild("param0");
         // Need different value, otherwise triggers internal caching (can't disable value check)
         int32_t increasingValue = 0;

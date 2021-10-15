@@ -9,9 +9,9 @@
 #pragma once
 
 #include "ramses-logic/APIExport.h"
-#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Collection.h"
 #include "ramses-logic/ErrorData.h"
+#include "ramses-logic/LuaConfig.h"
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/ERotationType.h"
@@ -34,7 +34,10 @@ namespace rlogic::internal
 
 namespace rlogic
 {
+    class LogicNode;
     class LuaScript;
+    class LuaModule;
+    class Property;
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
@@ -69,6 +72,13 @@ namespace rlogic
          * @return an iterable #rlogic::Collection with all #rlogic::LuaScript instances created by this #LogicEngine
          */
         [[nodiscard]] RLOGIC_API Collection<LuaScript> scripts() const;
+
+        /**
+        * Returns an iterable #rlogic::Collection of all #rlogic::LuaModule instances created by this #LogicEngine.
+        *
+        * @return an iterable #rlogic::Collection with all #rlogic::LuaModule instances created by this #LogicEngine
+        */
+        [[nodiscard]] RLOGIC_API Collection<LuaModule> luaModules() const;
 
         /**
          * Returns an iterable #rlogic::Collection of all #rlogic::RamsesNodeBinding instances created by this #LogicEngine.
@@ -114,6 +124,16 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API const LuaScript* findScript(std::string_view name) const;
         /// @copydoc findScript(std::string_view) const
         [[nodiscard]] RLOGIC_API LuaScript* findScript(std::string_view name);
+
+        /**
+        * Returns a pointer to the first occurrence of a #rlogic::LuaModule with a given \p name if such exists, and nullptr otherwise.
+        *
+        * @param name the name of the module to search for
+        * @return a pointer to the script, or nullptr if none was found
+        */
+        [[nodiscard]] RLOGIC_API const LuaModule* findLuaModule(std::string_view name) const;
+        /// @copydoc findScript(std::string_view) const
+        [[nodiscard]] RLOGIC_API LuaModule* findLuaModule(std::string_view name);
 
         /**
          * Returns a pointer to the first occurrence of a node binding with a given \p name if such exists, and nullptr otherwise.
@@ -166,32 +186,84 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API AnimationNode* findAnimationNode(std::string_view name);
 
         /**
-         * Creates a new #rlogic::LuaScript from an existing Lua source file. Refer to the #rlogic::LuaScript class documentation
-         * for requirements that Lua scripts must fulfill in order to be added to the #LogicEngine.
-         *
-         * Attention! This method clears all previous errors! See also docs of #getErrors()
-         *
-         * @param filename path to file from which to load the script source code
-         * @param scriptName name to assign to the script once it's created
-         * @return a pointer to the created object or nullptr if
-         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
-         * The script can be destroyed by calling the #destroy method
-         */
-        RLOGIC_API LuaScript* createLuaScriptFromFile(std::string_view filename, std::string_view scriptName = "");
+        * Creates a new Lua script from a source string. Refer to the #rlogic::LuaScript class
+        * for requirements which Lua scripts must fulfill in order to be added to the #LogicEngine.
+        * You can optionally provide Lua module dependencies via the \p config, they will be accessible
+        * under their configured alias name for use by the script. The provided module dependencies
+        * must exactly match the declared dependencies in source code (see #extractLuaDependencies).
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param source the Lua source code
+        * @param config configuration options, e.g. for module dependencies
+        * @param scriptName name to assign to the script once it's created
+        * @return a pointer to the created object or nullptr if
+        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+        * The script can be destroyed by calling the #destroy method
+        */
+        RLOGIC_API LuaScript* createLuaScript(
+            std::string_view source,
+            const LuaConfig& config = {},
+            std::string_view scriptName = "");
 
         /**
-         * Creates a new Lua script from a source string. Refer to the #rlogic::LuaScript class
-         * for requirements which Lua scripts must fulfill in order to be added to the #LogicEngine.
+         * Creates a new #rlogic::LuaModule from Lua source code.
+         * LuaModules can be used to share code and data constants across scripts or
+         * other modules. See also #createLuaScript and #rlogic::LuaConfig for details.
+         * You can optionally provide Lua module dependencies via the \p config, they will be accessible
+         * under their configured alias name for use by the module. The provided module dependencies
+         * must exactly match the declared dependencies in source code (see #extractLuaDependencies).
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
-         * @param source the Lua source code
-         * @param scriptName name to assign to the script once it's created
+         * @param source module source code
+         * @param config configuration options, e.g. for module dependencies
+         * @param moduleName name to assign to the module once it's created
          * @return a pointer to the created object or nullptr if
          * something went wrong during creation. In that case, use #getErrors() to obtain errors.
          * The script can be destroyed by calling the #destroy method
          */
-        RLOGIC_API LuaScript* createLuaScriptFromSource(std::string_view source, std::string_view scriptName = "");
+        RLOGIC_API LuaModule* createLuaModule(
+            std::string_view source,
+            const LuaConfig& config = {},
+            std::string_view moduleName = "");
+
+        /**
+         * Extracts dependencies from a Lua script or module source code so that the corresponding
+         * modules can be provided when creating #rlogic::LuaScript or #rlogic::LuaModule.
+         *
+         * Any #rlogic::LuaScript or #rlogic::LuaModule which has a module dependency,
+         * i.e. it requires another #rlogic::LuaModule for it to work, must explicitly declare these
+         * dependencies directly in their source code by calling function 'modules' in global space
+         * and pass list of module names it depends on, for example:
+         *   \code{.lua}
+         *       modules("foo", "bar")
+         *       function interface()
+         *         OUT.x = foo.myType()
+         *       end
+         *       function run()
+         *         OUT.x = bar.doSth()
+         *       end
+         *   \endcode
+         * The 'modules' function does not affect any other part of the source code in any way,
+         * it is used only for the purpose of explicit declaration and extraction of its dependencies.
+         *
+         * Please note that script runtime errors are ignored during extraction. In case a runtime
+         * error prevents the 'modules' function to be called, this method will still succeed
+         * but will not extract any modules, i.e. will not call \c callbackFunc. It is therefore
+         * highly recommended to put the modules declaration always at the beginning of every script
+         * before any other code so it will get executed even if there is runtime error later in the code.
+         *
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param source source code of module or script to parse for dependencies
+         * @param callbackFunc function callback will be called for each dependency found
+         * @return \c true if extraction succeeded (also if no dependencies found) or \c false if
+         * something went wrong. In that case, use #getErrors() to obtain errors.
+         */
+        RLOGIC_API bool extractLuaDependencies(
+            std::string_view source,
+            const std::function<void(const std::string&)>& callbackFunc);
 
         /**
          * Creates a new #rlogic::RamsesNodeBinding which can be used to set the properties of a Ramses Node object.
@@ -356,10 +428,14 @@ namespace rlogic
         * Destroys an instance of an object created with #LogicEngine.
         * All objects created using #LogicEngine derive from a base class #rlogic::LogicObject
         * and can be destroyed using this method.
+        *
         * In case of a #rlogic::LogicNode and its derived classes, if any links are connected to this #rlogic::LogicNode,
         * they will be destroyed too. Note that after this call, the execution order of #rlogic::LogicNode may change! See the
         * docs of #link and #unlink for more information.
-        * In case of a #rlogic::DataArray, destroy will fail it is used in any #rlogic::AnimationNode's #rlogic::AnimationChannel.
+        *
+        * In case of a #rlogic::DataArray, destroy will fail if it is used in any #rlogic::AnimationNode's #rlogic::AnimationChannel.
+        *
+        * In case of a #rlogic::LuaModule, destroy will fail if it is used in any #rlogic::LuaScript.
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
@@ -442,7 +518,7 @@ namespace rlogic
         *
         * @param other logic engine to move from
         */
-        LogicEngine(LogicEngine&& other) noexcept;
+        RLOGIC_API LogicEngine(LogicEngine&& other) noexcept;
 
         /**
         * Assignment operator of LogicEngine is deleted because logic engines hold named resources and are not supposed to be copied
@@ -456,7 +532,7 @@ namespace rlogic
         *
         * @param other logic engine to move from
         */
-        LogicEngine& operator=(LogicEngine&& other) noexcept;
+        RLOGIC_API LogicEngine& operator=(LogicEngine&& other) noexcept;
 
         /**
         * Implementation detail of LogicEngine

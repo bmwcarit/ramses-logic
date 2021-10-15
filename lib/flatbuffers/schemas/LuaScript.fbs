@@ -7,15 +7,18 @@
 //  -------------------------------------------------------------------------
 
 include "Property.fbs";
+include "LuaModule.fbs";
 
 namespace rlogic_serialization;
 
 table LuaScript
 {
     name:string;
-    filename:string;
+    filename:string; // TODO VersionBreak remove filename, it's obsolete
     luaSourceCode:string;
     // These are cached because they hold the property values
     rootInput:Property;
     rootOutput:Property;
+    dependencies:[LuaModuleUsage];
+    standardModules:[uint8];
 }

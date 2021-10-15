@@ -22,11 +22,6 @@ namespace rlogic
 
     LuaScript::~LuaScript() noexcept = default;
 
-    std::string_view LuaScript::getFilename() const
-    {
-        return m_script.getFilename();
-    }
-
     void LuaScript::overrideLuaPrint(LuaPrintFunction luaPrintFunction)
     {
         m_script.overrideLuaPrint(std::move(luaPrintFunction));

@@ -17,7 +17,7 @@ namespace rlogic::internal
         sol::state sol;
         sol::environment env(sol, sol::create, sol.globals());
 
-        PropertyTypeExtractor::RegisterTypesToEnvironment(env);
+        PropertyTypeExtractor::RegisterTypes(env);
 
         // Environment now has the type symbols (data types, declaration functions)
         EXPECT_TRUE(env["INT"].valid());
@@ -38,7 +38,7 @@ namespace rlogic::internal
         APropertyTypeExtractor()
             : m_env(m_sol, sol::create, m_sol.globals())
         {
-            PropertyTypeExtractor::RegisterTypesToEnvironment(m_env);
+            PropertyTypeExtractor::RegisterTypes(m_env);
         }
 
         HierarchicalTypeData extractTypeInfo(std::string_view source)

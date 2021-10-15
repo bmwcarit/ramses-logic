@@ -17,7 +17,7 @@ int main()
 {
     std::cout << "Start ramses-logic-submodule-check\n";
     rlogic::LogicEngine logicEngine;
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
             IN.int = INT
             OUT.float = FLOAT

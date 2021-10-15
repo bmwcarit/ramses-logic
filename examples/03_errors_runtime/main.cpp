@@ -7,6 +7,8 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
+
 #include <cassert>
 #include <iostream>
 
@@ -22,7 +24,7 @@ int main()
      * valid syntax, but the type check of the Logic engine will fire a runtime
      * error for trying to assign a string to a VEC4F property
      */
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* faultyScript = logicEngine.createLuaScript(R"(
         function interface()
             OUT.vec4f = VEC4F
         end
@@ -30,10 +32,10 @@ int main()
         function run()
             OUT.vec4f = "this is not a table with 4 floats and will trigger a runtime error!"
         end
-    )", "FaultyScript");
+    )");
 
     // Script is successfully created, as it is syntactically correct
-    assert(script != nullptr);
+    assert(faultyScript != nullptr);
 
     /**
      * Update the logic engine including our script
@@ -55,7 +57,7 @@ int main()
         std::cout << "Script '" << error.object->getName() << "' caused a runtime error:\n" << error.message << std::endl;
     }
 
-    logicEngine.destroy(*script);
+    logicEngine.destroy(*faultyScript);
 
     return 0;
 }

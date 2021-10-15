@@ -8,12 +8,14 @@
 
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/Property.h"
+#include "ramses-logic/LuaModule.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/EStandardModule.h"
 
 #include "ramses-client.h"
 #include "ramses-utils.h"
@@ -57,7 +59,7 @@ int main(int argc, char* argv[])
     scene->flush();
     rlogic::LogicEngine logicEngine;
 
-    rlogic::LuaScript* script1 = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* script1 = logicEngine.createLuaScript(R"(
         function interface()
             IN.intInput =      INT
             IN.vec2iInput =    VEC2I
@@ -83,30 +85,65 @@ int main(int argc, char* argv[])
             OUT.floatOutput = IN.floatInput
             OUT.nodeTranslation = {IN.floatInput, 2, 3}
         end
-    )", "script1");
-    rlogic::LuaScript* script2 = logicEngine.createLuaScriptFromSource(R"(
+    )", {}, "script1");
+
+    const auto luaNestedModuleMath = logicEngine.createLuaModule(R"(
+            local mymath = {}
+            function mymath.sub(a,b)
+                return a - b
+            end
+            return mymath
+        )");
+
+    rlogic::LuaConfig config;
+    config.addDependency("nestedMath", *luaNestedModuleMath);
+
+    const auto luaModuleMath = logicEngine.createLuaModule(R"(
+            local mymath = {}
+            mymath.sub=nestedMath.sub
+            function mymath.add(a,b)
+                return a + b
+            end
+            return mymath
+        )", config, "moduleMath");
+
+    const auto luaModuleTypes = logicEngine.createLuaModule(R"(
+            local mytypes = {}
+            function mytypes.camViewport()
+                return {
+                    offsetX = INT,
+                    offsetY = INT,
+                    width = INT,
+                    height = INT
+                }
+            end
+            return mytypes
+        )", {}, "moduleTypes");
+
+    config = {};
+    config.addDependency("modulemath", *luaModuleMath);
+    config.addDependency("moduletypes", *luaModuleTypes);
+    config.addStandardModuleDependency(rlogic::EStandardModule::Math);
+
+    rlogic::LuaScript* script2 = logicEngine.createLuaScript(R"(
         function interface()
             IN.floatInput = FLOAT
-
-            OUT.cameraViewport = {
-                offsetX = INT,
-                offsetY = INT,
-                width = INT,
-                height = INT
-            }
+            OUT.cameraViewport = moduletypes.camViewport()
             OUT.floatUniform = FLOAT
+            OUT.nestedModulesResult = INT
         end
         function run()
             OUT.floatUniform = IN.floatInput + 5.0
             local roundedFloat = math.ceil(IN.floatInput)
             OUT.cameraViewport = {
-                offsetX = 2 + roundedFloat,
-                offsetY = 4 + roundedFloat,
-                width = 100 + roundedFloat,
-                height = 200 + roundedFloat
+                offsetX = modulemath.add(2, roundedFloat),
+                offsetY = modulemath.add(4, roundedFloat),
+                width = modulemath.add(100, roundedFloat),
+                height = modulemath.add(200, roundedFloat)
             }
+            OUT.nestedModulesResult = modulemath.sub(1000, roundedFloat)
         end
-    )", "script2");
+    )", config, "script2");
 
     ramses::Node* node = { scene->createNode("test node") };
     ramses::OrthographicCamera* camera = { scene->createOrthographicCamera("test camera") };
@@ -127,7 +164,12 @@ int main(int argc, char* argv[])
     logicEngine.link(*script2->getOutputs()->getChild("floatUniform"), *appBinding->getInputs()->getChild("floatUniform"));
     logicEngine.link(*animNode->getOutputs()->getChild("channel"), *appBinding->getInputs()->getChild("animatedFloatUniform"));
 
-    logicEngine.update();
+    bool success = logicEngine.update();
+
+    if(!success)
+    {
+        return 1;
+    }
 
     logicEngine.saveToFile("testLogic.bin");
     scene->saveToFile("testScene.bin", false);

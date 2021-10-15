@@ -12,6 +12,6 @@
 
 namespace rlogic::internal
 {
-    // Always bump this with any file schema changes
+    // Always bump this with breaking file schema changes
     constexpr uint32_t g_FileFormatVersion = 2;
 }

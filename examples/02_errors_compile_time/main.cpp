@@ -22,16 +22,16 @@ int main()
      * Try to compile a script which has invalid Lua syntax
      * Giving a name to the script helps identify the source of the issue
      */
-    rlogic::LuaScript* script = logicEngine.createLuaScriptFromSource(R"(
+    rlogic::LuaScript* faultyScript = logicEngine.createLuaScript(R"(
         function interface()
             this.does.not.compile
         end
         function run()
         end
-    )", "FaultyScript");
+    )");
 
     // script is nullptr because of the compilation error
-    if (nullptr == script)
+    if (nullptr == faultyScript)
     {
         /**
          * To get further information about the issue, fetch errors from LogicEngine

@@ -20,7 +20,7 @@ namespace rlogic::internal
         PropertyTypeExtractor(std::string rootName, EPropertyType rootType);
 
         // Obtain collected type info
-        HierarchicalTypeData getExtractedTypeData() const;
+        [[nodiscard]] HierarchicalTypeData getExtractedTypeData() const;
 
         // Lua overloads
         std::reference_wrapper<PropertyTypeExtractor> index(const sol::object& propertyName);
@@ -28,7 +28,7 @@ namespace rlogic::internal
         static sol::object CreateArray(sol::this_state state, const sol::object& size, std::optional<sol::object> arrayType);
 
         // Register symbols for type extraction to sol environment
-        static void RegisterTypesToEnvironment(sol::environment& environment);
+        static void RegisterTypes(sol::environment& environment);
 
     private:
         TypeData m_typeData;

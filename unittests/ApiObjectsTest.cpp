@@ -21,6 +21,7 @@
 #include "impl/RamsesCameraBindingImpl.h"
 
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaModule.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
@@ -38,7 +39,6 @@ namespace rlogic::internal
     class AnApiObjects : public ::testing::Test
     {
     protected:
-        SolState        m_state;
         ErrorReporting  m_errorReporting;
         ApiObjects      m_apiObjects;
         flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
@@ -60,14 +60,12 @@ namespace rlogic::internal
 
         LuaScript* createScript()
         {
-            return createScript(m_apiObjects, m_state, m_valid_empty_script);
+            return createScript(m_apiObjects, m_valid_empty_script);
         }
 
-        LuaScript* createScript(ApiObjects& apiObjects, SolState& solState, std::string_view source)
+        LuaScript* createScript(ApiObjects& apiObjects, std::string_view source)
         {
-            auto compiledScript = LuaCompilationUtils::Compile(solState, std::string{ source }, "script", "", m_errorReporting);
-            EXPECT_TRUE(compiledScript);
-            auto script = apiObjects.createLuaScript(std::move(*compiledScript), "script");
+            auto script = apiObjects.createLuaScript(source, {}, "script", m_errorReporting);
             EXPECT_NE(nullptr, script);
             return script;
         }
@@ -92,7 +90,7 @@ namespace rlogic::internal
     TEST_F(AnApiObjects, ProducesErrorsWhenDestroyingScriptFromAnotherClassInstance)
     {
         ApiObjects otherInstance;
-        LuaScript* script = createScript(otherInstance, m_state, m_valid_empty_script);
+        LuaScript* script = createScript(otherInstance, m_valid_empty_script);
         ASSERT_FALSE(m_apiObjects.destroy(*script, m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find script in logic engine!");
@@ -100,6 +98,21 @@ namespace rlogic::internal
 
         // Did not affect existence in otherInstance!
         EXPECT_EQ(script, otherInstance.getApiObject(script->m_impl));
+    }
+
+    TEST_F(AnApiObjects, CreatesLuaModule)
+    {
+        const std::string_view moduleSrc = R"(
+            local mymath = {}
+            return mymath
+        )";
+
+        auto module = m_apiObjects.createLuaModule(moduleSrc, {}, "module", m_errorReporting);
+        EXPECT_NE(nullptr, module);
+
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        ASSERT_EQ(1u, m_apiObjects.getLuaModules().size());
+        EXPECT_EQ(module, m_apiObjects.getLuaModules().front().get());
     }
 
     TEST_F(AnApiObjects, CreatesRamsesNodeBindingWithoutErrors)
@@ -232,7 +245,7 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray3);
         m_errorReporting.clear();
 
-        EXPECT_FALSE(m_apiObjects.destroy(*dataArray4, m_errorReporting));
+        EXPECT_FALSE(m_apiObjects.destroy(*dataArray4,  m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Failed to destroy data array 'data4', it is used in animation node 'animNode' channel 'channel2'");
         EXPECT_EQ(m_errorReporting.getErrors()[0].object, dataArray4);
@@ -297,25 +310,6 @@ namespace rlogic::internal
 
         // Did not affect existence in otherInstance!
         EXPECT_TRUE(m_apiObjects.getAnimationNodes().empty());
-    }
-
-    TEST_F(AnApiObjects, CanBeMovedWithoutChangingObjectAddresses)
-    {
-        const LuaScript* script = createScript();
-        RamsesNodeBinding* ramsesNodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
-        RamsesAppearanceBinding* appBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
-        RamsesCameraBinding* camBinding = m_apiObjects.createRamsesCameraBinding(*m_camera, "CameraBinding");
-
-        ApiObjects movedObjects(std::move(m_apiObjects));
-        EXPECT_EQ(script, movedObjects.getScripts()[0].get());
-        EXPECT_EQ(ramsesNodeBinding, movedObjects.getNodeBindings()[0].get());
-        EXPECT_EQ(appBinding, movedObjects.getAppearanceBindings()[0].get());
-        EXPECT_EQ(camBinding, movedObjects.getCameraBindings()[0].get());
-
-        EXPECT_EQ(script, movedObjects.getApiObject(script->m_impl));
-        EXPECT_EQ(ramsesNodeBinding, movedObjects.getApiObject(ramsesNodeBinding->m_impl));
-        EXPECT_EQ(appBinding, movedObjects.getApiObject(appBinding->m_impl));
-        EXPECT_EQ(camBinding, movedObjects.getApiObject(camBinding->m_impl));
     }
 
     TEST_F(AnApiObjects, ProvidesEmptyCollections_WhenNothingWasCreated)
@@ -504,9 +498,8 @@ namespace rlogic::internal
         // Create test flatbuffer with only a script
         flatbuffers::FlatBufferBuilder builder;
         {
-            SolState tempState;
             ApiObjects toSerialize;
-            createScript(toSerialize, tempState, m_valid_empty_script);
+            createScript(toSerialize, m_valid_empty_script);
             ApiObjects::Serialize(toSerialize, builder);
         }
 
@@ -517,6 +510,9 @@ namespace rlogic::internal
         const rlogic_serialization::LuaScript& serializedScript = *serialized.luaScripts()->Get(0);
         EXPECT_EQ(std::string(m_valid_empty_script), serializedScript.luaSourceCode()->str());
         EXPECT_EQ("script", serializedScript.name()->str());
+
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "test", m_errorReporting);
+        EXPECT_TRUE(deserialized);
     }
 
     TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainers_ForBindings)
@@ -524,7 +520,6 @@ namespace rlogic::internal
         // Create test flatbuffer with only a node binding
         flatbuffers::FlatBufferBuilder builder;
         {
-            SolState tempState;
             ApiObjects toSerialize;
             toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "node");
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
@@ -555,7 +550,6 @@ namespace rlogic::internal
         // Create test flatbuffer with a link between script and binding
         flatbuffers::FlatBufferBuilder builder;
         {
-            SolState tempState;
             ApiObjects toSerialize;
 
             const std::string_view scriptWithOutput = R"(
@@ -569,7 +563,7 @@ namespace rlogic::internal
                 end
             )";
 
-            const LuaScript* script = createScript(toSerialize, tempState, scriptWithOutput);
+            const LuaScript* script = createScript(toSerialize, scriptWithOutput);
             RamsesNodeBinding* nodeBinding = toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
             ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
                 *script->getOutputs()->getChild("nested")->getChild("rotation")->m_impl,
@@ -599,9 +593,8 @@ namespace rlogic::internal
         // Create dummy data and serialize
         flatbuffers::FlatBufferBuilder builder;
         {
-            SolState tempState;
             ApiObjects toSerialize;
-            createScript(toSerialize, tempState, m_valid_empty_script);
+            createScript(toSerialize, m_valid_empty_script);
             toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "node");
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
             toSerialize.createRamsesCameraBinding(*m_camera, "camera");
@@ -614,7 +607,7 @@ namespace rlogic::internal
         EXPECT_CALL(m_resolverMock, findRamsesNodeInScene(::testing::Eq("node"), m_node->getSceneObjectId())).WillOnce(::testing::Return(m_node));
         EXPECT_CALL(m_resolverMock, findRamsesAppearanceInScene(::testing::Eq("appearance"), m_appearance->getSceneObjectId())).WillOnce(::testing::Return(m_appearance));
         EXPECT_CALL(m_resolverMock, findRamsesCameraInScene(::testing::Eq("camera"), m_camera->getSceneObjectId())).WillOnce(::testing::Return(m_camera));
-        std::optional<ApiObjects> apiObjectsOptional = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "", m_errorReporting);
+        std::unique_ptr<ApiObjects> apiObjectsOptional = ApiObjects::Deserialize(serialized, m_resolverMock, "", m_errorReporting);
 
         ASSERT_TRUE(apiObjectsOptional);
 
@@ -644,7 +637,6 @@ namespace rlogic::internal
         // Create dummy data and serialize
         flatbuffers::FlatBufferBuilder builder;
         {
-            SolState tempState;
             ApiObjects toSerialize;
 
             const std::string_view scriptForLinks = R"(
@@ -659,8 +651,8 @@ namespace rlogic::internal
                 end
             )";
 
-            auto script1 = createScript(toSerialize, tempState, scriptForLinks);
-            auto script2 = createScript(toSerialize, tempState, scriptForLinks);
+            auto script1 = createScript(toSerialize, scriptForLinks);
+            auto script2 = createScript(toSerialize, scriptForLinks);
             ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
                 *script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl,
                 *script2->getInputs()->getChild("integer")->m_impl,
@@ -671,7 +663,7 @@ namespace rlogic::internal
 
         auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(builder.GetBufferPointer());
 
-        std::optional<ApiObjects> apiObjectsOptional = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "", m_errorReporting);
+        std::unique_ptr<ApiObjects> apiObjectsOptional = ApiObjects::Deserialize(serialized, m_resolverMock, "", m_errorReporting);
 
         ASSERT_TRUE(apiObjectsOptional);
 
@@ -693,6 +685,32 @@ namespace rlogic::internal
         EXPECT_EQ(linkMap.begin()->first, script2->getInputs()->getChild("integer")->m_impl.get());
     }
 
+    // TODO VersionBreak enable test with next breaking change
+    //TEST_F(AnApiObjects_Serialization, ErrorWhenLuaModulesContainerMissing)
+    //{
+    //    {
+    //        auto apiObjects = rlogic_serialization::CreateApiObjects(
+    //            m_flatBufferBuilder,
+    //            0, // no modules container
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+    //            m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
+    //        );
+    //        m_flatBufferBuilder.Finish(apiObjects);
+    //    }
+    //
+    //    const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
+    //    std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
+    //
+    //    EXPECT_FALSE(deserialized);
+    //    ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+    //    EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing Lua scripts and/or modules container!");
+    //}
+
     TEST_F(AnApiObjects_Serialization, ErrorWhenScriptsContainerMissing)
     {
         {
@@ -710,11 +728,11 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing scripts container!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing Lua scripts container!");
     }
 
     TEST_F(AnApiObjects_Serialization, ErrorWhenNodeBindingsContainerMissing)
@@ -734,7 +752,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -758,7 +776,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -782,7 +800,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -806,7 +824,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -830,7 +848,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -854,7 +872,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -878,7 +896,7 @@ namespace rlogic::internal
         }
 
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
-        std::optional<ApiObjects> deserialized = ApiObjects::Deserialize(m_state, serialized, m_resolverMock, "unit test", m_errorReporting);
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);

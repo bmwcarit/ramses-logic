@@ -28,6 +28,29 @@ namespace rlogic
 {
     class ALogicEngine : public ::testing::Test
     {
+    public:
+        static LuaConfig CreateDeps(const std::vector<std::pair<std::string_view, const LuaModule*>>& dependencies)
+        {
+            LuaConfig config;
+            for (const auto& [alias, module] : dependencies)
+            {
+                config.addDependency(alias, *module);
+            }
+
+            return config;
+        }
+
+        static LuaConfig WithStdModules(std::initializer_list<EStandardModule> modules)
+        {
+            LuaConfig config;
+            for (auto m : modules)
+            {
+                config.addStandardModuleDependency(m);
+            }
+            return config;
+        }
+
+
     protected:
         LogicEngine m_logicEngine;
         RamsesTestSetup m_ramses;
@@ -44,6 +67,14 @@ namespace rlogic
         )";
 
         const std::string_view m_invalid_empty_script = R"(
+        )";
+
+        const std::string_view m_moduleSourceCode = R"(
+            local mymath = {}
+            function mymath.add(a,b)
+                print(a+b)
+            end
+            return mymath
         )";
 
         void recreate(bool skipAppearance = false)
@@ -63,6 +94,5 @@ namespace rlogic
                 m_appearance = &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene);
             }
         }
-
     };
 }

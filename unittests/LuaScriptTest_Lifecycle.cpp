@@ -24,54 +24,22 @@ namespace rlogic::internal
         WithTempDirectory tempFolder;
     };
 
-    TEST_F(ALuaScript_Lifecycle, HasEmptyFilenameWhenCreatedFromSource)
-    {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScript);
-        ASSERT_NE(nullptr, script);
-        EXPECT_EQ("", script->getFilename());
-    }
-
     TEST_F(ALuaScript_Lifecycle, ProducesNoErrorsWhenCreatedFromMinimalScript)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScript);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScript);
         ASSERT_NE(nullptr, script);
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
     TEST_F(ALuaScript_Lifecycle, ProvidesNameAsPassedDuringCreation)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScript, "script name");
+        auto* script = m_logicEngine.createLuaScript(m_minimalScript, {}, "script name");
         EXPECT_EQ("script name", script->getName());
-        EXPECT_EQ("", script->getFilename());
-    }
-
-    TEST_F(ALuaScript_Lifecycle, ProducesErrorWhenLoadedFileWithRuntimeErrorsInTheInterfaceFunction)
-    {
-        std::ofstream ofs;
-        ofs.open("script.lua", std::ofstream::out);
-        ofs << R"(
-            function interface()
-                error("This will cause errors when creating the script")
-            end
-            function run()
-            end
-        )";
-        ofs.close();
-
-        const auto script = m_logicEngine.createLuaScriptFromFile("script.lua");
-        EXPECT_EQ(nullptr, script);
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
-                "[script.lua] Error while loading script. Lua stack trace:\n"
-                "[string \"script.lua\"]:3: This will cause errors when creating the script\n"
-                "stack traceback:\n"
-                    "\t[C]: in function 'error'\n"
-                    "\t[string \"script.lua\"]:3: in function <[string \"script.lua\"]:2>");
     }
 
     TEST_F(ALuaScript_Lifecycle, KeepsGlobalScopeSymbolsDuringRunMethod)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             -- 'Local' symbols in the global space are global too
             local global1 = "global1"
             global2 = "global2"
@@ -107,14 +75,14 @@ namespace rlogic::internal
     {
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(
+            auto script = tempLogicEngine.createLuaScript(
                 R"(
                     function interface()
                         IN.param = INT
                     end
                     function run()
                     end
-                )", "MyScript");
+                )");
 
             ASSERT_NE(nullptr, script);
             EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
@@ -124,8 +92,6 @@ namespace rlogic::internal
             const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
 
             ASSERT_NE(nullptr, loadedScript);
-            EXPECT_EQ("MyScript", loadedScript->getName());
-            EXPECT_EQ("", loadedScript->getFilename());
 
             auto inputs = loadedScript->getInputs();
             auto outputs = loadedScript->getOutputs();
@@ -147,14 +113,14 @@ namespace rlogic::internal
     {
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(
+            auto script = tempLogicEngine.createLuaScript(
                 R"(
                 function interface()
                     IN.array = ARRAY(2, FLOAT)
                 end
                 function run()
                 end
-            )", "MyScript");
+            )", {}, "MyScript");
 
             ASSERT_NE(nullptr, script);
 
@@ -192,7 +158,7 @@ namespace rlogic::internal
     {
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(
+            auto script = tempLogicEngine.createLuaScript(
                 R"(
                 function interface()
                     IN.nested =
@@ -202,7 +168,7 @@ namespace rlogic::internal
                 end
                 function run()
                 end
-            )", "MyScript");
+            )", {}, "MyScript");
 
             script->getInputs()->getChild("nested")->getChild("array")->getChild(0)->set<vec3f>({1.1f, 1.2f, 1.3f});
             EXPECT_TRUE(tempLogicEngine.saveToFile("arrays.bin"));
@@ -235,7 +201,7 @@ namespace rlogic::internal
     {
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(
+            auto script = tempLogicEngine.createLuaScript(
                 R"(
                 function interface()
                     IN.int_param = INT
@@ -250,7 +216,7 @@ namespace rlogic::internal
                 function run()
                     OUT.float_param = 47.11
                 end
-            )", "MyScript");
+            )");
 
             ASSERT_NE(nullptr, script);
             EXPECT_TRUE(tempLogicEngine.saveToFile("nested_array.bin"));
@@ -260,8 +226,6 @@ namespace rlogic::internal
             const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
 
             ASSERT_NE(nullptr, loadedScript);
-            EXPECT_EQ("MyScript", loadedScript->getName());
-            EXPECT_EQ("", loadedScript->getFilename());
 
             auto inputs = loadedScript->getInputs();
             auto outputs = loadedScript->getOutputs();
@@ -305,7 +269,7 @@ namespace rlogic::internal
     {
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(
+            auto script = tempLogicEngine.createLuaScript(
                 R"(
                 function interface()
                     local structDecl = {
@@ -322,7 +286,7 @@ namespace rlogic::internal
                 function run()
                     OUT.arrayOfStructs = IN.arrayOfStructs
                 end
-            )", "MyScript");
+            )");
 
             ASSERT_NE(nullptr, script);
             script->getInputs()->getChild("arrayOfStructs")->getChild(1)->getChild("nested_struct")->getChild("nested_array")->getChild(0)->set<float>(42.f);
@@ -389,7 +353,7 @@ namespace rlogic::internal
 
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(scriptSrc, "MyScript");
+            auto script = tempLogicEngine.createLuaScript(scriptSrc, {}, "MyScript");
 
             ASSERT_NE(nullptr, script);
             EXPECT_TRUE(tempLogicEngine.saveToFile("arrays.bin"));
@@ -440,14 +404,14 @@ namespace rlogic::internal
     {
         {
             LogicEngine tempLogicEngine;
-            auto script = tempLogicEngine.createLuaScriptFromSource(
+            auto script = tempLogicEngine.createLuaScript(
                 R"(
                 function interface()
                     IN.data = INT
                 end
                 function run()
                 end
-            )", "MyScript");
+            )");
 
             ASSERT_NE(nullptr, script);
             script->getInputs()->getChild("data")->set<int32_t>(42);

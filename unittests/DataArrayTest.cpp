@@ -7,6 +7,8 @@
 //  -------------------------------------------------------------------------
 
 #include "gtest/gtest.h"
+#include "WithTempDirectory.h"
+
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/DataArray.h"
 #include "impl/DataArrayImpl.h"
@@ -108,6 +110,8 @@ namespace rlogic::internal
 
     TYPED_TEST(ADataArray, CanBeSerializedAndDeserialized)
     {
+        WithTempDirectory tempDir;
+
         const auto data1 = SomeDataVector<TypeParam>();
         const auto data2 = SomeDataVector<float>();
         const auto data3 = SomeDataVector<vec2f>();

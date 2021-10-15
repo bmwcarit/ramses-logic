@@ -7,6 +7,8 @@
 //  -------------------------------------------------------------------------
 
 #include "gtest/gtest.h"
+#include "WithTempDirectory.h"
+
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
@@ -291,6 +293,8 @@ namespace rlogic::internal
 
     TEST_F(AnAnimationNode, CanBeSerializedAndDeserialized)
     {
+        WithTempDirectory tempDir;
+
         {
             LogicEngine otherEngine;
 
@@ -379,6 +383,8 @@ namespace rlogic::internal
 
     TEST_F(AnAnimationNode, WillSerializeAnimationInputStatesButNotProgress)
     {
+        WithTempDirectory tempDir;
+
         {
             LogicEngine otherEngine;
 

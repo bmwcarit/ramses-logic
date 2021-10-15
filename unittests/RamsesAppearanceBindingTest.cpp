@@ -653,7 +653,7 @@ namespace rlogic::internal
                     OUT.float = 42.42
                 end
             )";
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
         ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("float"), *appearanceBinding.getInputs()->getChild("floatUniform1")));
 
         EXPECT_TRUE(m_logicEngine.update());
@@ -873,7 +873,7 @@ namespace rlogic::internal
                 end
             )";
 
-            LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+            LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
             auto& appearanceBinding = *m_logicEngine.createRamsesAppearanceBinding(appearance, "AppearanceBinding");
 
             script->getInputs()->getChild("float")->set<float>(42.42f);

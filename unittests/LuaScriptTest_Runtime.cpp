@@ -37,7 +37,7 @@ namespace rlogic
     // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
     TEST_F(ALuaScript_Runtime, DISABLED_GeneratesErrorWhenOverwritingInputsInRunFunction)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
 
@@ -54,7 +54,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningVectorComponentsIndividually)
     {
-        m_logicEngine.createLuaScriptFromSource(R"(
+        m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.vec3f = VEC3F
             end
@@ -72,7 +72,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedInputIsUsedInRun)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
@@ -88,7 +88,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedOutputIsUsedInRun)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
@@ -104,13 +104,13 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ReportsSourceNodeOnRuntimeError)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
                 error("this causes an error")
             end
-        )");
+        )", WithStdModules({ EStandardModule::Base }));
 
         ASSERT_NE(nullptr, script);
         EXPECT_FALSE(m_logicEngine.update());
@@ -121,7 +121,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToWriteInputValues)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.value = FLOAT
             end
@@ -157,7 +157,7 @@ namespace rlogic
 
         for (const auto& invalidStatement : invalidStatements)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, invalidStatement));
+            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, invalidStatement));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -192,7 +192,7 @@ namespace rlogic
 
         for (const auto& invalidStatement : invalidStatements)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, invalidStatement));
+            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, invalidStatement));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -220,12 +220,13 @@ namespace rlogic
 
         for (const auto& singleCase : allErrorCases)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource("function interface()\n"
-                                                                  "end\n"
-                                                                  "function run()\n" +
-                                                                  singleCase.errorCode +
-                                                                  "\n"
-                                                                  "end\n");
+            auto script = m_logicEngine.createLuaScript(
+                "function interface()\n"
+                "end\n"
+                "function run()\n" +
+                singleCase.errorCode +
+                "\n"
+                "end\n");
 
             ASSERT_NE(nullptr, script);
             m_logicEngine.update();
@@ -238,7 +239,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, SetsValueOfTopLevelInputSuccessfully_WhenTemplateMatchesDeclaredInputType)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(m_minimalScriptWithInputs);
+        auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithInputs);
         auto inputs = script->getInputs();
 
         auto speedInt32 = inputs->getChild("speed");
@@ -283,7 +284,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProvidesCalculatedValueAfterExecution)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
 
             function interface()
                 IN.a = INT
@@ -313,7 +314,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ReadsDataFromVec234Inputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.vec2f = VEC2F
                 IN.vec3f = VEC3F
@@ -354,7 +355,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, WritesValuesToVectorTypeOutputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.vec2f = VEC2F
                 OUT.vec3f = VEC3F
@@ -432,7 +433,7 @@ namespace rlogic
             scriptSource += aCase;
             scriptSource += "\nend\n";
 
-            auto* script = m_logicEngine.createLuaScriptFromSource(scriptSource);
+            auto* script = m_logicEngine.createLuaScript(scriptSource);
 
             ASSERT_NE(nullptr, script);
             EXPECT_TRUE(m_logicEngine.update());
@@ -444,7 +445,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, PermitsAssigningOfVector_FromTable_WithKeyValuePairs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.vec2f = VEC2F
                 OUT.vec3i = VEC3I
@@ -468,7 +469,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, UsesNestedInputsToProduceResult)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.data = {
                     a = INT,
@@ -500,7 +501,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, StoresDataToNestedOutputs_AsWholeStruct)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.data = INT
                 OUT.struct = {
@@ -533,7 +534,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, StoresDataToNestedOutputs_Individually)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.data = INT
                 OUT.data = {
@@ -564,7 +565,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_Underspecified)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.data = {
                     field1 = INT,
@@ -592,7 +593,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_Overspecified)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.data = {
                     field1 = INT,
@@ -622,7 +623,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenFieldHasWrongType)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.data = {
                     field1 = INT,
@@ -653,7 +654,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenNestedSubStructDoesNotMatch)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.data = {
                     field1 = INT,
@@ -705,7 +706,7 @@ namespace rlogic
             end
         )";
 
-        auto* script = m_logicEngine.createLuaScriptFromSource(scriptWithArrays);
+        auto* script = m_logicEngine.createLuaScript(scriptWithArrays);
 
         auto inputs = script->getInputs();
         auto in_array_int = inputs->getChild("array_int");
@@ -759,7 +760,7 @@ namespace rlogic
 
         for (const auto& invalidStatement : invalidStatements)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, invalidStatement));
+            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, invalidStatement));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -801,7 +802,7 @@ namespace rlogic
 
         for (const auto& singleCase : allErrorCases)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, singleCase.errorCode));
+            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, singleCase.errorCode));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -814,7 +815,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, AssignArrayValuesFromLuaTable)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int_array = ARRAY(2, INT)
                 OUT.float_array = ARRAY(2, FLOAT)
@@ -850,7 +851,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, AssignArrayValuesFromLuaTable_WithExplicitKeys)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int_array = ARRAY(3, INT)
             end
@@ -872,7 +873,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayWithFewerElementsThanRequired_UsingExplicitIndices)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int_array = ARRAY(3, INT)
             end
@@ -891,7 +892,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayFromLuaTableWithCorrectSizeButWrongIndices)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int_array = ARRAY(3, INT)
             end
@@ -944,7 +945,7 @@ namespace rlogic
 
         for (const auto& singleCase : allErrorCases)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, singleCase.errorCode));
+            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, singleCase.errorCode));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -957,7 +958,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, AssignsValuesArraysInVariousLuaSyntaxStyles)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.array = ARRAY(3, VEC2I)
                 OUT.array = ARRAY(3, VEC2I)
@@ -982,7 +983,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, AssignsValuesArraysInVariousLuaSyntaxStyles_InNestedStruct)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.struct = {
                     array1  = ARRAY(1, VEC2F),
@@ -1040,7 +1041,7 @@ namespace rlogic
 
         for (const auto& aCase : allCases)
         {
-            auto* script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, aCase));
+            auto* script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, aCase));
 
             ASSERT_NE(nullptr, script);
             EXPECT_TRUE(m_logicEngine.update());
@@ -1077,7 +1078,7 @@ namespace rlogic
 
         for (const auto& aCase : allCases)
         {
-            auto* script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, aCase.errorCode));
+            auto* script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, aCase.errorCode));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -1112,7 +1113,7 @@ namespace rlogic
 
         for (const auto& aCase : allCases)
         {
-            auto* script = m_logicEngine.createLuaScriptFromSource(fmt::format(scriptTemplate, aCase.errorCode));
+            auto* script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, aCase.errorCode));
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -1125,7 +1126,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenImplicitlyRoundingNumbers)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.float = FLOAT
                 OUT.int = INT
@@ -1154,7 +1155,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNilToIntOutputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int = INT
             end
@@ -1171,7 +1172,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningBoolToIntOutputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int = INT
             end
@@ -1188,7 +1189,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningBoolToStringOutputs)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.str = STRING
             end
@@ -1206,7 +1207,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNumberToStringOutputs)
     {
-        m_logicEngine.createLuaScriptFromSource(R"(
+        m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.str = STRING
             end
@@ -1222,7 +1223,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, SupportsMultipleLevelsOfNestedInputs_confidenceTest)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.rabbit = {
                     color = {
@@ -1277,7 +1278,7 @@ namespace rlogic
 
         for (const auto& singleCase : allCases)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(
+            auto script = m_logicEngine.createLuaScript(
                 "function interface()\n"
                 "end\n"
                 "function run()\n" +
@@ -1305,7 +1306,7 @@ namespace rlogic
 
         for (const auto& singleCase : allCases)
         {
-            auto script = m_logicEngine.createLuaScriptFromSource(
+            auto script = m_logicEngine.createLuaScript(
                 "function interface()\n"
                 "end\n"
                 "function run()\n" +
@@ -1336,7 +1337,7 @@ namespace rlogic
             end
         )";
 
-        auto* script = m_logicEngine.createLuaScriptFromSource(scriptWithArrays);
+        auto* script = m_logicEngine.createLuaScript(scriptWithArrays);
 
         auto inputs = script->getInputs();
         auto IN_array = inputs->getChild("array_structs");
@@ -1356,7 +1357,7 @@ namespace rlogic
     // I think this is not catchable, because it's just a normal function call
     TEST_F(ALuaScript_Runtime, DISABLED_ForbidsCallingInterfaceFunctionInsideTheRunFunction)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             do_the_shuffle = false
 
             function interface()
@@ -1385,7 +1386,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, AbortsAfterFirstRuntimeError)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.float = FLOAT
                 OUT.float = FLOAT
@@ -1404,7 +1405,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, AssignOutputsFromInputsInDifferentWays_ConfidenceTest)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.assignmentType = STRING
 
@@ -1574,7 +1575,7 @@ namespace rlogic
     // Therefore it is not catchable in c++
     TEST_F(ALuaScript_Runtime, DISABLED_ForbidsOverwritingRunFunctionInsideTheRunFunction)
     {
-        auto* script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.str = STRING
             end
@@ -1597,7 +1598,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfInvalidOutPropertyIsAccessed)
     {
-        auto scriptWithInvalidOutParam = m_logicEngine.createLuaScriptFromSource(R"(
+        auto scriptWithInvalidOutParam = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
@@ -1612,7 +1613,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfInvalidNestedOutPropertyIsAccessed)
     {
-        auto scriptWithInvalidStructAccess = m_logicEngine.createLuaScriptFromSource(R"(
+        auto scriptWithInvalidStructAccess = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
@@ -1627,7 +1628,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfValidestedButInvalidOutPropertyIsAccessed)
     {
-        auto scriptWithValidStructButInvalidField = m_logicEngine.createLuaScriptFromSource(R"(
+        auto scriptWithValidStructButInvalidField = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.struct = {
                     param = INT
@@ -1645,7 +1646,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, CanAssignInputDirectlyToOutput)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.param_struct = {
                     param1 = FLOAT,
@@ -1692,7 +1693,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, ProducesNoErrorIfOutputIsSetInFunction)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.param = INT
                 OUT.struct1 = {
@@ -1744,7 +1745,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Runtime, DoesNotSetOutputIfOutputParamIsPassedToFunction)
     {
-        auto script = m_logicEngine.createLuaScriptFromSource(R"(
+        auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.param = INT
             end
@@ -1796,9 +1797,9 @@ namespace rlogic
                 color = vec4(1.0, 0.0, 0.0, 1.0);
             })";
 
-        auto script1 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
-        auto script2 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
-        auto script3 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
+        auto script1 = m_logicEngine.createLuaScript(scriptSource);
+        auto script2 = m_logicEngine.createLuaScript(scriptSource);
+        auto script3 = m_logicEngine.createLuaScript(scriptSource);
 
         auto script1FloatInput  = script1->getInputs()->getChild("inFloat");
         auto script1FloatOutput = script1->getOutputs()->getChild("outFloat");
@@ -1896,7 +1897,7 @@ namespace rlogic
     }
 
 
-    TEST_F(ALuaScript_Runtime, IncludesStandardLibraries)
+    TEST_F(ALuaScript_Runtime, IncludesStandardLibraries_WhenConfiguredWithThem)
     {
         const std::string_view scriptSrc = R"(
             function debug_func(arg)
@@ -1921,7 +1922,7 @@ namespace rlogic
                 OUT.language_of_debug_func = debuginfo.what
             end
         )";
-        auto script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        auto script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({EStandardModule::Base, EStandardModule::String, EStandardModule::Table, EStandardModule::Debug, EStandardModule::Math}));
         ASSERT_NE(nullptr, script);
 
         m_logicEngine.update();

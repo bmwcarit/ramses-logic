@@ -9,6 +9,7 @@
 #include "benchmark/benchmark.h"
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 
 #include "impl/LogicEngineImpl.h"
@@ -34,7 +35,7 @@ namespace rlogic
             end
         )", loopCount);
 
-        logicEngine.createLuaScriptFromSource(scriptSrc);
+        logicEngine.createLuaScript(scriptSrc);
 
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
@@ -83,7 +84,7 @@ namespace rlogic
             end
         )", loopCount);
 
-        logicEngine.createLuaScriptFromSource(scriptSrc);
+        logicEngine.createLuaScript(scriptSrc);
 
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
@@ -112,7 +113,7 @@ namespace rlogic
             end
         )", loopCount);
 
-        logicEngine.createLuaScriptFromSource(scriptSrc);
+        logicEngine.createLuaScript(scriptSrc);
 
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
@@ -161,7 +162,7 @@ namespace rlogic
         std::vector<LuaScript*> scripts(scriptCount);
         for (int64_t i = 0; i < scriptCount; ++i)
         {
-            scripts[i] = logicEngine.createLuaScriptFromSource(scriptSrc, fmt::format("script{}", i));
+            scripts[i] = logicEngine.createLuaScript(scriptSrc, {}, fmt::format("script{}", i));
 
             if (i >= 1)
             {

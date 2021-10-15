@@ -50,6 +50,7 @@ namespace rlogic
     *     - T obeys the same rules as TYPE, except T can not be an ARRAY itself
     *     - T can be a struct, i.e. arrays of structs are supported
     * - Each property must have a name (string) - other types like number, bool etc. are not supported as keys
+    * - TYPE can also be defined in a module, see #rlogic::LuaModule for details
     * - the run() function only accesses the IN and OUT global symbols and the properties defined by it
     *
     * Violating any of these requirements will result in errors, which can be obtained by calling
@@ -57,6 +58,8 @@ namespace rlogic
     * The LuaScript object encapsulates a Lua environment (see official Lua docs) which strips all
     * global table entries after the script is loaded to the Lua state, and leaves only the run()
     * function.
+    * Note that none of the TYPE labels should be used in user code (outside of run() at least)
+    * for other than interface definition purposes, see #rlogic::LuaModule for details.
     *
     * See also the full documentation at https://ramses-logic.readthedocs.io/en/latest/api.html for more details on Lua and
     * its interaction with C++.
@@ -64,13 +67,6 @@ namespace rlogic
     class LuaScript : public LogicNode
     {
     public:
-
-        /**
-        * Returns the filename provided when the script was created
-        *
-        * @return the filename of the script
-        */
-        [[nodiscard]] RLOGIC_API std::string_view getFilename() const;
 
         /**
          * Overrides the lua print function with a custom function. Each time "print" is used

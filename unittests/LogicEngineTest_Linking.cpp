@@ -20,6 +20,7 @@
 #include "ramses-client-api/PerspectiveCamera.h"
 
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/EStandardModule.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
@@ -29,6 +30,7 @@
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/LogicNodeImpl.h"
 #include "impl/PropertyImpl.h"
+#include "internals/ApiObjects.h"
 
 #include "fmt/format.h"
 #include <array>
@@ -39,8 +41,8 @@ namespace rlogic
     {
     protected:
         ALogicEngine_Linking()
-            : m_sourceScript(*m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript, "SourceScript"))
-            , m_targetScript(*m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript, "TargetScript"))
+            : m_sourceScript(*m_logicEngine.createLuaScript(m_minimalLinkScript, {}, "SourceScript"))
+            , m_targetScript(*m_logicEngine.createLuaScript(m_minimalLinkScript, {}, "TargetScript"))
             , m_sourceProperty(*m_sourceScript.getOutputs()->getChild("source"))
             , m_targetProperty(*m_targetScript.getInputs()->getChild("target"))
         {
@@ -102,8 +104,8 @@ namespace rlogic
                 end
             )", std::get<1>(errorCase), std::get<0>(errorCase));
 
-            auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
-            auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+            auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+            auto targetScript = m_logicEngine.createLuaScript(luaScriptSource);
 
             const auto sourceProperty = sourceScript->getOutputs()->getChild("outParam");
             const auto targetProperty = targetScript->getInputs()->getChild("inParam");
@@ -155,8 +157,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfOutputIsLinkedToOutput)
     {
-        auto       sourceScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes);
-        auto       targetScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes);
+        auto       sourceScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
+        auto       targetScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
 
         const auto sourceOuput  = sourceScript->getOutputs()->getChild("source_INT");
         const auto targetOutput = targetScript->getOutputs()->getChild("source_INT");
@@ -239,8 +241,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource);
 
         const auto outputs  = sourceScript->getOutputs();
         const auto inputs   = targetScript->getInputs();
@@ -266,7 +268,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesErrorOnNextUpdateIfLinkCycleWasCreated)
     {
-        LuaScript& loopScript = *m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript);
+        LuaScript& loopScript = *m_logicEngine.createLuaScript(m_minimalLinkScript);
         const Property* sourceInput = m_sourceScript.getInputs()->getChild("target");
         const Property* sourceOutput = m_sourceScript.getOutputs()->getChild("source");
         const Property* targetInput = m_targetScript.getInputs()->getChild("target");
@@ -302,9 +304,9 @@ namespace rlogic
             end
         )";
 
-        auto script1 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script1");
-        auto script2 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script2");
-        auto script3 = m_logicEngine.createLuaScriptFromSource(scriptSource, "Script3");
+        auto script1 = m_logicEngine.createLuaScript(scriptSource);
+        auto script2 = m_logicEngine.createLuaScript(scriptSource);
+        auto script3 = m_logicEngine.createLuaScript(scriptSource);
 
         auto script1Input2 = script1->getInputs()->getChild("inString2");
         auto script2Input1 = script2->getInputs()->getChild("inString1");
@@ -346,8 +348,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource);
 
         const auto outputs = sourceScript->getOutputs();
         const auto inputs  = targetScript->getInputs();
@@ -377,8 +379,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource);
 
         auto arrayTarget = targetScript->getInputs()->getChild("array");
         auto arraySource = sourceScript->getOutputs()->getChild("array");
@@ -401,8 +403,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource);
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource);
 
         const auto sourceProperty = sourceScript->getOutputs()->getChild("intSource");
         const auto targetProperty1 = targetScript->getInputs()->getChild("intTarget1");
@@ -450,7 +452,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorsIfMultipleLinksFromSameSourceAreUnlinked)
     {
-        auto targetScript2 = m_logicEngine.createLuaScriptFromSource(m_minimalLinkScript);
+        auto targetScript2 = m_logicEngine.createLuaScript(m_minimalLinkScript);
 
         const auto targetProperty2 = targetScript2->getInputs()->getChild("target");
 
@@ -479,8 +481,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked)
     {
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(m_linkScriptMultipleTypes, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
+        auto targetScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
 
         auto output = sourceScript->getOutputs()->getChild("source_INT");
         auto input  = targetScript->getInputs()->getChild("target_INT");
@@ -516,8 +518,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptArrayOfStructs);
+        auto targetScript = m_logicEngine.createLuaScript(scriptArrayOfStructs);
 
         auto output = sourceScript->getOutputs()->getChild("data")->getChild(1)->getChild("one");
         auto input = targetScript->getInputs()->getChild("data")->getChild(1)->getChild("two");
@@ -551,8 +553,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptArrayOfStructs, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptArrayOfStructs);
+        auto targetScript = m_logicEngine.createLuaScript(scriptArrayOfStructs);
 
         auto output = sourceScript->getOutputs()->getChild("data")->getChild("one")->getChild(1);
         auto input = targetScript->getInputs()->getChild("data")->getChild("two")->getChild(1);
@@ -579,8 +581,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource);
 
         auto output = sourceScript->getOutputs()->getChild("intSource");
         auto input  = targetScript->getInputs()->getChild("intTarget");
@@ -619,8 +621,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource1, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource2, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource1);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource2);
 
         auto output = sourceScript->getOutputs()->getChild("intSource");
         auto input1 = targetScript->getInputs()->getChild("intTarget1");
@@ -656,7 +658,7 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript  = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
+        auto sourceScript  = m_logicEngine.createLuaScript(luaScriptSource);
         auto targetBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "TargetBinding");
 
         auto sourceInput  = sourceScript->getInputs()->getChild("floatInput");
@@ -687,7 +689,7 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
         auto targetBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "TargetBinding");
 
         auto sourceInput = sourceScript->getInputs()->getChild("floatInput");
@@ -722,8 +724,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource1, "source");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource2, "target");
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource1);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource2);
 
         auto sourceOutput = sourceScript->getOutputs()->getChild("output");
         auto targetInput  = targetScript->getInputs()->getChild("input");
@@ -758,8 +760,8 @@ namespace rlogic
             end
         )";
 
-        auto        sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource1, "source");
-        auto        targetScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource2, "target");
+        auto        sourceScript = m_logicEngine.createLuaScript(luaScriptSource1);
+        auto        targetScript = m_logicEngine.createLuaScript(luaScriptSource2);
 
         auto sourceOutput = sourceScript->getOutputs()->getChild("output");
         auto targetInput = targetScript->getInputs()->getChild("input");
@@ -795,8 +797,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(luaScriptSource, "SourceScript");
-        auto targetScript = otherLogicEngine.createLuaScriptFromSource(luaScriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource, {}, "SourceScript");
+        auto targetScript = otherLogicEngine.createLuaScript(luaScriptSource, {}, "TargetScript");
 
         const auto sourceOutput = sourceScript->getOutputs()->getChild("floatOutput");
         const auto targetInput  = targetScript->getInputs()->getChild("floatInput");
@@ -840,9 +842,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
-        auto scriptB = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptB");
-        auto scriptC = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScript(sourceScript);
+        auto scriptB = m_logicEngine.createLuaScript(sourceScript);
+        auto scriptC = m_logicEngine.createLuaScript(targetScript);
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -878,9 +880,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptA");
-        auto scriptB = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptB");
-        auto scriptC = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScript(scriptSource);
+        auto scriptB = m_logicEngine.createLuaScript(scriptSource);
+        auto scriptC = m_logicEngine.createLuaScript(scriptSource);
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -924,9 +926,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
-        auto scriptB = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptB");
-        auto scriptC = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScript(sourceScript);
+        auto scriptB = m_logicEngine.createLuaScript(targetScript);
+        auto scriptC = m_logicEngine.createLuaScript(targetScript);
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -967,9 +969,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptA");
-        auto scriptB = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptB");
-        auto scriptC = m_logicEngine.createLuaScriptFromSource(scriptSource, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScript(scriptSource);
+        auto scriptB = m_logicEngine.createLuaScript(scriptSource);
+        auto scriptC = m_logicEngine.createLuaScript(scriptSource);
 
         auto inputA  = scriptA->getInputs()->getChild("floatInput");
         auto outputA = scriptA->getOutputs()->getChild("floatOutput");
@@ -1022,8 +1024,8 @@ namespace rlogic
         )";
 
         // Create scripts in reversed order to make it more likely that order will be wrong unless ordered by dependencies
-        auto scriptB = m_logicEngine.createLuaScriptFromSource(srcScriptB, "ScriptB");
-        auto scriptA = m_logicEngine.createLuaScriptFromSource(srcScriptA, "ScriptA");
+        auto scriptB = m_logicEngine.createLuaScript(srcScriptB);
+        auto scriptA = m_logicEngine.createLuaScript(srcScriptA);
 
         auto scriptAOutput = scriptA->getOutputs()->getChild("output");
         auto scriptAnested_str1 = scriptA->getOutputs()->getChild("nested")->getChild("str1");
@@ -1058,7 +1060,7 @@ namespace rlogic
             end
         )";
 
-        auto script = m_logicEngine.createLuaScriptFromSource(scriptSrc);
+        auto script = m_logicEngine.createLuaScript(scriptSrc);
         // TODO Violin add appearance binding here too, once test PR #305 is merged
         auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
@@ -1107,9 +1109,9 @@ namespace rlogic
             end
         )";
 
-        auto scriptA = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptA");
-        auto scriptB = m_logicEngine.createLuaScriptFromSource(sourceScript, "ScriptB");
-        auto scriptC = m_logicEngine.createLuaScriptFromSource(targetScript, "ScriptC");
+        auto scriptA = m_logicEngine.createLuaScript(sourceScript);
+        auto scriptB = m_logicEngine.createLuaScript(sourceScript);
+        auto scriptC = m_logicEngine.createLuaScript(targetScript);
 
         auto scriptAInput  = scriptA->getInputs()->getChild("floatInput");
         auto scriptAOutput = scriptA->getOutputs()->getChild("floatOutput");
@@ -1152,7 +1154,7 @@ namespace rlogic
     {
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
-        auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* outScript = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.out_vec3f = VEC3F
             end
@@ -1184,7 +1186,7 @@ namespace rlogic
     {
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
-        auto* outScript = m_logicEngine.createLuaScriptFromSource(R"(
+        auto* outScript = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.translation = VEC3F
                 OUT.visibility = BOOL
@@ -1245,6 +1247,8 @@ namespace rlogic
              */
 
             LogicEngine tmpLogicEngine;
+            LuaConfig config;
+            config.addStandardModuleDependency(EStandardModule::Base);
             const auto  srcScriptAB = R"(
                 function interface()
                     IN.input = STRING
@@ -1266,9 +1270,9 @@ namespace rlogic
             )";
 
             // Create them in reversed order to make sure they are ordered wrongly if not ordered explicitly
-            auto scriptC = tmpLogicEngine.createLuaScriptFromSource(srcScriptCsrc, "ScriptC");
-            auto scriptB = tmpLogicEngine.createLuaScriptFromSource(srcScriptAB, "ScriptB");
-            auto scriptA = tmpLogicEngine.createLuaScriptFromSource(srcScriptAB, "ScriptA");
+            auto scriptC = tmpLogicEngine.createLuaScript(srcScriptCsrc, config, "ScriptC");
+            auto scriptB = tmpLogicEngine.createLuaScript(srcScriptAB, config, "ScriptB");
+            auto scriptA = tmpLogicEngine.createLuaScript(srcScriptAB, config, "ScriptA");
 
             auto scriptAInput  = scriptA->getInputs()->getChild("input");
             auto scriptAOutput = scriptA->getOutputs()->getChild("output");
@@ -1375,8 +1379,8 @@ namespace rlogic
             )";
 
             // Create scripts in reversed order to make it more likely that order will be wrong unless ordered by dependencies
-            auto scriptB = tmpLogicEngine.createLuaScriptFromSource(srcScriptB, "ScriptB");
-            auto scriptA = tmpLogicEngine.createLuaScriptFromSource(srcScriptA, "ScriptA");
+            auto scriptB = tmpLogicEngine.createLuaScript(srcScriptB, {}, "ScriptB");
+            auto scriptA = tmpLogicEngine.createLuaScript(srcScriptA, {}, "ScriptA");
 
             auto scriptAOutput = scriptA->getOutputs()->getChild("output");
             auto scriptAnested_str1 = scriptA->getOutputs()->getChild("nested")->getChild("str1");
@@ -1553,7 +1557,7 @@ namespace rlogic
                 end
             )";
 
-            auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
+            auto script = tmpLogicEngine.createLuaScript(scriptSrc);
             auto nodeBinding1 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode1, ERotationType::Euler_XYZ, "NodeBinding1");
             auto nodeBinding2 = tmpLogicEngine.createRamsesNodeBinding(*ramsesNode2, ERotationType::Euler_XYZ, "NodeBinding2");
 
@@ -1660,7 +1664,7 @@ namespace rlogic
                 end
             )";
 
-            auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
+            auto script = tmpLogicEngine.createLuaScript(scriptSrc);
             auto appBinding1 = tmpLogicEngine.createRamsesAppearanceBinding(appearance1, "AppBinding1");
             auto appBinding2 = tmpLogicEngine.createRamsesAppearanceBinding(appearance2, "AppBinding2");
 
@@ -1745,7 +1749,7 @@ namespace rlogic
                 end
             )";
 
-            auto script = tmpLogicEngine.createLuaScriptFromSource(scriptSrc, "Script");
+            auto script = tmpLogicEngine.createLuaScript(scriptSrc);
             auto cameraBinding1 = tmpLogicEngine.createRamsesCameraBinding(*camera1, "CameraBinding1");
             auto cameraBinding2 = tmpLogicEngine.createRamsesCameraBinding(*camera2, "CameraBinding2");
 
@@ -1822,8 +1826,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto middleScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "MiddleScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource);
+        auto middleScript = m_logicEngine.createLuaScript(scriptSource);
         auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
         auto sourceOutputBool = sourceScript->getOutputs()->getChild("output")->getChild("outBool");
@@ -1862,7 +1866,7 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript  = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto sourceScript  = m_logicEngine.createLuaScript(scriptSource);
         auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
         m_logicEngine.update();
@@ -1894,8 +1898,8 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript  = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript  = m_logicEngine.createLuaScript(scriptSource);
+        auto targetScript = m_logicEngine.createLuaScript(scriptSource);
 
         m_logicEngine.update();
 
@@ -1922,7 +1926,7 @@ namespace rlogic
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource);
         auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
         auto output = sourceScript->getOutputs()->getChild("output");
@@ -1981,8 +1985,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedScriptsWithComplexTypes_WithLinkStillActive_DestroySourceFirst)
     {
-        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
-        LuaScript& targetScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+        LuaScript& sourceScript(*m_logicEngine.createLuaScript(m_scriptNestedStructs));
+        LuaScript& targetScript(*m_logicEngine.createLuaScript(m_scriptNestedStructs));
 
         const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
         Property& targetVec(*targetScript.getInputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
@@ -1998,8 +2002,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedScriptsWithComplexTypes_WithLinkStillActive_DestroyTargetFirst)
     {
-        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
-        LuaScript& targetScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+        LuaScript& sourceScript(*m_logicEngine.createLuaScript(m_scriptNestedStructs));
+        LuaScript& targetScript(*m_logicEngine.createLuaScript(m_scriptNestedStructs));
 
         const Property& sourceVec(*sourceScript.getOutputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
         Property& targetVec(*targetScript.getInputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
@@ -2016,8 +2020,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedScriptsWithComplexTypes_WithLinkStillActive_ArrayOfStructs)
     {
-        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptArrayOfStructs));
-        LuaScript& targetScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+        LuaScript& sourceScript(*m_logicEngine.createLuaScript(m_scriptArrayOfStructs));
+        LuaScript& targetScript(*m_logicEngine.createLuaScript(m_scriptNestedStructs));
 
         const Property& sourceVec(*sourceScript.getOutputs()->getChild("array")->getChild(0)->getChild("vec3f"));
         Property& targetVec(*targetScript.getInputs()->getChild("struct")->getChild("nested")->getChild("vec3f"));
@@ -2034,7 +2038,7 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Linking_Confidence, CanDestroyLinkedBinding_WithNestedLinkStillActive)
     {
-        LuaScript& sourceScript(*m_logicEngine.createLuaScriptFromSource(m_scriptNestedStructs));
+        LuaScript& sourceScript(*m_logicEngine.createLuaScript(m_scriptNestedStructs));
 
         auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         auto translationProperty = targetBinding->getInputs()->getChild("translation");

@@ -19,6 +19,7 @@ content = [
     'options': '   :members:',
     'items': [
         'LogicEngine',
+        'LuaModule',
         'LuaScript',
         'RamsesNodeBinding',
         'RamsesAppearanceBinding',
@@ -30,6 +31,7 @@ content = [
         'AnimationNode',
         'Iterator',
         'Collection',
+        'LuaConfig',
     ],
     },
     {
@@ -76,6 +78,7 @@ content = [
     'namespace_prefix': 'rlogic::',
     'options': '',
     'items': [
+        'EStandardModule',
         'EPropertyType',
         'EInterpolationType',
         'ELogMessageType',

@@ -18,6 +18,7 @@ Class Index
 
 
     LogicEngine
+    LuaModule
     LuaScript
     RamsesNodeBinding
     RamsesAppearanceBinding
@@ -29,6 +30,7 @@ Class Index
     AnimationNode
     Iterator
     Collection
+    LuaConfig
 
 
 .. toctree::
@@ -70,6 +72,7 @@ Class Index
     :caption: Enums
 
 
+    EStandardModule
     EPropertyType
     EInterpolationType
     ELogMessageType

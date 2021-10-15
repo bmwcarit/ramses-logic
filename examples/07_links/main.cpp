@@ -41,8 +41,8 @@ int main()
     )";
 
     // Create two scripts using the Lua source code from above
-    rlogic::LuaScript* script1 = logicEngine.createLuaScriptFromSource(scriptSrc, "script 1");
-    rlogic::LuaScript* script2 = logicEngine.createLuaScriptFromSource(scriptSrc, "script 2");
+    rlogic::LuaScript* script1 = logicEngine.createLuaScript(scriptSrc);
+    rlogic::LuaScript* script2 = logicEngine.createLuaScript(scriptSrc);
 
     // Assign the scripts their names so that we can see their execution order
     script1->getInputs()->getChild("script_name")->set<std::string>("script 1");

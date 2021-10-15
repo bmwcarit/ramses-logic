@@ -252,6 +252,10 @@ Other scripts which may be linked to the erroneous script will not be executed t
 Using Lua modules
 ==================================================
 
+--------------------------------------------------
+Standard modules
+--------------------------------------------------
+
 The ``Logic Engine`` restricts which Lua modules can be used to a subset of the standard modules
 of ``Lua 5.1``:
 
@@ -269,6 +273,102 @@ Some of the standard modules are deliberately not supported:
 * Security/safety concerns (loading files, getting OS/environment info)
 * Not supported on all platforms (e.g. Android forbids direct file access)
 * Stability/integration concerns (e.g. opening relative files in Lua makes the scripts non-relocatable)
+
+--------------------------------------------------
+Custom modules
+--------------------------------------------------
+
+It is possible to create custom user modules (see :cpp:class:`rlogic::LuaModule` for the ``C++`` docs).
+A custom module can contain any Lua source code which obeys the modern Lua module definition convention
+(i.e. declare a table, fill it with data and functions, and return the table as a result of the module
+script):
+
+.. code-block:: lua
+    :linenos:
+    :emphasize-lines: 1,5, 10,14
+
+    local coalaModule = {}
+
+    coalaModule.coalaChief = "Alfred"
+
+    coalaModule.coalaStruct = {
+        preferredFood = STRING,
+        weight = INT
+    }
+
+    function coalaModule.bark()
+        print("Coalas don't bark...")
+    end
+
+    return coalaModule
+
+The name of the module (line 1) is not of importance and won't be visible anywhere outside of
+the module definition file. You can declare structs and other types you could otherwise use
+in the interface() functions of scripts (line 5). You can declare functions and make them part
+of the module by using the syntax on line 10. Make sure you return the module (line 14)!
+
+You can use modules in scripts as you would use a standard Lua module. The only exception
+is that you can't import the module with the ``require`` keyword, but have to use a free
+function ``modules()`` to declare the modules needed by the script:
+
+.. code-block:: lua
+    :linenos:
+    :emphasize-lines: 1,4,20,21
+
+    modules("coalas")
+
+    function interface()
+        local s = coalas.coalaStruct
+        OUT.coalas = ARRAY(2, s)
+    end
+
+    function run()
+        OUT.coalas = {
+            {
+                preferredFood = "bamboo",
+                weight = 5
+            },
+            {
+                preferredFood = "donuts",
+                weight = 12
+            }
+        }
+
+        print(coalas.chief .. " says:")
+        coalas.bark()
+    end
+
+The name ``coalas`` on line 1 is the name under which the module is mapped and available in the
+script (e.g. on lines 4, 20-21). The name obeys the same rules as Lua labels - it can only contain digits, letters and the
+underscore character, and it can't start with a digit. Also, the names used in the mapping must
+be unique (otherwise the script won't be able to uniquely resolve which modules are supposed to
+be used).
+
+It is also possible to use modules in other modules, like this:
+
+.. code-block:: lua
+    :linenos:
+
+    modules("quaternions")
+
+    local rotationHelper = {}
+
+    function rotationHelper.matrixFromEuler(x, y, z)
+        local q = quaternions.createFromEuler(x, y, z)
+        return q.toMatrix()
+    end
+
+    return rotationHelper
+
+In the example above, the ``rotationHelper`` module uses another module ``quaternions`` to provide
+a new function which computes a rotation matrix using quaternions as an intermediate step.
+
+.. warning::
+    Modules are supposed to read-only to prevent misuse and guarantee safe usage. However, this is not
+    implemented yet! This means that there is no mechanism (yet) which forbids modifying module data. We strongly advise against
+    modifying module data because a) it will produce errors in an upcoming release and b) it can introduce undefined behavior
+    when different module try to write the same data, or if one module writes and another one reads the
+    same data in undefined order.
 
 =====================================
 Additional Lua syntax specifics

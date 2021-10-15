@@ -22,10 +22,10 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfNoInterfaceIsPresent)
     {
-        LuaScript* scriptNoInterface = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* scriptNoInterface = m_logicEngine.createLuaScript(R"(
             function run()
             end
-        )", "scriptNoInterface");
+        )", {}, "scriptNoInterface");
 
         ASSERT_EQ(nullptr, scriptNoInterface);
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
@@ -34,10 +34,10 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfNoRunIsPresent)
     {
-        LuaScript* scriptNoRun = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* scriptNoRun = m_logicEngine.createLuaScript(R"(
             function interface()
             end
-        )", "scriptNoRun");
+        )", {}, "scriptNoRun");
 
         ASSERT_EQ(nullptr, scriptNoRun);
         EXPECT_EQ(1u, m_logicEngine.getErrors().size());
@@ -46,7 +46,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, CannotBeCreatedFromSyntacticallyIncorrectScript)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource("this.is.not.valid.lua.code", "badSyntaxScript");
+        LuaScript* script = m_logicEngine.createLuaScript("this.is.not.valid.lua.code", {}, "badSyntaxScript");
         ASSERT_EQ(nullptr, script);
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"badSyntaxScript\"]:1: '<name>' expected near 'not'"));
@@ -54,7 +54,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_FromGlobalScope)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             error("Expect this error!")
 
             function interface()
@@ -62,7 +62,7 @@ namespace rlogic
 
             function run()
             end
-        )", "scriptWithErrorInGlobalCode");
+        )", WithStdModules({EStandardModule::Base}), "scriptWithErrorInGlobalCode");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
@@ -73,14 +73,14 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_DuringInterfaceDeclaration)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 error("Expect this error!")
             end
 
             function run()
             end
-        )", "scriptWithErrorInInterface");
+        )", WithStdModules({EStandardModule::Base}), "scriptWithErrorInInterface");
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
@@ -91,14 +91,14 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_DuringRun)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
             end
 
             function run()
                 error("Expect this error!")
             end
-        )", "scriptWithErrorInRun");
+        )", WithStdModules({EStandardModule::Base}), "scriptWithErrorInRun");
 
         ASSERT_NE(nullptr, script);
 
@@ -114,7 +114,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorWhenIndexingVectorPropertiesOutOfRange)
     {
-        LuaScript* script  = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script  = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.vec2f = VEC2F
                 IN.vec3f = VEC3F
@@ -131,7 +131,7 @@ namespace rlogic
             function run()
                 local message = "Value of " .. IN.propertyName .. "[" .. tostring(IN.index) .. "]" .. " is " .. IN[IN.propertyName][IN.index]
             end
-        )", "scriptOOR");
+        )", WithStdModules({EStandardModule::Base}), "scriptOOR");
         Property*  inputs  = script->getInputs();
 
         inputs->getChild("vec2f")->set<vec2f>({1.1f, 1.2f});
@@ -194,7 +194,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingArraySize)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.array = ARRAY(3, INT)
                 OUT.array_size = INT
@@ -211,7 +211,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingComplexArraySize)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.array = ARRAY(3,
                     {
@@ -233,7 +233,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingStructSize)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.struct = {
                     data1 = VEC3F,
@@ -254,7 +254,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingVec234Size)
     {
-        m_logicEngine.createLuaScriptFromSource(R"(
+        m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.vec2f = VEC2F
                 IN.vec3f = VEC3F
@@ -279,7 +279,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingSizeOfStrings)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.string = STRING
                 OUT.string_size = INT
@@ -297,7 +297,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, RaisesErrorWhenTryingToGetSizeOfNonArrayTypes)
     {
-        LuaScript* script = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.notArray = INT
             end
@@ -305,7 +305,7 @@ namespace rlogic
             function run()
                 local size = #IN.notArray
             end
-        )", "invalidArraySizeAccess");
+        )", {}, "invalidArraySizeAccess");
 
         ASSERT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -316,7 +316,7 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProdocesErrorWhenIndexingVectorWithNonIntegerIndices)
     {
-        LuaScript* script  = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* script  = m_logicEngine.createLuaScript(R"(
             function interface()
                 IN.vec = VEC4I
 
@@ -338,7 +338,7 @@ namespace rlogic
                     error("Test problem - check error cases below")
                 end
             end
-        )", "invalidIndexingScript");
+        )", {}, "invalidIndexingScript");
         Property*  inputs = script->getInputs();
 
         Property* errorType = inputs->getChild("errorType");
@@ -423,7 +423,7 @@ namespace rlogic
             scriptSource += errorCase.errorCode;
             scriptSource += "\nend\n";
 
-            LuaScript* script = m_logicEngine.createLuaScriptFromSource(scriptSource, "mismatchedVecSizes");
+            LuaScript* script = m_logicEngine.createLuaScript(scriptSource, {}, "mismatchedVecSizes");
 
             ASSERT_NE(nullptr, script);
             EXPECT_FALSE(m_logicEngine.update());
@@ -439,12 +439,12 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfRunFunctionDoesNotEndCorrectly)
     {
-        LuaScript* scriptWithWrongEndInRun = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* scriptWithWrongEndInRun = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
             ENDE
-        )", "missingEndInScript");
+        )", {}, "missingEndInScript");
 
         ASSERT_EQ(nullptr, scriptWithWrongEndInRun);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -453,12 +453,12 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfInterfaceFunctionDoesNotEndCorrectly)
     {
-        LuaScript* scriptWithWrongEndInInterface = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* scriptWithWrongEndInInterface = m_logicEngine.createLuaScript(R"(
             function interface()
             ENDE
             function run()
             end
-        )", "missingEndInScript");
+        )", {}, "missingEndInScript");
 
         ASSERT_EQ(nullptr, scriptWithWrongEndInInterface);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -467,11 +467,11 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfInterfaceFunctionDoesNotEndAtAll)
     {
-        LuaScript* scriptWithNoEndInInterface = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* scriptWithNoEndInInterface = m_logicEngine.createLuaScript(R"(
             function interface()
             function run()
             end
-        )", "endlessInterface");
+        )", {}, "endlessInterface");
 
         ASSERT_EQ(nullptr, scriptWithNoEndInInterface);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
@@ -480,11 +480,11 @@ namespace rlogic
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfRunFunctionDoesNotEndAtAll)
     {
-        LuaScript* scriptWithNoEndInRun = m_logicEngine.createLuaScriptFromSource(R"(
+        LuaScript* scriptWithNoEndInRun = m_logicEngine.createLuaScript(R"(
             function interface()
             end
             function run()
-        )", "endlessRun");
+        )", {}, "endlessRun");
 
         ASSERT_EQ(nullptr, scriptWithNoEndInRun);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);

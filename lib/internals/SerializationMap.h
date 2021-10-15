@@ -16,11 +16,13 @@ namespace rlogic_serialization
 {
     struct Property;
     struct DataArray;
+    struct LuaModule;
 }
 
 namespace rlogic
 {
     class DataArray;
+    class LuaModule;
 }
 
 namespace rlogic::internal
@@ -46,20 +48,34 @@ namespace rlogic::internal
 
         void storeDataArray(const DataArray& dataArray, flatbuffers::Offset<rlogic_serialization::DataArray> offset)
         {
-            assert(m_dataArrayIndices.count(&dataArray) == 0 && "one time store only");
-            m_dataArrayIndices.insert({ &dataArray, offset });
+            assert(m_dataArrays.count(&dataArray) == 0 && "one time store only");
+            m_dataArrays.insert({ &dataArray, offset });
         }
 
         flatbuffers::Offset<rlogic_serialization::DataArray> resolveDataArrayOffset(const DataArray& dataArray) const
         {
-            const auto it = m_dataArrayIndices.find(&dataArray);
-            assert(it != m_dataArrayIndices.cend());
+            const auto it = m_dataArrays.find(&dataArray);
+            assert(it != m_dataArrays.cend());
+            return it->second;
+        }
+
+        void storeLuaModule(const LuaModule& luaModule, flatbuffers::Offset<rlogic_serialization::LuaModule> offset)
+        {
+            assert(m_luaModules.count(&luaModule) == 0 && "one time store only");
+            m_luaModules.insert({ &luaModule, offset });
+        }
+
+        flatbuffers::Offset<rlogic_serialization::LuaModule> resolveLuaModuleOffset(const LuaModule& luaModule) const
+        {
+            const auto it = m_luaModules.find(&luaModule);
+            assert(it != m_luaModules.cend());
             return it->second;
         }
 
     private:
         std::unordered_map<const PropertyImpl*, flatbuffers::Offset<rlogic_serialization::Property>> m_properties;
-        std::unordered_map<const DataArray*, flatbuffers::Offset<rlogic_serialization::DataArray>> m_dataArrayIndices;
+        std::unordered_map<const DataArray*, flatbuffers::Offset<rlogic_serialization::DataArray>> m_dataArrays;
+        std::unordered_map<const LuaModule*, flatbuffers::Offset<rlogic_serialization::LuaModule>> m_luaModules;
     };
 
 }

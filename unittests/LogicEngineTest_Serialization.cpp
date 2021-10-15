@@ -31,6 +31,7 @@
 #include "impl/LogicNodeImpl.h"
 #include "impl/LogicEngineImpl.h"
 #include "impl/DataArrayImpl.h"
+#include "internals/ApiObjects.h"
 #include "internals/FileUtils.h"
 #include "internals/FileFormatVersions.h"
 #include "LogTestUtils.h"
@@ -49,13 +50,13 @@ namespace rlogic::internal
         static std::vector<char> CreateTestBuffer()
         {
             LogicEngine logicEngineForSaving;
-            logicEngineForSaving.createLuaScriptFromSource(R"(
+            logicEngineForSaving.createLuaScript(R"(
                 function interface()
                     IN.param = INT
                 end
                 function run()
                 end
-            )", "luascript");
+            )", {}, "luascript");
 
             logicEngineForSaving.saveToFile("tempfile.bin");
 
@@ -254,13 +255,13 @@ namespace rlogic::internal
     {
         {
             LogicEngine logicEngine;
-            logicEngine.createLuaScriptFromSource(R"(
+            logicEngine.createLuaScript(R"(
                 function interface()
                     IN.param = INT
                 end
                 function run()
                 end
-            )", "luascript");
+            )", {}, "luascript");
 
             logicEngine.saveToFile("LogicEngine.bin");
         }
@@ -364,13 +365,13 @@ namespace rlogic::internal
     {
         {
             LogicEngine logicEngine;
-            logicEngine.createLuaScriptFromSource(R"(
+            logicEngine.createLuaScript(R"(
                 function interface()
                     IN.param = INT
                 end
                 function run()
                 end
-            )", "luascript");
+            )", {}, "luascript");
 
             logicEngine.createRamsesAppearanceBinding(*m_appearance, "appearancebinding");
             logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
@@ -442,25 +443,25 @@ namespace rlogic::internal
     {
         {
             LogicEngine logicEngine;
-            logicEngine.createLuaScriptFromSource(R"(
+            logicEngine.createLuaScript(R"(
                 function interface()
                     IN.param = INT
                 end
                 function run()
                 end
-            )", "luascript");
+            )", {}, "luascript");
 
             logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "binding");
             logicEngine.saveToFile("LogicEngine.bin");
         }
         {
-            m_logicEngine.createLuaScriptFromSource(R"(
+            m_logicEngine.createLuaScript(R"(
                 function interface()
                     IN.param2 = FLOAT
                 end
                 function run()
                 end
-            )", "luascript2");
+            )", {}, "luascript2");
 
             m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "binding2");
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
@@ -492,9 +493,9 @@ namespace rlogic::internal
             )";
 
             LogicEngine logicEngine;
-            auto sourceScript = logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-            auto targetScript = logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
-            logicEngine.createLuaScriptFromSource(scriptSource, "NotLinkedScript");
+            auto sourceScript = logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
+            auto targetScript = logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
+            logicEngine.createLuaScript(scriptSource, {}, "NotLinkedScript");
 
             auto output = sourceScript->getOutputs()->getChild("output");
             auto input  = targetScript->getInputs()->getChild("input");
@@ -539,8 +540,8 @@ namespace rlogic::internal
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScriptFromSource(scriptSource, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
+        auto targetScript = m_logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
 
         // Save logic engine state without links to file
         m_logicEngine.saveToFile("LogicEngine.bin");
@@ -575,6 +576,57 @@ namespace rlogic::internal
         EXPECT_EQ(2u, (*internalNodeDependencies.getTopologicallySortedNodes()).size());
     }
 
+    TEST_F(ALogicEngine_Serialization, PreviouslyCreatedModulesAreDeletedInSolStateAfterDeserialization)
+    {
+        {
+            LogicEngine logicEngineForSaving;
+            const std::string_view moduleSrc = R"(
+                local mymath = {}
+                mymath.PI=3.1415
+                return mymath
+            )";
+
+            std::string_view script = R"(
+                modules("mymath")
+                function interface()
+                    OUT.pi = FLOAT
+                end
+                function run()
+                    OUT.pi = mymath.PI
+                end
+            )";
+
+            LuaModule* mymath = logicEngineForSaving.createLuaModule(moduleSrc, {}, "mymath");
+            LuaConfig config;
+            config.addDependency("mymath", *mymath);
+            logicEngineForSaving.createLuaScript(script, config, "script");
+
+            logicEngineForSaving.saveToFile("LogicEngine.bin");
+        }
+
+        // Create a module with name colliding with the one from file - it should be deleted
+        const std::string_view moduleToBeWipedSrc = R"(
+                local mymath = {}
+                mymath.PI=4
+                return mymath
+            )";
+
+        // This module will be overwritten when loading the file below. The logic engine should not
+        // keep any leftovers from modules or scripts when loading from file - all content should be
+        // taken from the file!
+        LuaModule* moduleToBeWiped = m_logicEngine.createLuaModule(moduleToBeWipedSrc, {}, "mymath");
+        EXPECT_NE(nullptr, moduleToBeWiped);
+
+        EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+
+        m_logicEngine.update();
+
+        LuaScript* script = m_logicEngine.findScript("script");
+
+        // This is the PI from the loaded module, not from 'moduleToBeWiped'
+        EXPECT_FLOAT_EQ(3.1415f, *script->getOutputs()->getChild("pi")->get<float>());
+    }
+
     class ALogicEngine_Serialization_Compatibility : public ALogicEngine
     {
     protected:
@@ -607,6 +659,7 @@ namespace rlogic::internal
         }
 
         flatbuffers::FlatBufferBuilder m_fbBuilder;
+        WithTempDirectory m_tempDir;
     };
 
     TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromFileReferencingIncompatibleRamsesVersion)
@@ -664,61 +717,71 @@ namespace rlogic::internal
         // Then copy the resulting testLogic.bin and testScene.bin to unittests/res folder
         {
             // Load and update works
-            RamsesTestSetup m_ramses;
-            LogicEngine     m_logicEngine;
-            ramses::Scene*  m_scene = &m_ramses.loadSceneFromFile("res/unittests/testScene.bin");
-            ASSERT_NE(nullptr, m_scene);
-            ASSERT_TRUE(m_logicEngine.loadFromFile("res/unittests/testLogic.bin", m_scene));
+            RamsesTestSetup ramses;
+            LogicEngine     logicEngine;
+            ramses::Scene*  scene = &ramses.loadSceneFromFile("res/unittests/testScene.bin");
+            ASSERT_NE(nullptr, scene);
+            ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic.bin", scene));
 
             // Contains objects and their input/outputs
-            ASSERT_NE(nullptr, m_logicEngine.findScript("script1"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script1")->getInputs()->getChild("floatInput"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script1")->getOutputs()->getChild("floatOutput"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script1")->getOutputs()->getChild("nodeTranslation"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getInputs()->getChild("floatInput"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getInputs()->getChild("floatInput"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetX"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetY"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("width"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("height"));
-            EXPECT_NE(nullptr, m_logicEngine.findScript("script2")->getOutputs()->getChild("floatUniform"));
-            ASSERT_NE(nullptr, m_logicEngine.findAnimationNode("animNode"));
-            EXPECT_NE(nullptr, m_logicEngine.findAnimationNode("animNode")->getOutputs()->getChild("channel"));
 
-            EXPECT_NE(nullptr, m_logicEngine.findNodeBinding("nodebinding"));
-            EXPECT_NE(nullptr, m_logicEngine.findCameraBinding("camerabinding"));
-            EXPECT_NE(nullptr, m_logicEngine.findAppearanceBinding("appearancebinding"));
-            EXPECT_NE(nullptr, m_logicEngine.findDataArray("dataarray"));
+            // When breaking file version, re-enable this check and re-export asset from assetProducer
+            // Consider making modules non-optional again
+            static_assert(g_FileFormatVersion == 2, "Consider making modules mandatory with next file version break");
+            //ASSERT_NE(nullptr, logicEngine.findLuaModule("nestedModuleMath"));
+            //ASSERT_NE(nullptr, logicEngine.findLuaModule("moduleMath"));
+            //ASSERT_NE(nullptr, logicEngine.findLuaModule("moduleTypes"));
+            ASSERT_NE(nullptr, logicEngine.findScript("script1"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script1")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script1")->getOutputs()->getChild("floatOutput"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script1")->getOutputs()->getChild("nodeTranslation"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetX"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetY"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("width"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getOutputs()->getChild("cameraViewport")->getChild("height"));
+            EXPECT_NE(nullptr, logicEngine.findScript("script2")->getOutputs()->getChild("floatUniform"));
+            ASSERT_NE(nullptr, logicEngine.findAnimationNode("animNode"));
+            EXPECT_NE(nullptr, logicEngine.findAnimationNode("animNode")->getOutputs()->getChild("channel"));
+
+            EXPECT_NE(nullptr, logicEngine.findNodeBinding("nodebinding"));
+            EXPECT_NE(nullptr, logicEngine.findCameraBinding("camerabinding"));
+            EXPECT_NE(nullptr, logicEngine.findAppearanceBinding("appearancebinding"));
+            EXPECT_NE(nullptr, logicEngine.findDataArray("dataarray"));
 
             // Can set new value and update()
-            m_logicEngine.findScript("script1")->getInputs()->getChild("floatInput")->set<float>(42.5f);
-            EXPECT_TRUE(m_logicEngine.update());
+            logicEngine.findScript("script1")->getInputs()->getChild("floatInput")->set<float>(42.5f);
+            EXPECT_TRUE(logicEngine.update());
 
             // Values on Ramses are updated according to expectations
             vec3f translation;
-            auto m_node = ramses::RamsesUtils::TryConvert<ramses::Node>(*m_scene->findObjectByName("test node"));
-            auto m_camera = ramses::RamsesUtils::TryConvert<ramses::OrthographicCamera>(*m_scene->findObjectByName("test camera"));
-            m_node->getTranslation(translation[0], translation[1], translation[2]);
+            auto node = ramses::RamsesUtils::TryConvert<ramses::Node>(*scene->findObjectByName("test node"));
+            auto camera = ramses::RamsesUtils::TryConvert<ramses::OrthographicCamera>(*scene->findObjectByName("test camera"));
+            node->getTranslation(translation[0], translation[1], translation[2]);
             EXPECT_THAT(translation, ::testing::ElementsAre(42.5f, 2.f, 3.f));
 
-            EXPECT_EQ(m_camera->getViewportX(), 45);
-            EXPECT_EQ(m_camera->getViewportY(), 47);
-            EXPECT_EQ(m_camera->getViewportWidth(), 143u);
-            EXPECT_EQ(m_camera->getViewportHeight(), 243u);
+            EXPECT_EQ(camera->getViewportX(), 45);
+            EXPECT_EQ(camera->getViewportY(), 47);
+            EXPECT_EQ(camera->getViewportWidth(), 143u);
+            EXPECT_EQ(camera->getViewportHeight(), 243u);
 
             // Animation node is linked and can be animated
-            const auto animNode = m_logicEngine.findAnimationNode("animNode");
-            EXPECT_TRUE(m_logicEngine.isLinked(*animNode));
+            const auto animNode = logicEngine.findAnimationNode("animNode");
+            EXPECT_TRUE(logicEngine.isLinked(*animNode));
             animNode->getInputs()->getChild("play")->set(true);
             animNode->getInputs()->getChild("timeDelta")->set(1.5f);
-            EXPECT_TRUE(m_logicEngine.update());
+            EXPECT_TRUE(logicEngine.update());
 
             ramses::UniformInput uniform;
-            auto m_appearance = ramses::RamsesUtils::TryConvert<ramses::Appearance>(*m_scene->findObjectByName("test appearance"));
-            m_appearance->getEffect().getUniformInput(1, uniform);
+            auto appearance = ramses::RamsesUtils::TryConvert<ramses::Appearance>(*scene->findObjectByName("test appearance"));
+            appearance->getEffect().getUniformInput(1, uniform);
             float floatValue = 0.f;
-            m_appearance->getInputValueFloat(uniform, floatValue);
+            appearance->getInputValueFloat(uniform, floatValue);
             EXPECT_FLOAT_EQ(1.5f, floatValue);
+
+            static_assert(g_FileFormatVersion == 2); // When breaking file version, re-enable this check
+            //EXPECT_EQ(957, *logicEngine.findScript("script2")->getOutputs()->getChild("nestedModulesResult")->get<int32_t>());
         }
     }
 }

@@ -136,7 +136,7 @@ namespace rlogic
         *
         * @return true if the property is an input and is linked, false otherwise.
         */
-        [[nodiscard]] bool isLinked() const;
+        [[nodiscard]] RLOGIC_API bool isLinked() const;
 
         /**
         * Constructor of Property. User is not supposed to call this - properties are created by other factory classes

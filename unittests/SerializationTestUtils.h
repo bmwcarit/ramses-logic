@@ -74,7 +74,8 @@ namespace rlogic::internal
                 m_builder.CreateString("some/file"),
                 m_builder.CreateString("print('test lua code')"),
                 serializeTestProperty("IN"),
-                serializeTestProperty("OUT")
+                serializeTestProperty("OUT"),
+                m_builder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{})
             );
         }
 

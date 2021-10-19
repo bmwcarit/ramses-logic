@@ -1,5 +1,11 @@
 # master
 
+# v0.10.2
+
+**Improvements**
+
+* Updates Ramses to 27.0.112
+
 # v0.10.1
 
 **Bugfixes**

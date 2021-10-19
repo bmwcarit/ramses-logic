@@ -7,9 +7,10 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/LogicNodeImpl.h"
-#include "impl/PropertyImpl.h"
 
 #include "ramses-logic/Property.h"
+
+#include "impl/PropertyImpl.h"
 
 namespace rlogic::internal
 {

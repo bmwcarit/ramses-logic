@@ -8,8 +8,6 @@
 
 #include "ramses-logic/LuaScript.h"
 #include "impl/LuaScriptImpl.h"
-#include "impl/PropertyImpl.h"
-#include "ramses-logic/Property.h"
 
 namespace rlogic
 {

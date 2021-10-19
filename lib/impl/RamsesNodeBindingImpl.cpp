@@ -8,17 +8,18 @@
 
 #include "impl/RamsesNodeBindingImpl.h"
 
-#include "impl/PropertyImpl.h"
-#include "impl/LoggerImpl.h"
+#include "ramses-client-api/Node.h"
 
 #include "ramses-logic/Property.h"
 
-#include "ramses-client-api/Node.h"
+#include "impl/PropertyImpl.h"
+#include "impl/LoggerImpl.h"
 
-#include "generated/RamsesNodeBindingGen.h"
 #include "internals/ErrorReporting.h"
 #include "internals/IRamsesObjectResolver.h"
 #include "internals/RotationUtils.h"
+
+#include "generated/RamsesNodeBindingGen.h"
 
 namespace rlogic::internal
 {

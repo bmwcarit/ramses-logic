@@ -7,6 +7,11 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/LogicEngineImpl.h"
+
+#include "ramses-framework-api/RamsesVersion.h"
+#include "ramses-logic/LogicNode.h"
+#include "ramses-logic/DataArray.h"
+
 #include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
 #include "impl/LuaModuleImpl.h"
@@ -18,25 +23,14 @@
 #include "internals/RamsesObjectResolver.h"
 #include "internals/ApiObjects.h"
 
-// TODO Violin remove these header dependencies
-#include "ramses-logic/RamsesNodeBinding.h"
-#include "ramses-logic/RamsesAppearanceBinding.h"
-#include "ramses-logic/RamsesCameraBinding.h"
-#include "ramses-logic/AnimationNode.h"
-#include "ramses-logic/DataArray.h"
-#include "ramses-logic/LuaScript.h"
-#include "ramses-logic/LuaModule.h"
-
-#include "ramses-logic-build-config.h"
 #include "generated/LogicEngineGen.h"
+#include "ramses-logic-build-config.h"
 
-#include "ramses-framework-api/RamsesVersion.h"
+#include "fmt/format.h"
 
 #include <string>
 #include <fstream>
 #include <streambuf>
-
-#include "fmt/format.h"
 
 namespace rlogic::internal
 {

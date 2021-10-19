@@ -1,5 +1,13 @@
 # master
 
+# v0.10.1
+
+**Bugfixes**
+
+* Restore access to global data from the interface() function
+    * This was a hardening measure which turned out to be breaking user projects
+    * Will be re-introduced after we have added proper support for global variables
+
 # v0.10.0
 
 **API Changes**

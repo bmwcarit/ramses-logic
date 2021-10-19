@@ -8,16 +8,18 @@
 
 #include "internals/ApiObjects.h"
 #include "internals/ErrorReporting.h"
-#include "internals/RamsesObjectResolver.h"
 
 #include "ramses-logic-build-config.h"
 
+#include "ramses-logic/LogicObject.h"
+#include "ramses-logic/LogicNode.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/DataArray.h"
+#include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/AnimationNode.h"
 
 #include "impl/PropertyImpl.h"
@@ -32,7 +34,6 @@
 #include "ramses-client-api/Node.h"
 #include "ramses-client-api/Appearance.h"
 #include "ramses-client-api/Camera.h"
-#include "ramses-framework-api/RamsesVersion.h"
 
 #include "generated/ApiObjectsGen.h"
 #include "generated/RamsesAppearanceBindingGen.h"

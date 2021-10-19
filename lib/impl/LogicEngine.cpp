@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic/LogicEngine.h"
+
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/RamsesNodeBinding.h"

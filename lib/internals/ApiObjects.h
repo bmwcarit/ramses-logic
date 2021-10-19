@@ -10,6 +10,7 @@
 
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/ERotationType.h"
+#include "ramses-logic/AnimationTypes.h"
 
 #include "impl/LuaConfigImpl.h"
 
@@ -29,6 +30,17 @@ namespace ramses
     class Camera;
 }
 
+namespace rlogic_serialization
+{
+    struct ApiObjects;
+}
+
+namespace flatbuffers
+{
+    template<typename T> struct Offset;
+    class FlatBufferBuilder;
+}
+
 namespace rlogic
 {
     class LogicObject;
@@ -40,17 +52,6 @@ namespace rlogic
     class RamsesCameraBinding;
     class DataArray;
     class AnimationNode;
-}
-
-namespace rlogic_serialization
-{
-    struct ApiObjects;
-}
-
-namespace flatbuffers
-{
-    template<typename T> struct Offset;
-    class FlatBufferBuilder;
 }
 
 namespace rlogic::internal
@@ -76,8 +77,8 @@ namespace rlogic::internal
         // Moving those would require a custom move assignment operator which keeps both sol states alive
         // until the objects have been moved, and only then also moves the sol state - we don't need this
         // complexity because we never move-assign ApiObjects
-        ApiObjects(ApiObjects&& other) noexcept = delete;
-        ApiObjects& operator=(ApiObjects&& other) noexcept = delete;
+        ApiObjects(ApiObjects&& other) = delete;
+        ApiObjects& operator=(ApiObjects&& other) = delete;
         ApiObjects(const ApiObjects& other) = delete;
         ApiObjects& operator=(const ApiObjects& other) = delete;
 

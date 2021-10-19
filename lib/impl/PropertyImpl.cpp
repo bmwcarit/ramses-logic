@@ -10,11 +10,11 @@
 
 #include "impl/PropertyImpl.h"
 #include "impl/LogicNodeImpl.h"
+#include "impl/LoggerImpl.h"
 
 #include "internals/SerializationHelper.h"
 #include "internals/TypeUtils.h"
 #include "internals/ErrorReporting.h"
-#include "LoggerImpl.h"
 
 #include "generated/PropertyGen.h"
 

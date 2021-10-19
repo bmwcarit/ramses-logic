@@ -7,7 +7,9 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/RamsesBindingImpl.h"
+
 #include "ramses-client-api/SceneObject.h"
+
 #include "generated/RamsesReferenceGen.h"
 
 namespace rlogic::internal

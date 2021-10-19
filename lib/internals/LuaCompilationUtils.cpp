@@ -45,6 +45,13 @@ namespace rlogic::internal
         // TODO Violin use separate environment for script loading, don't reuse it as a runtime environment
         sol::environment env = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Runtime);
 
+        PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
+        PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
+
+        env["IN"] = std::ref(inputsExtractor);
+        env["OUT"] = std::ref(outputsExtractor);
+
+        // TODO Violin check that result here is not something else
         sol::protected_function mainFunction = load_result;
         env.set_on(mainFunction);
 
@@ -72,21 +79,11 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
-        PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
-        PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
-
-        sol::environment interfaceEnvironment = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Interface);
-
-        interfaceEnvironment["IN"] = std::ref(inputsExtractor);
-        interfaceEnvironment["OUT"] = std::ref(outputsExtractor);
-
-        interfaceEnvironment.set_on(intf);
+        env.set_on(intf);
         sol::protected_function_result intfResult = intf();
 
-        interfaceEnvironment["IN"] = sol::lua_nil;
-        interfaceEnvironment["OUT"] = sol::lua_nil;
-        for (const auto& module : userModules)
-            interfaceEnvironment[module.first] = sol::lua_nil;
+        env["IN"] = sol::lua_nil;
+        env["OUT"] = sol::lua_nil;
 
         if (!intfResult.valid())
         {

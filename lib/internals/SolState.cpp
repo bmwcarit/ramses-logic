@@ -72,9 +72,15 @@ namespace rlogic::internal
         return m_solState.load(source, std::string(scriptName));
     }
 
-    sol::environment SolState::createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules, EEnvironmentType type)
+    // TODO Violin re-implement environment isolation after modules are supported by RaCo. Should work like this:
+    // - modules are visible in all environments (both std. and custom modules)
+    // - interface environment: sees only extraction symbols additionally
+    // - runtime environment - sees global variables from the init() function additionally
+    // - module environment: sees extraction symbols additionally, but doesn't have IN and OUT globals
+    // - none of the environments see the Lua state globals
+    sol::environment SolState::createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules, EEnvironmentType /*type*/)
     {
-        sol::environment newEnv(m_solState, sol::create);
+        sol::environment newEnv(m_solState, sol::create, m_solState.globals());
 
         // Set itself as a global variable registry
         newEnv["_G"] = newEnv;
@@ -87,11 +93,7 @@ namespace rlogic::internal
             newEnv[module.first] = module.second->m_impl.getModule();
         }
 
-        // Allow access to interface types in all environments, except runtime
-        if (type != EEnvironmentType::Runtime)
-        {
-            PropertyTypeExtractor::RegisterTypes(newEnv);
-        }
+        PropertyTypeExtractor::RegisterTypes(newEnv);
 
         // if using 'modules' call to declare dependencies - resolve it to noop
         auto dummyFunc = [](const std::string& /*unused*/) {};

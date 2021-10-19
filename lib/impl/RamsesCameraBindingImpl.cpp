@@ -7,6 +7,14 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/RamsesCameraBindingImpl.h"
+
+#include "ramses-utils.h"
+#include "ramses-client-api/Camera.h"
+#include "ramses-client-api/PerspectiveCamera.h"
+
+#include "ramses-logic/EPropertyType.h"
+#include "ramses-logic/Property.h"
+
 #include "impl/PropertyImpl.h"
 #include "impl/LoggerImpl.h"
 
@@ -14,14 +22,7 @@
 #include "internals/ErrorReporting.h"
 #include "internals/IRamsesObjectResolver.h"
 
-#include "ramses-logic/EPropertyType.h"
-#include "ramses-logic/Property.h"
-
 #include "generated/RamsesCameraBindingGen.h"
-
-#include "ramses-utils.h"
-#include "ramses-client-api/Camera.h"
-#include "ramses-client-api/PerspectiveCamera.h"
 
 namespace rlogic::internal
 {

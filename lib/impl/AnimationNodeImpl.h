@@ -8,10 +8,11 @@
 
 #pragma once
 
+#include "ramses-logic/AnimationTypes.h"
+
 #include "impl/LogicNodeImpl.h"
 #include "PropertyImpl.h"
 #include <memory>
-#include "ramses-logic/AnimationTypes.h"
 
 namespace rlogic_serialization
 {

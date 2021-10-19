@@ -9,7 +9,6 @@
 #include "ramses-logic/RamsesBinding.h"
 
 #include "impl/RamsesBindingImpl.h"
-#include "impl/LogicNodeImpl.h"
 
 namespace rlogic
 {

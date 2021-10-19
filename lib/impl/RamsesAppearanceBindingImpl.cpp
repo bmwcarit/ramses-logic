@@ -7,23 +7,23 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/RamsesAppearanceBindingImpl.h"
+
+#include "ramses-client-api/Appearance.h"
+#include "ramses-client-api/Effect.h"
+#include "ramses-client-api/UniformInput.h"
+
+#include "ramses-logic/EPropertyType.h"
+#include "ramses-logic/Property.h"
+
 #include "impl/PropertyImpl.h"
 #include "impl/LoggerImpl.h"
-
-#include "ramses-client-api/UniformInput.h"
 
 #include "internals/RamsesHelper.h"
 #include "internals/ErrorReporting.h"
 #include "internals/TypeUtils.h"
 #include "internals/IRamsesObjectResolver.h"
 
-#include "ramses-logic/EPropertyType.h"
-#include "ramses-logic/Property.h"
-
 #include "generated/RamsesAppearanceBindingGen.h"
-
-#include "ramses-client-api/Appearance.h"
-#include "ramses-client-api/Effect.h"
 
 namespace rlogic::internal
 {

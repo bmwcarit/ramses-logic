@@ -7,8 +7,10 @@
 //  -------------------------------------------------------------------------
 
 #include <iostream>
+#include <vector>
 
 #include "ramses-logic/LogicEngine.h"
+#include "ramses-logic/DataArray.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/EPropertyType.h"
@@ -17,7 +19,7 @@ int main()
 {
     std::cout << "Start ramses-logic-shared-lib-check\n";
     rlogic::LogicEngine logicEngine;
-    rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
+    logicEngine.createLuaScript(R"(
         function interface()
             IN.int = INT
             OUT.float = FLOAT
@@ -26,9 +28,15 @@ int main()
         function run()
             OUT.float = IN.int + 0.5
         end
-    )");
+    )", {}, "aScript");
+
+    // Test that type cast works
+    rlogic::LuaScript* script = logicEngine.findLogicObject("aScript")->as<rlogic::LuaScript>();
 
     script->getInputs()->getChild("int")->set<int32_t>(5);
+    const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
+    const auto arrayData = dataArray->getData<float>();
+    (void) arrayData;
 
     logicEngine.update();
 

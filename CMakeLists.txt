@@ -14,8 +14,8 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 10)
-set(RLOGIC_VERSION_PATCH 1)
+set(RLOGIC_VERSION_MINOR 11)
+set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -32,15 +32,15 @@ project(RamsesLogic
 #==========================================================================
 
 set(ramses-logic_SHARED_LIB_TARGET_NAME "ramses-logic" CACHE STRING "Name of ramses-logic shared library target")
-set(ramses-logic_RAMSES_TARGET "ramses-shared-lib-client-only" CACHE
+set(ramses-logic_RAMSES_TARGET "" CACHE
     STRING "Set this cache variable to a custom RAMSES target. If this is a valid target name, Ramses Logic will use it instead of building Ramses")
 set(ramses-logic_FOLDER_PREFIX "" CACHE
     STRING "Set a custom prefix for target folders in Visual Studio. If not set, will be set based on project's relative path")
-set(ramses-logic_BUILD_RAMSES_RENDERER false CACHE BOOL "Set whether the ramses renderer will be built as part of this build. If this option is set to ON, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
+set(ramses-logic_BUILD_RAMSES_RENDERER true CACHE BOOL "Set whether the ramses renderer will be built as part of this build. If this option is set to ON, ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
 option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ramses build, even if ramses-logic_RAMSES_TARGET is not a valid ramses target" ON)
 option(ramses-logic_FIND_RAMSES_FROM_SYSTEM "Set this to ON if you want to use an existing installation or package of Ramses (find_package)" OFF)
 set(ramses-logic_PLATFORM "" CACHE
-    STRING "Use this in conjunction with ramses-logic_FIND_RAMSES_FROM_SYSTEM to search for a specific Ramses platform")
+    STRING "Use this in conjunction with ramses-logic_FIND_RAMSES_FROM_SYSTEM or ramses-logic_BUILD_RAMSES_RENDERER to search for a specific Ramses platform")
 option(ramses-logic_BUILD_SHARED_LIB "Enable/disable build of Ramses Logic shared lib target" ON)
 option(ramses-logic_BUILD_STATIC_LIB "Enable/disable build of Ramses Logic static lib target" OFF)
 option(ramses-logic_ENABLE_INSTALL "Enable/disable installation of Ramses Logic" ON)
@@ -51,6 +51,7 @@ option(ramses-logic_FORCE_OFF_TESTS "Fully disable tests" OFF)
 option(ramses-logic_BUILD_DOCUMENTATION "Enable building documentation when dependencies available" ON)
 option(ramses-logic_FORCE_BUILD_DOCS "Abort build if documentation dependencies not found(doxygen, sphinx, breathe and the rtd theme for sphinx)" OFF)
 option(ramses-logic_BUILD_EXAMPLES "Build examples" ON)
+option(ramses-logic_BUILD_TOOLS "Build tools" ON)
 option(ramses-logic_ENABLE_FLATBUFFERS_GENERATION "Create target to generate flatbuffers serialization files (ON/OFF)" ON)
 option(ramses-logic_ENABLE_TEST_COVERAGE "Enable test coverage - works on clang only (ON/OFF)" OFF)
 option(ramses-logic_ENABLE_CODE_STYLE "Enable code style checker target (requires python3.6+)" ON)
@@ -66,6 +67,23 @@ endif()
 
 if(ramses-logic_FIND_RAMSES_FROM_SYSTEM AND ramses-logic_BUILD_RAMSES_RENDERER)
     message(FATAL_ERROR "Can't have both ramses-logic_FIND_RAMSES_FROM_SYSTEM and ramses-logic_BUILD_RAMSES_RENDERER options enabled!")
+endif()
+
+if(ramses-logic_BUILD_TOOLS AND NOT ramses-logic_BUILD_RAMSES_RENDERER)
+    message(FATAL_ERROR "Can't build tools without also having a ramses renderer. Enable a renderer or disable the tools!")
+endif()
+
+if(ramses-logic_BUILD_RAMSES_RENDERER)
+    # Set some automatic values if platform not set explicitly
+    if(NOT ramses-logic_PLATFORM)
+        if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
+            set(ramses-logic_PLATFORM "WINDOWS")
+        elseif(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+            set(ramses-logic_PLATFORM "LINUX-X11")
+        elseif(${CMAKE_SYSTEM_NAME} MATCHES "Android")
+            set(ramses-logic_PLATFORM "ANDROID")
+        endif()
+    endif()
 endif()
 
 #==========================================================================

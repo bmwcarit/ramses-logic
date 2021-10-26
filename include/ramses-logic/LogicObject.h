@@ -40,6 +40,21 @@ namespace rlogic
         RLOGIC_API void setName(std::string_view name);
 
         /**
+        * Casts this object to given type.
+        * Has same behavior as \c dynamic_cast, will return nullptr (without error) if given type does not match this object.
+        *
+        * @return logic object cast to given type or nullptr if wrong type provided
+        */
+        template <typename T>
+        [[nodiscard]] const T* as() const;
+
+        /**
+        * @copydoc as() const
+        */
+        template <typename T>
+        [[nodiscard]] T* as();
+
+        /**
         * Deleted copy constructor
         */
         LogicObject(const LogicObject&) = delete;
@@ -49,6 +64,10 @@ namespace rlogic
         */
         LogicObject& operator=(const LogicObject&) = delete;
 
+        /**
+        * Destructor of #LogicObject
+        */
+        virtual ~LogicObject() noexcept;
     protected:
         /**
         * Constructor of #LogicObject. User is not supposed to call this - LogcNodes are created by subclasses
@@ -58,10 +77,30 @@ namespace rlogic
         explicit LogicObject(std::unique_ptr<internal::LogicObjectImpl> impl) noexcept;
 
         /**
-        * Destructor of #LogicObject
+        * Internal implementation of #as<T> with check that T is the correct type
         */
-        virtual ~LogicObject() noexcept;
+        template <typename T>
+        [[nodiscard]] RLOGIC_API const T* internalCast() const;
+
+        /**
+        * @copydoc internalCast() const
+        */
+        template <typename T>
+        [[nodiscard]] RLOGIC_API T* internalCast();
+
 
         std::unique_ptr<internal::LogicObjectImpl> m_impl;
     };
+
+    template <typename T> const T* LogicObject::as() const
+    {
+        static_assert(std::is_base_of<LogicObject, T>::value, "T in as<T> must be a subclass of LogicObject!");
+        return internalCast<T>();
+    }
+
+    template <typename T> T* LogicObject::as()
+    {
+        static_assert(std::is_base_of<LogicObject, T>::value, "T in as<T> must be a subclass of LogicObject!");
+        return internalCast<T>();
+    }
 }

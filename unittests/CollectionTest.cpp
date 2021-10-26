@@ -43,12 +43,19 @@ namespace rlogic
         ACollection()
             : m_testCollection(m_internalContainer)
         {
-            m_internalContainer.emplace_back(std::make_unique<TestCollectionItem>(1));
-            m_internalContainer.emplace_back(std::make_unique<TestCollectionItem>(2));
-            m_internalContainer.emplace_back(std::make_unique<TestCollectionItem>(3));
+            auto testCollectionItem1 = std::make_unique<TestCollectionItem>(1);
+            auto testCollectionItem2 = std::make_unique<TestCollectionItem>(2);
+            auto testCollectionItem3 = std::make_unique<TestCollectionItem>(3);
+            m_internalContainer.push_back(testCollectionItem1.get());
+            m_internalContainer.push_back(testCollectionItem2.get());
+            m_internalContainer.push_back(testCollectionItem3.get());
+            m_objectsOwningVector.push_back(std::move(testCollectionItem1));
+            m_objectsOwningVector.push_back(std::move(testCollectionItem2));
+            m_objectsOwningVector.push_back(std::move(testCollectionItem3));
         }
 
-        std::vector<std::unique_ptr<TestCollectionItem>> m_internalContainer;
+        std::vector<std::unique_ptr<TestCollectionItem>> m_objectsOwningVector;
+        std::vector<TestCollectionItem*> m_internalContainer;
         TestCollectionType m_testCollection;
     };
 
@@ -144,8 +151,8 @@ namespace rlogic
         i = 1;
         std::for_each(collectionConstRef.begin(), collectionConstRef.end(), checkNames);
 
-        EXPECT_EQ(m_internalContainer[1].get(), *std::find_if(m_testCollection.begin(), m_testCollection.end(), [](TestCollectionItem* item) {return item->getId() == 2; }));
-        EXPECT_EQ(m_internalContainer[1].get(), *std::find_if(collectionCopy.cbegin(), collectionCopy.cend(), [](const TestCollectionItem* item) {return item->getId() == 2; }));
+        EXPECT_EQ(m_internalContainer[1], *std::find_if(m_testCollection.begin(), m_testCollection.end(), [](TestCollectionItem* item) {return item->getId() == 2; }));
+        EXPECT_EQ(m_internalContainer[1], *std::find_if(collectionCopy.cbegin(), collectionCopy.cend(), [](const TestCollectionItem* item) {return item->getId() == 2; }));
         EXPECT_EQ(m_testCollection.end(), std::find_if(m_testCollection.begin(), m_testCollection.end(), [](TestCollectionItem* item) {return item->getId() == 999; }));
     }
 

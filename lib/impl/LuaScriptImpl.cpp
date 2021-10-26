@@ -200,6 +200,21 @@ namespace rlogic::internal
             return nullptr;
         }
 
+        env["GLOBAL"] = solState.createTable();
+        sol::protected_function init = env["init"];
+
+        if (init.valid())
+        {
+            sol::protected_function_result initResult = init();
+
+            if (!initResult.valid())
+            {
+                sol::error error = initResult;
+                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed initializing script:\n{}!", name, error.what()), nullptr);
+                return nullptr;
+            }
+        }
+
         return std::make_unique<LuaScriptImpl>(
             LuaCompiledScript{
                 LuaSource{

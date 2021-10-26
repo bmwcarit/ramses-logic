@@ -100,7 +100,7 @@ namespace rlogic
         * @return vector of data or nullptr if wrong template type provided
         */
         template <typename T>
-        [[nodiscard]] const std::vector<T>* getDataInternal() const;
+        [[nodiscard]] RLOGIC_API const std::vector<T>* getDataInternal() const;
     };
 
     template <typename T>

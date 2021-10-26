@@ -78,15 +78,16 @@ things can be enabled using following CMake options:
 
 * -Dramses-logic_RAMSES_TARGET
     * options: ramses-shared-lib-client-only, ramses-shared-lib-<platform>, or a custom target name
-    * default: ramses-shared-lib-client-only (will be built from ``Ramses`` sources)
+    * default: empty
     * enables setting a custom Ramses target instead of building and linking Ramses from source. If set,
       and if the target exists, will use it, otherwise fallback to building from source.
 
 * -Dramses-logic_BUILD_RAMSES_RENDERER
     * options: ON/OFF
-    * default: OFF
-    * enables building the ramses renderer as part of the build. If this option is set to ON, Dramses-logic_RAMSES_TARGET has to
-      be set to a shared library target of ramses which contains a renderer (e.g ramses-shared-lib-android-egl-es-3-0).
+    * default: ON
+    * enables building the ramses renderer as part of the build. If this option is set to ON, will build
+      a default Ramses renderer for your system. If you want to build a specific platform, use either
+      -Dramses-logic_PLATFORM or a custom target (-Dramses-logic_RAMSES_TARGET).
 
 * -Dramses-logic_ALLOW_RAMSES_BUILD
     * options: ON/OFF
@@ -106,7 +107,8 @@ things can be enabled using following CMake options:
 * -Dramses-logic_PLATFORM
     * options: any of [LINUX-X11, LINUX-WAYLAND, WINDOWS, ANDROID, or empty/not set]
     * default: not set (defaults to using client-only version of ramses)
-    * Use this in conjunction with 'ramses-logic_FIND_RAMSES_FROM_SYSTEM' to search for a specific Ramses platform on the system
+    * Use this in conjunction with 'ramses-logic_FIND_RAMSES_FROM_SYSTEM' to search for a specific Ramses platform on the system.
+      Also influences which version of the renderer is built when using -Dramses-logic_BUILD_RAMSES_RENDERER.
 
 * -Dramses-logic_WARNINGS_AS_ERRORS
     * options: ON/OFF
@@ -143,6 +145,11 @@ things can be enabled using following CMake options:
     * options: ON/OFF
     * default: ON
     * set to OFF if you don't need the examples and want to reduce building time
+
+* -Dramses-logic_BUILD_TOOLS
+    * options: ON/OFF
+    * default: ON
+    * set to OFF if you don't need the tools (e.g. imgui-based viewer) and want to reduce building time
 
 * -Dramses-logic_BUILD_DOCUMENTATION
     * options: ON/OFF

@@ -39,6 +39,8 @@ RUN if [ -n "${HTTP_PROXY}" ]; then \
         valgrind \
         graphviz\
         gosu\
+        libgles2-mesa-dev \
+        libx11-dev \
     && add-apt-repository ppa:ubuntu-toolchain-r/test \
     && echo "deb http://apt.llvm.org/bionic/ llvm-toolchain-bionic-12 main\ndeb-src http://apt.llvm.org/bionic/ llvm-toolchain-bionic-12 main\n" >> /etc/apt/sources.list \
     && sh -c "curl -o - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -" \

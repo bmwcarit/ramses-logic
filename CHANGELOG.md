@@ -1,5 +1,24 @@
 # master
 
+# v0.11.0
+
+**Features**
+
+* Global variables can now be declared in a new function `init()` in Lua scripts using the GLOBAL table
+    * See docs or example for more info and exact usage
+
+**Improvements**
+
+* Logic also builds a Ramses renderer now
+    * Builds a default renderer for the host system
+    * Affected by setting -Dramses-logic_PLATFORM
+    * Can still build custom Ramses and inject as target, or find from system
+    * See build docs for more details and options
+* Added Iterator and collection for LogicObjects to LogicEngine
+* Added convenience method LogicEngine::findLogicObject(name) to find object with name regardless of its type
+* Added convenience method LogicObject::as<Type> that returns the logic object cast to given concrete type
+* Updates Ramses to 27.0.113
+
 # v0.10.2
 
 **Improvements**

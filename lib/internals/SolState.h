@@ -59,6 +59,7 @@ namespace rlogic::internal
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
         sol::environment createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules, EEnvironmentType type);
         void copyTableIntoEnvironment(const sol::table& table, std::string_view name, sol::environment& env);
+        sol::table createTable();
 
         [[nodiscard]] static bool IsReservedModuleName(std::string_view name);
     private:

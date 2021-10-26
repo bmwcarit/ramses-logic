@@ -36,12 +36,12 @@ namespace rlogic
         return m_impl.getNumElements();
     }
 
-    template const std::vector<float>* DataArray::getDataInternal() const;
-    template const std::vector<vec2f>* DataArray::getDataInternal() const;
-    template const std::vector<vec3f>* DataArray::getDataInternal() const;
-    template const std::vector<vec4f>* DataArray::getDataInternal() const;
-    template const std::vector<int32_t>* DataArray::getDataInternal() const;
-    template const std::vector<vec2i>* DataArray::getDataInternal() const;
-    template const std::vector<vec3i>* DataArray::getDataInternal() const;
-    template const std::vector<vec4i>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<float>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<vec2f>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<vec3f>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<vec4f>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<int32_t>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<vec2i>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<vec3i>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<vec4i>* DataArray::getDataInternal() const;
 }

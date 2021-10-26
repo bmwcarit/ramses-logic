@@ -175,6 +175,32 @@ if (NOT TARGET fmt)
     folderize_target(fmt "external")
 endif()
 
+if(ramses-logic_BUILD_TOOLS AND NOT TARGET imgui)
+    ensure_submodule_exists(imgui)
+
+    # Collect all source and header files
+    file(GLOB IMGUI_SOURCE
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/*.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/misc/cpp/*.cpp
+        )
+    file(GLOB IMGUI_HEADER
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/imgui/misc/cpp/*.h
+        )
+
+    set_source_files_properties(${IMGUI_SOURCE} PROPERTIES LANGUAGE CXX)
+
+    # Create library for imgui
+    add_library(imgui STATIC ${IMGUI_SOURCE} ${IMGUI_HEADER})
+
+    target_include_directories(imgui
+        PUBLIC
+            $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/imgui>
+    )
+
+    folderize_target(imgui "external")
+endif()
+
 ################################################
 ################     Ramses   ##################
 ################################################
@@ -218,21 +244,44 @@ else()
 
             ensure_submodule_exists(ramses)
 
-            #TODO Daniel find a better way to configure ramses renderer
+            # TODO Violin we should find a better way to configure ramses and just expose it here
             if(ramses-logic_BUILD_RAMSES_RENDERER)
-                set(RAMSES_TARGET ${ramses-logic_RAMSES_TARGET})
-                message(STATUS " + Building ramses from source with renderer, using target ${ramses-logic_RAMSES_TARGET}")
+                # Enable shared lib, disable client-only lib
                 set(ramses-sdk_BUILD_FULL_SHARED_LIB ON CACHE BOOL "" FORCE)
                 set(ramses-sdk_BUILD_CLIENT_ONLY_SHARED_LIB OFF CACHE BOOL "" FORCE)
 
+                # Disable all platforms
+                set(ramses-sdk_renderer_Platform_Platform_Windows_WGL_4_2_core  OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_Platform_Platform_Windows_WGL_4_5       OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_Platform_Platform_Windows_WGL_ES_3_0    OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_Platform_Platform_Wayland_IVI_EGL       OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_Platform_Platform_Wayland_Shell_EGL     OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_Platform_Platform_X11                   OFF CACHE BOOL "" FORCE)
+                set(ramses-sdk_renderer_Platform_Platform_Android               OFF CACHE BOOL "" FORCE)
+
+                # Enable only the platform which was configured
+                if(${ramses-logic_PLATFORM} STREQUAL "WINDOWS")
+                    set(RAMSES_TARGET "ramses-shared-lib-windows-wgl-4-2-core")
+                    set(ramses-sdk_renderer_Platform_Platform_Windows_WGL_4_2_core  ON CACHE BOOL "" FORCE)
+                elseif(${ramses-logic_PLATFORM} STREQUAL "LINUX-X11")
+                    set(RAMSES_TARGET "ramses-shared-lib-x11-egl-es-3-0")
+                    set(ramses-sdk_renderer_Platform_Platform_X11                   ON CACHE BOOL "" FORCE)
+                elseif(${ramses-logic_PLATFORM} STREQUAL "LINUX-WAYLAND")
+                    set(RAMSES_TARGET "wayland-shell-egl-es-3-0")
+                    set(ramses-sdk_renderer_Platform_Platform_Wayland_Shell_EGL     ON CACHE BOOL "" FORCE)
+                elseif(${ramses-logic_PLATFORM} STREQUAL "ANDROID")
+                    set(RAMSES_TARGET "ramses-shared-lib-android-egl-es-3-0")
+                    set(ramses-sdk_renderer_Platform_Platform_Android               ON CACHE BOOL "" FORCE)
+                else()
+                    message(FATAL_ERROR "Platform ${ramses-logic_PLATFORM} was not recognized! Please use one of the supported ramses platforms (WINDOWS, LINUX-X11, LINUX-WAYLAND, ANDROID)")
+                endif()
+
+                message(STATUS " + Building ramses from source with renderer, using target ${RAMSES_TARGET}")
+
                 add_subdirectory(ramses)
 
-                if ((NOT TARGET ${RAMSES_TARGET})
-                    OR (${RAMSES_TARGET} MATCHES "ramses-shared-lib-client-only")
-                    OR (NOT ${RAMSES_TARGET} MATCHES "ramses-shared-lib-"))
-                    message(FATAL_ERROR "Invalid Ramses target '${RAMSES_TARGET}'. If ramses-logic_BUILD_RAMSES_RENDERER is set, \
-                        ramses-logic_RAMSES_TARGET has to be set to a shared library target of ramses which contains a \
-                        renderer (e.g ramses-shared-lib-android-egl-es-3-0)")
+                if (NOT TARGET ${RAMSES_TARGET})
+                    message(FATAL_ERROR "Failed building Ramses target '${RAMSES_TARGET}'")
                 endif()
             else()
                 message(STATUS " + Building ramses from source, using target ramses-shared-lib-client-only")

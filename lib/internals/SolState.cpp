@@ -171,4 +171,10 @@ namespace rlogic::internal
 
         return false;
     }
+
+    sol::table SolState::createTable()
+    {
+        return m_solState.create_table();
+    }
+
 }

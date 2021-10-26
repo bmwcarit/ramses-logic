@@ -59,13 +59,15 @@ namespace rlogic::internal
     class SolState;
     class IRamsesObjectResolver;
 
-    using ScriptsContainer = std::vector<std::unique_ptr<LuaScript>>;
-    using LuaModulesContainer = std::vector<std::unique_ptr<LuaModule>>;
-    using NodeBindingsContainer = std::vector<std::unique_ptr<RamsesNodeBinding>>;
-    using AppearanceBindingsContainer = std::vector<std::unique_ptr<RamsesAppearanceBinding>>;
-    using CameraBindingsContainer = std::vector<std::unique_ptr<RamsesCameraBinding>>;
-    using DataArrayContainer = std::vector<std::unique_ptr<DataArray>>;
-    using AnimationNodesContainer = std::vector<std::unique_ptr<AnimationNode>>;
+    using ScriptsContainer = std::vector<LuaScript*>;
+    using LuaModulesContainer = std::vector<LuaModule*>;
+    using NodeBindingsContainer = std::vector<RamsesNodeBinding*>;
+    using AppearanceBindingsContainer = std::vector<RamsesAppearanceBinding*>;
+    using CameraBindingsContainer = std::vector<RamsesCameraBinding*>;
+    using DataArrayContainer = std::vector<DataArray*>;
+    using AnimationNodesContainer = std::vector<AnimationNode*>;
+    using LogicObjectContainer = std::vector<LogicObject*>;
+    using ObjectsOwningContainer = std::vector<std::unique_ptr<LogicObject>>;
 
     class ApiObjects
     {
@@ -113,6 +115,8 @@ namespace rlogic::internal
         [[nodiscard]] bool checkBindingsReferToSameRamsesScene(ErrorReporting& errorReporting) const;
 
         // Getters
+        [[nodiscard]] LogicObjectContainer& getLogicObjects();
+        [[nodiscard]] const LogicObjectContainer& getLogicObjects() const;
         [[nodiscard]] ScriptsContainer& getScripts();
         [[nodiscard]] const ScriptsContainer& getScripts() const;
         [[nodiscard]] LuaModulesContainer& getLuaModules();
@@ -127,6 +131,7 @@ namespace rlogic::internal
         [[nodiscard]] const DataArrayContainer& getDataArrays() const;
         [[nodiscard]] AnimationNodesContainer& getAnimationNodes();
         [[nodiscard]] const AnimationNodesContainer& getAnimationNodes() const;
+        [[nodiscard]] const ObjectsOwningContainer& getOwnedObjects() const;
 
         [[nodiscard]] const LogicNodeDependencies& getLogicNodeDependencies() const;
         [[nodiscard]] LogicNodeDependencies& getLogicNodeDependencies();
@@ -144,6 +149,8 @@ namespace rlogic::internal
         // Handle internal data structures and mappings
         void registerLogicNode(LogicNode& logicNode);
         void unregisterLogicNode(LogicNode& logicNode);
+        void registerLogicObject(std::unique_ptr<LogicObject> obj);
+        void unregisterLogicObject(LogicObject& objToDelete);
 
         bool checkLuaModules(
             const ModuleMapping& moduleMapping,
@@ -168,6 +175,9 @@ namespace rlogic::internal
         DataArrayContainer                  m_dataArrays;
         AnimationNodesContainer             m_animationNodes;
         LogicNodeDependencies               m_logicNodeDependencies;
+        LogicObjectContainer                m_logicObjects;
+        ObjectsOwningContainer              m_objectsOwningContainer;
+
         std::unordered_map<LogicNodeImpl*, LogicNode*> m_reverseImplMapping;
     };
 }

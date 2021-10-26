@@ -236,6 +236,115 @@ namespace rlogic
         EXPECT_EQ("", ramsesCameraBinding->getName());
     }
 
+    TEST_F(ALogicEngine_Factory, CanCastObjectsToValidTypes)
+    {
+        LogicObject* luaModule         = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        LogicObject* luaScript         = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        LogicObject* nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        LogicObject* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        LogicObject* cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        LogicObject* dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
+        LogicObject* animNode          = m_logicEngine.createAnimationNode({{"channel", dataArray->as<DataArray>(), dataArray->as<DataArray>()}}, "animNode");
+
+        EXPECT_TRUE(luaModule->as<LuaModule>());
+        EXPECT_TRUE(luaScript->as<LuaScript>());
+        EXPECT_TRUE(nodeBinding->as<RamsesNodeBinding>());
+        EXPECT_TRUE(appearanceBinding->as<RamsesAppearanceBinding>());
+        EXPECT_TRUE(cameraBinding->as<RamsesCameraBinding>());
+        EXPECT_TRUE(dataArray->as<DataArray>());
+        EXPECT_TRUE(animNode->as<AnimationNode>());
+
+        EXPECT_FALSE(luaModule->as<AnimationNode>());
+        EXPECT_FALSE(luaScript->as<DataArray>());
+        EXPECT_FALSE(nodeBinding->as<RamsesCameraBinding>());
+        EXPECT_FALSE(appearanceBinding->as<AnimationNode>());
+        EXPECT_FALSE(cameraBinding->as<RamsesNodeBinding>());
+        EXPECT_FALSE(dataArray->as<LuaScript>());
+        EXPECT_FALSE(animNode->as<LuaModule>());
+
+        //cast obj -> node -> binding -> appearanceBinding
+        auto* nodeCastFromObject = appearanceBinding->as<LogicNode>();
+        EXPECT_TRUE(nodeCastFromObject);
+        auto* bindingCastFromNode = nodeCastFromObject->as<RamsesBinding>();
+        EXPECT_TRUE(bindingCastFromNode);
+        auto* appearanceBindingCastFromBinding = bindingCastFromNode->as<RamsesAppearanceBinding>();
+        EXPECT_TRUE(appearanceBindingCastFromBinding);
+
+        //cast appearanceBinding -> binding -> node -> obj
+        EXPECT_TRUE(appearanceBindingCastFromBinding->as<RamsesBinding>());
+        EXPECT_TRUE(bindingCastFromNode->as<LogicNode>());
+        EXPECT_TRUE(nodeCastFromObject->as<LogicObject>());
+
+        //cast obj -> node -> animationnode
+        auto* anNodeCastFromObject = animNode->as<LogicNode>();
+        EXPECT_TRUE(anNodeCastFromObject);
+        auto* animationCastFromNode = anNodeCastFromObject->as<AnimationNode>();
+        EXPECT_TRUE(animationCastFromNode);
+
+        //cast animationnode -> node -> obj
+        EXPECT_TRUE(animationCastFromNode->as<LogicNode>());
+        EXPECT_TRUE(anNodeCastFromObject->as<LogicObject>());
+    }
+
+    TEST_F(ALogicEngine_Factory, CanCastObjectsToValidTypes_Const)
+    {
+        m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const LogicObject* dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
+        m_logicEngine.createAnimationNode({{"channel", dataArray->as<DataArray>(), dataArray->as<DataArray>()}}, "animNode");
+
+        const auto& immutableLogicEngine = m_logicEngine;
+        const auto* luaModuleConst         = immutableLogicEngine.findLogicObject("luaModule");
+        const auto* luaScriptConst         = immutableLogicEngine.findLogicObject("script");
+        const auto* nodeBindingConst       = immutableLogicEngine.findLogicObject("nodebinding");
+        const auto* appearanceBindingConst = immutableLogicEngine.findLogicObject("appbinding");
+        const auto* cameraBindingConst     = immutableLogicEngine.findLogicObject("camerabinding");
+        const auto* dataArrayConst         = immutableLogicEngine.findLogicObject("dataarray");
+        const auto* animNodeConst          = immutableLogicEngine.findLogicObject("animNode");
+
+        EXPECT_TRUE(luaModuleConst->as<LuaModule>());
+        EXPECT_TRUE(luaScriptConst->as<LuaScript>());
+        EXPECT_TRUE(nodeBindingConst->as<RamsesNodeBinding>());
+        EXPECT_TRUE(appearanceBindingConst->as<RamsesAppearanceBinding>());
+        EXPECT_TRUE(cameraBindingConst->as<RamsesCameraBinding>());
+        EXPECT_TRUE(dataArrayConst->as<DataArray>());
+        EXPECT_TRUE(animNodeConst->as<AnimationNode>());
+
+        EXPECT_FALSE(luaModuleConst->as<AnimationNode>());
+        EXPECT_FALSE(luaScriptConst->as<DataArray>());
+        EXPECT_FALSE(nodeBindingConst->as<RamsesCameraBinding>());
+        EXPECT_FALSE(appearanceBindingConst->as<AnimationNode>());
+        EXPECT_FALSE(cameraBindingConst->as<RamsesNodeBinding>());
+        EXPECT_FALSE(dataArrayConst->as<LuaScript>());
+        EXPECT_FALSE(animNodeConst->as<LuaModule>());
+
+        // cast obj -> node -> binding -> appearanceBinding
+        const auto* nodeCastFromObject = appearanceBindingConst->as<LogicNode>();
+        EXPECT_TRUE(nodeCastFromObject);
+        const auto* bindingCastFromNode = nodeCastFromObject->as<RamsesBinding>();
+        EXPECT_TRUE(bindingCastFromNode);
+        const auto* appearanceBindingCastFromBinding = bindingCastFromNode->as<RamsesAppearanceBinding>();
+        EXPECT_TRUE(appearanceBindingCastFromBinding);
+
+        // cast appearanceBinding -> binding -> node -> obj
+        EXPECT_TRUE(appearanceBindingCastFromBinding->as<RamsesBinding>());
+        EXPECT_TRUE(bindingCastFromNode->as<LogicNode>());
+        EXPECT_TRUE(nodeCastFromObject->as<LogicObject>());
+
+        // cast obj -> node -> animationnode
+        const auto* anNodeCastFromObject = animNodeConst->as<LogicNode>();
+        EXPECT_TRUE(anNodeCastFromObject);
+        const auto* animationCastFromNode = anNodeCastFromObject->as<AnimationNode>();
+        EXPECT_TRUE(animationCastFromNode);
+
+        // cast animationnode -> node -> obj
+        EXPECT_TRUE(animationCastFromNode->as<LogicNode>());
+        EXPECT_TRUE(anNodeCastFromObject->as<LogicObject>());
+    }
+
     TEST_F(ALogicEngine_Factory, ProducesErrorIfWrongObjectTypeIsDestroyed)
     {
         struct UnknownObjectImpl: internal::LogicNodeImpl

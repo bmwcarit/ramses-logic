@@ -35,7 +35,7 @@ namespace rlogic
         size_t m_id;
     };
 
-    using TestIternalType = std::vector<std::unique_ptr<TestIteratorItem>>;
+    using TestIternalType = std::vector<TestIteratorItem*>;
     using TestIteratorType = Iterator<TestIteratorItem, TestIternalType, false>;
     using TestConstIteratorType = Iterator<TestIteratorItem, TestIternalType, true>;
 
@@ -44,9 +44,16 @@ namespace rlogic
     protected:
         AIterator()
         {
-            m_internalContainer.emplace_back(std::make_unique<TestIteratorItem>(1));
-            m_internalContainer.emplace_back(std::make_unique<TestIteratorItem>(2));
-            m_internalContainer.emplace_back(std::make_unique<TestIteratorItem>(3));
+            auto testIteratorItem1 = std::make_unique<TestIteratorItem>(1);
+            auto testIteratorItem2 = std::make_unique<TestIteratorItem>(2);
+            auto testIteratorItem3 = std::make_unique<TestIteratorItem>(3);
+
+            m_internalContainer.push_back(testIteratorItem1.get());
+            m_internalContainer.push_back(testIteratorItem2.get());
+            m_internalContainer.push_back(testIteratorItem3.get());
+            m_objectsOwningVector.push_back(std::move(testIteratorItem1));
+            m_objectsOwningVector.push_back(std::move(testIteratorItem2));
+            m_objectsOwningVector.push_back(std::move(testIteratorItem3));
 
             m_begin = TestIteratorType(m_internalContainer.begin());
             m_end = TestIteratorType(m_internalContainer.end());
@@ -54,7 +61,8 @@ namespace rlogic
             m_cend = TestConstIteratorType(m_internalContainer.end());
         }
 
-        std::vector<std::unique_ptr<TestIteratorItem>> m_internalContainer;
+        std::vector<std::unique_ptr<TestIteratorItem>> m_objectsOwningVector;
+        std::vector<TestIteratorItem*> m_internalContainer;
         TestIteratorType m_begin;
         TestIteratorType m_end;
         TestConstIteratorType m_cbegin;
@@ -63,8 +71,8 @@ namespace rlogic
 
     TEST_F(AIterator, CanBeDereferenced)
     {
-        EXPECT_EQ(m_internalContainer.begin()->get(), *m_begin);
-        EXPECT_EQ(m_internalContainer.begin()->get(), *m_cbegin);
+        EXPECT_EQ(*m_internalContainer.begin(), *m_begin);
+        EXPECT_EQ(*m_internalContainer.begin(), *m_cbegin);
     }
 
     TEST_F(AIterator, CanBePostIncremented)

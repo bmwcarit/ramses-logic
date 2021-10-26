@@ -35,6 +35,11 @@ namespace rlogic
 
     LogicEngine& LogicEngine::operator=(LogicEngine&& other) noexcept = default;
 
+    Collection<LogicObject> LogicEngine::logicObjects() const
+    {
+        return Collection<LogicObject>(m_impl->getApiObjects().getLogicObjects());
+    }
+
     Collection<LuaScript> LogicEngine::scripts() const
     {
         return Collection<LuaScript>(m_impl->getApiObjects().getScripts());
@@ -71,21 +76,30 @@ namespace rlogic
     }
 
     template <typename T>
-    const T* findObject(const std::vector<std::unique_ptr<T>>& container, std::string_view name)
+    const T* findObject(const std::vector<T*>& container, std::string_view name)
     {
         const auto it = std::find_if(container.cbegin(), container.cend(), [name](const auto& o) {
             return o->getName() == name; });
 
-        return (it == container.cend() ? nullptr : it->get());
+        return (it == container.cend() ? nullptr : *it);
     }
 
     template <typename T>
-    T* findObject(std::vector<std::unique_ptr<T>>& container, std::string_view name)
+    T* findObject(std::vector<T*>& container, std::string_view name)
     {
         const auto it = std::find_if(container.begin(), container.end(), [name](const auto& o) {
             return o->getName() == name; });
 
-        return (it == container.end() ? nullptr : it->get());
+        return (it == container.end() ? nullptr : *it);
+    }
+
+    const LogicObject* LogicEngine::findLogicObject(std::string_view name) const
+    {
+        return findObject(m_impl->getApiObjects().getLogicObjects(), name);
+    }
+    LogicObject* LogicEngine::findLogicObject(std::string_view name)
+    {
+        return findObject(m_impl->getApiObjects().getLogicObjects(), name);
     }
 
     const LuaScript* LogicEngine::findScript(std::string_view name) const

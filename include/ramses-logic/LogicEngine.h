@@ -67,6 +67,13 @@ namespace rlogic
         RLOGIC_API ~LogicEngine() noexcept;
 
         /**
+         * Returns an iterable #rlogic::Collection of all #rlogic::LogicObject instances created by this #LogicEngine.
+         *
+         * @return an iterable #rlogic::Collection with all #rlogic::LogicObject instances created by this #LogicEngine
+         */
+        [[nodiscard]] RLOGIC_API Collection<LogicObject> logicObjects() const;
+
+        /**
          * Returns an iterable #rlogic::Collection of all #rlogic::LuaScript instances created by this #LogicEngine.
          *
          * @return an iterable #rlogic::Collection with all #rlogic::LuaScript instances created by this #LogicEngine
@@ -114,6 +121,20 @@ namespace rlogic
         * @return an iterable #rlogic::Collection with all #rlogic::AnimationNode created by this #LogicEngine
         */
         [[nodiscard]] RLOGIC_API Collection<AnimationNode> animationNodes() const;
+
+        /**
+         * Returns a pointer to the first occurrence of an object with a given \p name regardless of its type.
+         * To convert the object to a concrete type (e.g. LuaScript) use #rlogic::LogicObject::as<Type>() e.g.:
+         *   auto myLuaScript = logicEngine.findLogicObject("myLuaScript")->as<LuaScript>());
+         * Be aware that this function behaves as \c dynamic_cast and will return nullptr (without error) if
+         * given type doesn't match the objects type. This can later lead to crash if ignored.
+         *
+         * @param name the name of the logic object to search for
+         * @return a pointer to the logic object, or nullptr if none was found
+         */
+        [[nodiscard]] RLOGIC_API const LogicObject* findLogicObject(std::string_view name) const;
+        /// @copydoc findLogicObject(std::string_view) const
+        [[nodiscard]] RLOGIC_API LogicObject* findLogicObject(std::string_view name);
 
         /**
          * Returns a pointer to the first occurrence of a script with a given \p name if such exists, and nullptr otherwise.

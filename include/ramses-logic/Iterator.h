@@ -94,7 +94,7 @@ namespace rlogic
          */
         [[nodiscard]] maybe_const_T operator*() noexcept
         {
-            return m_iterator->get();
+            return *m_iterator;
         }
 
         /**
@@ -103,7 +103,7 @@ namespace rlogic
          */
         [[nodiscard]] maybe_const_T operator->() noexcept
         {
-            return m_iterator->get();
+            return *m_iterator;
         }
 
         /**

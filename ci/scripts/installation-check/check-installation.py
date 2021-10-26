@@ -25,10 +25,11 @@ def main():
     # Expect exactly these files after installation (don't list header files here, they are cross-checked with source tree)
     expectNonheaderFiles = [
         # Ramses
-        r"^lib/libramses-shared-lib-client-only\.so$",
-        r"^lib/libramses-shared-lib-client-only\.so\.\d+\.\d+$",
-        r"^lib/cmake/ramses-shared-lib-client-only-\d+\.\d+/ramses-shared-lib-client-onlyConfigVersion\.cmake$",
-        r"^lib/cmake/ramses-shared-lib-client-only-\d+\.\d+/ramses-shared-lib-client-onlyConfig\.cmake$",
+        r"^bin/ramses-renderer-[\w-]+$",
+        r"^lib/libramses-shared-lib-[\w-]+\.so$",
+        r"^lib/libramses-shared-lib-[\w-]+\.so\.\d+\.\d+$",
+        r"^lib/cmake/ramses-shared-lib-\d+\.\d+/ramses-shared-libConfigVersion\.cmake$",
+        r"^lib/cmake/ramses-shared-lib-\d+\.\d+/ramses-shared-libConfig\.cmake$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/LICENSE\.txt$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/CHANGELOG\.txt$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/README\.md$",

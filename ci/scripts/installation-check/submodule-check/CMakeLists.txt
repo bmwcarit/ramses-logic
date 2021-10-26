@@ -17,14 +17,14 @@ project(submodule_check)
 ### Find ramses from installation and simulate custom ramses target
 #######################################################################
 
-find_package(ramses-shared-lib-client-only REQUIRED NO_CMAKE_BUILDS_PATH)
+find_package(ramses-shared-lib REQUIRED NO_CMAKE_BUILDS_PATH COMPONENTS LINUX-X11)
 
 add_library(custom-ramses SHARED IMPORTED GLOBAL)
-set_target_properties(custom-ramses PROPERTIES IMPORTED_LOCATION ${ramses-shared-lib-client-only_LIBRARIES})
+set_target_properties(custom-ramses PROPERTIES IMPORTED_LOCATION ${ramses-shared-lib_LIBRARIES})
 if (MSVC)
-    set_target_properties(custom-ramses PROPERTIES IMPORTED_IMPLIB ${ramses-shared-lib-client-only_LIBRARIES})
+    set_target_properties(custom-ramses PROPERTIES IMPORTED_IMPLIB ${ramses-shared-lib_LIBRARIES})
 endif()
-target_include_directories(custom-ramses INTERFACE ${ramses-shared-lib-client-only_INCLUDE_DIRS})
+target_include_directories(custom-ramses INTERFACE ${ramses-shared-lib_INCLUDE_DIRS})
 add_library(my::custom-ramses ALIAS custom-ramses)
 
 #######################################################################

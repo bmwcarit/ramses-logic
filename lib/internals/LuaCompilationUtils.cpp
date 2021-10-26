@@ -45,6 +45,8 @@ namespace rlogic::internal
         // TODO Violin use separate environment for script loading, don't reuse it as a runtime environment
         sol::environment env = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Runtime);
 
+        env["GLOBAL"] = solState.createTable();
+
         PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
         PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
 
@@ -69,6 +71,20 @@ namespace rlogic::internal
         {
             errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname), nullptr);
             return std::nullopt;
+        }
+
+        sol::protected_function init = env["init"];
+
+        if (init.valid())
+        {
+            sol::protected_function_result initResult = init();
+
+            if (!initResult.valid())
+            {
+                sol::error error = initResult;
+                errorReporting.add(fmt::format("[{}] Error while initializing script. Lua stack trace:\n{}", chunkname, error.what()), nullptr);
+                return std::nullopt;
+            }
         }
 
         sol::protected_function run = env["run"];

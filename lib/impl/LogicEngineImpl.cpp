@@ -105,7 +105,7 @@ namespace rlogic::internal
         auto containsDataArray = [this](const DataArray* da) {
             const auto& dataArrays = m_apiObjects->getDataArrays();
             const auto it = std::find_if(dataArrays.cbegin(), dataArrays.cend(),
-                [da](const auto& d) { return d.get() == da; });
+                [da](const auto& d) { return d == da; });
             return it != dataArrays.cend();
         };
 

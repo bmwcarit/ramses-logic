@@ -188,10 +188,40 @@ The examples above demonstrate how structs can be nested in other structs or in 
 have a primitive type (e.g. ``INT``) or a complex type (a struct) which can have arbitrary properties, also nested ones. It is not possible to have arrays of arrays
 (multidimensional arrays). Also, array size is limited to 255 elements currently.
 
-.. note::
+==============================================
+Global variables and the init() function
+==============================================
 
-    Global symbols (symbols declared outside of the scope of functions) are **not** visible in the ``interface()`` function.
-    This restriction makes sure that scripts are stateless and not execution-dependent.
+Global symbols (symbols declared outside of the scope of functions) are **not** visible in the ``interface()`` or the ``run()`` functions.
+This restriction makes sure that scripts are stateless and not execution-dependent and that they behave the same after loading from a file as when they
+were created.
+
+In order to declare global variables, use the ``init()`` function in conjunction with the ``GLOBAL`` special table for holding global symbols.
+Here is an example:
+
+.. code-block:: lua
+
+    function init()
+        GLOBAL.coala = {
+            name = "Mr. Worldwide",
+            age = 14
+        }
+    end
+
+    function interface()
+    end
+
+    function run()
+        print(GLOBAL.coala.name .. " is " .. tostring(GLOBAL.coala.age))
+    end
+
+The ``init()`` function is executed exactly once right after the script is created, and once when it is loaded from binary
+data (:cpp:func:`rlogic::LogicEngine::loadFromFile`, :cpp:func:`rlogic::LogicEngine::loadFromBuffer`). The contents of the ``GLOBAL``
+table can be modified the same way as normal global Lua variables, and can also be functions. It also allows declaring types which
+can be then used in the ``interface()`` function. The ``init()`` function is optional, contrary to the other
+two functions - ``interface()`` and ``run()``.
+
+You can also use modules in ``init()``, see the :ref:`modules section <Using Lua modules>`.
 
 ==================================================
 Indexing inside Lua

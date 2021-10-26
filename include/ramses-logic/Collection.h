@@ -37,7 +37,7 @@ namespace rlogic
         /**
          * Internal container type. Not supposed to be used by user code in any way!
          */
-        using internal_container_type = std::vector<std::unique_ptr<T>>;
+        using internal_container_type = std::vector<T*>;
     public:
         /**
          * The iterator type returned by #begin() and #end()

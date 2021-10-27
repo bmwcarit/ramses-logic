@@ -52,7 +52,10 @@ jobs:
       shell: bash
       working-directory: ${{runner.workspace}}/build
       run: |
-        cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+        cmake $GITHUB_WORKSPACE \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -Dramses-logic_BUILD_TOOLS=0 \
+            -Dramses-logic_BUILD_RAMSES_RENDERER=0
       if: ${{ matrix.os == 'windows-latest' }}
 
     - name: Configure CMake (Linux)
@@ -62,7 +65,9 @@ jobs:
         cmake $GITHUB_WORKSPACE \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -Dramses-logic_BUILD_TOOLS=0 \
+            -Dramses-logic_BUILD_RAMSES_RENDERER=0
       if: ${{ matrix.os == 'ubuntu-latest' }}
 
     - name: Build

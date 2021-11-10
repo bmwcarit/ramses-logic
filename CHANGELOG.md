@@ -1,5 +1,21 @@
 # master
 
+# v0.12.0
+
+**API Changes**
+
+* Re-implemented Lua environment sandboxing
+    * This is a safety feature which was temporarily reverted to allow usage of global variables
+    * This version reintroduces it - there are now better alternatives:
+        * [init() function](https://ramses-logic.readthedocs.io/en/v0.11.0/lua_syntax.html#global-variables-and-the-init-function)
+        * [Custom modules](https://ramses-logic.readthedocs.io/en/v0.11.0/lua_syntax.html#custom-modules)
+    * Docs for new behavior: see [Lua docs](https://ramses-logic.readthedocs.io/en/v0.12.0/lua_syntax.html#environments-and-isolation)
+
+**Features**
+
+* Added a new tool - a viewer binary which can load, show and configure binary ramses/logic scenes
+    * For more info, read the [docs](https://ramses-logic.readthedocs.io/en/v0.12.0/viewer.html#ramses-logic-viewer)
+
 # v0.11.0
 
 **Features**

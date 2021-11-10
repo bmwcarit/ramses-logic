@@ -192,7 +192,8 @@ have a primitive type (e.g. ``INT``) or a complex type (a struct) which can have
 Global variables and the init() function
 ==============================================
 
-Global symbols (symbols declared outside of the scope of functions) are **not** visible in the ``interface()`` or the ``run()`` functions.
+Global symbols (symbols declared outside of the scope of functions) are **not** visible in the ``interface()`` or the ``run()`` functions
+(see :ref:`Environments and isolation`).
 This restriction makes sure that scripts are stateless and not execution-dependent and that they behave the same after loading from a file as when they
 were created.
 
@@ -222,6 +223,23 @@ can be then used in the ``interface()`` function. The ``init()`` function is opt
 two functions - ``interface()`` and ``run()``.
 
 You can also use modules in ``init()``, see the :ref:`modules section <Using Lua modules>`.
+
+==============================================
+Environments and isolation
+==============================================
+
+``Lua`` is a powerful scripting language which can do practically anything. This can be a problem sometimes - especially
+if the scripts are running in a restricted environment with strict safety and security concerns. In order to reduce the
+risk of security attacks and stability problems, the ``Logic Engine`` isolates scripts in their own `environment <https://www.lua.org/pil/14.3.html>`_ and limits
+the access of data and code. This ensures that a script can not be influenced by other scripts, modules, or dynamically loaded
+content, unless explicitly desired by the content creator.
+
+The following set of rules describes which part of the ``Lua`` script is assigned to which environment:
+
+* Each script has its own ``runtime`` environment - applied to the ``run()`` function
+* The ``init()`` function is also executed in the runtime environment
+* The ``interface()`` function is executed in a temporary environment which is destroyed afterwards (alongside all its data!)
+* The ``interface()`` function has access to modules and the ``GLOBAL`` table, but nothing else
 
 ==================================================
 Indexing inside Lua

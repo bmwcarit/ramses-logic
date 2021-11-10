@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 11)
+set(RLOGIC_VERSION_MINOR 12)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
@@ -97,12 +97,6 @@ set(RLOGIC_INSTALL_ARCHIVE_PATH     lib)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
-set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules" ${CMAKE_MODULE_PATH})
-
-include(cmake/platformConfig.cmake)
-include(cmake/externalTools.cmake)
-include(cmake/folderize.cmake)
-
 # By default redirect binaries and shared libs to /bin for easier development
 if (NOT CMAKE_LIBRARY_OUTPUT_DIRECTORY)
     message(STATUS "Redirect ramses logic library output to ${CMAKE_CURRENT_BINARY_DIR}/bin")
@@ -118,6 +112,12 @@ set(CMAKE_DEBUG_POSTFIX "") # no debug suffix in this project
 if(NOT ramses-logic_FORCE_OFF_TESTS AND (ramses-logic_FORCE_BUILD_TESTS OR CMAKE_PROJECT_NAME STREQUAL PROJECT_NAME))
     set(ramses-logic_BUILD_TESTS ON)
 endif()
+
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules" ${CMAKE_MODULE_PATH})
+
+include(cmake/platformConfig.cmake)
+include(cmake/externalTools.cmake)
+include(cmake/folderize.cmake)
 
 if(ramses-logic_BUILD_TESTS)
     include(cmake/testSetup.cmake)
@@ -247,6 +247,10 @@ endif()
 
 if(ramses-logic_BUILD_EXAMPLES)
     add_subdirectory(examples)
+endif()
+
+if(ramses-logic_BUILD_TOOLS)
+    add_subdirectory(tools)
 endif()
 
 include(cmake/addCheckerTargets.cmake)

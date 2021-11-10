@@ -43,15 +43,9 @@ namespace rlogic::internal
             return std::nullopt;
 
         // TODO Violin use separate environment for script loading, don't reuse it as a runtime environment
-        sol::environment env = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Runtime);
+        sol::environment env = solState.createEnvironment(stdModules, userModules);
 
         env["GLOBAL"] = solState.createTable();
-
-        PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
-        PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
-
-        env["IN"] = std::ref(inputsExtractor);
-        env["OUT"] = std::ref(outputsExtractor);
 
         // TODO Violin check that result here is not something else
         sol::protected_function mainFunction = load_result;
@@ -95,11 +89,22 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
-        env.set_on(intf);
+        PropertyTypeExtractor inputsExtractor("IN", EPropertyType::Struct);
+        PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
+
+        sol::environment interfaceEnvironment = solState.createEnvironment(stdModules, userModules);
+
+        interfaceEnvironment["IN"] = std::ref(inputsExtractor);
+        interfaceEnvironment["OUT"] = std::ref(outputsExtractor);
+        interfaceEnvironment["GLOBAL"] = env["GLOBAL"];
+
+        interfaceEnvironment.set_on(intf);
         sol::protected_function_result intfResult = intf();
 
-        env["IN"] = sol::lua_nil;
-        env["OUT"] = sol::lua_nil;
+        interfaceEnvironment["IN"] = sol::lua_nil;
+        interfaceEnvironment["OUT"] = sol::lua_nil;
+        for (const auto& module : userModules)
+            interfaceEnvironment[module.first] = sol::lua_nil;
 
         if (!intfResult.valid())
         {
@@ -142,7 +147,7 @@ namespace rlogic::internal
         if (!CrossCheckDeclaredAndProvidedModules(source, userModules, chunkname, errorReporting))
             return std::nullopt;
 
-        sol::environment env = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Module);
+        sol::environment env = solState.createEnvironment(stdModules, userModules);
 
         sol::protected_function mainFunction = load_result;
         env.set_on(mainFunction);

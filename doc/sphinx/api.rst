@@ -507,9 +507,10 @@ such pointers after loading from file.
 File compatibility
 --------------------------------------------------
 
-Since version ``0.7.0``, Ramses Logic binary files are backwards and forwards compatible.
-This means that a newer version of the runtime can be used to load an older binary file and vice-versa.
-For the exact compatibility info, see the `version matrix <https://ramses-logic.readthedocs.io/en/latest/readme_ref.html#version-matrix>`_.
+Since version ``0.7.0``, Ramses Logic binary files are backwards compatible.
+This means that a newer version of the runtime can be used to load an older binary file, unless the file format version
+had a breaking change and a newer version of the Logic Engine must be used.
+The exact compatibility info is documented in the `version matrix <https://ramses-logic.readthedocs.io/en/latest/readme_ref.html#version-matrix>`_.
 There are some limitations:
 
 * Loading a file older than v0.7.0 will result in an error with a runtime equal or newer than v0.7.0

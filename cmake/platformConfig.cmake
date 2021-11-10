@@ -138,11 +138,31 @@ ENDIF()
 # Special handling for C++17 filesystem
 # Unfortunately not trivial, please keep this CMake config in one place!
 
+function(check_handle_special_filesystem_lib libname)
+    include(CheckCXXSourceCompiles)
+    set(CMAKE_REQUIRED_LIBRARIES ${libname})
+    check_cxx_source_compiles("int main() {}" RLOGIC_HAS_STD_FS)
+
+    if (RLOGIC_HAS_STD_FS)
+        link_libraries(${libname})
+    else()
+        if (ramses-logic_BUILD_TESTS)
+            message(FATAL_ERROR "std::filesystem libary not found. Cannot use emulation with tests enabled")
+        endif()
+        if (NOT CMAKE_SYSTEM_NAME STREQUAL Linux)
+            message(FATAL_ERROR "std::filesystem libary not found. Can use emulation only on Linux")
+        endif()
+
+        message(STATUS "std::filesystem libary not found, enable emulation")
+        add_definitions("-DRLOGIC_STD_FILESYSTEM_EMULATION")
+    endif()
+endfunction()
+
 # GCC prior version 9.1 puts filesystem in a separate static lib (stdc++fs) and potentially in the experimental namespace
 if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU" AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.1)
-    link_libraries(stdc++fs)
+    check_handle_special_filesystem_lib(stdc++fs)
     # gcc prior version 8 puts symbols in the experimental namespace
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
+    if(RLOGIC_HAS_STD_FS AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 8)
         add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
     endif()
 endif()
@@ -154,17 +174,19 @@ if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" AND CMAKE_CXX_COMPILER_VERSION VE
     string(FIND "${CMAKE_CXX_FLAGS}" "-stdlib=libc++" USES_LIBCXX)
     if(USES_LIBCXX EQUAL -1)
         # Link stdc++fs from the std lib
-        link_libraries(stdc++fs)
+        check_handle_special_filesystem_lib(stdc++fs)
         # llvm prior version 7 puts symbols in the experimental namespace
-        if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
+        if(RLOGIC_HAS_STD_FS AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
             add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
         endif()
     else()
         message(STATUS "Detected usage of libc++, using libc++ specific compiler flags")
         # See docs for more details https://libcxx.llvm.org/docs/UsingLibcxx.html#using-libc-experimental-and-experimental
         if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 7)
-            link_libraries(c++experimental)
-            add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
+            check_handle_special_filesystem_lib(c++experimental)
+            if (RLOGIC_HAS_STD_FS)
+                add_definitions("-DRLOGIC_STD_FILESYSTEM_EXPERIMENTAL")
+            endif()
         else()
             link_libraries(libc++fs)
         endif()

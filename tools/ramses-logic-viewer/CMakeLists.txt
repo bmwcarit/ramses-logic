@@ -1,0 +1,35 @@
+#  -------------------------------------------------------------------------
+#  Copyright (C) 2021 BMW AG
+#  -------------------------------------------------------------------------
+#  This Source Code Form is subject to the terms of the Mozilla Public
+#  License, v. 2.0. If a copy of the MPL was not distributed with this
+#  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+#  -------------------------------------------------------------------------
+
+add_executable(ramses-logic-viewer
+    main.cpp
+    ImguiClientHelper.h
+    LogicViewer.h
+    LogicViewer.cpp
+    LogicViewerGui.h
+    LogicViewerGui.cpp
+    LogicViewerLuaTypes.h
+    LogicViewerLuaTypes.cpp
+    Arguments.h
+    SceneSetup.h
+    )
+
+target_include_directories(ramses-logic-viewer
+    PRIVATE
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
+)
+
+set(RAMSES_LOGIC_VIEWER_LIBS imgui fmt::fmt sol2::sol2 lua::lua)
+
+if(TARGET rlogic::ramses-logic)
+    target_link_libraries(ramses-logic-viewer PRIVATE rlogic::ramses-logic ${RAMSES_LOGIC_VIEWER_LIBS})
+else()
+    target_link_libraries(ramses-logic-viewer PRIVATE rlogic::ramses-logic-static ${RAMSES_LOGIC_VIEWER_LIBS})
+endif()
+
+folderize_target(ramses-logic-viewer "tools")

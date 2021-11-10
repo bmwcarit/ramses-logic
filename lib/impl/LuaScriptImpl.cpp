@@ -188,7 +188,7 @@ namespace rlogic::internal
         }
 
         sol::protected_function mainFunction = load_result;
-        sol::environment env = solState.createEnvironment(stdModules, userModules, EEnvironmentType::Runtime);
+        sol::environment env = solState.createEnvironment(stdModules, userModules);
 
         env.set_on(mainFunction);
 

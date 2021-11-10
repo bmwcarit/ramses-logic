@@ -435,6 +435,8 @@ namespace rlogic::internal
             return false;
         }
 
+        LOG_INFO("Saved logic engine to file: '{}'.", filename);
+
         return true;
     }
 

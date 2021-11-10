@@ -16,13 +16,6 @@
 
 namespace rlogic::internal
 {
-    enum class EEnvironmentType
-    {
-        Interface,
-        Runtime,
-        Module
-    };
-
     constexpr std::array<rlogic::EStandardModule, 5> StdModules = {
         rlogic::EStandardModule::Base,
         rlogic::EStandardModule::String,
@@ -57,7 +50,7 @@ namespace rlogic::internal
         SolState& operator=(const SolState& other) = delete;
 
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
-        sol::environment createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules, EEnvironmentType type);
+        sol::environment createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules);
         void copyTableIntoEnvironment(const sol::table& table, std::string_view name, sol::environment& env);
         sol::table createTable();
 

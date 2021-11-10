@@ -25,6 +25,12 @@ Ramses Logic documentation
 
 .. toctree::
     :maxdepth: 3
+    :caption: Viewer
+
+    viewer
+
+.. toctree::
+    :maxdepth: 3
     :caption: Lua Syntax
 
     lua_syntax

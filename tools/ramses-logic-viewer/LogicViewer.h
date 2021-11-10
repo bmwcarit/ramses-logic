@@ -1,0 +1,190 @@
+//  -------------------------------------------------------------------------
+//  Copyright (C) 2021 BMW AG
+//  -------------------------------------------------------------------------
+//  This Source Code Form is subject to the terms of the Mozilla Public
+//  License, v. 2.0. If a copy of the MPL was not distributed with this
+//  file, You can obtain one at https://mozilla.org/MPL/2.0/.
+//  -------------------------------------------------------------------------
+
+#pragma once
+
+#include "LogicViewerLuaTypes.h"
+#include "ramses-logic/Property.h"
+#include "ramses-logic/LogicEngine.h"
+#include <string>
+#include <chrono>
+
+namespace rlogic
+{
+    class LogicEngine;
+    class Property;
+
+    class LogicViewer
+    {
+    public:
+        using ScreenshotFunc = std::function<bool(const std::string&)>;
+
+        // global tokens
+        static const char* const ltnModule;
+        static const char* const ltnScript;
+        static const char* const ltnAnimation;
+        static const char* const ltnNode;
+        static const char* const ltnAppearance;
+        static const char* const ltnCamera;
+        static const char* const ltnScreenshot;
+        static const char* const ltnViews;
+        static const char* const ltnLink;
+        static const char* const ltnUnlink;
+        static const char* const ltnUpdate;
+        // property type
+        static const char* const ltnPropertyValue;
+        // view type
+        static const char* const ltnViewUpdate;
+        static const char* const ltnViewInputs;
+        static const char* const ltnViewName;
+        static const char* const ltnViewDescription;
+
+        class Result
+        {
+        public:
+            Result() = default;
+
+            explicit Result(std::string msg)
+                : m_message(std::move(msg))
+            {
+            }
+
+            [[nodiscard]] bool ok() const
+            {
+                return m_message.empty();
+            }
+
+            [[nodiscard]] const std::string& getMessage() const
+            {
+                return m_message;
+            }
+        private:
+            std::string m_message;
+        };
+
+        class View
+        {
+        public:
+            explicit View(sol::optional<sol::table>&& tbl)
+                : m_tbl(std::move(tbl))
+            {
+            }
+
+            [[nodiscard]] bool isValid() const
+            {
+                return m_tbl ? true : false;
+            }
+
+            [[nodiscard]] std::string name() const
+            {
+                if (m_tbl)
+                    return (*m_tbl).get_or(ltnViewName, std::string());
+                return std::string();
+            }
+
+            [[nodiscard]] size_t getInputCount() const
+            {
+                if (m_tbl)
+                {
+                    sol::optional<sol::table> inputs = (*m_tbl)[ltnViewInputs];
+                    if (inputs)
+                    {
+                        return (*inputs).size();
+                    }
+                }
+                return 0U;
+            }
+
+            [[nodiscard]] Property* getInput(size_t index) const
+            {
+                if (m_tbl)
+                {
+                    sol::optional<PropertyWrapper> input = (*m_tbl)[ltnViewInputs][index + 1];
+                    if (input)
+                    {
+                        return &input->m_property;
+                    }
+                }
+                return nullptr;
+            }
+
+            [[nodiscard]] std::string description() const
+            {
+                if (m_tbl)
+                    return (*m_tbl).get_or(ltnViewDescription, std::string());
+                return std::string();
+            }
+
+        private:
+            sol::optional<sol::table> m_tbl;
+        };
+
+        explicit LogicViewer(ScreenshotFunc screenshotFunc);
+
+        [[nodiscard]] bool loadRamsesLogic(const std::string& filename, ramses::Scene* scene);
+
+        [[nodiscard]] const std::string& getLogicFilename() const;
+
+        [[nodiscard]] Result loadLuaFile(const std::string& filename);
+
+        [[nodiscard]] Result call(const std::string& functionName);
+
+        [[nodiscard]] const std::string& getLuaFilename() const;
+
+        [[nodiscard]] rlogic::LogicEngine& getEngine();
+
+        [[nodiscard]] Result update();
+
+        [[nodiscard]] size_t getViewCount() const;
+
+        void setCurrentView(size_t viewId);
+
+        [[nodiscard]] size_t  getCurrentView() const;
+
+        [[nodiscard]] View getView(size_t viewId) const;
+
+        [[nodiscard]] const Result& getLastResult() const;
+
+    private:
+        rlogic::LogicEngine m_logicEngine;
+        ScreenshotFunc      m_screenshotFunc;
+        std::string         m_logicFilename;
+        std::string         m_luaFilename;
+        sol::state          m_sol;
+        size_t              m_view = 1U;
+        Result              m_result;
+
+        std::chrono::steady_clock::time_point m_startTime;
+    };
+
+    inline LogicEngine& LogicViewer::getEngine()
+    {
+        return m_logicEngine;
+    }
+
+    inline const std::string& LogicViewer::getLuaFilename() const
+    {
+        return m_luaFilename;
+    }
+
+    inline const std::string& LogicViewer::getLogicFilename() const
+    {
+        return m_logicFilename;
+    }
+
+    inline const LogicViewer::Result& LogicViewer::getLastResult() const
+    {
+        return m_result;
+    }
+
+    inline size_t LogicViewer::getCurrentView() const
+    {
+        return m_view;
+    }
+}
+

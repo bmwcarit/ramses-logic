@@ -34,6 +34,7 @@ Prefer to learn by example? Have a look at our [self-contained example snippets]
 
 |Logic    | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
 |---------|-------------------------------|------------------------------------|------------------------------|
+|0.12.0   | 27.0.113                      | same as 0.6.0                      | 0.9.x                        |
 |0.11.0   | 27.0.113                      | same as 0.6.0                      | 0.9.x                        |
 |0.10.2   | 27.0.112                      | same as 0.6.0                      | 0.9.x                        |
 |0.10.1   | 27.0.111                      | same as 0.6.0                      | 0.9.x                        |
@@ -61,7 +62,6 @@ listed alongside their licenses here:
 * Sol (MIT)
 * Flatbuffers (Apache-2.0)
 * Fmtlib (MIT)
-* ImGui (MIT)
 * Googletest (BSD-3-Clause)
 * Google Benchmark (Apache-2.0)
 

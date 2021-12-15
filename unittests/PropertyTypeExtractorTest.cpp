@@ -90,7 +90,8 @@ namespace rlogic::internal
         const HierarchicalTypeData typeInfo = extractTypeInfo(R"(
             IN.bool = BOOL
             IN.string = STRING
-            IN.int = INT
+            IN.int32 = INT
+            IN.int64 = INT64
             IN.vec2i = VEC2I
             IN.vec3i = VEC3I
             IN.vec4i = VEC4I
@@ -104,7 +105,8 @@ namespace rlogic::internal
             {
                 {"bool", EPropertyType::Bool},
                 {"float", EPropertyType::Float},
-                {"int", EPropertyType::Int32},
+                {"int32", EPropertyType::Int32},
+                {"int64", EPropertyType::Int64},
                 {"string", EPropertyType::String},
                 {"vec2f", EPropertyType::Vec2f},
                 {"vec2i", EPropertyType::Vec2i},
@@ -190,7 +192,7 @@ namespace rlogic::internal
     TEST_F(APropertyTypeExtractor_Errors, ProducesErrorWhenIndexingUndeclaredProperty)
     {
         const sol::error error = expectErrorDuringTypeExtraction("prop = IN.doesNotExist");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: Trying to access not available property doesNotExist in interface!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Field 'doesNotExist' does not exist in struct 'IN'"));
     }
 
     TEST_F(APropertyTypeExtractor_Errors, ProducesErrorWhenDeclaringPropertyTwice)
@@ -201,39 +203,31 @@ namespace rlogic::internal
                 IN.property = FLOAT
             )");
 
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: Property 'property' already exists! Can't declare the same property twice!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: Field 'property' already exists! Can't declare the same field twice!"));
     }
 
     TEST_F(APropertyTypeExtractor_Errors, ProducesErrorWhenTryingToAccessInterfaceProperties_WithNonStringIndex)
     {
-        const std::vector<std::string_view> wrongStatements = {
-            "prop = IN[1]",
-            "prop = IN[true]",
-            "prop = IN[{x=5}]",
-            "prop = IN[nil]"
-        };
-
-        for (const auto& statement : wrongStatements)
-        {
-            const sol::error error = expectErrorDuringTypeExtraction(statement);
-            EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: Only strings supported as table key type!"));
-        }
+        sol::error error = expectErrorDuringTypeExtraction("prop = IN[1]");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Bad index access to struct 'IN': Expected a string but got object of type number instead!"));
+        error = expectErrorDuringTypeExtraction("prop = IN[true]");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Bad index access to struct 'IN': Expected a string but got object of type bool instead!"));
+        error = expectErrorDuringTypeExtraction("prop = IN[{x=5}]");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Bad index access to struct 'IN': Expected a string but got object of type table instead!"));
+        error = expectErrorDuringTypeExtraction("prop = IN[nil]");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Bad index access to struct 'IN': Expected a string but got object of type nil instead!"));
     }
 
     TEST_F(APropertyTypeExtractor_Errors, ProducesErrorWhenTryingToCreateInterfaceProperties_WithNonStringIndex)
     {
-        const std::vector<std::string_view> wrongStatements = {
-            "IN[1] = INT",
-            "IN[true] = INT",
-            "IN[{x=5}] = INT",
-            "IN[nil] = INT"
-        };
-
-        for (const auto& statement : wrongStatements)
-        {
-            const sol::error error = expectErrorDuringTypeExtraction(statement);
-            EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: Only strings supported as table key type!"));
-        }
+        sol::error error = expectErrorDuringTypeExtraction("IN[1] = INT");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type number instead!"));
+        error = expectErrorDuringTypeExtraction("IN[true] = INT");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type bool instead!"));
+        error = expectErrorDuringTypeExtraction("IN[{x=5}] = INT");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type table instead!"));
+        error = expectErrorDuringTypeExtraction("IN[nil] = INT");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type nil instead!"));
     }
 
     TEST_F(APropertyTypeExtractor_Errors, InvalidTypeSpecifiers)
@@ -271,9 +265,8 @@ namespace rlogic::internal
     {
         const sol::error error1 = expectErrorDuringTypeExtraction("IN.parent = {INT}");
         const sol::error error2 = expectErrorDuringTypeExtraction("IN.parent = {5}");
-        // TODO Violin these error messages are misleading, try to improve!
-        EXPECT_THAT(error1.what(), ::testing::HasSubstr("Only strings supported as table key type!"));
-        EXPECT_THAT(error2.what(), ::testing::HasSubstr("Only strings supported as table key type!"));
+        EXPECT_THAT(error1.what(), ::testing::HasSubstr("Invalid index for new field on struct 'parent': Expected a string but got object of type number instead!"));
+        EXPECT_THAT(error2.what(), ::testing::HasSubstr("Invalid index for new field on struct 'parent': Expected a string but got object of type number instead!"));
     }
 
     TEST_F(APropertyTypeExtractor_Errors, CorrectNameButWrongTypeProvided_ForNestedProperty)
@@ -339,13 +332,13 @@ namespace rlogic::internal
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayDefinedWithoutArguments)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY()");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with size parameter N which is not a positive integer!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'nil'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithFirstArgumentNotANumber)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY('not a number')");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with size parameter N which is not a positive integer!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'string'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithoutTypeArgument)
@@ -375,19 +368,19 @@ namespace rlogic::internal
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithNegativeSize)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(-1, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: ARRAY(N, T) invoked with size parameter N which is not a positive integer!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected non-negative number, received '-1'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithFloatSize)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(1.5, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: ARRAY(N, T) invoked with size parameter N which is not a positive integer!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithUserDataInsteadOfSize)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(IN, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: ARRAY(N, T) invoked with size parameter N which is not a positive integer!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'userdata'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithUserDataInsteadOfTypeInfo)

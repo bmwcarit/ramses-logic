@@ -40,6 +40,10 @@ namespace rlogic::internal
         [[nodiscard]] sol::object index(sol::this_state solState, const sol::object& index) const;
         // Called on '#obj'
         [[nodiscard]] size_t size() const;
+        [[nodiscard]] sol::object resolveChild(sol::this_state solState, size_t childIndex) const;
+        [[nodiscard]] size_t resolvePropertyIndex(const sol::object& propertyIndex) const;
+
+        [[nodiscard]] const PropertyImpl& getWrappedProperty() const;
 
         // Register symbols for type extraction to sol state globally
         static void RegisterTypes(sol::state& state);
@@ -52,8 +56,6 @@ namespace rlogic::internal
         [[nodiscard]] sol::object extractVectorComponent(sol::this_state solState, const sol::object& index) const;
         template <typename T, int N>
         void setVectorComponents(const sol::object& rhs);
-        [[nodiscard]] size_t resolvePropertyIndex(const sol::object& propertyIndex) const;
-        [[nodiscard]] sol::object resolveChild(sol::this_state solState, size_t childIndex) const;
 
         void setChildValue(size_t index, const sol::object& rhs);
         void setComplex(const WrappedLuaProperty& other);
@@ -61,13 +63,13 @@ namespace rlogic::internal
         void setStruct(const sol::object& rhs);
         void setArray(const sol::object& rhs);
         void setInt32(const sol::object& rhs);
+        void setInt64(const sol::object& rhs);
         void setFloat(const sol::object& rhs);
         void setString(const sol::object& rhs);
         void setBool(const sol::object& rhs);
 
         [[nodiscard]] std::string getChildDebugName(size_t childIndex) const;
         void verifyTypeCompatibility(const WrappedLuaProperty& other) const;
-        void verifyTableSize(const sol::table& rhs) const;
         void badTypeAssignment(const sol::type rhsType);
     };
 }

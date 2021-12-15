@@ -29,6 +29,7 @@ namespace rlogic::internal
             case EPropertyType::Vec3f:
             case EPropertyType::Vec4f:
             case EPropertyType::Int32:
+            case EPropertyType::Int64:
             case EPropertyType::Vec2i:
             case EPropertyType::Vec3i:
             case EPropertyType::Vec4i:
@@ -53,6 +54,7 @@ namespace rlogic::internal
             case EPropertyType::Vec3f:
             case EPropertyType::Vec4f:
             case EPropertyType::Int32:
+            case EPropertyType::Int64:
             case EPropertyType::Vec2i:
             case EPropertyType::Vec3i:
             case EPropertyType::Vec4i:
@@ -81,6 +83,7 @@ namespace rlogic::internal
                 return true;
             case EPropertyType::Float:
             case EPropertyType::Int32:
+            case EPropertyType::Int64:
             case EPropertyType::String:
             case EPropertyType::Bool:
             case EPropertyType::Struct:
@@ -143,6 +146,7 @@ namespace rlogic::internal
             {
             case EPropertyType::Float:
             case EPropertyType::Int32:
+            case EPropertyType::Int64:
                 return 1u;
             case EPropertyType::Vec2f:
             case EPropertyType::Vec2i:

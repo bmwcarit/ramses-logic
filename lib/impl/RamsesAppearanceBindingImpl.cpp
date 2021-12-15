@@ -27,8 +27,8 @@
 
 namespace rlogic::internal
 {
-    RamsesAppearanceBindingImpl::RamsesAppearanceBindingImpl(ramses::Appearance& ramsesAppearance, std::string_view name)
-        : RamsesBindingImpl(name)
+    RamsesAppearanceBindingImpl::RamsesAppearanceBindingImpl(ramses::Appearance& ramsesAppearance, std::string_view name, uint64_t id)
+        : RamsesBindingImpl(name, id)
         , m_ramsesAppearance(ramsesAppearance)
     {
         const auto& effect = m_ramsesAppearance.get().getEffect();
@@ -83,6 +83,7 @@ namespace rlogic::internal
 
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
             builder.CreateString(binding.getName()),
+            binding.getId(),
             ramsesReference,
             // TODO Violin don't serialize these - they carry no useful information and are redundant
             PropertyImpl::Serialize(*binding.getInputs()->m_impl, builder, serializationMap));
@@ -109,6 +110,12 @@ namespace rlogic::internal
         if (!appearanceBinding.base())
         {
             errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing base class info!", nullptr);
+            return nullptr;
+        }
+
+        if (appearanceBinding.base()->id() == 0u)
+        {
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing id!", nullptr);
             return nullptr;
         }
 
@@ -164,7 +171,7 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        auto binding = std::make_unique<RamsesAppearanceBindingImpl>(*resolvedAppearance, name);
+        auto binding = std::make_unique<RamsesAppearanceBindingImpl>(*resolvedAppearance, name, appearanceBinding.base()->id());
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         const uint32_t uniformCount = effect.getUniformInputCount();
@@ -213,7 +220,6 @@ namespace rlogic::internal
                 switch (propertyType)
                 {
                 case EPropertyType::Float:
-
                     m_ramsesAppearance.get().setInputValueFloat(uniform, inputProperty.getValueAs<float>());
                     break;
                 case EPropertyType::Int32:
@@ -259,6 +265,7 @@ namespace rlogic::internal
                 case EPropertyType::Array:
                 case EPropertyType::Struct:
                 case EPropertyType::Bool:
+                case EPropertyType::Int64:
                     assert(false && "This should never happen");
                     break;
                 }
@@ -316,6 +323,7 @@ namespace rlogic::internal
                 case EPropertyType::Array:
                 case EPropertyType::Struct:
                 case EPropertyType::Bool:
+                case EPropertyType::Int64:
                     assert(false && "This should never happen");
                     break;
                 }

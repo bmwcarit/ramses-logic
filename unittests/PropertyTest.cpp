@@ -24,6 +24,7 @@
 #include "LogTestUtils.h"
 
 #include <memory>
+#include <fmt/format.h>
 
 namespace rlogic::internal
 {
@@ -76,37 +77,24 @@ namespace rlogic::internal
 
     TEST_F(AProperty, IsNotLinkedAfterCreation)
     {
-        Property property(CreateInputProperty(EPropertyType::Float));
-        EXPECT_FALSE(property.isLinked());
+        Property inputProperty(CreateInputProperty(EPropertyType::Float));
+        EXPECT_FALSE(inputProperty.isLinked());
+        Property outputProperty(CreateOutputProperty(EPropertyType::Float));
+        EXPECT_FALSE(outputProperty.isLinked());
     }
 
-    TEST_F(AProperty, CanBeSetToLinkedStatus)
+    TEST_F(AProperty, CanBeLinkedAndUnlinked)
     {
-        Property property(CreateInputProperty(EPropertyType::Float));
-        ASSERT_FALSE(property.isLinked());
-        property.m_impl->setIsLinkedInput(true);
-        EXPECT_TRUE(property.isLinked());
-        property.m_impl->setIsLinkedInput(false);
-        EXPECT_FALSE(property.isLinked());
-    }
-
-    TEST_F(AProperty, OutputIsNeverLinked_CheckReportsError)
-    {
-        Property property(CreateProperty(MakeType("output", EPropertyType::Float), EPropertySemantics::ScriptOutput, true));
-
-        ELogMessageType logType(ELogMessageType::Info);
-        std::string logMessage;
-
-        ScopedLogContextLevel logCollector{ ELogMessageType::Error, [&](ELogMessageType type, std::string_view message)
-            {
-                logType = type;
-                logMessage = message;
-        }
-        };
-
-        EXPECT_FALSE(property.isLinked());
-        EXPECT_EQ(logType, ELogMessageType::Error);
-        EXPECT_EQ(logMessage, "Property 'output' is not an input! Call 'Property::isLinked' only with input properties!");
+        Property property1(CreateInputProperty(EPropertyType::Float));
+        Property property2(CreateInputProperty(EPropertyType::Float));
+        property2.m_impl->setLinkedOutput(*property1.m_impl);
+        EXPECT_TRUE(property1.isLinked());
+        EXPECT_TRUE(property2.isLinked());
+        EXPECT_EQ(property2.m_impl->getLinkedIncomingProperty(), property1.m_impl.get());
+        property2.m_impl->unsetLinkedOutput();
+        EXPECT_FALSE(property1.isLinked());
+        EXPECT_FALSE(property2.isLinked());
+        EXPECT_EQ(property2.m_impl->getLinkedIncomingProperty(), nullptr);
     }
 
     TEST_F(AProperty, CanBeInitializedWithAValue)
@@ -154,7 +142,7 @@ namespace rlogic::internal
         Property linkSource(CreateProperty(MakeType("", EPropertyType::Float), EPropertySemantics::ScriptOutput, true));
 
         // Set to different than default value
-        linkSource.set<float>(0.5f);
+        linkSource.m_impl->setValue({0.5f});
 
         // Simulate link behavior
         linkTarget.m_impl->setValue(linkSource.m_impl->getValue());
@@ -201,6 +189,10 @@ namespace rlogic::internal
         Property aInt(CreateInputProperty(EPropertyType::Int32));
         ASSERT_TRUE(aInt.get<int32_t>());
         EXPECT_EQ(0, *aInt.get<int32_t>());
+
+        Property aInt64(CreateInputProperty(EPropertyType::Int64));
+        ASSERT_TRUE(aInt64.get<int64_t>());
+        EXPECT_EQ(0L, *aInt64.get<int64_t>());
 
         Property aBool(CreateInputProperty(EPropertyType::Bool));
         ASSERT_TRUE(aBool.get<bool>());
@@ -270,25 +262,30 @@ namespace rlogic::internal
     {
         Property aFloat(CreateInputProperty(EPropertyType::Float));
         Property aInt32(CreateInputProperty(EPropertyType::Int32));
+        Property aInt64(CreateInputProperty(EPropertyType::Int64));
         Property aBool(CreateInputProperty(EPropertyType::Bool));
         Property aString(CreateInputProperty(EPropertyType::String));
 
         EXPECT_TRUE(aFloat.set<float>(47.11f));
-        EXPECT_TRUE(aInt32.set<int>(5));
+        EXPECT_TRUE(aInt32.set<int32_t>(5));
+        EXPECT_TRUE(aInt64.set<int64_t>(7));
         EXPECT_TRUE(aBool.set<bool>(true));
         EXPECT_TRUE(aString.set<std::string>("hello"));
 
-        auto valueFloat = aFloat.get<float>();
-        auto valueInt32 = aInt32.get<int>();
-        auto valueBool = aBool.get<bool>();
-        auto valueString = aString.get<std::string>();
+        const auto valueFloat = aFloat.get<float>();
+        const auto valueInt32 = aInt32.get<int32_t>();
+        const auto valueInt64 = aInt64.get<int64_t>();
+        const auto valueBool = aBool.get<bool>();
+        const auto valueString = aString.get<std::string>();
         ASSERT_TRUE(valueFloat);
         ASSERT_TRUE(valueInt32);
+        ASSERT_TRUE(valueInt64);
         ASSERT_TRUE(valueBool);
         ASSERT_TRUE(valueString);
 
         EXPECT_FLOAT_EQ(47.11f, *valueFloat);
         EXPECT_EQ(5, *valueInt32);
+        EXPECT_EQ(7, *valueInt64);
         EXPECT_EQ(true, *valueBool);
         EXPECT_EQ("hello", *valueString);
     }
@@ -373,6 +370,7 @@ namespace rlogic::internal
         Property vec3fProp(CreateInputProperty(EPropertyType::Vec3f));
         Property vec4fProp(CreateInputProperty(EPropertyType::Vec4f));
         Property int32Prop(CreateInputProperty(EPropertyType::Int32));
+        Property int64Prop(CreateInputProperty(EPropertyType::Int64));
         Property vec2iProp(CreateInputProperty(EPropertyType::Vec2i));
         Property vec3iProp(CreateInputProperty(EPropertyType::Vec3i));
         Property vec4iProp(CreateInputProperty(EPropertyType::Vec4i));
@@ -396,7 +394,12 @@ namespace rlogic::internal
 
         // Integers
         EXPECT_TRUE(int32Prop.get<int32_t>());
+        EXPECT_FALSE(int32Prop.get<int64_t>());
         EXPECT_FALSE(int32Prop.get<float>());
+
+        EXPECT_TRUE(int64Prop.get<int64_t>());
+        EXPECT_FALSE(int64Prop.get<float>());
+        EXPECT_FALSE(int64Prop.get<int32_t>());
 
         EXPECT_TRUE(vec2iProp.get<vec2i>());
         EXPECT_FALSE(vec2iProp.get<vec2f>());
@@ -469,26 +472,31 @@ namespace rlogic::internal
     {
         Property floatProperty(CreateInputProperty(EPropertyType::Float));
         Property int32Property(CreateInputProperty(EPropertyType::Int32));
+        Property int64Property(CreateInputProperty(EPropertyType::Int64));
         Property stringProperty(CreateInputProperty(EPropertyType::String));
         Property boolProperty(CreateInputProperty(EPropertyType::Bool));
 
         EXPECT_TRUE(floatProperty.set<float>(47.11f));
         EXPECT_TRUE(int32Property.set<int32_t>(4711));
+        EXPECT_TRUE(int64Property.set<int64_t>(4711111));
         EXPECT_TRUE(stringProperty.set<std::string>("4711"));
         EXPECT_TRUE(boolProperty.set<bool>(true));
 
-        auto floatValue  = floatProperty.get<float>();
-        auto intValue    = int32Property.get<int32_t>();
-        auto stringValue = stringProperty.get<std::string>();
-        auto boolValue   = boolProperty.get<bool>();
+        const auto floatValue  = floatProperty.get<float>();
+        const auto int32Value  = int32Property.get<int32_t>();
+        const auto int64Value  = int64Property.get<int64_t>();
+        const auto stringValue = stringProperty.get<std::string>();
+        const auto boolValue   = boolProperty.get<bool>();
 
         ASSERT_TRUE(floatValue);
-        ASSERT_TRUE(intValue);
+        ASSERT_TRUE(int32Value);
+        ASSERT_TRUE(int64Value);
         ASSERT_TRUE(stringValue);
         ASSERT_TRUE(boolValue);
 
         ASSERT_EQ(47.11f, *floatValue);
-        ASSERT_EQ(4711, *intValue);
+        ASSERT_EQ(4711, *int32Value);
+        ASSERT_EQ(4711111, *int64Value);
         ASSERT_EQ("4711", *stringValue);
         ASSERT_EQ(true, *boolValue);
     }
@@ -497,26 +505,31 @@ namespace rlogic::internal
     {
         Property floatProperty(CreateInputProperty(EPropertyType::Float));
         Property int32Property(CreateInputProperty(EPropertyType::Int32));
+        Property int64Property(CreateInputProperty(EPropertyType::Int64));
         Property stringProperty(CreateInputProperty(EPropertyType::String));
         Property boolProperty(CreateInputProperty(EPropertyType::Bool));
 
         EXPECT_FALSE(floatProperty.set<int32_t>(4711));
         EXPECT_FALSE(int32Property.set<float>(47.11f));
+        EXPECT_FALSE(int64Property.set<int32_t>(47));
         EXPECT_FALSE(stringProperty.set<bool>(true));
         EXPECT_FALSE(boolProperty.set<std::string>("4711"));
         EXPECT_FALSE(floatProperty.set<vec2f>({0.1f, 0.2f}));
 
-        auto floatValue  = floatProperty.get<float>();
-        auto intValue    = int32Property.get<int32_t>();
-        auto stringValue = stringProperty.get<std::string>();
-        auto boolValue   = boolProperty.get<bool>();
+        const auto floatValue  = floatProperty.get<float>();
+        const auto int32Value  = int32Property.get<int32_t>();
+        const auto int64Value  = int64Property.get<int64_t>();
+        const auto stringValue = stringProperty.get<std::string>();
+        const auto boolValue   = boolProperty.get<bool>();
 
         EXPECT_TRUE(floatValue);
-        EXPECT_TRUE(intValue);
+        EXPECT_TRUE(int32Value);
+        EXPECT_TRUE(int64Value);
         EXPECT_TRUE(stringValue);
         EXPECT_TRUE(boolValue);
         EXPECT_EQ(0.0f, floatValue);
-        EXPECT_EQ(0, intValue);
+        EXPECT_EQ(0, int32Value);
+        EXPECT_EQ(0, int64Value);
         EXPECT_EQ("", stringValue);
         EXPECT_EQ(false, boolValue);
     }
@@ -659,6 +672,7 @@ namespace rlogic::internal
             auto rootImpl = CreateProperty(MakeStruct("root",
                 {
                     {"Int32", EPropertyType::Int32},
+                    {"Int64", EPropertyType::Int64},
                     {"Float", EPropertyType::Float},
                     {"Bool", EPropertyType::Bool},
                     {"String", EPropertyType::String},
@@ -672,6 +686,7 @@ namespace rlogic::internal
                 }), EPropertySemantics::ScriptInput, true);
 
             auto propInt32  = rootImpl->getChild("Int32");
+            auto propInt64  = rootImpl->getChild("Int64");
             auto propFloat  = rootImpl->getChild("Float");
             auto propBool   = rootImpl->getChild("Bool");
             auto propString = rootImpl->getChild("String");
@@ -680,9 +695,10 @@ namespace rlogic::internal
             auto propVec4f  = rootImpl->getChild("Vec4f");
             auto propVec2i  = rootImpl->getChild("Vec2i");
             auto propVec3i  = rootImpl->getChild("Vec3i");
-            auto propVec4i = rootImpl->getChild("Vec4i");
+            auto propVec4i  = rootImpl->getChild("Vec4i");
 
             propInt32->set(4711);
+            propInt64->set<int64_t>(4711111);
             propFloat->set(47.11f);
             propBool->set(true);
             propString->set<std::string>("4711");
@@ -699,22 +715,24 @@ namespace rlogic::internal
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::Property>(m_flatBufferBuilder.GetBufferPointer());
         std::unique_ptr<PropertyImpl> deserialized = PropertyImpl::Deserialize(serialized, EPropertySemantics::ScriptInput, m_errorReporting, m_deserializationMap);
 
-        ASSERT_EQ(11u, deserialized->getChildCount());
+        ASSERT_EQ(12u, deserialized->getChildCount());
         EXPECT_EQ(EPropertyType::Struct, deserialized->getType());
 
         const auto propInt32 = deserialized->getChild(0);
-        const auto propFloat = deserialized->getChild(1);
-        const auto propBool = deserialized->getChild(2);
-        const auto propString = deserialized->getChild(3);
-        const auto propVec2f = deserialized->getChild(4);
-        const auto propVec3f = deserialized->getChild(5);
-        const auto propVec4f = deserialized->getChild(6);
-        const auto propVec2i = deserialized->getChild(7);
-        const auto propVec3i = deserialized->getChild(8);
-        const auto propVec4i = deserialized->getChild(9);
-        const auto propDefValue = deserialized->getChild(10);
+        const auto propInt64 = deserialized->getChild(1);
+        const auto propFloat = deserialized->getChild(2);
+        const auto propBool = deserialized->getChild(3);
+        const auto propString = deserialized->getChild(4);
+        const auto propVec2f = deserialized->getChild(5);
+        const auto propVec3f = deserialized->getChild(6);
+        const auto propVec4f = deserialized->getChild(7);
+        const auto propVec2i = deserialized->getChild(8);
+        const auto propVec3i = deserialized->getChild(9);
+        const auto propVec4i = deserialized->getChild(10);
+        const auto propDefValue = deserialized->getChild(11);
 
         EXPECT_EQ("Int32", propInt32->getName());
+        EXPECT_EQ("Int64", propInt64->getName());
         EXPECT_EQ("Float", propFloat->getName());
         EXPECT_EQ("Bool", propBool->getName());
         EXPECT_EQ("String", propString->getName());
@@ -733,6 +751,7 @@ namespace rlogic::internal
         const vec3i expectedValueVec3i{3, 4, 5};
         const vec4i expectedValueVec4i{6, 7, 8, 9};
         EXPECT_EQ(4711, *propInt32->get<int32_t>());
+        EXPECT_EQ(4711111L, *propInt64->get<int64_t>());
         EXPECT_FLOAT_EQ(47.11f, *propFloat->get<float>());
         EXPECT_TRUE(*propBool->get<bool>());
         EXPECT_EQ("4711", *propString->get<std::string>());
@@ -929,31 +948,36 @@ namespace rlogic::internal
 
     TEST_F(AProperty, DoesNotSetLogicNodeToDirtyIfValueIsNotChanged)
     {
-        auto intProperty    = CreateInputProperty(EPropertyType::Int32);
+        auto int32Property  = CreateInputProperty(EPropertyType::Int32);
+        auto int64Property  = CreateInputProperty(EPropertyType::Int64);
         auto floatProperty  = CreateInputProperty(EPropertyType::Float);
         auto vec2fProperty  = CreateInputProperty(EPropertyType::Vec2f);
         auto vec3iProperty  = CreateInputProperty(EPropertyType::Vec3i);
         auto stringProperty = CreateInputProperty(EPropertyType::String);
 
-        intProperty->setValue(42);
+        int32Property->setValue(42);
+        int64Property->setValue(int64_t{ 421 });
         floatProperty->setValue(42.f);
         vec2fProperty->setValue(vec2f{4.f, 2.f});
         vec3iProperty->setValue(vec3i{4, 2, 3});
         stringProperty->setValue(std::string("42"));
 
-        intProperty->getLogicNode().setDirty(false);
+        int32Property->getLogicNode().setDirty(false);
+        int64Property->getLogicNode().setDirty(false);
         floatProperty->getLogicNode().setDirty(false);
         vec2fProperty->getLogicNode().setDirty(false);
         vec3iProperty->getLogicNode().setDirty(false);
         stringProperty->getLogicNode().setDirty(false);
 
-        intProperty->setValue(42);
+        int32Property->setValue(42);
+        int64Property->setValue(int64_t{ 421 });
         floatProperty->setValue(42.f);
         vec2fProperty->setValue(vec2f{ 4.f, 2.f });
         vec3iProperty->setValue(vec3i{ 4, 2, 3 });
         stringProperty->setValue(std::string("42"));
 
-        EXPECT_FALSE(intProperty->getLogicNode().isDirty());
+        EXPECT_FALSE(int32Property->getLogicNode().isDirty());
+        EXPECT_FALSE(int64Property->getLogicNode().isDirty());
         EXPECT_FALSE(floatProperty->getLogicNode().isDirty());
         EXPECT_FALSE(vec2fProperty->getLogicNode().isDirty());
         EXPECT_FALSE(vec3iProperty->getLogicNode().isDirty());
@@ -962,22 +986,62 @@ namespace rlogic::internal
 
     TEST_F(AProperty, SetsLogicNodeToDirtyIfValueIsChanged)
     {
-        auto intProperty    = CreateInputProperty(EPropertyType::Int32);
+        auto int32Property  = CreateInputProperty(EPropertyType::Int32);
+        auto int64Property  = CreateInputProperty(EPropertyType::Int64);
         auto floatProperty  = CreateInputProperty(EPropertyType::Float);
         auto vec2fProperty  = CreateInputProperty(EPropertyType::Vec2f);
         auto vec3iProperty  = CreateInputProperty(EPropertyType::Vec3i);
         auto stringProperty = CreateInputProperty(EPropertyType::String);
 
-        intProperty->setValue(42);
+        int32Property->setValue(42);
+        int64Property->setValue(int64_t{ 421 });
         floatProperty->setValue(42.f);
         vec2fProperty->setValue(vec2f{4.f, 2.f});
         vec3iProperty->setValue(vec3i{4, 2, 3});
         stringProperty->setValue(std::string("42"));
 
-        EXPECT_TRUE(intProperty->getLogicNode().isDirty());
+        EXPECT_TRUE(int32Property->getLogicNode().isDirty());
+        EXPECT_TRUE(int64Property->getLogicNode().isDirty());
         EXPECT_TRUE(floatProperty->getLogicNode().isDirty());
         EXPECT_TRUE(vec2fProperty->getLogicNode().isDirty());
         EXPECT_TRUE(vec3iProperty->getLogicNode().isDirty());
         EXPECT_TRUE(stringProperty->getLogicNode().isDirty());
+    }
+
+    TEST_F(AProperty, FailsToSetINT64ValueThatCannotBeRepresentedInLua)
+    {
+        Property int64Property{ CreateProperty(MakeType("int64input", EPropertyType::Int64), EPropertySemantics::ScriptInput, true) };
+
+        ELogMessageType logType{ ELogMessageType::Info };
+        std::string logMessage;
+        ScopedLogContextLevel logCollector{ ELogMessageType::Error, [&](ELogMessageType type, std::string_view message)
+        {
+            logType = type;
+            logMessage = message;
+        }
+        };
+
+        EXPECT_FALSE(int64Property.set(std::numeric_limits<int64_t>::max()));
+        EXPECT_EQ(logType, ELogMessageType::Error);
+        EXPECT_EQ(logMessage, fmt::format("Invalid value when setting property 'int64input', Lua cannot handle full range of 64-bit integer, trying to set '{}' which is out of this range!",
+            std::numeric_limits<int64_t>::max()).c_str());
+
+        EXPECT_FALSE(int64Property.set(std::numeric_limits<int64_t>::min()));
+        EXPECT_EQ(logType, ELogMessageType::Error);
+        EXPECT_EQ(logMessage, fmt::format("Invalid value when setting property 'int64input', Lua cannot handle full range of 64-bit integer, trying to set '{}' which is out of this range!",
+            std::numeric_limits<int64_t>::min()).c_str());
+
+        static constexpr auto maxIntegerAsDouble = static_cast<int64_t>(1LLU << 53u);
+        EXPECT_TRUE(int64Property.set(maxIntegerAsDouble));
+        EXPECT_FALSE(int64Property.set(maxIntegerAsDouble + 1));
+        EXPECT_EQ(logType, ELogMessageType::Error);
+        EXPECT_EQ(logMessage, fmt::format("Invalid value when setting property 'int64input', Lua cannot handle full range of 64-bit integer, trying to set '{}' which is out of this range!",
+            maxIntegerAsDouble + 1).c_str());
+
+        EXPECT_TRUE(int64Property.set(-maxIntegerAsDouble));
+        EXPECT_FALSE(int64Property.set(-maxIntegerAsDouble - 1));
+        EXPECT_EQ(logType, ELogMessageType::Error);
+        EXPECT_EQ(logMessage, fmt::format("Invalid value when setting property 'int64input', Lua cannot handle full range of 64-bit integer, trying to set '{}' which is out of this range!",
+            -maxIntegerAsDouble - 1).c_str());
     }
 }

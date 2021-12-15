@@ -45,7 +45,7 @@ namespace rlogic::internal
     class RamsesAppearanceBindingImpl : public RamsesBindingImpl
     {
     public:
-        explicit RamsesAppearanceBindingImpl(ramses::Appearance& ramsesAppearance, std::string_view name);
+        explicit RamsesAppearanceBindingImpl(ramses::Appearance& ramsesAppearance, std::string_view name, uint64_t id);
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> Serialize(
             const RamsesAppearanceBindingImpl& binding,

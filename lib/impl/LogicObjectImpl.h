@@ -15,15 +15,17 @@ namespace rlogic::internal
     class LogicObjectImpl
     {
     public:
-        explicit LogicObjectImpl(std::string_view name) noexcept;
+        explicit LogicObjectImpl(std::string_view name, uint64_t id) noexcept;
         virtual ~LogicObjectImpl() noexcept;
         LogicObjectImpl(const LogicObjectImpl&) = delete;
         LogicObjectImpl& operator=(const LogicObjectImpl&) = delete;
 
         [[nodiscard]] std::string_view getName() const;
+        [[nodiscard]] uint64_t getId() const;
         void setName(std::string_view name);
 
     private:
         std::string m_name;
+        uint64_t    m_id;
     };
 }

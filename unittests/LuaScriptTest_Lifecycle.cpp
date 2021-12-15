@@ -89,7 +89,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
-            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
+            const LuaScript* loadedScript = *m_logicEngine.getCollection<LuaScript>().begin();
 
             ASSERT_NE(nullptr, loadedScript);
 
@@ -131,7 +131,7 @@ namespace rlogic::internal
         }
         {
             m_logicEngine.loadFromFile("script.bin");
-            const LuaScript* loadedScript = m_logicEngine.findScript("MyScript");
+            const LuaScript* loadedScript = m_logicEngine.findByName<LuaScript>("MyScript");
 
             const auto inputs = loadedScript->getInputs();
 
@@ -175,7 +175,7 @@ namespace rlogic::internal
         }
         {
             m_logicEngine.loadFromFile("arrays.bin");
-            const LuaScript* loadedScript = m_logicEngine.findScript("MyScript");
+            const LuaScript* loadedScript = m_logicEngine.findByName<LuaScript>("MyScript");
 
             const auto inputs = loadedScript->getInputs();
 
@@ -223,7 +223,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("nested_array.bin"));
-            const LuaScript* loadedScript = *m_logicEngine.scripts().begin();
+            const LuaScript* loadedScript = *m_logicEngine.getCollection<LuaScript>().begin();
 
             ASSERT_NE(nullptr, loadedScript);
 
@@ -294,7 +294,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("array_of_structs.bin"));
-            LuaScript* loadedScript = *m_logicEngine.scripts().begin();
+            LuaScript* loadedScript = *m_logicEngine.getCollection<LuaScript>().begin();
 
             ASSERT_NE(nullptr, loadedScript);
 
@@ -360,7 +360,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("arrays.bin"));
-            const LuaScript* loadedScript = m_logicEngine.findScript("MyScript");
+            const LuaScript* loadedScript = m_logicEngine.findByName<LuaScript>("MyScript");
 
             auto inputs = loadedScript->getInputs();
             auto outputs = loadedScript->getOutputs();
@@ -419,11 +419,11 @@ namespace rlogic::internal
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
-        auto loadedScript = *m_logicEngine.scripts().begin();
+        auto loadedScript = *m_logicEngine.getCollection<LuaScript>().begin();
         loadedScript->getInputs()->getChild("data")->set<int32_t>(5);
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
-        loadedScript = *m_logicEngine.scripts().begin();
+        loadedScript = *m_logicEngine.getCollection<LuaScript>().begin();
         EXPECT_EQ(42, *loadedScript->getInputs()->getChild("data")->get<int32_t>());
     }
 }

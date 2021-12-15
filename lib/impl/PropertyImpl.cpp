@@ -15,6 +15,7 @@
 #include "internals/SerializationHelper.h"
 #include "internals/TypeUtils.h"
 #include "internals/ErrorReporting.h"
+#include "internals/TypeUtils.h"
 
 #include "generated/PropertyGen.h"
 
@@ -32,34 +33,37 @@ namespace rlogic::internal
             switch (m_typeData.type)
             {
             case EPropertyType::Float:
-                m_value = 0.0f;
+                m_value = PropertyEnumToType<EPropertyType::Float>::TYPE{ 0.0f };
                 break;
             case EPropertyType::Vec2f:
-                m_value = vec2f{ 0.0f, 0.0f };
+                m_value = PropertyEnumToType<EPropertyType::Vec2f>::TYPE{ 0.0f, 0.0f };
                 break;
             case EPropertyType::Vec3f:
-                m_value = vec3f{ 0.0f, 0.0f, 0.0f };
+                m_value = PropertyEnumToType<EPropertyType::Vec3f>::TYPE{ 0.0f, 0.0f, 0.0f };
                 break;
             case EPropertyType::Vec4f:
-                m_value = vec4f{ 0.0f, 0.0f, 0.0f, 0.0f };
+                m_value = PropertyEnumToType<EPropertyType::Vec4f>::TYPE{ 0.0f, 0.0f, 0.0f, 0.0f };
                 break;
             case EPropertyType::Int32:
-                m_value = 0;
+                m_value = PropertyEnumToType<EPropertyType::Int32>::TYPE{ 0 };
+                break;
+            case EPropertyType::Int64:
+                m_value = PropertyEnumToType<EPropertyType::Int64>::TYPE{ 0 };
                 break;
             case EPropertyType::Vec2i:
-                m_value = vec2i{ 0, 0 };
+                m_value = PropertyEnumToType<EPropertyType::Vec2i>::TYPE{ 0, 0 };
                 break;
             case EPropertyType::Vec3i:
-                m_value = vec3i{ 0, 0, 0 };
+                m_value = PropertyEnumToType<EPropertyType::Vec3i>::TYPE{ 0, 0, 0 };
                 break;
             case EPropertyType::Vec4i:
-                m_value = vec4i{ 0, 0, 0, 0 };
+                m_value = PropertyEnumToType<EPropertyType::Vec4i>::TYPE{ 0, 0, 0, 0 };
                 break;
             case EPropertyType::String:
-                m_value = std::string("");
+                m_value = PropertyEnumToType<EPropertyType::String>::TYPE{};
                 break;
             case EPropertyType::Bool:
-                m_value = false;
+                m_value = PropertyEnumToType<EPropertyType::Bool>::TYPE{ false };
                 break;
             case EPropertyType::Array:
             case EPropertyType::Struct:
@@ -81,6 +85,21 @@ namespace rlogic::internal
     {
         assert(TypeUtils::IsPrimitiveType(m_typeData.type) && "Don't use this constructor with non-primitive types!");
         m_value = std::move(initialValue);
+    }
+
+    PropertyImpl::~PropertyImpl() noexcept
+    {
+        // TODO Violin/Vaclav discuss if we want to handle this here
+        if (m_incomingLinkedProperty != nullptr)
+        {
+            unsetLinkedOutput();
+        }
+
+        for (auto outgoingLink : m_outgoingLinkedProperties)
+        {
+            assert(outgoingLink->m_incomingLinkedProperty == this);
+            outgoingLink->m_incomingLinkedProperty = nullptr;
+        }
     }
 
     flatbuffers::Offset<rlogic_serialization::Property> PropertyImpl::Serialize(const PropertyImpl& prop, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap)
@@ -152,6 +171,13 @@ namespace rlogic::internal
             const rlogic_serialization::int32_s int32_struct(prop.getValueAs<int32_t>());
             valueOffset = builder.CreateStruct(int32_struct).Union();
             valueType = rlogic_serialization::PropertyValueTraits<rlogic_serialization::int32_s>::enum_value;
+        }
+        break;
+        case EPropertyType::Int64:
+        {
+            const rlogic_serialization::int64_s int64_struct(prop.getValueAs<int64_t>());
+            valueOffset = builder.CreateStruct(int64_struct).Union();
+            valueType = rlogic_serialization::PropertyValueTraits<rlogic_serialization::int64_s>::enum_value;
         }
         break;
         case EPropertyType::Vec2i:
@@ -283,6 +309,14 @@ namespace rlogic::internal
                     return nullptr;
                 }
                 impl->m_value = prop.value_as_int32_s()->v();
+                break;
+            case rlogic_serialization::PropertyValue::int64_s:
+                if (!prop.value_as_int64_s())
+                {
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    return nullptr;
+                }
+                impl->m_value = prop.value_as_int64_s()->v();
                 break;
             case rlogic_serialization::PropertyValue::vec2i_s:
             {
@@ -442,9 +476,8 @@ namespace rlogic::internal
     {
         if (PropertyTypeToEnum<T>::TYPE == m_typeData.type)
         {
-            const T* value = std::get_if<T>(&m_value);
-            assert(value);
-            return {*value};
+            assert(std::holds_alternative<T>(m_value));
+            return std::get<T>(m_value);
         }
         LOG_ERROR("Invalid type '{}' when accessing property '{}', correct type is '{}'",
             GetLuaPrimitiveTypeName(PropertyTypeToEnum<T>::TYPE), m_typeData.name, GetLuaPrimitiveTypeName(m_typeData.type));
@@ -456,6 +489,7 @@ namespace rlogic::internal
     template std::optional<vec3f>       PropertyImpl::getValue_PublicApi<vec3f>() const;
     template std::optional<vec4f>       PropertyImpl::getValue_PublicApi<vec4f>() const;
     template std::optional<int32_t>     PropertyImpl::getValue_PublicApi<int32_t>() const;
+    template std::optional<int64_t>     PropertyImpl::getValue_PublicApi<int64_t>() const;
     template std::optional<vec2i>       PropertyImpl::getValue_PublicApi<vec2i>() const;
     template std::optional<vec3i>       PropertyImpl::getValue_PublicApi<vec3i>() const;
     template std::optional<vec4i>       PropertyImpl::getValue_PublicApi<vec4i>() const;
@@ -470,9 +504,9 @@ namespace rlogic::internal
             return false;
         }
 
-        if (m_isLinkedInput)
+        if (m_incomingLinkedProperty != nullptr)
         {
-            LOG_ERROR(fmt::format("Property '{}' is currently linked. Unlink it first before setting its value!", m_typeData.name));
+            LOG_ERROR(fmt::format("Property '{}' is currently linked (to property '{}'). Unlink it first before setting its value!", m_typeData.name, m_incomingLinkedProperty->getName()));
             return false;
         }
 
@@ -488,7 +522,27 @@ namespace rlogic::internal
             return false;
         }
 
-        setValue(std::move(value), true);
+        if (std::holds_alternative<int64_t>(value))
+        {
+            // Lua uses (by default) double for internal storage of numerical values.
+            // IEEE 754 64-bit double can represent higher integers than this (DBL_MAX) but this is the maximum
+            // for which double can represent this value and all values below correctly
+            static constexpr auto maxIntegerAsDouble = static_cast<int64_t>(1LLU << 53u);
+            const auto int64Value = std::get<int64_t>(value);
+            if (int64Value > maxIntegerAsDouble || int64Value < -maxIntegerAsDouble)
+            {
+                LOG_ERROR("Invalid value when setting property '{}', Lua cannot handle full range of 64-bit integer, trying to set '{}' which is out of this range!",
+                    m_typeData.name, int64Value);
+                return false;
+            }
+        }
+
+        // Marks corresponding node dirty if value changed
+        const bool valueChanged = setValue(std::move(value));
+        if (valueChanged || m_semantics == EPropertySemantics::AnimationInput || m_semantics == EPropertySemantics::BindingInput)
+        {
+            m_logicNode->setDirty(true);
+        }
 
         return true;
     }
@@ -507,43 +561,21 @@ namespace rlogic::internal
         return newValue;
     }
 
-    void PropertyImpl::setValue(PropertyValue value, bool checkDirty)
+    bool PropertyImpl::setValue(PropertyValue value)
     {
         assert(m_value.index() == value.index());
         assert(TypeUtils::IsPrimitiveType(m_typeData.type));
 
-        if (checkDirty)
+        if (m_semantics == EPropertySemantics::BindingInput)
         {
-            // Check if value changed before doing something
-            // Animation input properties always set dirty regardless of value
-            if (m_value != value || m_semantics == EPropertySemantics::AnimationInput)
-            {
-                m_value = std::move(value);
-                m_logicNode->setDirty(true);
-            }
-
-            // Binding inputs behave differently than other inputs
-            if (m_semantics == EPropertySemantics::BindingInput)
-            {
-                m_bindingInputHasNewValue = true;
-                m_logicNode->setDirty(true);
-            }
+            m_bindingInputHasNewValue = true;
         }
-        else
-        {
-            m_value = std::move(value);
-        }
-    }
 
-    void PropertyImpl::setIsLinkedInput(bool isLinkedInput)
-    {
-        m_isLinkedInput = isLinkedInput;
-    }
+        const bool valueChanged = (m_value != value);
 
-    bool PropertyImpl::isLinkedInput() const
-    {
-        assert(isInput());
-        return m_isLinkedInput;
+        m_value = std::move(value);
+
+        return valueChanged;
     }
 
     void PropertyImpl::setLogicNode(LogicNodeImpl& logicNode)
@@ -557,6 +589,12 @@ namespace rlogic::internal
     }
 
     LogicNodeImpl& PropertyImpl::getLogicNode()
+    {
+        assert(m_logicNode != nullptr);
+        return *m_logicNode;
+    }
+
+    const LogicNodeImpl& PropertyImpl::getLogicNode() const
     {
         assert(m_logicNode != nullptr);
         return *m_logicNode;
@@ -581,4 +619,54 @@ namespace rlogic::internal
     {
         return m_value;
     }
+
+    bool PropertyImpl::isLinked() const
+    {
+        return (m_incomingLinkedProperty != nullptr) || !m_outgoingLinkedProperties.empty();
+    }
+
+    const PropertyImpl* PropertyImpl::getLinkedIncomingProperty() const
+    {
+        assert(isInput());
+        return m_incomingLinkedProperty;
+    }
+
+    std::vector<PropertyImpl*>& PropertyImpl::getLinkedOutgoingProperties()
+    {
+        assert(isOutput());
+        return m_outgoingLinkedProperties;
+    }
+
+    const std::vector<PropertyImpl*>& PropertyImpl::getLinkedOutgoingProperties() const
+    {
+        assert(isOutput());
+        return m_outgoingLinkedProperties;
+    }
+
+    void PropertyImpl::setLinkedOutput(PropertyImpl& output)
+    {
+        assert(TypeUtils::IsPrimitiveType(getType()));
+        assert(TypeUtils::IsPrimitiveType(output.getType()));
+        assert (m_incomingLinkedProperty == nullptr);
+
+        assert(std::find(output.m_outgoingLinkedProperties.begin(), output.m_outgoingLinkedProperties.end(), this) == output.m_outgoingLinkedProperties.end());
+        output.m_outgoingLinkedProperties.push_back(this);
+        m_incomingLinkedProperty = &output;
+    }
+
+    void PropertyImpl::unsetLinkedOutput()
+    {
+        assert(isInput() && m_incomingLinkedProperty != nullptr);
+        auto linkIter = std::find(m_incomingLinkedProperty->m_outgoingLinkedProperties.begin(), m_incomingLinkedProperty->m_outgoingLinkedProperties.end(), this);
+        assert(linkIter != m_incomingLinkedProperty->m_outgoingLinkedProperties.end());
+        m_incomingLinkedProperty->m_outgoingLinkedProperties.erase(linkIter);
+        m_incomingLinkedProperty = nullptr;
+    }
+
+    void PropertyImpl::initializeBindingInputValue(PropertyValue value)
+    {
+        setValue(std::move(value));
+        m_bindingInputHasNewValue = false;
+    }
+
 }

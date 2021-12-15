@@ -34,6 +34,7 @@ def main():
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/CHANGELOG\.txt$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/README\.md$",
         # Ramses Logic
+        r"^bin/ramses-logic-viewer$",
         r"^lib/libramses-logic\.so$",
         r"^lib/libramses-logic\.so\.\d+\.\d+$",
         r"^lib/cmake/ramses-logic-\d+\.\d+/ramses-logicConfig\.cmake$",

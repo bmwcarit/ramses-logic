@@ -234,12 +234,16 @@ struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_TYPE = 6,
-    VT_DATA_TYPE = 8,
-    VT_DATA = 10
+    VT_ID = 6,
+    VT_TYPE = 8,
+    VT_DATA_TYPE = 10,
+    VT_DATA = 12
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
+  }
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   rlogic_serialization::EDataArrayType type() const {
     return static_cast<rlogic_serialization::EDataArrayType>(GetField<uint8_t>(VT_TYPE, 0));
@@ -261,6 +265,7 @@ struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
+           VerifyField<uint64_t>(verifier, VT_ID) &&
            VerifyField<uint8_t>(verifier, VT_TYPE) &&
            VerifyField<uint8_t>(verifier, VT_DATA_TYPE) &&
            VerifyOffset(verifier, VT_DATA) &&
@@ -283,6 +288,9 @@ struct DataArrayBuilder {
   flatbuffers::uoffset_t start_;
   void add_name(flatbuffers::Offset<flatbuffers::String> name) {
     fbb_.AddOffset(DataArray::VT_NAME, name);
+  }
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(DataArray::VT_ID, id, 0);
   }
   void add_type(rlogic_serialization::EDataArrayType type) {
     fbb_.AddElement<uint8_t>(DataArray::VT_TYPE, static_cast<uint8_t>(type), 0);
@@ -308,10 +316,12 @@ struct DataArrayBuilder {
 inline flatbuffers::Offset<DataArray> CreateDataArray(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> name = 0,
+    uint64_t id = 0,
     rlogic_serialization::EDataArrayType type = rlogic_serialization::EDataArrayType::Float,
     rlogic_serialization::ArrayUnion data_type = rlogic_serialization::ArrayUnion::NONE,
     flatbuffers::Offset<void> data = 0) {
   DataArrayBuilder builder_(_fbb);
+  builder_.add_id(id);
   builder_.add_data(data);
   builder_.add_name(name);
   builder_.add_data_type(data_type);
@@ -327,6 +337,7 @@ struct DataArray::Traits {
 inline flatbuffers::Offset<DataArray> CreateDataArrayDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
+    uint64_t id = 0,
     rlogic_serialization::EDataArrayType type = rlogic_serialization::EDataArrayType::Float,
     rlogic_serialization::ArrayUnion data_type = rlogic_serialization::ArrayUnion::NONE,
     flatbuffers::Offset<void> data = 0) {
@@ -334,6 +345,7 @@ inline flatbuffers::Offset<DataArray> CreateDataArrayDirect(
   return rlogic_serialization::CreateDataArray(
       _fbb,
       name__,
+      id,
       type,
       data_type,
       data);

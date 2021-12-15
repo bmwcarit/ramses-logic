@@ -34,16 +34,20 @@ namespace rlogic
             end
         )", propertyCount);
 
-        LuaScript* srcScript = logicEngine.createLuaScript(scriptSrc);
-        LuaScript* destScript = logicEngine.createLuaScript(scriptSrc);
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Base);
+
+        LuaScript* srcScript = logicEngine.createLuaScript(scriptSrc, config);
+        LuaScript* destScript = logicEngine.createLuaScript(scriptSrc, config);
         const Property* from = srcScript->getOutputs()->getChild("src0");
         Property* to = destScript->getInputs()->getChild("target0");
 
+        logicEngine.m_impl->disableTrackingDirtyNodes();
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
             logicEngine.link(*from, *to);
             logicEngine.unlink(*from, *to);
-            logicEngine.m_impl->update(true);
+            logicEngine.update();
         }
     }
 
@@ -70,10 +74,13 @@ namespace rlogic
             end
         )";
 
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Base);
+
         std::vector<LuaScript*> scripts(scriptCount);
         for (int64_t i = 0; i < scriptCount; ++i)
         {
-            scripts[i] = logicEngine.createLuaScript(scriptSrc);
+            scripts[i] = logicEngine.createLuaScript(scriptSrc, config);
 
             if (i >= 1)
             {
@@ -89,11 +96,13 @@ namespace rlogic
         const int64_t halfwayIndex = scriptCount/2;
         const Property* srcPropertyInTheMiddle  = scripts[halfwayIndex]->getOutputs()->getChild("src10");
         const Property* destPropertyInTheMiddle = scripts[halfwayIndex+1]->getInputs()->getChild("dest10");
+
+        logicEngine.m_impl->disableTrackingDirtyNodes();
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
             logicEngine.unlink(*srcPropertyInTheMiddle, *destPropertyInTheMiddle);
             logicEngine.link(*srcPropertyInTheMiddle, *destPropertyInTheMiddle);
-            logicEngine.m_impl->update(true);
+            logicEngine.update();
         }
     }
 

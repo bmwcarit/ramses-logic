@@ -14,17 +14,19 @@ include "RamsesCameraBinding.fbs";
 include "Link.fbs";
 include "DataArray.fbs";
 include "AnimationNode.fbs";
+include "TimerNode.fbs";
 
 namespace rlogic_serialization;
 
 table ApiObjects
 {
+    luaModules:[LuaModule];
     luaScripts:[LuaScript];
     nodeBindings:[RamsesNodeBinding];
     appearanceBindings:[RamsesAppearanceBinding];
     cameraBindings:[RamsesCameraBinding];
     dataArrays:[DataArray];
     animationNodes:[AnimationNode];
+    timerNodes:[TimerNode];
     links:[Link];
-    luaModules:[LuaModule];
 }

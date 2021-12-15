@@ -31,7 +31,7 @@ namespace rlogic::internal
     class RamsesBindingImpl : public LogicNodeImpl
     {
     public:
-        explicit RamsesBindingImpl(std::string_view name) noexcept;
+        explicit RamsesBindingImpl(std::string_view name, uint64_t id) noexcept;
 
     protected:
         // Used by subclasses to handle serialization

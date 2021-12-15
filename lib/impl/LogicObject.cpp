@@ -14,6 +14,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 #include "impl/LogicObjectImpl.h"
 
 namespace rlogic
@@ -28,6 +29,11 @@ namespace rlogic
     std::string_view LogicObject::getName() const
     {
         return m_impl->getName();
+    }
+
+    uint64_t LogicObject::getId() const
+    {
+        return m_impl->getId();
     }
 
     template <typename T>
@@ -57,6 +63,7 @@ namespace rlogic
     template RLOGIC_API const RamsesCameraBinding*     LogicObject::internalCast() const;
     template RLOGIC_API const DataArray*               LogicObject::internalCast() const;
     template RLOGIC_API const AnimationNode*           LogicObject::internalCast() const;
+    template RLOGIC_API const TimerNode*               LogicObject::internalCast() const;
 
     template RLOGIC_API LogicObject*             LogicObject::internalCast();
     template RLOGIC_API LogicNode*               LogicObject::internalCast();
@@ -68,4 +75,5 @@ namespace rlogic
     template RLOGIC_API RamsesCameraBinding*     LogicObject::internalCast();
     template RLOGIC_API DataArray*               LogicObject::internalCast();
     template RLOGIC_API AnimationNode*           LogicObject::internalCast();
+    template RLOGIC_API TimerNode*               LogicObject::internalCast();
 }

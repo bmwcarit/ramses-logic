@@ -32,6 +32,7 @@ namespace rlogic::internal
     {
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Bool));
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Int32));
+        EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Int64));
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Float));
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Vec2i));
         EXPECT_TRUE(TypeUtils::IsValidType(EPropertyType::Vec3i));
@@ -51,6 +52,7 @@ namespace rlogic::internal
     {
         EXPECT_TRUE(TypeUtils::IsPrimitiveType(EPropertyType::Bool));
         EXPECT_TRUE(TypeUtils::IsPrimitiveType(EPropertyType::Int32));
+        EXPECT_TRUE(TypeUtils::IsPrimitiveType(EPropertyType::Int64));
         EXPECT_TRUE(TypeUtils::IsPrimitiveType(EPropertyType::Float));
         EXPECT_TRUE(TypeUtils::IsPrimitiveType(EPropertyType::Vec2i));
         EXPECT_TRUE(TypeUtils::IsPrimitiveType(EPropertyType::Vec4f));
@@ -77,6 +79,7 @@ namespace rlogic::internal
 
         EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Bool));
         EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Int32));
+        EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Int64));
         EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Float));
         EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::String));
         EXPECT_FALSE(TypeUtils::IsPrimitiveVectorType(EPropertyType::Struct));

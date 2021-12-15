@@ -31,7 +31,7 @@ int main()
     )", {}, "aScript");
 
     // Test that type cast works
-    rlogic::LuaScript* script = logicEngine.findLogicObject("aScript")->as<rlogic::LuaScript>();
+    auto script = logicEngine.findByName<rlogic::LogicObject>("aScript")->as<rlogic::LuaScript>();
 
     script->getInputs()->getChild("int")->set<int32_t>(5);
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");

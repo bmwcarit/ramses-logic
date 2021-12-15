@@ -87,29 +87,31 @@ namespace rlogic
 
         auto outputs = script->getOutputs();
 
-        ASSERT_EQ(10u, outputs->getChildCount());
+        ASSERT_EQ(11u, outputs->getChildCount());
         EXPECT_EQ("enabled", outputs->getChild(0)->getName());
         EXPECT_EQ(EPropertyType::Bool, outputs->getChild(0)->getType());
         EXPECT_EQ("name", outputs->getChild(1)->getName());
         EXPECT_EQ(EPropertyType::String, outputs->getChild(1)->getType());
         EXPECT_EQ("speed", outputs->getChild(2)->getName());
         EXPECT_EQ(EPropertyType::Int32, outputs->getChild(2)->getType());
-        EXPECT_EQ("temp", outputs->getChild(3)->getName());
-        EXPECT_EQ(EPropertyType::Float, outputs->getChild(3)->getType());
+        EXPECT_EQ("speed2", outputs->getChild(3)->getName());
+        EXPECT_EQ(EPropertyType::Int64, outputs->getChild(3)->getType());
+        EXPECT_EQ("temp", outputs->getChild(4)->getName());
+        EXPECT_EQ(EPropertyType::Float, outputs->getChild(4)->getType());
 
         // Vec2/3/4 f/i
-        EXPECT_EQ("vec2f", outputs->getChild(4)->getName());
-        EXPECT_EQ(EPropertyType::Vec2f, outputs->getChild(4)->getType());
-        EXPECT_EQ("vec2i", outputs->getChild(5)->getName());
-        EXPECT_EQ(EPropertyType::Vec2i, outputs->getChild(5)->getType());
-        EXPECT_EQ("vec3f", outputs->getChild(6)->getName());
-        EXPECT_EQ(EPropertyType::Vec3f, outputs->getChild(6)->getType());
-        EXPECT_EQ("vec3i", outputs->getChild(7)->getName());
-        EXPECT_EQ(EPropertyType::Vec3i, outputs->getChild(7)->getType());
-        EXPECT_EQ("vec4f", outputs->getChild(8)->getName());
-        EXPECT_EQ(EPropertyType::Vec4f, outputs->getChild(8)->getType());
-        EXPECT_EQ("vec4i", outputs->getChild(9)->getName());
-        EXPECT_EQ(EPropertyType::Vec4i, outputs->getChild(9)->getType());
+        EXPECT_EQ("vec2f", outputs->getChild(5)->getName());
+        EXPECT_EQ(EPropertyType::Vec2f, outputs->getChild(5)->getType());
+        EXPECT_EQ("vec2i", outputs->getChild(6)->getName());
+        EXPECT_EQ(EPropertyType::Vec2i, outputs->getChild(6)->getType());
+        EXPECT_EQ("vec3f", outputs->getChild(7)->getName());
+        EXPECT_EQ(EPropertyType::Vec3f, outputs->getChild(7)->getType());
+        EXPECT_EQ("vec3i", outputs->getChild(8)->getName());
+        EXPECT_EQ(EPropertyType::Vec3i, outputs->getChild(8)->getType());
+        EXPECT_EQ("vec4f", outputs->getChild(9)->getName());
+        EXPECT_EQ(EPropertyType::Vec4f, outputs->getChild(9)->getType());
+        EXPECT_EQ("vec4i", outputs->getChild(10)->getName());
+        EXPECT_EQ(EPropertyType::Vec4i, outputs->getChild(10)->getType());
     }
 
     TEST_F(ALuaScript_Interface, ReturnsNestedOutputsByIndex_OrderedLexicographically_whenDeclaredOneByOne)
@@ -217,6 +219,87 @@ namespace rlogic
         {
             EXPECT_EQ(internal::EPropertySemantics::ScriptOutput, outputs->getChild(i)->m_impl->getPropertySemantics());
         }
+    }
+
+    TEST_F(ALuaScript_Interface, AllowsAccessToWrappedUserdata)
+    {
+        auto* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                OUT.struct = {a=INT, b={c = INT, d=FLOAT}}
+                OUT.array_struct = ARRAY(3, {a=INT, b=FLOAT})
+
+                local expectedUserdata = {
+                    IN,
+                    IN.array_int,
+                    OUT,
+                    OUT.struct,
+                    OUT.struct.a,
+                    OUT.struct.b,
+                    OUT.struct.b.c,
+                    OUT.struct.b.d,
+                    OUT.array_struct,
+                    OUT.array_struct[2],
+                    OUT.array_struct[2].a,
+                    OUT.array_struct[2].b
+                }
+
+                for k, v in pairs(expectedUserdata) do
+                    if type(v) ~= 'userdata' then
+                        error("Expected userdata!")
+                    end
+                end
+            end
+
+            function run()
+            end
+        )", WithStdModules({EStandardModule::Base}));
+        ASSERT_NE(nullptr, script);
+    }
+
+    TEST_F(ALuaScript_Interface, ReportsErrorWhenAccessingStructByIndex)
+    {
+        auto* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+                OUT.struct = {a=INT, b={c = INT, d=FLOAT}}
+                local causesError = OUT.struct[1]
+            end
+
+            function run()
+            end
+        )");
+        ASSERT_EQ(nullptr, script);
+        EXPECT_THAT(m_logicEngine.getErrors().back().message, ::testing::HasSubstr("lua: error: Bad index access to struct 'struct': Expected a string but got object of type number instead!"));
+    }
+
+    TEST_F(ALuaScript_Interface, ReportsErrorWhenAccessingArrayByString)
+    {
+        auto* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                local causesError = IN.array_int["causesError"]
+            end
+
+            function run()
+            end
+        )");
+        ASSERT_EQ(nullptr, script);
+        EXPECT_THAT(m_logicEngine.getErrors().back().message, ::testing::HasSubstr("lua: error: Invalid index access in array 'array_int'"));
+    }
+
+    TEST_F(ALuaScript_Interface, ReportsErrorWhenAccessingArrayWithIndexOverflow)
+    {
+        auto* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                local causesError = IN.array_int[3]
+            end
+
+            function run()
+            end
+        )");
+        ASSERT_EQ(nullptr, script);
+        EXPECT_THAT(m_logicEngine.getErrors().back().message, ::testing::HasSubstr("Invalid index access in array 'array_int'. Expected index in the range [0, 2] but got 3 instead!"));
     }
 
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToItsInputs)
@@ -328,4 +411,54 @@ namespace rlogic
         }
     }
 
+    TEST_F(ALuaScript_Interface, ComputesSizeOfCustomPropertiesUsingCustomLengthFunction)
+    {
+        std::string_view scriptSrc = R"(
+            function init()
+                -- use global variables to store size info from interface() - otherwise no way to transfer data
+                -- outside of interface()!
+                GLOBAL.sizes = {}
+            end
+            function interface()
+                IN.unused = INT
+                -- store size of IN with one property
+                GLOBAL.sizes.inputsSizeSingle = rl_len(IN)
+                IN.unused2 = INT
+                -- store size of IN with two properties
+                GLOBAL.sizes.inputsSizeTwo = rl_len(IN)
+
+                -- Create nested output to store (and provide) the sizes of all containers
+                OUT.sizes = {
+                    inputsSizeSingle = INT,
+                    inputsSizeTwo = INT,
+                    outputSizeSingleStruct = INT,
+                    outputSizeNested = INT,
+                    outputSizeArray = INT,
+                    outputSizeArrayElem = INT
+                }
+                -- Store size of OUT
+                GLOBAL.sizes.outputSizeSingleStruct = rl_len(OUT)
+                -- Store size of OUT.sizes (nested container)
+                GLOBAL.sizes.outputSizeNested = rl_len(OUT.sizes)
+
+                OUT.array = ARRAY(5, {a=INT, b=FLOAT})
+                GLOBAL.sizes.outputSizeArray = rl_len(OUT.array)
+                GLOBAL.sizes.outputSizeArrayElem = rl_len(OUT.array[1])
+            end
+
+            function run()
+                OUT.sizes = GLOBAL.sizes
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc);
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(m_logicEngine.update());
+
+        EXPECT_EQ(1, *script->getOutputs()->getChild("sizes")->getChild("inputsSizeSingle")->get<int32_t>());
+        EXPECT_EQ(2, *script->getOutputs()->getChild("sizes")->getChild("inputsSizeTwo")->get<int32_t>());
+        EXPECT_EQ(1, *script->getOutputs()->getChild("sizes")->getChild("outputSizeSingleStruct")->get<int32_t>());
+        EXPECT_EQ(6, *script->getOutputs()->getChild("sizes")->getChild("outputSizeNested")->get<int32_t>());
+        EXPECT_EQ(5, *script->getOutputs()->getChild("sizes")->getChild("outputSizeArray")->get<int32_t>());
+        EXPECT_EQ(2, *script->getOutputs()->getChild("sizes")->getChild("outputSizeArrayElem")->get<int32_t>());
+    }
 }

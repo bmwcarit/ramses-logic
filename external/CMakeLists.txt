@@ -17,6 +17,9 @@ function(ensure_submodule_exists SUBMOD_NAME)
     endif()
 endfunction()
 
+# Ensure all external dependencies are built as static libs when not explicitly specified
+# otherwise using logic will lead to issues when BUILD_SHARED_LIBS in ON
+set(BUILD_SHARED_LIBS OFF)
 
 # #### externals that are build with normal compiler flags ####
 
@@ -267,8 +270,8 @@ else()
                     set(RAMSES_TARGET "ramses-shared-lib-x11-egl-es-3-0")
                     set(ramses-sdk_renderer_Platform_Platform_X11                   ON CACHE BOOL "" FORCE)
                 elseif(${ramses-logic_PLATFORM} STREQUAL "LINUX-WAYLAND")
-                    set(RAMSES_TARGET "wayland-shell-egl-es-3-0")
-                    set(ramses-sdk_renderer_Platform_Platform_Wayland_Shell_EGL     ON CACHE BOOL "" FORCE)
+                    set(RAMSES_TARGET "ramses-shared-lib-wayland-ivi-egl-es-3-0")
+                    set(ramses-sdk_renderer_Platform_Platform_Wayland_IVI_EGL       ON CACHE BOOL "" FORCE)
                 elseif(${ramses-logic_PLATFORM} STREQUAL "ANDROID")
                     set(RAMSES_TARGET "ramses-shared-lib-android-egl-es-3-0")
                     set(ramses-sdk_renderer_Platform_Platform_Android               ON CACHE BOOL "" FORCE)

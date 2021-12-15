@@ -15,6 +15,7 @@ namespace rlogic_serialization;
 table RamsesBinding
 {
     name:string;
+    id:uint64;
     boundRamsesObject:RamsesReference;
     // TODO Violin don't serialize rootInput, it is redundant! (inputs are uniquely defined by the binding type and reference)
     // Storing property values is furthermore dangerous because they may override ramses values

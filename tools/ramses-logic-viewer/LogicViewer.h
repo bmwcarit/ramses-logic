@@ -9,6 +9,7 @@
 #pragma once
 
 #include "LogicViewerLuaTypes.h"
+#include "UpdateReportSummary.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LogicEngine.h"
 #include <string>
@@ -150,7 +151,15 @@ namespace rlogic
 
         [[nodiscard]] const Result& getLastResult() const;
 
+        void enableUpdateReport(bool enable, size_t interval);
+
+        [[nodiscard]] bool isUpdateReportEnabled() const;
+
+        [[nodiscard]] const UpdateReportSummary& getUpdateReport() const;
+
     private:
+        void updateEngine();
+
         rlogic::LogicEngine m_logicEngine;
         ScreenshotFunc      m_screenshotFunc;
         std::string         m_logicFilename;
@@ -160,6 +169,9 @@ namespace rlogic
         Result              m_result;
 
         std::chrono::steady_clock::time_point m_startTime;
+
+        bool                m_updateReportEnabled = false;
+        UpdateReportSummary m_updateReportSummary;
     };
 
     inline LogicEngine& LogicViewer::getEngine()
@@ -180,6 +192,23 @@ namespace rlogic
     inline const LogicViewer::Result& LogicViewer::getLastResult() const
     {
         return m_result;
+    }
+
+    inline void LogicViewer::enableUpdateReport(bool enable, size_t interval)
+    {
+        m_logicEngine.enableUpdateReport(enable);
+        m_updateReportSummary.setInterval(interval);
+        m_updateReportEnabled = enable;
+    }
+
+    inline bool LogicViewer::isUpdateReportEnabled() const
+    {
+        return m_updateReportEnabled;
+    }
+
+    inline const UpdateReportSummary& LogicViewer::getUpdateReport() const
+    {
+        return m_updateReportSummary;
     }
 
     inline size_t LogicViewer::getCurrentView() const

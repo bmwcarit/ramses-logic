@@ -37,9 +37,10 @@ namespace rlogic
 
         logicEngine.createLuaScript(scriptSrc);
 
+        logicEngine.m_impl->disableTrackingDirtyNodes();
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
-            logicEngine.m_impl->update(true);
+            logicEngine.update();
         }
     }
 
@@ -86,9 +87,10 @@ namespace rlogic
 
         logicEngine.createLuaScript(scriptSrc);
 
+        logicEngine.m_impl->disableTrackingDirtyNodes();
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
-            logicEngine.m_impl->update(true);
+            logicEngine.update();
         }
     }
 
@@ -115,9 +117,10 @@ namespace rlogic
 
         logicEngine.createLuaScript(scriptSrc);
 
+        logicEngine.m_impl->disableTrackingDirtyNodes();
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
-            logicEngine.m_impl->update(true);
+            logicEngine.update();
         }
     }
 
@@ -156,13 +159,16 @@ namespace rlogic
             end
         )";
 
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Base);
+
         // To make sure there were no API errors
         bool success = false;
         (void)success;
         std::vector<LuaScript*> scripts(scriptCount);
         for (int64_t i = 0; i < scriptCount; ++i)
         {
-            scripts[i] = logicEngine.createLuaScript(scriptSrc, {}, fmt::format("script{}", i));
+            scripts[i] = logicEngine.createLuaScript(scriptSrc, config, fmt::format("script{}", i));
 
             if (i >= 1)
             {

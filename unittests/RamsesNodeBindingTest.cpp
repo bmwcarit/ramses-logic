@@ -87,6 +87,12 @@ namespace rlogic::internal
         EXPECT_EQ("NodeBinding", nodeBinding.getName());
     }
 
+    TEST_F(ARamsesNodeBinding, KeepsIdProvidedDuringConstruction)
+    {
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
+        EXPECT_EQ(nodeBinding.getId(), 1u);
+    }
+
     TEST_F(ARamsesNodeBinding, ReturnsNullptrForOutputs)
     {
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
@@ -551,7 +557,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "name");
+            RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "name", 1u);
             (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -561,6 +567,7 @@ namespace rlogic::internal
         ASSERT_TRUE(serializedBinding.base());
         ASSERT_TRUE(serializedBinding.base()->name());
         EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedBinding.base()->id(), 1u);
 
         ASSERT_TRUE(serializedBinding.base()->rootInput());
         EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -574,6 +581,7 @@ namespace rlogic::internal
 
             ASSERT_TRUE(deserializedBinding);
             EXPECT_EQ(deserializedBinding->getName(), "name");
+            EXPECT_EQ(deserializedBinding->getId(), 1u);
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
             EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
@@ -585,7 +593,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node");
+            RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node", 1u);
             (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -609,7 +617,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node");
+            RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node", 1u);
             // Set non-standard values. These will not be used after deserialization, instead the binding
             // will re-load the values from ramses
             binding.getInputs()->getChild("rotation")->set<vec3f>({100, 200, 300});
@@ -662,7 +670,8 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0 // no name!
+                0, // no name!
+                1u
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
                 m_flatBufferBuilder,
@@ -679,12 +688,32 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesNodeBinding from serialized data: missing name!");
     }
 
+    TEST_F(ARamsesNodeBinding_SerializationLifecycle, ErrorWhenNoBindingId)
+    {
+        {
+            auto base    = rlogic_serialization::CreateRamsesBinding(
+                m_flatBufferBuilder,
+                0 // no id (id gets checked before name)!
+            );
+            auto binding = rlogic_serialization::CreateRamsesNodeBinding(m_flatBufferBuilder, base);
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto&                            serialized   = *flatbuffers::GetRoot<rlogic_serialization::RamsesNodeBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesNodeBindingImpl> deserialized = RamsesNodeBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesNodeBinding from serialized data: missing id!");
+    }
+
     TEST_F(ARamsesNodeBinding_SerializationLifecycle, ErrorWhenNoRootInput)
     {
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 0 // no root input
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
@@ -708,6 +737,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 0,
                 m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
             );
@@ -737,6 +767,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 ramsesRef,
                 m_testUtils.serializeTestProperty("IN")
             );
@@ -771,6 +802,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 ramsesRef,
                 m_testUtils.serializeTestProperty("IN")
             );
@@ -818,8 +850,9 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("OneBinding.bin", m_scene));
-            const auto& nodeBinding = *m_logicEngine.findNodeBinding("NodeBinding");
+            const auto& nodeBinding = *m_logicEngine.findByName<RamsesNodeBinding>("NodeBinding");
             EXPECT_EQ("NodeBinding", nodeBinding.getName());
+            EXPECT_EQ(nodeBinding.getId(), 1u);
 
             const auto& inputs = nodeBinding.getInputs();
             ASSERT_EQ(inputs->getChildCount(), 4u);
@@ -868,7 +901,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("OneBinding.bin", m_scene));
-            const auto& nodeBinding = *m_logicEngine.findNodeBinding("NodeBinding");
+            const auto& nodeBinding = *m_logicEngine.findByName<RamsesNodeBinding>("NodeBinding");
             EXPECT_EQ(&nodeBinding.getRamsesNode(), m_node);
         }
     }
@@ -954,7 +987,7 @@ namespace rlogic::internal
             EXPECT_EQ(m_node->getVisibility(), ramses::EVisibilityMode::Invisible);
 
             // Set only scaling. Use the same value as before save on purpose! Calling set forces set on ramses
-            m_logicEngine.findNodeBinding("NodeBinding")->getInputs()->getChild("scaling")->set<vec3f>(vec3f{ 3.1f, 3.2f, 3.3f });
+            m_logicEngine.findByName<RamsesNodeBinding>("NodeBinding")->getInputs()->getChild("scaling")->set<vec3f>(vec3f{ 3.1f, 3.2f, 3.3f });
             EXPECT_TRUE(m_logicEngine.update());
 
             // Only scaling changed, the rest is unchanged
@@ -1093,14 +1126,16 @@ namespace rlogic::internal
 
         const std::string_view scriptSrc = R"(
             function interface()
+                IN.rotation = VEC3F
                 OUT.rotation = VEC3F
             end
             function run()
-                OUT.rotation = {1, 2, 3}
+                OUT.rotation = IN.rotation
             end
         )";
 
         LuaScript* script = m_logicEngine.createLuaScript(scriptSrc);
+        script->getInputs()->getChild("rotation")->set<vec3f>({ 1.f, 2.f, 3.f });
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
 
         // Adding and removing link does not set anything in ramses
@@ -1114,10 +1149,15 @@ namespace rlogic::internal
         m_logicEngine.update();
         ExpectValues(*m_node, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 2.f, 3.f });
 
-        // As long as link is active, binding overwrites value which was manually set directly to the ramses node
+        // Link does not overwrite manually set value ...
         m_node->setRotation(100.f, 100.f, 100.f, ramses::ERotationConvention::XYZ);
         m_logicEngine.update();
-        ExpectValues(*m_node, ENodePropertyStaticIndex::Rotation, vec3f{ 1.f, 2.f, 3.f });
+        ExpectValues(*m_node, ENodePropertyStaticIndex::Rotation, vec3f{ 100.f, 100.f, 100.f });
+
+        // ... until the linked script is re-executed and provides a new value
+        script->getInputs()->getChild("rotation")->set<vec3f>({11.f, 12.f, 13.f});
+        m_logicEngine.update();
+        ExpectValues(*m_node, ENodePropertyStaticIndex::Rotation, vec3f{ 11.f, 12.f, 13.f });
 
         // Remove link -> value is not overwritten any more
         ASSERT_TRUE(m_logicEngine.unlink(*script->getOutputs()->getChild("rotation"), *nodeBinding.getInputs()->getChild("rotation")));

@@ -8,11 +8,11 @@
 
 #pragma once
 
-#ifdef RLOGIC_STD_FILESYSTEM_EXPERIMENTAL
+#if defined(RLOGIC_STD_FILESYSTEM_EXPERIMENTAL)
 #include <experimental/filesystem>
 namespace fs = std::experimental::filesystem;
 
-#elif RLOGIC_STD_FILESYSTEM_EMULATION
+#elif defined(RLOGIC_STD_FILESYSTEM_EMULATION)
 
 // add more emulation methods when needed
 #include <string>

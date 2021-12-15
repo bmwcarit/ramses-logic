@@ -65,12 +65,12 @@ namespace rlogic
         ASSERT_NE(nullptr, module);
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
-        EXPECT_EQ(module, m_logicEngine.findLuaModule("mymodule"));
-        ASSERT_EQ(1u, m_logicEngine.luaModules().size());
-        EXPECT_EQ(module, *m_logicEngine.luaModules().cbegin());
+        EXPECT_EQ(module, m_logicEngine.findByName<LuaModule>("mymodule"));
+        ASSERT_EQ(1u, m_logicEngine.getCollection<LuaModule>().size());
+        EXPECT_EQ(module, *m_logicEngine.getCollection<LuaModule>().cbegin());
 
         const auto& constLogicEngine = m_logicEngine;
-        EXPECT_EQ(module, constLogicEngine.findLuaModule("mymodule"));
+        EXPECT_EQ(module, constLogicEngine.findByName<LuaModule>("mymodule"));
     }
 
     TEST_F(ALogicEngine_Factory, AllowsCreatingLuaModuleWithEmptyName)
@@ -101,7 +101,7 @@ namespace rlogic
         ASSERT_NE(nullptr, module);
         EXPECT_TRUE(m_logicEngine.destroy(*module));
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
-        EXPECT_FALSE(m_logicEngine.findLuaModule("mymodule"));
+        EXPECT_FALSE(m_logicEngine.findByName<LuaModule>("mymodule"));
     }
 
     TEST_F(ALogicEngine_Factory, FailsToDestroyLuaModuleIfFromOtherLogicInstance)
@@ -297,13 +297,13 @@ namespace rlogic
         m_logicEngine.createAnimationNode({{"channel", dataArray->as<DataArray>(), dataArray->as<DataArray>()}}, "animNode");
 
         const auto& immutableLogicEngine = m_logicEngine;
-        const auto* luaModuleConst         = immutableLogicEngine.findLogicObject("luaModule");
-        const auto* luaScriptConst         = immutableLogicEngine.findLogicObject("script");
-        const auto* nodeBindingConst       = immutableLogicEngine.findLogicObject("nodebinding");
-        const auto* appearanceBindingConst = immutableLogicEngine.findLogicObject("appbinding");
-        const auto* cameraBindingConst     = immutableLogicEngine.findLogicObject("camerabinding");
-        const auto* dataArrayConst         = immutableLogicEngine.findLogicObject("dataarray");
-        const auto* animNodeConst          = immutableLogicEngine.findLogicObject("animNode");
+        const auto* luaModuleConst         = immutableLogicEngine.findByName<LogicObject>("luaModule");
+        const auto* luaScriptConst         = immutableLogicEngine.findByName<LogicObject>("script");
+        const auto* nodeBindingConst       = immutableLogicEngine.findByName<LogicObject>("nodebinding");
+        const auto* appearanceBindingConst = immutableLogicEngine.findByName<LogicObject>("appbinding");
+        const auto* cameraBindingConst     = immutableLogicEngine.findByName<LogicObject>("camerabinding");
+        const auto* dataArrayConst         = immutableLogicEngine.findByName<LogicObject>("dataarray");
+        const auto* animNodeConst          = immutableLogicEngine.findByName<LogicObject>("animNode");
 
         EXPECT_TRUE(luaModuleConst->as<LuaModule>());
         EXPECT_TRUE(luaScriptConst->as<LuaScript>());
@@ -350,7 +350,7 @@ namespace rlogic
         struct UnknownObjectImpl: internal::LogicNodeImpl
         {
             UnknownObjectImpl()
-                : LogicNodeImpl("name")
+                : LogicNodeImpl("name", 1u)
             {
             }
 
@@ -380,20 +380,20 @@ namespace rlogic
         RamsesCameraBinding* camBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
 
         LogicEngine movedLogicEngine(std::move(m_logicEngine));
-        EXPECT_EQ(script, movedLogicEngine.findScript("Script"));
-        EXPECT_EQ(ramsesNodeBinding, movedLogicEngine.findNodeBinding("NodeBinding"));
-        EXPECT_EQ(appBinding, movedLogicEngine.findAppearanceBinding("AppearanceBinding"));
-        EXPECT_EQ(camBinding, movedLogicEngine.findCameraBinding("CameraBinding"));
+        EXPECT_EQ(script, movedLogicEngine.findByName<LuaScript>("Script"));
+        EXPECT_EQ(ramsesNodeBinding, movedLogicEngine.findByName<RamsesNodeBinding>("NodeBinding"));
+        EXPECT_EQ(appBinding, movedLogicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding"));
+        EXPECT_EQ(camBinding, movedLogicEngine.findByName<RamsesCameraBinding>("CameraBinding"));
 
         movedLogicEngine.update();
 
         LogicEngine moveAssignedLogicEngine;
         moveAssignedLogicEngine = std::move(movedLogicEngine);
 
-        EXPECT_EQ(script, moveAssignedLogicEngine.findScript("Script"));
-        EXPECT_EQ(ramsesNodeBinding, moveAssignedLogicEngine.findNodeBinding("NodeBinding"));
-        EXPECT_EQ(appBinding, moveAssignedLogicEngine.findAppearanceBinding("AppearanceBinding"));
-        EXPECT_EQ(camBinding, moveAssignedLogicEngine.findCameraBinding("CameraBinding"));
+        EXPECT_EQ(script, moveAssignedLogicEngine.findByName<LuaScript>("Script"));
+        EXPECT_EQ(ramsesNodeBinding, moveAssignedLogicEngine.findByName<RamsesNodeBinding>("NodeBinding"));
+        EXPECT_EQ(appBinding, moveAssignedLogicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding"));
+        EXPECT_EQ(camBinding, moveAssignedLogicEngine.findByName<RamsesCameraBinding>("CameraBinding"));
 
         moveAssignedLogicEngine.update();
     }

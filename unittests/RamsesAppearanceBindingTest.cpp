@@ -74,7 +74,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesAppearanceBindingImpl binding(*m_appearance, "name");
+            RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
             (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -84,6 +84,7 @@ namespace rlogic::internal
         ASSERT_TRUE(serializedBinding.base());
         ASSERT_TRUE(serializedBinding.base()->name());
         EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedBinding.base()->id(), 1u);
 
         ASSERT_TRUE(serializedBinding.base()->rootInput());
         EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -97,6 +98,7 @@ namespace rlogic::internal
 
             ASSERT_TRUE(deserializedBinding);
             EXPECT_EQ(deserializedBinding->getName(), "name");
+            EXPECT_EQ(deserializedBinding->getId(), 1u);
             EXPECT_TRUE(m_errorReporting.getErrors().empty());
         }
     }
@@ -105,7 +107,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesAppearanceBindingImpl binding(*m_appearance, "name");
+            RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
             (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -155,7 +157,8 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0 // no name!
+                0, // no name!
+                1u
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(
                 m_flatBufferBuilder,
@@ -172,12 +175,31 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name!");
     }
 
+    TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, ErrorWhenNoBindingId)
+    {
+        {
+            auto base = rlogic_serialization::CreateRamsesBinding(m_flatBufferBuilder,
+                0 // no id (id gets checked before name)!
+            );
+            auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(m_flatBufferBuilder, base);
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto&                                  serialized   = *flatbuffers::GetRoot<rlogic_serialization::RamsesAppearanceBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesAppearanceBindingImpl> deserialized = RamsesAppearanceBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesAppearanceBinding from serialized data: missing id!");
+    }
+
     TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, ErrorWhenNoRootInput)
     {
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 0 // no root input
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(
@@ -206,6 +228,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 ramsesRef,
                 m_testUtils.serializeTestProperty("IN")
             );
@@ -230,6 +253,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 0,
                 m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
             );
@@ -274,7 +298,7 @@ namespace rlogic::internal
 
         // Serialize
         {
-            RamsesAppearanceBindingImpl binding(*m_appearance, "name");
+            RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
             (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -678,7 +702,7 @@ namespace rlogic::internal
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("appearancebinding.bin", m_scene));
-            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
+            auto loadedAppearanceBinding = m_logicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding");
             EXPECT_EQ(&loadedAppearanceBinding->getRamsesAppearance(), m_appearance);
             EXPECT_EQ(loadedAppearanceBinding->getInputs()->getChildCount(), 1u);
             EXPECT_EQ(loadedAppearanceBinding->getOutputs(), nullptr);
@@ -718,7 +742,7 @@ namespace rlogic::internal
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("logic.bin", m_scene));
-            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
+            auto loadedAppearanceBinding = m_logicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding");
             EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance().getSceneObjectId(), appearance.getSceneObjectId());
 
             const auto& inputs = loadedAppearanceBinding->getInputs();
@@ -781,7 +805,7 @@ namespace rlogic::internal
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("logic.bin", m_scene));
-            auto loadedAppearanceBinding = m_logicEngine.findAppearanceBinding("AppearanceBinding");
+            auto loadedAppearanceBinding = m_logicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding");
             EXPECT_EQ(loadedAppearanceBinding->getRamsesAppearance().getSceneObjectId(), appearanceIdBeforeReload);
 
             const auto& inputs = loadedAppearanceBinding->getInputs();
@@ -819,7 +843,7 @@ namespace rlogic::internal
             "Fatal error during loading of RamsesAppearanceBinding from serialized data: effect signature doesn't match after loading!");
 
         // Did not overwrite existing objects (because loading from file failed)
-        EXPECT_EQ(appearanceBinding, m_logicEngine.findAppearanceBinding("AppearanceBinding"));
+        EXPECT_EQ(appearanceBinding, m_logicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding"));
     }
 
     TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, DoesNotReapplyAppearanceUniformValuesToRamses_WhenLoadingFromFileAndCallingUpdate_UntilSetToANewValue)
@@ -846,7 +870,7 @@ namespace rlogic::internal
             EXPECT_FLOAT_EQ(100.f, GetUniformValueFloat(appearance, "floatUniform"));
 
             // ... unless explicitly set again on the binding object + update() called
-            m_logicEngine.findAppearanceBinding("AppearanceBinding")->getInputs()->getChild("floatUniform")->set<float>(42.42f);
+            m_logicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding")->getInputs()->getChild("floatUniform")->set<float>(42.42f);
             EXPECT_TRUE(m_logicEngine.update());
             EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform"));
         }
@@ -900,12 +924,10 @@ namespace rlogic::internal
             EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform1"));
             EXPECT_FLOAT_EQ(200.0f, GetUniformValueFloat(appearance, "floatUniform2"));
 
-            // Reset uniform manually and call update currently re-applies value to ramses
-            // TODO Violin optimize this - we are not making us favors by spaming the ramses API with setters with
-            // the same value
+            // Reset uniform manually and call update does nothing (must set binding input explicitly to cause overwrite in ramses)
             SetUniformValueFloat(appearance, "floatUniform1", 100.0f);
             EXPECT_TRUE(m_logicEngine.update());
-            EXPECT_FLOAT_EQ(42.42f, GetUniformValueFloat(appearance, "floatUniform1"));
+            EXPECT_FLOAT_EQ(100.0f, GetUniformValueFloat(appearance, "floatUniform1"));
             EXPECT_FLOAT_EQ(200.0f, GetUniformValueFloat(appearance, "floatUniform2"));
         }
     }

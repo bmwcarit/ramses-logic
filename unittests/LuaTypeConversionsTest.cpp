@@ -33,27 +33,23 @@ namespace rlogic::internal
         m_sol["a_string"] = "string content";
         const sol::object solObject = m_sol["a_string"];
 
-        const std::string_view asStringView = LuaTypeConversions::GetIndexAsString(solObject);
-        EXPECT_EQ("string content", asStringView);
+        const DataOrError<std::string_view> asStringView = LuaTypeConversions::ExtractSpecificType<std::string_view>(solObject);
+        EXPECT_EQ("string content", asStringView.getData());
     }
 
-    TEST_F(TheLuaTypeConversions, ThrowsExceptionWhenWrongTypeConvertedToString)
+    TEST_F(TheLuaTypeConversions, RecognizesNonStringDataWhenExtractingStringView)
     {
-        m_sol["not_a_string"] = 5;
-        const sol::object solObject = m_sol["not_a_string"];
+        m_sol["aNumber"] = 5;
+        m_sol["aBool"] = true;
+        m_sol["aTable"] = m_sol.create_table_with("a", 5);
+        m_sol["aFunction"] = [](){};
 
         std::string errorMsg;
 
-        try
-        {
-            LuaTypeConversions::GetIndexAsString(solObject);
-        }
-        catch (sol::error const& err)
-        {
-            errorMsg = err.what();
-        }
-
-        EXPECT_EQ(errorMsg, std::string("lua: error: Only strings supported as table key type!"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<std::string_view>(m_sol["aNumber"]).getError(), ::testing::HasSubstr("Expected a string but got object of type number instead!"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<std::string_view>(m_sol["aBool"]).getError(), ::testing::HasSubstr("Expected a string but got object of type bool instead!"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<std::string_view>(m_sol["aTable"]).getError(), ::testing::HasSubstr("Expected a string but got object of type table instead!"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<std::string_view>(m_sol["aFunction"]).getError(), ::testing::HasSubstr("Expected a string but got object of type function instead!"));
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsSignedIntegers)
@@ -63,13 +59,15 @@ namespace rlogic::internal
         const sol::object positiveInt = m_sol["positiveInt"];
         const sol::object negativeInt = m_sol["negativeInt"];
 
-        const std::optional<int32_t> positiveIntOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(positiveInt);
-        const std::optional<int32_t> negativeIntOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(negativeInt);
-        ASSERT_TRUE(positiveIntOpt);
-        ASSERT_TRUE(negativeIntOpt);
+        const DataOrError<int32_t> positiveIntOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(positiveInt);
+        const DataOrError<int32_t> negativeIntOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(negativeInt);
+        const DataOrError<int64_t> positiveInt64Opt = LuaTypeConversions::ExtractSpecificType<int64_t>(positiveInt);
+        const DataOrError<int64_t> negativeInt64Opt = LuaTypeConversions::ExtractSpecificType<int64_t>(negativeInt);
 
-        EXPECT_EQ(5, *positiveIntOpt);
-        EXPECT_EQ(-6, *negativeIntOpt);
+        EXPECT_EQ(5, positiveIntOpt.getData());
+        EXPECT_EQ(-6, negativeIntOpt.getData());
+        EXPECT_EQ(5, positiveInt64Opt.getData());
+        EXPECT_EQ(-6, negativeInt64Opt.getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsSignedIntegers_AllowsEpsilonRounding)
@@ -85,22 +83,17 @@ namespace rlogic::internal
         const sol::object negativeIntMinusEps = m_sol["negativeIntMinusEps"];
         const sol::object zeroMinusEps = m_sol["zeroMinusEps"];
 
-        const std::optional<int32_t> positiveIntPlusEpsOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntPlusEps);
-        const std::optional<int32_t> positiveIntMinusEpsOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntMinusEps);
-        const std::optional<int32_t> negativeIntPlusEpsOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntPlusEps);
-        const std::optional<int32_t> negativeIntMinusEpsOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntMinusEps);
-        const std::optional<int32_t> zeroMinusEpsOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(zeroMinusEps);
-        ASSERT_TRUE(positiveIntPlusEpsOpt);
-        ASSERT_TRUE(positiveIntMinusEpsOpt);
-        ASSERT_TRUE(negativeIntPlusEpsOpt);
-        ASSERT_TRUE(negativeIntMinusEpsOpt);
-        ASSERT_TRUE(zeroMinusEpsOpt);
+        EXPECT_EQ(5, LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntPlusEps).getData());
+        EXPECT_EQ(5, LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntMinusEps).getData());
+        EXPECT_EQ(-6, LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntPlusEps).getData());
+        EXPECT_EQ(-6, LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntMinusEps).getData());
+        EXPECT_EQ(0, LuaTypeConversions::ExtractSpecificType<int32_t>(zeroMinusEps).getData());
 
-        EXPECT_EQ(5, *positiveIntPlusEpsOpt);
-        EXPECT_EQ(5, *positiveIntMinusEpsOpt);
-        EXPECT_EQ(-6, *negativeIntPlusEpsOpt);
-        EXPECT_EQ(-6, *negativeIntMinusEpsOpt);
-        EXPECT_EQ(0, *zeroMinusEpsOpt);
+        EXPECT_EQ(5, LuaTypeConversions::ExtractSpecificType<int64_t>(positiveIntPlusEps).getData());
+        EXPECT_EQ(5, LuaTypeConversions::ExtractSpecificType<int64_t>(positiveIntMinusEps).getData());
+        EXPECT_EQ(-6, LuaTypeConversions::ExtractSpecificType<int64_t>(negativeIntPlusEps).getData());
+        EXPECT_EQ(-6, LuaTypeConversions::ExtractSpecificType<int64_t>(negativeIntMinusEps).getData());
+        EXPECT_EQ(0, LuaTypeConversions::ExtractSpecificType<int64_t>(zeroMinusEps).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsSignedIntegers_ForbidsLargerThanEpsilonRounding)
@@ -116,11 +109,21 @@ namespace rlogic::internal
         const sol::object negativeIntMinusEps = m_sol["negativeIntMinusEps"];
         const sol::object zeroMinusEps = m_sol["zeroMinusEps"];
 
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntPlusEps));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntMinusEps));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntPlusEps));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntMinusEps));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(zeroMinusEps));
+        const std::string errorSubstr = "Error while extracting integer: implicit rounding (fractional part";
+
+        // 32 bit
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntPlusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(positiveIntMinusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntPlusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(negativeIntMinusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(zeroMinusEps).getError(), ::testing::HasSubstr(errorSubstr));
+
+        // 64 bit
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(positiveIntPlusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(positiveIntMinusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(negativeIntPlusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(negativeIntMinusEps).getError(), ::testing::HasSubstr(errorSubstr));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(zeroMinusEps).getError(), ::testing::HasSubstr(errorSubstr));
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsUnsignedIntegers_AcceptsUpToEpsilonRounding)
@@ -135,20 +138,13 @@ namespace rlogic::internal
         const sol::object okRoundingNeg = m_sol["okRoundingNeg"];
         const sol::object zeroMinusEps = m_sol["zeroMinusEps"];
 
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["tooMuchRoundingPos"]));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["tooMuchRoundingNeg"]));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["zeroRoundingError"]));
-        const std::optional<size_t> okRoundingPosOpt = LuaTypeConversions::ExtractSpecificType<size_t>(okRoundingPos);
-        const std::optional<size_t> okRoundingNegOpt = LuaTypeConversions::ExtractSpecificType<size_t>(okRoundingNeg);
-        const std::optional<size_t> zeroMinusEpsOpt = LuaTypeConversions::ExtractSpecificType<size_t>(zeroMinusEps);
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["tooMuchRoundingPos"]).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["tooMuchRoundingNeg"]).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["zeroRoundingError"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected non-negative number, received"));
 
-        ASSERT_TRUE(okRoundingPosOpt);
-        ASSERT_TRUE(okRoundingNegOpt);
-        ASSERT_TRUE(zeroMinusEpsOpt);
-
-        EXPECT_EQ(5u, *okRoundingPosOpt);
-        EXPECT_EQ(5u, *okRoundingNegOpt);
-        EXPECT_EQ(0u, *zeroMinusEpsOpt);
+        EXPECT_EQ(5u, LuaTypeConversions::ExtractSpecificType<size_t>(okRoundingPos).getData());
+        EXPECT_EQ(5u, LuaTypeConversions::ExtractSpecificType<size_t>(okRoundingNeg).getData());
+        EXPECT_EQ(0u, LuaTypeConversions::ExtractSpecificType<size_t>(zeroMinusEps).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsUnsignedIntegers)
@@ -156,17 +152,14 @@ namespace rlogic::internal
         m_sol["uint"] = 5;
         const sol::object uint = m_sol["uint"];
 
-        const std::optional<size_t> uintOpt = LuaTypeConversions::ExtractSpecificType<size_t>(uint);
-        ASSERT_TRUE(uintOpt);
-
-        EXPECT_EQ(5, *uintOpt);
+        EXPECT_EQ(5, LuaTypeConversions::ExtractSpecificType<size_t>(uint).getData());
     }
 
     TEST_F(TheLuaTypeConversions, CatchesErrorWhenCastingNegativeNumberToUnsignedInteger)
     {
         m_sol["negative"] = -5;
 
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["negative"]));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["negative"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected non-negative number, received"));
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsUnsignedIntegers_AllowsEpsilonRounding)
@@ -174,10 +167,7 @@ namespace rlogic::internal
         m_sol["uint"] = 5.0 + std::numeric_limits<double>::epsilon();
         const sol::object uint = m_sol["uint"];
 
-        const std::optional<size_t> uintOpt = LuaTypeConversions::ExtractSpecificType<size_t>(uint);
-        ASSERT_TRUE(uintOpt);
-
-        EXPECT_EQ(5, *uintOpt);
+        EXPECT_EQ(5, LuaTypeConversions::ExtractSpecificType<size_t>(uint).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsFloats)
@@ -189,16 +179,9 @@ namespace rlogic::internal
         const sol::object negFloat = m_sol["negFloat"];
         const sol::object floatWithIntegralPart = m_sol["floatWithIntegralPart"];
 
-        const std::optional<float> floatOpt = LuaTypeConversions::ExtractSpecificType<float>(float_);
-        const std::optional<float> negFloatOpt = LuaTypeConversions::ExtractSpecificType<float>(negFloat);
-        const std::optional<float> floatWithIntegralPartOpt = LuaTypeConversions::ExtractSpecificType<float>(floatWithIntegralPart);
-        ASSERT_TRUE(floatOpt);
-        ASSERT_TRUE(negFloatOpt);
-        ASSERT_TRUE(floatWithIntegralPartOpt);
-
-        EXPECT_FLOAT_EQ(0.5f, *floatOpt);
-        EXPECT_FLOAT_EQ(-0.5f, *negFloatOpt);
-        EXPECT_FLOAT_EQ(1.5f, *floatWithIntegralPartOpt);
+        EXPECT_FLOAT_EQ(0.5f, LuaTypeConversions::ExtractSpecificType<float>(float_).getData());
+        EXPECT_FLOAT_EQ(-0.5f, LuaTypeConversions::ExtractSpecificType<float>(negFloat).getData());
+        EXPECT_FLOAT_EQ(1.5f, LuaTypeConversions::ExtractSpecificType<float>(floatWithIntegralPart).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsExtremeSignedIntegers)
@@ -210,13 +193,8 @@ namespace rlogic::internal
         const sol::object maxInt = m_sol["maxInt"];
         const sol::object lowInt = m_sol["lowInt"];
 
-        const std::optional<int32_t> maxIntOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(maxInt);
-        const std::optional<int32_t> lowIntOpt = LuaTypeConversions::ExtractSpecificType<int32_t>(lowInt);
-        ASSERT_TRUE(maxIntOpt);
-        ASSERT_TRUE(lowIntOpt);
-
-        EXPECT_EQ(maxIntValue, *maxIntOpt);
-        EXPECT_EQ(lowestIntValue, *lowIntOpt);
+        EXPECT_EQ(maxIntValue, LuaTypeConversions::ExtractSpecificType<int32_t>(maxInt).getData());
+        EXPECT_EQ(lowestIntValue, LuaTypeConversions::ExtractSpecificType<int32_t>(lowInt).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsExtremeUnsignedIntegers)
@@ -229,13 +207,8 @@ namespace rlogic::internal
         const sol::object maxUInt = m_sol["maxUInt"];
         const sol::object lowUInt = m_sol["lowUInt"];
 
-        const std::optional<size_t> maxUIntOpt = LuaTypeConversions::ExtractSpecificType<size_t>(maxUInt);
-        const std::optional<size_t> lowUIntOpt = LuaTypeConversions::ExtractSpecificType<size_t>(lowUInt);
-        ASSERT_TRUE(maxUIntOpt);
-        ASSERT_TRUE(lowUIntOpt);
-
-        EXPECT_EQ(maxUIntValue, *maxUIntOpt);
-        EXPECT_EQ(lowestUIntValue, *lowUIntOpt);
+        EXPECT_EQ(maxUIntValue, LuaTypeConversions::ExtractSpecificType<size_t>(maxUInt).getData());
+        EXPECT_EQ(lowestUIntValue, LuaTypeConversions::ExtractSpecificType<size_t>(lowUInt).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsExtremeFloats)
@@ -256,20 +229,10 @@ namespace rlogic::internal
         const sol::object epsilon = m_sol["epsilon"];
         const sol::object negEpsilon = m_sol["negEpsilon"];
 
-        const std::optional<float> maxFloatOpt = LuaTypeConversions::ExtractSpecificType<float>(maxFloat);
-        const std::optional<float> lowestFloatOpt = LuaTypeConversions::ExtractSpecificType<float>(lowestFloat);
-        const std::optional<float> epsilonOpt = LuaTypeConversions::ExtractSpecificType<float>(epsilon);
-        const std::optional<float> negEpsilonOpt = LuaTypeConversions::ExtractSpecificType<float>(negEpsilon);
-
-        ASSERT_TRUE(maxFloatOpt);
-        ASSERT_TRUE(lowestFloatOpt);
-        ASSERT_TRUE(epsilonOpt);
-        ASSERT_TRUE(negEpsilonOpt);
-
-        EXPECT_FLOAT_EQ(maxFloatValue, *maxFloatOpt);
-        EXPECT_FLOAT_EQ(lowestFloatValue, *lowestFloatOpt);
-        EXPECT_FLOAT_EQ(epsilonValue, *epsilonOpt);
-        EXPECT_FLOAT_EQ(negEpsilonValue, *negEpsilonOpt);
+        EXPECT_FLOAT_EQ(maxFloatValue,   LuaTypeConversions::ExtractSpecificType<float>(maxFloat).getData());
+        EXPECT_FLOAT_EQ(lowestFloatValue,LuaTypeConversions::ExtractSpecificType<float>(lowestFloat).getData());
+        EXPECT_FLOAT_EQ(epsilonValue,    LuaTypeConversions::ExtractSpecificType<float>(epsilon).getData());
+        EXPECT_FLOAT_EQ(negEpsilonValue, LuaTypeConversions::ExtractSpecificType<float>(negEpsilon).getData());
     }
 
     TEST_F(TheLuaTypeConversions, RoundsDoublesToFloats)
@@ -283,14 +246,8 @@ namespace rlogic::internal
         const sol::object onePlusEpsilon = m_sol["onePlusEpsilon"];
         const sol::object oneMinusEpsilon = m_sol["oneMinusEpsilon"];
 
-        const std::optional<float> onePlusEpsilonOpt = LuaTypeConversions::ExtractSpecificType<float>(onePlusEpsilon);
-        const std::optional<float> oneMinusEpsilonOpt = LuaTypeConversions::ExtractSpecificType<float>(oneMinusEpsilon);
-
-        ASSERT_TRUE(onePlusEpsilonOpt);
-        ASSERT_TRUE(oneMinusEpsilonOpt);
-
-        EXPECT_FLOAT_EQ(1.0f, *onePlusEpsilonOpt);
-        EXPECT_FLOAT_EQ(1.0f, *oneMinusEpsilonOpt);
+        EXPECT_FLOAT_EQ(1.0f, LuaTypeConversions::ExtractSpecificType<float>(onePlusEpsilon).getData());
+        EXPECT_FLOAT_EQ(1.0f, LuaTypeConversions::ExtractSpecificType<float>(oneMinusEpsilon).getData());
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsTableOfFloatsToFloatArray)
@@ -299,10 +256,10 @@ namespace rlogic::internal
             floats = {0.1, 10000.42}
         )");
 
-        const std::array<float, 2> floatArray = LuaTypeConversions::ExtractArray<float, 2>(m_sol["floats"]);
+        const DataOrError<std::array<float, 2>> floatArray = LuaTypeConversions::ExtractArray<float, 2>(m_sol["floats"]);
 
-        EXPECT_FLOAT_EQ(0.1f, floatArray[0]);
-        EXPECT_FLOAT_EQ(10000.42f, floatArray[1]);
+        EXPECT_FLOAT_EQ(0.1f, floatArray.getData()[0]);
+        EXPECT_FLOAT_EQ(10000.42f, floatArray.getData()[1]);
     }
 
     TEST_F(TheLuaTypeConversions, ExtractsTableOfIntegersToSignedIntegerArray)
@@ -311,17 +268,18 @@ namespace rlogic::internal
             ints = {11, -12, (1.5 - 2.5)}
         )");
 
-        const std::array<int32_t, 3> intsArray = LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["ints"]);
+        const DataOrError<std::array<int32_t, 3>> intsArray = LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["ints"]);
 
-        EXPECT_EQ(11, intsArray[0]);
-        EXPECT_EQ(-12, intsArray[1]);
-        EXPECT_EQ(-1, intsArray[2]);
+        EXPECT_EQ(11, intsArray.getData()[0]);
+        EXPECT_EQ(-12, intsArray.getData()[1]);
+        EXPECT_EQ(-1, intsArray.getData()[2]);
     }
 
     TEST_F(TheLuaTypeConversions, FailsValueExtractionWhenSymbolDoesNotExist)
     {
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["noSuchSymbol"]));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<float>(m_sol["noSuchSymbol"]));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["noSuchSymbol"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected a number, received 'nil'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(m_sol["noSuchSymbol"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected a number, received 'nil'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<float>(m_sol["noSuchSymbol"]).getError(), ::testing::HasSubstr("Error while extracting floating point number: expected a number, received 'nil'"));
     }
 
     TEST_F(TheLuaTypeConversions, FailsValueExtractionWhenTypesDontMatch)
@@ -332,31 +290,22 @@ namespace rlogic::internal
             aNil = nil
         )");
 
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["aString"]));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<float>(m_sol["aString"]));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["aNil"]));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<float>(m_sol["aNil"]));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["aString"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected a number, received 'string'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(m_sol["aString"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected a number, received 'string'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<float>(m_sol["aString"]).getError(), ::testing::HasSubstr("Error while extracting floating point number: expected a number, received 'string'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["aNil"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected a number, received 'nil'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(m_sol["aNil"]).getError(), ::testing::HasSubstr("Error while extracting integer: expected a number, received 'nil'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<float>(m_sol["aNil"]).getError(), ::testing::HasSubstr("Error while extracting floating point number: expected a number, received 'nil'"));
     }
 
-    TEST_F(TheLuaTypeConversions, ThrowsExceptionWhenTableAndArraySizeDontMatch)
+    TEST_F(TheLuaTypeConversions, ReportsErrorWhenTableAndArraySizeDontMatch)
     {
         m_sol.script(R"(
             ints = {11, 12, 13, 14, 15}
         )");
 
-        std::string errorMsg;
-
-        try
-        {
-            LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["ints"]);
-        }
-        catch (sol::error const& err)
-        {
-            errorMsg = err.what();
-        }
-
-        // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Expected 3 array components in table but got 5 instead!"));
+        auto error = LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["ints"]).getError();
+        EXPECT_THAT(error, ::testing::HasSubstr("Error while extracting array: expected 3 array components in table but got 5 instead!"));
     }
 
     class TheLuaTypeConversions_CatchNumericErrors : public TheLuaTypeConversions
@@ -369,13 +318,11 @@ namespace rlogic::internal
         constexpr double smallerThanLowestInt32Value = std::numeric_limits<double>::lowest() - double(1.0);
         m_sol["largerThanMaxInt32"] = largerThanMaxInt32Value;
         m_sol["smallerThanLowestInt32"] = smallerThanLowestInt32Value;
-        const sol::object largerThanMaxInt32 = m_sol["largerThanMaxInt32"];
-        const sol::object smallerThanLowestInt32 = m_sol["smallerThanLowestInt32"];
 
-        const std::optional<int32_t> largerThanMaxInt32Opt = LuaTypeConversions::ExtractSpecificType<int32_t>(largerThanMaxInt32);
-        const std::optional<int32_t> smallerThanLowestInt32Opt = LuaTypeConversions::ExtractSpecificType<int32_t>(smallerThanLowestInt32);
-        EXPECT_FALSE(largerThanMaxInt32Opt);
-        EXPECT_FALSE(smallerThanLowestInt32Opt);
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["largerThanMaxInt32"]).getError(),
+            ::testing::HasSubstr("Error while extracting integer: integral part too large to fit in a signed 32-bit integer ('2147483648')"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(m_sol["smallerThanLowestInt32"]).getError(),
+            ::testing::HasSubstr("Error while extracting integer: integral part too large to fit in a signed 32-bit integer"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, WhenNarrowingFloats)
@@ -385,13 +332,11 @@ namespace rlogic::internal
         constexpr double smallerThanLowestFloatValue = std::numeric_limits<float>::lowest() * double(2.0);
         m_sol["largerThanMaxFloat"] = largerThanMaxFloatValue;
         m_sol["smallerThanLowestFloat"] = smallerThanLowestFloatValue;
-        const sol::object largerThanMaxFloat = m_sol["largerThanMaxFloat"];
-        const sol::object smallerThanLowestFloat = m_sol["smallerThanLowestFloat"];
 
-        const std::optional<float> largerThanMaxFloatOpt = LuaTypeConversions::ExtractSpecificType<float>(largerThanMaxFloat);
-        const std::optional<float> smallerThanLowestFloatOpt = LuaTypeConversions::ExtractSpecificType<float>(smallerThanLowestFloat);
-        EXPECT_FALSE(largerThanMaxFloatOpt);
-        EXPECT_FALSE(smallerThanLowestFloatOpt);
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<float>(m_sol["largerThanMaxFloat"]).getError(),
+            ::testing::HasSubstr("Error while extracting floating point number: value would cause overflow in float"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<float>(m_sol["smallerThanLowestFloat"]).getError(),
+            ::testing::HasSubstr("Error while extracting floating point number: value would cause overflow in float"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, WhenNarrowingUnsignedIntegers)
@@ -399,7 +344,7 @@ namespace rlogic::internal
         // Adding is not enough, have to multiply to get out of range
         constexpr double largerThanMaxUIntValue = double(std::numeric_limits<size_t>::max()) * 2.0;
         m_sol["largerThanMaxUInt"] = largerThanMaxUIntValue;
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["largerThanMaxUInt"]));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(m_sol["largerThanMaxUInt"]).getError(), ::testing::HasSubstr("Error while extracting integer: integral part too large to fit in 64-bit unsigned integer"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, WhenImplicitlyRoundingFloats)
@@ -415,14 +360,18 @@ namespace rlogic::internal
         const sol::object smallerThanMinusOne = m_sol["smallerThanMinusOne"];
 
         // Check signed and unsigned types alike, both should fail
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(float_));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(negFloat));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(largerThanOneFloat));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(smallerThanMinusOne));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(float_));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(negFloat));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(largerThanOneFloat));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(smallerThanMinusOne));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(float_).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(negFloat).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(largerThanOneFloat).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(smallerThanMinusOne).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(float_).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(negFloat).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(largerThanOneFloat).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(smallerThanMinusOne).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(float_).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(negFloat).getError(), ::testing::HasSubstr("Error while extracting integer: expected non-negative number, received '-0.5'"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(largerThanOneFloat).getError(), ::testing::HasSubstr("Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(smallerThanMinusOne).getError(), ::testing::HasSubstr("Error while extracting integer: expected non-negative number, received '-1.5'"));
     }
 
     TEST_F(TheLuaTypeConversions_CatchNumericErrors, WhenImplicitlyRoundingFloats_RoundingErrorLargerThanEpsilon)
@@ -436,77 +385,59 @@ namespace rlogic::internal
         const sol::object onePlusEpsilon = m_sol["onePlusEpsilon"];
         const sol::object oneMinusEpsilon = m_sol["oneMinusEpsilon"];
 
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(onePlusEpsilon));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<int32_t>(oneMinusEpsilon));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(onePlusEpsilon));
-        EXPECT_FALSE(LuaTypeConversions::ExtractSpecificType<size_t>(oneMinusEpsilon));
+        const std::string errorMsg = "Error while extracting integer: implicit rounding (fractional part";
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(onePlusEpsilon).getError(), ::testing::HasSubstr(errorMsg));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int32_t>(oneMinusEpsilon).getError(), ::testing::HasSubstr(errorMsg));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(onePlusEpsilon).getError(), ::testing::HasSubstr(errorMsg));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(oneMinusEpsilon).getError(), ::testing::HasSubstr(errorMsg));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(onePlusEpsilon).getError(), ::testing::HasSubstr(errorMsg));
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<size_t>(oneMinusEpsilon).getError(), ::testing::HasSubstr(errorMsg));
     }
 
-    TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsExceptiion_WhenNarrowing_WhileExtractingIntegerArray)
+    TEST_F(TheLuaTypeConversions_CatchNumericErrors, WhenImplicitlyRoundingLargeNumbersToInt64)
+    {
+        m_sol["dblMax"] = std::numeric_limits<double>::max();
+        EXPECT_THAT(LuaTypeConversions::ExtractSpecificType<int64_t>(m_sol["dblMax"]).getError(),
+            ::testing::HasSubstr("Error while extracting integer: integral part too large to fit in a signed 64-bit integer ('1.7976931348623157e+308')"));
+    }
+
+    TEST_F(TheLuaTypeConversions_CatchNumericErrors, CatchesError_WhenNarrowing_WhileExtractingIntegerArray)
     {
         m_sol["oneAboveLargestSignedInt"] = double(std::numeric_limits<int32_t>::max()) + 1;
         m_sol.script(R"(
             notOnlyInts = {11, 12, oneAboveLargestSignedInt}
         )");
 
-        std::string errorMsg;
-
-        try
-        {
-            LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["notOnlyInts"]);
-        }
-        catch (sol::error const& err)
-        {
-            errorMsg = err.what();
-        }
-
-        // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
+        const std::string errorMsg = LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["notOnlyInts"]).getError();
+        EXPECT_THAT(errorMsg,
+            ::testing::HasSubstr("Error while extracting array: unexpected value (type: 'number') at array element # 3! Reason: Error while extracting integer: integral part too large to fit in a signed 32-bit integer"));
     }
 
-    TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsException_WhenImplicitlyRoundingFloats_WhileExtractingIntegerArray)
+    TEST_F(TheLuaTypeConversions_CatchNumericErrors, CatchesError_WhenImplicitlyRoundingFloats_WhileExtractingIntegerArray)
     {
         m_sol.script(R"(
             notOnlyInts = {11, 12, 0.5}
         )");
 
-        std::string errorMsg;
-
-        try
-        {
-            LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["notOnlyInts"]);
-        }
-        catch (sol::error const& err)
-        {
-            errorMsg = err.what();
-        }
-
-        // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
+        const std::string errorMsg = LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["notOnlyInts"]).getError();
+        EXPECT_THAT(errorMsg,
+            ::testing::HasSubstr("Error while extracting array: unexpected value (type: 'number') at array element # 3! Reason: Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
     }
 
-    TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsException_WhenNegativeFloatFound_WhileExtractingIntegerArray)
+    TEST_F(TheLuaTypeConversions_CatchNumericErrors, CatchesError_WhenNegativeFloatFound_WhileExtractingIntegerArray)
     {
         m_sol.script(R"(
             notOnlyInts = {11, 12, -1.5}
         )");
 
-        std::string errorMsg;
-
-        try
-        {
-            LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["notOnlyInts"]);
-        }
-        catch (sol::error const& err)
-        {
-            errorMsg = err.what();
-        }
-
-        // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
+        const std::string errorMsg = LuaTypeConversions::ExtractArray<int32_t, 3>(m_sol["notOnlyInts"]).getError();
+        EXPECT_THAT(errorMsg,
+            ::testing::HasSubstr(
+                "Error while extracting array: unexpected value (type: 'number') at array element # 3! "
+                "Reason: Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
     }
 
-    TEST_F(TheLuaTypeConversions_CatchNumericErrors, ThrowsException_WhenNarrowing_WhileExtractingFloatArray)
+    TEST_F(TheLuaTypeConversions_CatchNumericErrors, CatchesError_WhenNarrowing_WhileExtractingFloatArray)
     {
         constexpr double largerThanMaxFloatValue = std::numeric_limits<float>::max() * double(2.0);
         m_sol["largerThanMaxFloat"] = largerThanMaxFloatValue;
@@ -514,18 +445,8 @@ namespace rlogic::internal
             tooLarge = {11, 12, largerThanMaxFloat}
         )");
 
-        std::string errorMsg;
-
-        try
-        {
-            LuaTypeConversions::ExtractArray<float, 3>(m_sol["tooLarge"]);
-        }
-        catch (sol::error const& err)
-        {
-            errorMsg = err.what();
-        }
-
-        // TODO Violin error message is not clear - fix this
-        EXPECT_EQ(errorMsg, std::string("lua: error: Unexpected value (type: 'number') at array element # 3!"));
+        const std::string errorMsg = LuaTypeConversions::ExtractArray<float, 3>(m_sol["tooLarge"]).getError();
+        EXPECT_THAT(errorMsg,
+            ::testing::HasSubstr("Error while extracting array: unexpected value (type: 'number') at array element # 3! Reason: Error while extracting floating point number: value would cause overflow in float"));
     }
 }

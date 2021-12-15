@@ -46,7 +46,6 @@ add_example(NAME 03_errors_runtime        FILES 03_errors_runtime/main.cpp      
 # Can't execute ramses runtime example as test - it has a loop which blocks test automation and wastes resources
 add_example(NAME 04_ramses_scene          FILES 04_ramses_scene/main.cpp)
 add_example(NAME 05_serialization         FILES 05_serialization/main.cpp         MAKE_TEST)
-add_example(NAME 06_override_print        FILES 06_override_print/main.cpp        MAKE_TEST)
 add_example(NAME 07_links                 FILES 07_links/main.cpp                 MAKE_TEST)
 add_example(NAME 08_animation             FILES 08_animation/main.cpp             MAKE_TEST)
 add_example(NAME 09_modules               FILES 09_modules/main.cpp               MAKE_TEST)

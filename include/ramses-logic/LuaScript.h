@@ -43,7 +43,7 @@ namespace rlogic
     *           OUT.output_name = TYPE
     *       end
     *   \endcode
-    * - TYPE is one of [INT|FLOAT|BOOL|STRING|VEC2F|VEC3F|VEC4F|VEC2I|VEC3I|VEC4I], or...
+    * - TYPE is one of [INT32|INT64|FLOAT|BOOL|STRING|VEC2F|VEC3F|VEC4F|VEC2I|VEC3I|VEC4I], or...
     * - TYPE can be also a Lua table with nested properties, obeying the same rules as above, or...
     * - TYPE can be an array declaration of the form ARRAY(n, T) where:
     *     - n is a positive integer
@@ -67,14 +67,6 @@ namespace rlogic
     class LuaScript : public LogicNode
     {
     public:
-
-        /**
-         * Overrides the lua print function with a custom function. Each time "print" is used
-         * inside a lua script, the function will be called. Because the lua "print" function allows
-         * an arbitrary amount of parameters, the function is called for each provided parameter.
-         * @param luaPrintFunction to use for printing
-         */
-        RLOGIC_API void overrideLuaPrint(LuaPrintFunction luaPrintFunction);
 
         /**
         * Constructor of LuaScript. User is not supposed to call this - script are created by other factory classes

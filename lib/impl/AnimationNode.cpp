@@ -22,7 +22,7 @@ namespace rlogic
 
     float AnimationNode::getDuration() const
     {
-        return m_animationNodeImpl.getDuration();
+        return m_animationNodeImpl.getMaximumChannelDuration();
     }
 
     const AnimationChannels& AnimationNode::getChannels() const

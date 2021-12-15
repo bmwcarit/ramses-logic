@@ -18,6 +18,7 @@
 #include "RamsesCameraBindingGen.h"
 #include "RamsesNodeBindingGen.h"
 #include "RamsesReferenceGen.h"
+#include "TimerNodeGen.h"
 
 namespace rlogic_serialization {
 

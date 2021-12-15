@@ -81,8 +81,10 @@ namespace rlogic
     {
         const char* errorString = "Types of source property 'outParam:{}' does not match target property 'inParam:{}'";
 
-        std::array<std::tuple<std::string, std::string, std::string>, 5> errorCases = {
-            std::make_tuple("FLOAT", "INT",   fmt::format(errorString, "FLOAT", "INT")),
+        std::array<std::tuple<std::string, std::string, std::string>, 7> errorCases = {
+            std::make_tuple("FLOAT", "INT",   fmt::format(errorString, "FLOAT", "INT32")),
+            std::make_tuple("INT32", "INT64", fmt::format(errorString, "INT32", "INT64")),
+            std::make_tuple("INT64", "INT32", fmt::format(errorString, "INT64", "INT32")),
             std::make_tuple("VEC3F", "VEC3I", fmt::format(errorString, "VEC3F", "VEC3I")),
             std::make_tuple("VEC2F", "VEC4I", fmt::format(errorString, "VEC2F", "VEC4I")),
             std::make_tuple("VEC2I", "FLOAT", fmt::format(errorString, "VEC2I", "FLOAT")),
@@ -90,7 +92,7 @@ namespace rlogic
             R"({
                 param1 = INT,
                 param2 = FLOAT
-            })", fmt::format(errorString, "INT", "STRUCT"))
+            })", fmt::format(errorString, "INT32", "STRUCT"))
         };
 
         for (const auto& errorCase : errorCases)
@@ -182,7 +184,7 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0].message, "The property 'source' of LogicNode 'SourceScript' is already linked to the property 'target' of LogicNode 'TargetScript'");
+        EXPECT_EQ(errors[0].message, "The property 'target' of LogicNode 'TargetScript' is already linked (to property 'source' of LogicNode 'SourceScript')");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwice_RamsesBinding)
@@ -196,7 +198,7 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0].message, "The property 'source' of LogicNode 'SourceScript' is already linked to the property 'visibility' of LogicNode 'RamsesBinding'");
+        EXPECT_EQ(errors[0].message, "The property 'visibility' of LogicNode 'RamsesBinding' is already linked (to property 'source' of LogicNode 'SourceScript')");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_LuaScript)
@@ -205,8 +207,7 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        // TODO Violin error message is not giving enough info where the error came from
-        EXPECT_EQ(errors[0].message, "No link available from source property 'source' to target property 'target'");
+        EXPECT_EQ(errors[0].message, "Input property 'target' is not currently linked!");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesNodeBinding)
@@ -219,7 +220,7 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ(errors[0].message, "No link available from source property 'source' to target property 'visibility'");
+        EXPECT_EQ(errors[0].message, "Input property 'visibility' is not currently linked!");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorIfLinkedToMatchingType)
@@ -228,11 +229,13 @@ namespace rlogic
             function interface()
                 IN.boolTarget  = BOOL
                 IN.intTarget   = INT
+                IN.int64Target = INT64
                 IN.floatTarget = FLOAT
                 IN.vec2Target  = VEC2F
                 IN.vec3Target  = VEC3F
                 OUT.boolSource  = BOOL
                 OUT.intSource   = INT
+                OUT.int64Source = INT64
                 OUT.floatSource = FLOAT
                 OUT.vec2Source  = VEC2F
                 OUT.vec3Source  = VEC3F
@@ -249,18 +252,21 @@ namespace rlogic
 
         auto boolTarget = inputs->getChild("boolTarget");
         auto intTarget = inputs->getChild("intTarget");
+        auto int64Target = inputs->getChild("int64Target");
         auto floatTarget = inputs->getChild("floatTarget");
         auto vec2Target = inputs->getChild("vec2Target");
         auto vec3Target = inputs->getChild("vec3Target");
 
         auto boolSource = outputs->getChild("boolSource");
         auto intSource = outputs->getChild("intSource");
+        auto int64Source = outputs->getChild("int64Source");
         auto floatSource = outputs->getChild("floatSource");
         auto vec2Source = outputs->getChild("vec2Source");
         auto vec3Source = outputs->getChild("vec3Source");
 
         EXPECT_TRUE(m_logicEngine.link(*boolSource, *boolTarget));
         EXPECT_TRUE(m_logicEngine.link(*intSource, *intTarget));
+        EXPECT_TRUE(m_logicEngine.link(*int64Source, *int64Target));
         EXPECT_TRUE(m_logicEngine.link(*floatSource, *floatTarget));
         EXPECT_TRUE(m_logicEngine.link(*vec2Source, *vec2Target));
         EXPECT_TRUE(m_logicEngine.link(*vec3Source, *vec3Target));
@@ -416,8 +422,7 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        // TODO Violin error message is not giving enough info where the error came from
-        EXPECT_EQ(errors[0].message, "No link available from source property 'intSource' to target property 'intTarget2'");
+        EXPECT_EQ(errors[0].message, "Input property 'intTarget2' is not currently linked!");
     }
 
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesBinding)
@@ -432,8 +437,7 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        // TODO Violin error message is not giving enough info where the error came from
-        EXPECT_EQ(errors[0].message, "No link available from source property 'source' to target property 'translation'");
+        EXPECT_EQ(errors[0].message, "Input property 'translation' is not currently linked!");
     }
 
     TEST_F(ALogicEngine_Linking, UnlinksPropertiesWhichAreLinked)
@@ -447,7 +451,6 @@ namespace rlogic
             m_sourceProperty,
             m_targetProperty
         ));
-        // TODO Violin This is already tested below, isn't it? (and the other test also checks what happens with the values - this one only checks return value of unlink())
     }
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorsIfMultipleLinksFromSameSourceAreUnlinked)
@@ -475,8 +478,6 @@ namespace rlogic
             m_sourceProperty,
             *targetProperty2
         ));
-
-        // TODO Violin What happens after they are unlinked? Probably should test that the link has no effect, i.e. doesn't propagate values any more
     }
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked)
@@ -494,6 +495,34 @@ namespace rlogic
         m_logicEngine.update();
 
         EXPECT_EQ(42, *targetScript->getOutputs()->getChild("source_INT")->get<int32_t>());
+    }
+
+    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_Int64)
+    {
+        const std::string_view scriptSrc = R"(
+            function interface()
+                IN.data = INT64
+                OUT.data = INT64
+            end
+            function run()
+                OUT.data = IN.data
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSrc);
+        auto targetScript = m_logicEngine.createLuaScript(scriptSrc);
+
+        auto output = sourceScript->getOutputs()->getChild("data");
+        auto input = targetScript->getInputs()->getChild("data");
+
+        EXPECT_TRUE(m_logicEngine.link(*output, *input));
+
+        const int64_t value = static_cast<int64_t>(std::numeric_limits<int32_t>::max()) + 1;
+        sourceScript->getInputs()->getChild("data")->set<int64_t>(value);
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        EXPECT_EQ(value, *targetScript->getOutputs()->getChild("data")->get<int64_t>());
     }
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_ArraysOfStructs)
@@ -568,7 +597,6 @@ namespace rlogic
         EXPECT_EQ(42, *targetScript->getOutputs()->getChild("data")->getChild("two")->getChild(1)->get<int32_t>());
     }
 
-    // TODO Violin test more corner cases - especially with the value of the unlinked input and different ordering of link/unlink/update calls
     TEST_F(ALogicEngine_Linking, DoesNotPropagateOutputsToInputsAfterUnlink)
     {
         const auto  luaScriptSource = R"(
@@ -1300,14 +1328,10 @@ namespace rlogic
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("links.bin"));
 
-            // Internal check that deserialization did not result in more link copies
-            const auto& links = m_logicEngine.m_impl->getApiObjects().getLogicNodeDependencies().getLinks();
-            EXPECT_EQ(links.size(), 3u);
-
             // Load all scripts and their properties
-            auto scriptC = m_logicEngine.findScript("ScriptC");
-            auto scriptB = m_logicEngine.findScript("ScriptB");
-            auto scriptA = m_logicEngine.findScript("ScriptA");
+            auto scriptC = m_logicEngine.findByName<LuaScript>("ScriptC");
+            auto scriptB = m_logicEngine.findByName<LuaScript>("ScriptB");
+            auto scriptA = m_logicEngine.findByName<LuaScript>("ScriptA");
 
             auto scriptAInput = scriptA->getInputs()->getChild("input");
             auto scriptAOutput = scriptA->getOutputs()->getChild("output");
@@ -1318,6 +1342,15 @@ namespace rlogic
             auto scriptC_fromA = scriptC->getInputs()->getChild("fromA");
             auto scriptC_fromB = scriptC->getInputs()->getChild("fromB");
             auto scriptC_concatenate_AB = scriptC->getOutputs()->getChild("concatenate_AB");
+
+            // Internal check that deserialization did not result in more link copies
+            EXPECT_EQ(scriptBInput->m_impl->getLinkedIncomingProperty(), scriptAOutput->m_impl.get());
+            EXPECT_EQ(scriptC_fromA->m_impl->getLinkedIncomingProperty(), scriptAOutput->m_impl.get());
+            EXPECT_EQ(scriptC_fromB->m_impl->getLinkedIncomingProperty(), scriptBOutput->m_impl.get());
+            EXPECT_THAT(scriptAOutput->m_impl->getLinkedOutgoingProperties(), ::testing::UnorderedElementsAreArray({ scriptBInput->m_impl.get(), scriptC_fromA->m_impl.get() }));
+            EXPECT_EQ(scriptBOutput->m_impl->getLinkedOutgoingProperties().size(), 1u);
+            EXPECT_EQ(scriptBOutput->m_impl->getLinkedOutgoingProperties()[0], scriptC_fromB->m_impl.get());
+            EXPECT_TRUE(scriptC_concatenate_AB->m_impl->getLinkedOutgoingProperties().empty());
 
             // Before update, values should be still as before saving
             EXPECT_EQ(std::string("forward 'From A'"), *scriptAOutput->get<std::string>());
@@ -1406,13 +1439,9 @@ namespace rlogic
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("nested_links.bin"));
 
-            // Internal check that deserialization did not result in more link copies
-            const auto& links = m_logicEngine.m_impl->getApiObjects().getLogicNodeDependencies().getLinks();
-            EXPECT_EQ(links.size(), 3u);
-
             // Load all scripts and their properties
-            auto scriptA = m_logicEngine.findScript("ScriptA");
-            auto scriptB = m_logicEngine.findScript("ScriptB");
+            auto scriptA = m_logicEngine.findByName<LuaScript>("ScriptA");
+            auto scriptB = m_logicEngine.findByName<LuaScript>("ScriptB");
 
             auto scriptAOutput = scriptA->getOutputs()->getChild("output");
             auto scriptAnested_str1 = scriptA->getOutputs()->getChild("nested")->getChild("str1");
@@ -1422,6 +1451,17 @@ namespace rlogic
             auto scriptBnested_str1 = scriptB->getInputs()->getChild("nested")->getChild("str1");
             auto scriptBnested_str2 = scriptB->getInputs()->getChild("nested")->getChild("str2");
             auto scriptB_concatenated = scriptB->getOutputs()->getChild("concat_all");
+
+            // Internal check that deserialization did not result in more link copies
+            EXPECT_EQ(scriptBnested_str1->m_impl->getLinkedIncomingProperty(), scriptAOutput->m_impl.get());
+            EXPECT_EQ(scriptBInput->m_impl->getLinkedIncomingProperty(), scriptAnested_str1->m_impl.get());
+            EXPECT_EQ(scriptBnested_str2->m_impl->getLinkedIncomingProperty(), scriptAnested_str2->m_impl.get());
+            EXPECT_EQ(scriptAOutput->m_impl->getLinkedOutgoingProperties().size(), 1u);
+            EXPECT_EQ(scriptAnested_str1->m_impl->getLinkedOutgoingProperties().size(), 1u);
+            EXPECT_EQ(scriptAnested_str2->m_impl->getLinkedOutgoingProperties().size(), 1u);
+            EXPECT_EQ(scriptAOutput->m_impl->getLinkedOutgoingProperties()[0], scriptBnested_str1->m_impl.get());
+            EXPECT_EQ(scriptAnested_str1->m_impl->getLinkedOutgoingProperties()[0], scriptBInput->m_impl.get());
+            EXPECT_EQ(scriptAnested_str2->m_impl->getLinkedOutgoingProperties()[0], scriptBnested_str2->m_impl.get());
 
             // Before update, values should be still as before saving
             EXPECT_EQ(std::string("foo"), *scriptAOutput->get<std::string>());
@@ -1605,8 +1645,8 @@ namespace rlogic
             ExpectValues(*ramsesNode1, ENodePropertyStaticIndex::Translation, { 0.0f, 0.0f, 0.0f });
             EXPECT_EQ(ramsesNode1->getVisibility(), ramses::EVisibilityMode::Visible);
 
-            auto nodeBinding1 = m_logicEngine.findNodeBinding("NodeBinding1");
-            auto nodeBinding2 = m_logicEngine.findNodeBinding("NodeBinding2");
+            auto nodeBinding1 = m_logicEngine.findByName<RamsesNodeBinding>("NodeBinding1");
+            auto nodeBinding2 = m_logicEngine.findByName<RamsesNodeBinding>("NodeBinding2");
 
             auto binding1TranslationInput = nodeBinding1->getInputs()->getChild("translation");
             auto binding2RotationInput = nodeBinding2->getInputs()->getChild("rotation");
@@ -1702,8 +1742,8 @@ namespace rlogic
             ExpectVec3f(appearance2, "uniform1", { 0.0f, 0.0f, 0.0f });
             ExpectVec3f(appearance2, "uniform2", { 0.0f, 0.0f, 0.0f });
 
-            auto appBinding1 = m_logicEngine.findAppearanceBinding("AppBinding1");
-            auto appBinding2 = m_logicEngine.findAppearanceBinding("AppBinding2");
+            auto appBinding1 = m_logicEngine.findByName<RamsesAppearanceBinding>("AppBinding1");
+            auto appBinding2 = m_logicEngine.findByName<RamsesAppearanceBinding>("AppBinding2");
 
             auto binding1uniform1 = appBinding1->getInputs()->getChild("uniform1");
             auto binding1uniform2 = appBinding1->getInputs()->getChild("uniform2");
@@ -1787,8 +1827,8 @@ namespace rlogic
             EXPECT_EQ(camera2->getViewportX(), 0);
             EXPECT_EQ(camera2->getFarPlane(), .2f);
 
-            auto cameraBinding1 = m_logicEngine.findCameraBinding("CameraBinding1");
-            auto cameraBinding2 = m_logicEngine.findCameraBinding("CameraBinding2");
+            auto cameraBinding1 = m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding1");
+            auto cameraBinding2 = m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding2");
 
             auto binding1cameraProperty1 = cameraBinding1->getInputs()->getChild("viewport")->getChild("offsetX");
             auto binding1cameraProperty2 = cameraBinding1->getInputs()->getChild("frustum")->getChild("farPlane");
@@ -1855,7 +1895,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.isLinked(*targetBinding));
     }
 
-    TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinking)
+    TEST_F(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinking)
     {
         auto        scriptSource = R"(
             function interface()
@@ -1879,11 +1919,11 @@ namespace rlogic
 
         m_logicEngine.link(*output, *input);
 
-        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_TRUE(sourceScript->m_impl.isDirty());
         EXPECT_TRUE(targetBinding->m_impl.isDirty());
     }
 
-    TEST_F(ALogicEngine_Linking, SetsTargetNodeToDirtyAfterLinkingWithStructs)
+    TEST_F(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinkingWithStructs)
     {
         auto scriptSource = R"(
             function interface()
@@ -1911,7 +1951,7 @@ namespace rlogic
 
         m_logicEngine.link(*output, *input);
 
-        EXPECT_FALSE(sourceScript->m_impl.isDirty());
+        EXPECT_TRUE(sourceScript->m_impl.isDirty());
         EXPECT_TRUE(targetScript->m_impl.isDirty());
     }
 

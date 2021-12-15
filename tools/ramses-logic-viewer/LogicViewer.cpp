@@ -143,11 +143,11 @@ namespace rlogic
             &LogicWrapper::views,
             ltnScreenshot,
             [&](const std::string& screenshotFile) {
-                m_logicEngine.update();
+                updateEngine();
                 return m_screenshotFunc(screenshotFile);
             },
             ltnUpdate,
-            [&]() { m_logicEngine.update(); },
+            [&]() { updateEngine(); },
             ltnLink,
             [&](const ConstPropertyWrapper& src, const PropertyWrapper& target) { return m_logicEngine.link(src.m_property, target.m_property); },
             ltnUnlink,
@@ -179,7 +179,7 @@ namespace rlogic
 
     LogicViewer::Result LogicViewer::update()
     {
-        m_logicEngine.update();
+        updateEngine();
         // don't update if there's already an error
         if (m_result.ok())
         {
@@ -226,6 +226,15 @@ namespace rlogic
     {
         sol::optional<sol::table> tbl = m_sol[ltnModule][ltnViews][viewId];
         return View(std::move(tbl));
+    }
+
+    void LogicViewer::updateEngine()
+    {
+        m_logicEngine.update();
+        if (m_updateReportEnabled)
+        {
+            m_updateReportSummary.add(m_logicEngine.getLastUpdateReport());
+        }
     }
 }
 

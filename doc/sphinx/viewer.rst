@@ -90,7 +90,8 @@ The module ``rlogic`` provides members to access all Logic Node types:
 * ``rlogic.appearanceBindings`` (:cpp:class:`rlogic::RamsesAppearanceBinding`)
 * ``rlogic.cameraBindings`` (:cpp:class:`rlogic::RamsesCameraBinding`)
 
-The Logic Node instances can be either found by name or iterated.
+The Logic Node instances can be either found by name or by object id.
+Alternatively the node list can be iterated.
 
 Example:
 
@@ -99,11 +100,20 @@ Example:
     -- returns the LuaScript node with the name `foo` or nil if it does not exist
     rlogic.scripts.foo
 
+    -- returns the LuaScript node with the object id `42` or nil if it does not exist
+    rlogic.scripts[42]
+
+    -- returns the LuaScript node with the name `name with spaces` or nil if it does not exist
+    rlogic.scripts["name with spaces"]
+
     -- iterates through all LuaScript instances
     for script in rlogic.scripts() do
         print(script)
     end
 
+.. note::
+    Ramses Logic does not guarantee unique names.
+    Also empty names are possible.
 
 --------------------------------------------------
 Logic Properties

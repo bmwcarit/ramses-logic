@@ -14,11 +14,11 @@ namespace rlogic_serialization;
 table LuaScript
 {
     name:string;
-    filename:string; // TODO VersionBreak remove filename, it's obsolete
+    id:uint64;
     luaSourceCode:string;
+    userModules:[LuaModuleUsage];
+    standardModules:[uint8];
     // These are cached because they hold the property values
     rootInput:Property;
     rootOutput:Property;
-    dependencies:[LuaModuleUsage];
-    standardModules:[uint8];
 }

@@ -33,7 +33,9 @@ namespace rlogic
             end
         )", propertyCount);
 
-        LuaScript* script = logicEngine.createLuaScript(scriptSrc);
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Base);
+        LuaScript* script = logicEngine.createLuaScript(scriptSrc, config);
         Property* property = script->getInputs()->getChild("param0");
         // Need different value, otherwise triggers internal caching (can't disable value check)
         int32_t increasingValue = 0;

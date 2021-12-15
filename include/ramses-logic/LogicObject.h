@@ -40,6 +40,14 @@ namespace rlogic
         RLOGIC_API void setName(std::string_view name);
 
         /**
+        * Returns the id of this object. Every object gets a unique, immutable id assigned on object creation.
+        * The id is serialized and thus persisted on load.
+        *
+        * @return the id of this object
+        */
+        RLOGIC_API uint64_t getId() const;
+
+        /**
         * Casts this object to given type.
         * Has same behavior as \c dynamic_cast, will return nullptr (without error) if given type does not match this object.
         *

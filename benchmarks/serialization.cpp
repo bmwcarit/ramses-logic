@@ -11,6 +11,7 @@
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
+#include "ramses-logic/Logger.h"
 
 #include "fmt/format.h"
 #include <fstream>
@@ -19,6 +20,8 @@ namespace rlogic
 {
     static std::vector<char> CreateLargeLogicEngineBuffer(std::string_view fileName, int64_t scriptCount)
     {
+        Logger::SetLogVerbosityLimit(ELogMessageType::Off);
+
         LogicEngine logicEngine;
 
         const std::string scriptSrc = R"(
@@ -32,10 +35,13 @@ namespace rlogic
             end
         )";
 
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Base);
+
         std::vector<LuaScript*> scripts(scriptCount);
         for (int64_t i = 0; i < scriptCount; ++i)
         {
-            scripts[i] = logicEngine.createLuaScript(scriptSrc);
+            scripts[i] = logicEngine.createLuaScript(scriptSrc, config);
 
             if (i >= 1)
             {
@@ -60,6 +66,8 @@ namespace rlogic
 
     static void BM_LoadFromBuffer_WithVerifier(benchmark::State& state)
     {
+        Logger::SetLogVerbosityLimit(ELogMessageType::Off);
+
         const int64_t scriptCount = state.range(0);
 
         const std::vector<char> buffer = CreateLargeLogicEngineBuffer("largeFile.bin", scriptCount);
@@ -76,6 +84,8 @@ namespace rlogic
 
     static void BM_LoadFromBuffer_WithoutVerifier(benchmark::State& state)
     {
+        Logger::SetLogVerbosityLimit(ELogMessageType::Off);
+
         const int64_t scriptCount = state.range(0);
 
         const std::vector<char> buffer = CreateLargeLogicEngineBuffer("largeFile.bin", scriptCount);

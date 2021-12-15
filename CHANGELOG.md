@@ -1,5 +1,58 @@
 # master
 
+# v0.13.0
+
+Summary:
+* Major performance improvement for large scenes with lots of links alongside few bugfixes
+* New Ramses (27.0.114)
+* Not backwards compatible
+    * binary files need re-export
+
+**API Changes**
+
+* Removed LuaScript::overrideLuaPrint
+    * Logic engine has better means for debugging since this was introduced
+    * Overriding built-in Lua print was a security threat and also violated sandboxing
+    * If you still want to get string data out of scripts, just create a string property and read it out
+* Can't modify module data any more (this was a technical debt which was fixed in this release)
+* Added a built-in methods to make it easier to work with custom types from C++
+    * 'rl_len' to get the size of ramses logic built-in types and modules from inside Lua
+    * 'rl_next' to create and increment stateless iterators for custom types similar to standard next()
+    * 'rl_pairs' and 'rl_ipairs' to iterate custom types similar to standard pairs() and ipairs()
+    * See the [Lua docs](https://ramses-logic.readthedocs.io/en/latest/lua_syntax.html#custom-functions) for more info
+* Added unique (in the scope of one Logic Engine) and immutable Logic Object Id that will be automatically assigned on object creation.
+    *Object Ids start at 1 and are counted upwards for new objects.
+* Added convenience method LogicEngine::findLogicObjectById(id) to find object with id regardless of its type
+* Added LogicEngineReport, LogicEngine::enableUpdateReport, LogicEngine::getLastUpdateReport which collects statistics about updated nodes.
+* Added PropertyEnumToType traits to be able to obtain a C++ data type of a property (inverse of EPropertyTypeToEnum)
+* Added TimerNode which is a new logic node to handle timing information for AnimationNode and scripts
+* All LogicEngine collection getters and finders were replaced with templated versions:
+    * LogicEngine::scripts() -> LogicEngine::getCollection<LuaScript>
+      LogicEngine::ramsesNodeBindings() -> LogicEngine::getCollection<RamsesNodeBinding>()
+      ...
+    * LogicEngine::findScript(name) -> LogicEngine::findByName<LuaScript>(name)
+      LogicEngine::findNodeBinding(name) -> LogicEngine::findByName<RamsesNodeBinding>(name)
+      ...
+
+**Features**
+
+* Added EPropertyType::Int64 (INT64 in Lua) property type to represent 64bit signed integer in logic network
+    * Also added INT32 Lua interface property which is equivalent to INT (INT is kept and act as alias for INT32)
+* Animation begin and end can be modified by setting AnimationNode 'timeRange' input property.
+* Added Update Report (statistics about updated nodes) to ramses-logic-viewer
+* Large scenes with many links now don't cause unnecessary CPU usage when input data didn't change
+* Link updates are generally faster after major rework of link handling
+
+**Bugfixes**
+
+* Fixed bug where ramses bindings re-applied their values to ramses when linked, even though the value didn't change
+* It's now possible to access array elements by index in interface()
+* Improved error messages when converting numeric types. Errors now contain info why the conversion failed,
+  i.e. because of numeric rounding, silent truncation, negative numbers etc.. Also works for arrays and VECx types
+* Fixed bug in the viewer program where default settings were not exported correctly
+* Property::isLinked() works for outputs too, not just inputs
+* Linking/unlinking errors contain more useful information
+
 # v0.12.0
 
 **API Changes**

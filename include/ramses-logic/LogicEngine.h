@@ -15,6 +15,7 @@
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/ERotationType.h"
+#include "ramses-logic/LogicEngineReport.h"
 
 #include <vector>
 #include <string_view>
@@ -43,6 +44,7 @@ namespace rlogic
     class RamsesCameraBinding;
     class DataArray;
     class AnimationNode;
+    class TimerNode;
 
     /**
     * Central object which creates and manages the lifecycle and execution
@@ -67,144 +69,43 @@ namespace rlogic
         RLOGIC_API ~LogicEngine() noexcept;
 
         /**
-         * Returns an iterable #rlogic::Collection of all #rlogic::LogicObject instances created by this #LogicEngine.
-         *
-         * @return an iterable #rlogic::Collection with all #rlogic::LogicObject instances created by this #LogicEngine
-         */
-        [[nodiscard]] RLOGIC_API Collection<LogicObject> logicObjects() const;
-
-        /**
-         * Returns an iterable #rlogic::Collection of all #rlogic::LuaScript instances created by this #LogicEngine.
-         *
-         * @return an iterable #rlogic::Collection with all #rlogic::LuaScript instances created by this #LogicEngine
-         */
-        [[nodiscard]] RLOGIC_API Collection<LuaScript> scripts() const;
-
-        /**
-        * Returns an iterable #rlogic::Collection of all #rlogic::LuaModule instances created by this #LogicEngine.
+        * Returns an iterable #rlogic::Collection of all instances of \c T created by this #LogicEngine.
+        * \c T must be a concrete logic object type (e.g. #rlogic::LuaScript) or #rlogic::LogicObject which will retrieve
+        * all logic objects created with this #LogicEngine (see #rlogic::LogicObject::as<Type> to convert to concrete type).
         *
-        * @return an iterable #rlogic::Collection with all #rlogic::LuaModule instances created by this #LogicEngine
+        * @return an iterable #rlogic::Collection with all instances of \c T created by this #LogicEngine
         */
-        [[nodiscard]] RLOGIC_API Collection<LuaModule> luaModules() const;
+        template <typename T>
+        [[nodiscard]] Collection<T> getCollection() const;
 
         /**
-         * Returns an iterable #rlogic::Collection of all #rlogic::RamsesNodeBinding instances created by this #LogicEngine.
-         *
-         * @return an iterable #rlogic::Collection with all #rlogic::RamsesNodeBinding instances created by this #LogicEngine
-         */
-        [[nodiscard]] RLOGIC_API Collection<RamsesNodeBinding> ramsesNodeBindings() const;
-
-        /**
-         * Returns an iterable #rlogic::Collection of all #rlogic::RamsesAppearanceBinding instances created by this LogicEngine.
-         *
-         * @return an iterable #rlogic::Collection with all #rlogic::RamsesAppearanceBinding created by this #LogicEngine
-         */
-        [[nodiscard]] RLOGIC_API Collection<RamsesAppearanceBinding> ramsesAppearanceBindings() const;
-
-        /**
-         * Returns an iterable #rlogic::Collection of all #rlogic::RamsesCameraBinding instances created by this LogicEngine.
-         *
-         * @return an iterable #rlogic::Collection with all #rlogic::RamsesCameraBinding created by this #LogicEngine
-         */
-        [[nodiscard]] RLOGIC_API Collection<RamsesCameraBinding> ramsesCameraBindings() const;
-
-        /**
-        * Returns an iterable #rlogic::Collection of all #rlogic::DataArray instances created by this LogicEngine.
+        * Returns a pointer to the first occurrence of an object with a given \p name of the type \c T.
+        * \c T must be a concrete logic object type (e.g. #rlogic::LuaScript) or #rlogic::LogicObject which will search
+        * any object with given name regardless of its type (see #rlogic::LogicObject::as<Type> to convert to concrete type).
         *
-        * @return an iterable #rlogic::Collection with all #rlogic::DataArray created by this #LogicEngine
+        * @param name the name of the logic object to search for
+        * @return a pointer to the logic object, or nullptr if none was found
         */
-        [[nodiscard]] RLOGIC_API Collection<DataArray> dataArrays() const;
+        template <typename T>
+        [[nodiscard]] const T* findByName(std::string_view name) const;
+
+        /** @copydoc findByName(std::string_view) const */
+        template <typename T>
+        [[nodiscard]] T* findByName(std::string_view name);
 
         /**
-        * Returns an iterable #rlogic::Collection of all #rlogic::AnimationNode instances created by this LogicEngine.
+        * Returns a pointer to the first occurrence of an object with a given \p id regardless of its type.
+        * To convert the object to a concrete type (e.g. LuaScript) use #rlogic::LogicObject::as<Type>() e.g.:
+        *   auto myLuaScript = logicEngine.findLogicObjectById(1u)->as<LuaScript>());
+        * Be aware that this function behaves as \c dynamic_cast and will return nullptr (without error) if
+        * given type doesn't match the objects type. This can later lead to crash if ignored.
         *
-        * @return an iterable #rlogic::Collection with all #rlogic::AnimationNode created by this #LogicEngine
+        * @param id the id of the logic object to search for
+        * @return a pointer to the logic object, or nullptr if none was found
         */
-        [[nodiscard]] RLOGIC_API Collection<AnimationNode> animationNodes() const;
-
-        /**
-         * Returns a pointer to the first occurrence of an object with a given \p name regardless of its type.
-         * To convert the object to a concrete type (e.g. LuaScript) use #rlogic::LogicObject::as<Type>() e.g.:
-         *   auto myLuaScript = logicEngine.findLogicObject("myLuaScript")->as<LuaScript>());
-         * Be aware that this function behaves as \c dynamic_cast and will return nullptr (without error) if
-         * given type doesn't match the objects type. This can later lead to crash if ignored.
-         *
-         * @param name the name of the logic object to search for
-         * @return a pointer to the logic object, or nullptr if none was found
-         */
-        [[nodiscard]] RLOGIC_API const LogicObject* findLogicObject(std::string_view name) const;
-        /// @copydoc findLogicObject(std::string_view) const
-        [[nodiscard]] RLOGIC_API LogicObject* findLogicObject(std::string_view name);
-
-        /**
-         * Returns a pointer to the first occurrence of a script with a given \p name if such exists, and nullptr otherwise.
-         *
-         * @param name the name of the script to search for
-         * @return a pointer to the script, or nullptr if none was found
-         */
-        [[nodiscard]] RLOGIC_API const LuaScript* findScript(std::string_view name) const;
-        /// @copydoc findScript(std::string_view) const
-        [[nodiscard]] RLOGIC_API LuaScript* findScript(std::string_view name);
-
-        /**
-        * Returns a pointer to the first occurrence of a #rlogic::LuaModule with a given \p name if such exists, and nullptr otherwise.
-        *
-        * @param name the name of the module to search for
-        * @return a pointer to the script, or nullptr if none was found
-        */
-        [[nodiscard]] RLOGIC_API const LuaModule* findLuaModule(std::string_view name) const;
-        /// @copydoc findScript(std::string_view) const
-        [[nodiscard]] RLOGIC_API LuaModule* findLuaModule(std::string_view name);
-
-        /**
-         * Returns a pointer to the first occurrence of a node binding with a given \p name if such exists, and nullptr otherwise.
-         *
-         * @param name the name of the node binding to search for
-         * @return a pointer to the node binding, or nullptr if none was found
-         */
-        [[nodiscard]] RLOGIC_API const RamsesNodeBinding* findNodeBinding(std::string_view name) const;
-        /// @copydoc findNodeBinding(std::string_view) const
-        [[nodiscard]] RLOGIC_API RamsesNodeBinding* findNodeBinding(std::string_view name);
-
-        /**
-         * Returns a pointer to the first occurrence of an appearance binding with a given \p name if such exists, and nullptr otherwise.
-         *
-         * @param name the name of the appearance binding to search for
-         * @return a pointer to the appearance binding, or nullptr if none was found
-         */
-        [[nodiscard]] RLOGIC_API const RamsesAppearanceBinding* findAppearanceBinding(std::string_view name) const;
-        /// @copydoc findAppearanceBinding(std::string_view) const
-        [[nodiscard]] RLOGIC_API RamsesAppearanceBinding* findAppearanceBinding(std::string_view name);
-
-        /**
-         * Returns a pointer to the first occurrence of a camera binding with a given \p name if such exists, and nullptr otherwise.
-         *
-         * @param name the name of the camera binding to search for
-         * @return a pointer to the camera binding, or nullptr if none was found
-         */
-        [[nodiscard]] RLOGIC_API const RamsesCameraBinding* findCameraBinding(std::string_view name) const;
-        /// @copydoc findCameraBinding(std::string_view) const
-        [[nodiscard]] RLOGIC_API RamsesCameraBinding* findCameraBinding(std::string_view name);
-
-        /**
-        * Returns a pointer to the first occurrence of a #rlogic::DataArray with a given \p name if such exists, and nullptr otherwise.
-        *
-        * @param name the name of the #rlogic::DataArray to search for
-        * @return a pointer to the #rlogic::DataArray, or nullptr if none was found
-        */
-        [[nodiscard]] RLOGIC_API const DataArray* findDataArray(std::string_view name) const;
-        /// @copydoc findDataArray(std::string_view) const
-        [[nodiscard]] RLOGIC_API DataArray* findDataArray(std::string_view name);
-
-        /**
-        * Returns a pointer to the first occurrence of an #rlogic::AnimationNode with a given \p name if such exists, and nullptr otherwise.
-        *
-        * @param name the name of the #rlogic::AnimationNode to search for
-        * @return a pointer to the #rlogic::AnimationNode, or nullptr if none was found
-        */
-        [[nodiscard]] RLOGIC_API const AnimationNode* findAnimationNode(std::string_view name) const;
-        /// @copydoc findAnimationNode(std::string_view) const
-        [[nodiscard]] RLOGIC_API AnimationNode* findAnimationNode(std::string_view name);
+        [[nodiscard]] RLOGIC_API const LogicObject* findLogicObjectById(uint64_t id) const;
+        /// @copydoc findLogicObjectById(uint64_t id) const
+        [[nodiscard]] RLOGIC_API LogicObject* findLogicObjectById(uint64_t id);
 
         /**
         * Creates a new Lua script from a source string. Refer to the #rlogic::LuaScript class
@@ -360,6 +261,18 @@ namespace rlogic
         RLOGIC_API AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name = "");
 
         /**
+        * Creates a new #rlogic::TimerNode for generate and/or propagate timing information.
+        * Refer to #rlogic::TimerNode for more information about its use.
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param name a name for the the new #rlogic::TimerNode.
+        * @return a pointer to the created object or nullptr if
+        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+        */
+        RLOGIC_API TimerNode* createTimerNode(std::string_view name = "");
+
+        /**
          * Updates all #rlogic::LogicNode's which were created by this #LogicEngine instance.
          * The order in which #rlogic::LogicNode's are executed is determined by the links created
          * between them (see #link and #unlink). #rlogic::LogicNode's which don't have any links
@@ -375,6 +288,29 @@ namespace rlogic
          * In case of an error, use #getErrors() to obtain errors.
          */
         RLOGIC_API bool update();
+
+        /**
+        * Enables collecting of statistics during call to #update which can be obtained using #getLastUpdateReport.
+        * Once enabled every subsequent call to #update will be instructed to collect various statistical data
+        * which can be useful for profiling and optimizing the network of logic nodes.
+        * Note that when enabled there is a slight performance overhead to collect the data, it is recommended
+        * to use this only during a development phase.
+        *
+        * @param enable true or false to enable or disable update reports.
+        */
+        RLOGIC_API void enableUpdateReport(bool enable);
+
+        /**
+        * Returns collection of statistics from last call to #update if reporting is enabled (#enableUpdateReport).
+        * The report contains lists of logic nodes that were executed and not executed and other useful data collected
+        * during last #update. See #rlogic::LogicEngineReport for details.
+        * The report data is generated only if previously enabled using #enableUpdateReport and is empty otherwise.
+        * The data is only relevant for the last #update and is overwritten during next #update.
+        * Note that if #update fails the report contents are undefined.
+        *
+        * @return collected statistics from last #update.
+        */
+        [[nodiscard]] RLOGIC_API LogicEngineReport getLastUpdateReport() const;
 
         /**
          * Links a property of a #rlogic::LogicNode to another #rlogic::Property of another #rlogic::LogicNode.
@@ -562,6 +498,29 @@ namespace rlogic
 
     private:
         /**
+        * Internal implementation of collection getter
+        * @return collection of objects
+        */
+        template <typename T>
+        RLOGIC_API Collection<T> getLogicObjectsInternal() const;
+
+        /**
+        * Internal implementation of object finder
+        * @param name object name
+        * @return found object
+        */
+        template <typename T>
+        RLOGIC_API const T* findLogicObjectInternal(std::string_view name) const;
+
+        /**
+        * Internal implementation of object finder
+        * @param name object name
+        * @return found object
+        */
+        template <typename T>
+        RLOGIC_API T* findLogicObjectInternal(std::string_view name);
+
+        /**
         * Internal implementation of #createDataArray
         *
         * @param data source data
@@ -570,7 +529,32 @@ namespace rlogic
         */
         template <typename T>
         RLOGIC_API DataArray* createDataArrayInternal(const std::vector<T>& data, std::string_view name);
+
+        /// Internal static helper to validate type
+        template <typename T>
+        static void StaticTypeCheck();
     };
+
+    template <typename T>
+    Collection<T> LogicEngine::getCollection() const
+    {
+        StaticTypeCheck<T>();
+        return getLogicObjectsInternal<T>();
+    }
+
+    template <typename T>
+    const T* LogicEngine::findByName(std::string_view name) const
+    {
+        StaticTypeCheck<T>();
+        return findLogicObjectInternal<T>(name);
+    }
+
+    template <typename T>
+    T* LogicEngine::findByName(std::string_view name)
+    {
+        StaticTypeCheck<T>();
+        return findLogicObjectInternal<T>(name);
+    }
 
     template <typename T>
     DataArray* LogicEngine::createDataArray(const std::vector<T>& data, std::string_view name)
@@ -578,5 +562,21 @@ namespace rlogic
         static_assert(IsPrimitiveProperty<T>::value && CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE),
             "Unsupported data type, see createDataArray API doc to see supported types.");
         return createDataArrayInternal<T>(data, name);
+    }
+
+    template <typename T>
+    void LogicEngine::StaticTypeCheck()
+    {
+        static_assert(
+            std::is_same_v<T, LogicObject> ||
+            std::is_same_v<T, LuaScript> ||
+            std::is_same_v<T, LuaModule> ||
+            std::is_same_v<T, RamsesNodeBinding> ||
+            std::is_same_v<T, RamsesAppearanceBinding> ||
+            std::is_same_v<T, RamsesCameraBinding> ||
+            std::is_same_v<T, DataArray> ||
+            std::is_same_v<T, AnimationNode> ||
+            std::is_same_v<T, TimerNode>,
+            "Attempting to retrieve invalid type of object.");
     }
 }

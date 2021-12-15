@@ -23,8 +23,8 @@
 
 namespace rlogic::internal
 {
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
-        : RamsesBindingImpl(name)
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name, uint64_t id)
+        : RamsesBindingImpl(name, id)
         , m_ramsesNode(ramsesNode)
         , m_rotationType(rotationType)
     {
@@ -51,6 +51,7 @@ namespace rlogic::internal
 
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
             builder.CreateString(nodeBinding.getName()),
+            nodeBinding.getId(),
             ramsesReference,
             // TODO Violin don't serialize inputs - it's better to re-create them on the fly, they are uniquely defined and don't need serialization
             PropertyImpl::Serialize(*nodeBinding.getInputs()->m_impl, builder, serializationMap));
@@ -74,6 +75,12 @@ namespace rlogic::internal
         if (!nodeBinding.base())
         {
             errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing base class info!", nullptr);
+            return nullptr;
+        }
+
+        if (nodeBinding.base()->id() == 0u)
+        {
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing id!", nullptr);
             return nullptr;
         }
 
@@ -130,7 +137,7 @@ namespace rlogic::internal
 
         const auto rotationType (static_cast<ERotationType>(nodeBinding.rotationType()));
 
-        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name);
+        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name, nodeBinding.base()->id());
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         ApplyRamsesValuesToInputProperties(*binding, *ramsesNode);
@@ -223,19 +230,19 @@ namespace rlogic::internal
     void RamsesNodeBindingImpl::ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode)
     {
         const bool visible = (ramsesNode.getVisibility() == ramses::EVisibilityMode::Visible);
-        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->setValue( PropertyValue{ visible }, false);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->initializeBindingInputValue(PropertyValue{ visible });
 
         vec3f translationValue;
         ramsesNode.getTranslation(translationValue[0], translationValue[1], translationValue[2]);
-        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl->setValue( PropertyValue{ translationValue }, false);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Translation))->m_impl->initializeBindingInputValue(PropertyValue{ translationValue });
 
         vec3f scalingValue;
         ramsesNode.getScaling(scalingValue[0], scalingValue[1], scalingValue[2]);
-        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->setValue( PropertyValue{ scalingValue }, false);
+        binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Scaling))->m_impl->initializeBindingInputValue(PropertyValue{ scalingValue });
 
         if (binding.m_rotationType == ERotationType::Quaternion)
         {
-            binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->setValue(vec4f{0.f, 0.f, 0.f, 1.f}, false);
+            binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->initializeBindingInputValue(vec4f{0.f, 0.f, 0.f, 1.f});
         }
         else
         {
@@ -250,7 +257,7 @@ namespace rlogic::internal
             }
             else
             {
-                binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->setValue(PropertyValue{ rotationValue }, false);
+                binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Rotation))->m_impl->initializeBindingInputValue(PropertyValue{ rotationValue });
             }
         }
     }

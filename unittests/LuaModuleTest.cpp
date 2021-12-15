@@ -15,6 +15,12 @@
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LuaModule.h"
 #include "impl/LuaModuleImpl.h"
+#include "internals/ErrorReporting.h"
+#include "internals/SolState.h"
+#include "internals/DeserializationMap.h"
+
+#include "generated/LuaModuleGen.h"
+
 #include <fstream>
 
 namespace rlogic::internal
@@ -50,6 +56,7 @@ namespace rlogic::internal
         const auto module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "mymodule");
         ASSERT_NE(nullptr, module);
         EXPECT_EQ("mymodule", module->getName());
+        EXPECT_EQ(module->getId(), 1u);
     }
 
     TEST_F(ALuaModule, ChangesName)
@@ -59,7 +66,7 @@ namespace rlogic::internal
 
         module->setName("mm");
         EXPECT_EQ("mm", module->getName());
-        EXPECT_EQ(module, this->m_logicEngine.findLuaModule("mm"));
+        EXPECT_EQ(module, this->m_logicEngine.findByName<LuaModule>("mm"));
         EXPECT_TRUE(this->m_logicEngine.getErrors().empty());
     }
 
@@ -103,10 +110,98 @@ namespace rlogic::internal
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("module.tmp"));
-        const auto module = m_logicEngine.findLuaModule("mymodule");
+        const auto module = m_logicEngine.findByName<LuaModule>("mymodule");
         ASSERT_NE(nullptr, module);
         EXPECT_EQ("mymodule", module->getName());
+        EXPECT_EQ(module->getId(), 1u);
         EXPECT_EQ(m_moduleSourceCode, module->m_impl.getSourceCode());
+    }
+
+    class ALuaModule_SerializationLifecycle : public ALuaModule
+    {
+    protected:
+        SolState                                        m_solState;
+        ErrorReporting                                  m_errorReporting;
+        flatbuffers::FlatBufferBuilder                  m_flatBufferBuilder;
+        DeserializationMap                              m_deserializationMap;
+    };
+
+    TEST_F(ALuaModule_SerializationLifecycle, ProducesErrorWhenNameMissing)
+    {
+        {
+            auto module = rlogic_serialization::CreateLuaModule(
+                m_flatBufferBuilder,
+                0 // no name
+            );
+            m_flatBufferBuilder.Finish(module);
+        }
+
+        const auto&                    serialized   = *flatbuffers::GetRoot<rlogic_serialization::LuaModule>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaModuleImpl> deserialized = LuaModuleImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing name!");
+    }
+
+    TEST_F(ALuaModule_SerializationLifecycle, ProducesErrorWhenIdMissing)
+    {
+        {
+            auto module = rlogic_serialization::CreateLuaModule(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                0 // no id
+            );
+            m_flatBufferBuilder.Finish(module);
+        }
+
+        const auto&                    serialized   = *flatbuffers::GetRoot<rlogic_serialization::LuaModule>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaModuleImpl> deserialized = LuaModuleImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing id!");
+    }
+
+    TEST_F(ALuaModule_SerializationLifecycle, ProducesErrorWhenLuaSourceCodeMissing)
+    {
+        {
+            auto module = rlogic_serialization::CreateLuaModule(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                1u,
+                0 // no source code
+            );
+            m_flatBufferBuilder.Finish(module);
+        }
+
+        const auto&                    serialized   = *flatbuffers::GetRoot<rlogic_serialization::LuaModule>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaModuleImpl> deserialized = LuaModuleImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing source code!");
+    }
+
+    TEST_F(ALuaModule_SerializationLifecycle, ProducesErrorWhenDependenciesMissing)
+    {
+        {
+            auto module = rlogic_serialization::CreateLuaModule(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                1u,
+                m_flatBufferBuilder.CreateString(m_moduleSourceCode),
+                0 // no source code
+            );
+            m_flatBufferBuilder.Finish(module);
+        }
+
+        const auto&                    serialized   = *flatbuffers::GetRoot<rlogic_serialization::LuaModule>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaModuleImpl> deserialized = LuaModuleImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing dependencies!");
     }
 
     class ALuaModuleWithDependency : public ALuaModule
@@ -135,6 +230,7 @@ namespace rlogic::internal
         const auto quadsMod = m_logicEngine.createLuaModule(m_quadsSrc, createDeps({{"mymath", m_mathSrc}}), "quadsMod");
         ASSERT_NE(nullptr, quadsMod);
         EXPECT_EQ("quadsMod", quadsMod->getName());
+        EXPECT_EQ(quadsMod->getId(), 2u); // module dependency has id 1u
     }
 
     TEST_F(ALuaModuleWithDependency, HasTwoDependencies)
@@ -265,10 +361,12 @@ namespace rlogic::internal
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("dep_modules.tmp"));
 
-        const LuaModule* mathMod = m_logicEngine.findLuaModule("mathMod");
-        LuaModule* quadsMod = m_logicEngine.findLuaModule("quadsMod");
+        const LuaModule* mathMod = m_logicEngine.findByName<LuaModule>("mathMod");
+        auto quadsMod = m_logicEngine.findByName<LuaModule>("quadsMod");
         ASSERT_NE(mathMod, nullptr);
         ASSERT_NE(quadsMod, nullptr);
+        EXPECT_EQ(mathMod->getId(), 1u);
+        EXPECT_EQ(quadsMod->getId(), 2u);
 
         EXPECT_THAT(quadsMod->m_impl.getDependencies(), ::testing::ElementsAre(std::pair<std::string, const LuaModule*>({"mymath", mathMod})));
     }

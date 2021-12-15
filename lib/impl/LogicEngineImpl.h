@@ -8,10 +8,12 @@
 
 #pragma once
 
-#include "internals/LogicNodeDependencies.h"
-#include "internals/ErrorReporting.h"
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/AnimationTypes.h"
+#include "ramses-logic/LogicEngineReport.h"
+#include "internals/LogicNodeDependencies.h"
+#include "internals/ErrorReporting.h"
+#include "internals/UpdateReport.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 
@@ -36,6 +38,7 @@ namespace rlogic
     class RamsesCameraBinding;
     class DataArray;
     class AnimationNode;
+    class TimerNode;
     class LuaScript;
     class LuaModule;
     class LogicNode;
@@ -78,10 +81,11 @@ namespace rlogic::internal
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name);
+        TimerNode* createTimerNode(std::string_view name);
 
         bool destroy(LogicObject& object);
 
-        bool update(bool disableDirtyTracking = false);
+        bool update();
         [[nodiscard]] const std::vector<ErrorData>& getErrors() const;
 
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
@@ -95,17 +99,27 @@ namespace rlogic::internal
 
         [[nodiscard]] ApiObjects& getApiObjects();
 
-    private:
-        std::unique_ptr<ApiObjects> m_apiObjects;
-        ErrorReporting m_errors;
+        // for benchmarking purposes only
+        void disableTrackingDirtyNodes();
 
-        void updateLinksRecursive(Property& inputProperty);
+        void enableUpdateReport(bool enable);
+        [[nodiscard]] LogicEngineReport getLastUpdateReport() const;
+
+    private:
+        size_t activateLinksRecursive(PropertyImpl& output);
 
         bool checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
-        [[nodiscard]] bool updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking);
+        [[nodiscard]] bool updateNodes(const NodeVector& nodes);
 
         [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription);
+
+        std::unique_ptr<ApiObjects> m_apiObjects;
+        ErrorReporting m_errors;
+        bool m_nodeDirtyMechanismEnabled = true;
+
+        bool m_updateReportEnabled = false;
+        UpdateReport m_updateReport;
     };
 }

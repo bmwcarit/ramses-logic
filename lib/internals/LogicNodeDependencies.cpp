@@ -24,13 +24,14 @@ namespace rlogic::internal
 
     void LogicNodeDependencies::addNode(LogicNodeImpl& node)
     {
+        assert(!m_logicNodeDAG.containsNode(node));
         m_logicNodeDAG.addNode(node);
         m_nodeTopologyChanged = true;
     }
 
     void LogicNodeDependencies::removeNode(LogicNodeImpl& node)
     {
-        m_logicNodeConnector.unlinkAll(node);
+        assert(m_logicNodeDAG.containsNode(node));
         m_logicNodeDAG.removeNode(node);
 
         // Remove the node from the cache without reordering the rest (unless there is no cache yet)
@@ -43,12 +44,49 @@ namespace rlogic::internal
         }
     }
 
-    bool LogicNodeDependencies::isLinked(const LogicNodeImpl& node) const
+    bool LogicNodeDependencies::isLinked(const LogicNodeImpl& logicNode) const
     {
-        return m_logicNodeConnector.isLinked(node);
+        auto inputs = logicNode.getInputs();
+        if (isLinked(*inputs->m_impl))
+        {
+            return true;
+        }
+
+        const auto outputs = logicNode.getOutputs();
+        if (nullptr != outputs)
+        {
+            return isLinked(*outputs->m_impl);
+        }
+        return false;
     }
 
-    std::optional<NodeVector> LogicNodeDependencies::getTopologicallySortedNodes()
+    bool LogicNodeDependencies::isLinked(PropertyImpl& input) const
+    {
+        const auto inputCount = input.getChildCount();
+        // check if an input of this node is a target of another node
+        for (size_t i = 0; i < inputCount; ++i)
+        {
+            const auto child = input.getChild(i);
+            if (TypeUtils::CanHaveChildren(child->getType()))
+            {
+                if (isLinked(*child->m_impl))
+                {
+                    return true;
+                }
+            }
+            else
+            {
+                assert(TypeUtils::IsPrimitiveType(child->getType()));
+                if (child->m_impl->isLinked())
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    const std::optional<NodeVector>& LogicNodeDependencies::getTopologicallySortedNodes()
     {
         if (m_nodeTopologyChanged)
         {
@@ -57,16 +95,6 @@ namespace rlogic::internal
         }
 
         return m_cachedTopologicallySortedNodes;
-    }
-
-    const PropertyImpl* LogicNodeDependencies::getLinkedOutput(PropertyImpl& inputProperty) const
-    {
-        return m_logicNodeConnector.getLinkedOutput(inputProperty);
-    }
-
-    const LinksMap& LogicNodeDependencies::getLinks() const
-    {
-        return m_logicNodeConnector.getLinks();
     }
 
     bool LogicNodeDependencies::link(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting)
@@ -114,29 +142,28 @@ namespace rlogic::internal
             return false;
         }
 
-        auto& targetNode = input.getLogicNode();
-        auto& node = output.getLogicNode();
-
-        if (!m_logicNodeConnector.link(output, input))
+        const PropertyImpl* linkedIncomingProperty = input.getLinkedIncomingProperty();
+        if (linkedIncomingProperty != nullptr)
         {
-            errorReporting.add(fmt::format("The property '{}' of LogicNode '{}' is already linked to the property '{}' of LogicNode '{}'",
-                output.getName(),
-                node.getName(),
+            errorReporting.add(fmt::format("The property '{}' of LogicNode '{}' is already linked (to property '{}' of LogicNode '{}')",
                 input.getName(),
-                targetNode.getName()
+                input.getLogicNode().getName(),
+                linkedIncomingProperty->getName(),
+                linkedIncomingProperty->getLogicNode().getName()
             ), nullptr);
             return false;
         }
-        input.setIsLinkedInput(true);
 
-        // TODO Violin below code sets two different things to dirty. Try to not have redundant dirty
-        // flags and consolidate dirtiness to one place
-        const bool isNewEdge = m_logicNodeDAG.addEdge(node, targetNode);
+        input.setLinkedOutput(output);
+
+        const bool isNewEdge = m_logicNodeDAG.addEdge(output.getLogicNode(), input.getLogicNode());
         if (isNewEdge)
         {
             m_nodeTopologyChanged = true;
         }
-        targetNode.setDirty(true);
+        // TODO Violin don't set anything dirty here, handle dirtiness purely in update()
+        input.getLogicNode().setDirty(true);
+        output.getLogicNode().setDirty(true);
 
         return true;
     }
@@ -149,15 +176,22 @@ namespace rlogic::internal
             return false;
         }
 
-        if (!m_logicNodeConnector.unlinkPrimitiveInput(input))
+        const PropertyImpl* linkedIncomingProperty = input.getLinkedIncomingProperty();
+        if (linkedIncomingProperty == nullptr)
         {
-            errorReporting.add(fmt::format("No link available from source property '{}' to target property '{}'", output.getName(), input.getName()), nullptr);
+            errorReporting.add(fmt::format("Input property '{}' is not currently linked!", input.getName()), nullptr);
+            return false;
+        }
+
+        if (linkedIncomingProperty != &output)
+        {
+            errorReporting.add(fmt::format("Input property '{}' is currently linked to another property '{}'", linkedIncomingProperty->getName(), input.getName()), nullptr);
             return false;
         }
 
         auto& node = output.getLogicNode();
         auto& targetNode = input.getLogicNode();
-        input.setIsLinkedInput(false);
+        input.unsetLinkedOutput();
 
         m_logicNodeDAG.removeEdge(node, targetNode);
 

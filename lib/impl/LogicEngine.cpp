@@ -15,6 +15,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 
 #include "impl/LogicEngineImpl.h"
 #include "impl/LuaConfigImpl.h"
@@ -35,49 +36,16 @@ namespace rlogic
 
     LogicEngine& LogicEngine::operator=(LogicEngine&& other) noexcept = default;
 
-    Collection<LogicObject> LogicEngine::logicObjects() const
+    template <typename T>
+    Collection<T> LogicEngine::getLogicObjectsInternal() const
     {
-        return Collection<LogicObject>(m_impl->getApiObjects().getLogicObjects());
-    }
-
-    Collection<LuaScript> LogicEngine::scripts() const
-    {
-        return Collection<LuaScript>(m_impl->getApiObjects().getScripts());
-    }
-
-    Collection<LuaModule> LogicEngine::luaModules() const
-    {
-        return Collection<LuaModule>(m_impl->getApiObjects().getLuaModules());
-    }
-
-    Collection<RamsesNodeBinding> LogicEngine::ramsesNodeBindings() const
-    {
-        return Collection<RamsesNodeBinding>(m_impl->getApiObjects().getNodeBindings());
-    }
-
-    Collection<RamsesAppearanceBinding> LogicEngine::ramsesAppearanceBindings() const
-    {
-        return Collection<RamsesAppearanceBinding>(m_impl->getApiObjects().getAppearanceBindings());
-    }
-
-    Collection<RamsesCameraBinding> LogicEngine::ramsesCameraBindings() const
-    {
-        return Collection<RamsesCameraBinding>(m_impl->getApiObjects().getCameraBindings());
-    }
-
-    Collection<DataArray> LogicEngine::dataArrays() const
-    {
-        return Collection<DataArray>(m_impl->getApiObjects().getDataArrays());
-    }
-
-    Collection<rlogic::AnimationNode> LogicEngine::animationNodes() const
-    {
-        return Collection<AnimationNode>(m_impl->getApiObjects().getAnimationNodes());
+        return Collection<T>(m_impl->getApiObjects().getApiObjectContainer<T>());
     }
 
     template <typename T>
-    const T* findObject(const std::vector<T*>& container, std::string_view name)
+    const T* findObject(const internal::ApiObjects& apiObjects, std::string_view name)
     {
+        const auto& container = apiObjects.getApiObjectContainer<T>();
         const auto it = std::find_if(container.cbegin(), container.cend(), [name](const auto& o) {
             return o->getName() == name; });
 
@@ -85,84 +53,33 @@ namespace rlogic
     }
 
     template <typename T>
-    T* findObject(std::vector<T*>& container, std::string_view name)
+    const T* LogicEngine::findLogicObjectInternal(std::string_view name) const
     {
+        auto& container = m_impl->getApiObjects().getApiObjectContainer<T>();
         const auto it = std::find_if(container.begin(), container.end(), [name](const auto& o) {
             return o->getName() == name; });
 
         return (it == container.end() ? nullptr : *it);
     }
 
-    const LogicObject* LogicEngine::findLogicObject(std::string_view name) const
+    template <typename T>
+    T* LogicEngine::findLogicObjectInternal(std::string_view name)
     {
-        return findObject(m_impl->getApiObjects().getLogicObjects(), name);
-    }
-    LogicObject* LogicEngine::findLogicObject(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getLogicObjects(), name);
+        auto& container = m_impl->getApiObjects().getApiObjectContainer<T>();
+        const auto it = std::find_if(container.begin(), container.end(), [name](const auto& o) {
+            return o->getName() == name; });
+
+        return (it == container.end() ? nullptr : *it);
     }
 
-    const LuaScript* LogicEngine::findScript(std::string_view name) const
+    const LogicObject* LogicEngine::findLogicObjectById(uint64_t id) const
     {
-        return findObject(m_impl->getApiObjects().getScripts(), name);
-    }
-    LuaScript* LogicEngine::findScript(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getScripts(), name);
+        return m_impl->getApiObjects().getApiObjectById(id);
     }
 
-    const LuaModule* LogicEngine::findLuaModule(std::string_view name) const
+    LogicObject* LogicEngine::findLogicObjectById(uint64_t id)
     {
-        return findObject(m_impl->getApiObjects().getLuaModules(), name);
-    }
-    LuaModule* LogicEngine::findLuaModule(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getLuaModules(), name);
-    }
-
-    const RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name) const
-    {
-        return findObject(m_impl->getApiObjects().getNodeBindings(), name);
-    }
-    RamsesNodeBinding* LogicEngine::findNodeBinding(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getNodeBindings(), name);
-    }
-
-    const RamsesAppearanceBinding* LogicEngine::findAppearanceBinding(std::string_view name) const
-    {
-        return findObject(m_impl->getApiObjects().getAppearanceBindings(), name);
-    }
-    RamsesAppearanceBinding* LogicEngine::findAppearanceBinding(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getAppearanceBindings(), name);
-    }
-
-    const RamsesCameraBinding* LogicEngine::findCameraBinding(std::string_view name) const
-    {
-        return findObject(m_impl->getApiObjects().getCameraBindings(), name);
-    }
-    RamsesCameraBinding* LogicEngine::findCameraBinding(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getCameraBindings(), name);
-    }
-
-    const DataArray* LogicEngine::findDataArray(std::string_view name) const
-    {
-        return findObject(m_impl->getApiObjects().getDataArrays(), name);
-    }
-    DataArray* LogicEngine::findDataArray(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getDataArrays(), name);
-    }
-
-    const AnimationNode* LogicEngine::findAnimationNode(std::string_view name) const
-    {
-        return findObject(m_impl->getApiObjects().getAnimationNodes(), name);
-    }
-    AnimationNode* LogicEngine::findAnimationNode(std::string_view name)
-    {
-        return findObject(m_impl->getApiObjects().getAnimationNodes(), name);
+        return m_impl->getApiObjects().getApiObjectById(id);
     }
 
     LuaScript* LogicEngine::createLuaScript(std::string_view source, const LuaConfig& config, std::string_view scriptName)
@@ -212,6 +129,11 @@ namespace rlogic
         return m_impl->createAnimationNode(channels, name);
     }
 
+    TimerNode* LogicEngine::createTimerNode(std::string_view name)
+    {
+        return m_impl->createTimerNode(name);
+    }
+
     const std::vector<ErrorData>& LogicEngine::getErrors() const
     {
         return m_impl->getErrors();
@@ -220,6 +142,16 @@ namespace rlogic
     bool LogicEngine::update()
     {
         return m_impl->update();
+    }
+
+    void LogicEngine::enableUpdateReport(bool enable)
+    {
+        m_impl->enableUpdateReport(enable);
+    }
+
+    LogicEngineReport LogicEngine::getLastUpdateReport() const
+    {
+        return m_impl->getLastUpdateReport();
     }
 
     bool LogicEngine::loadFromFile(std::string_view filename, ramses::Scene* ramsesScene /* = nullptr*/, bool enableMemoryVerification /* = true */)
@@ -251,6 +183,36 @@ namespace rlogic
     {
         return m_impl->isLinked(logicNode);
     }
+
+    template RLOGIC_API Collection<LogicObject>             LogicEngine::getLogicObjectsInternal<LogicObject>() const;
+    template RLOGIC_API Collection<LuaScript>               LogicEngine::getLogicObjectsInternal<LuaScript>() const;
+    template RLOGIC_API Collection<LuaModule>               LogicEngine::getLogicObjectsInternal<LuaModule>() const;
+    template RLOGIC_API Collection<RamsesNodeBinding>       LogicEngine::getLogicObjectsInternal<RamsesNodeBinding>() const;
+    template RLOGIC_API Collection<RamsesAppearanceBinding> LogicEngine::getLogicObjectsInternal<RamsesAppearanceBinding>() const;
+    template RLOGIC_API Collection<RamsesCameraBinding>     LogicEngine::getLogicObjectsInternal<RamsesCameraBinding>() const;
+    template RLOGIC_API Collection<DataArray>               LogicEngine::getLogicObjectsInternal<DataArray>() const;
+    template RLOGIC_API Collection<AnimationNode>           LogicEngine::getLogicObjectsInternal<AnimationNode>() const;
+    template RLOGIC_API Collection<TimerNode>               LogicEngine::getLogicObjectsInternal<TimerNode>() const;
+
+    template RLOGIC_API const LogicObject*             LogicEngine::findLogicObjectInternal<LogicObject>(std::string_view) const;
+    template RLOGIC_API const LuaScript*               LogicEngine::findLogicObjectInternal<LuaScript>(std::string_view) const;
+    template RLOGIC_API const LuaModule*               LogicEngine::findLogicObjectInternal<LuaModule>(std::string_view) const;
+    template RLOGIC_API const RamsesNodeBinding*       LogicEngine::findLogicObjectInternal<RamsesNodeBinding>(std::string_view) const;
+    template RLOGIC_API const RamsesAppearanceBinding* LogicEngine::findLogicObjectInternal<RamsesAppearanceBinding>(std::string_view) const;
+    template RLOGIC_API const RamsesCameraBinding*     LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view) const;
+    template RLOGIC_API const DataArray*               LogicEngine::findLogicObjectInternal<DataArray>(std::string_view) const;
+    template RLOGIC_API const AnimationNode*           LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view) const;
+    template RLOGIC_API const TimerNode*               LogicEngine::findLogicObjectInternal<TimerNode>(std::string_view) const;
+
+    template RLOGIC_API LogicObject*             LogicEngine::findLogicObjectInternal<LogicObject>(std::string_view);
+    template RLOGIC_API LuaScript*               LogicEngine::findLogicObjectInternal<LuaScript>(std::string_view);
+    template RLOGIC_API LuaModule*               LogicEngine::findLogicObjectInternal<LuaModule>(std::string_view);
+    template RLOGIC_API RamsesNodeBinding*       LogicEngine::findLogicObjectInternal<RamsesNodeBinding>(std::string_view);
+    template RLOGIC_API RamsesAppearanceBinding* LogicEngine::findLogicObjectInternal<RamsesAppearanceBinding>(std::string_view);
+    template RLOGIC_API RamsesCameraBinding*     LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view);
+    template RLOGIC_API DataArray*               LogicEngine::findLogicObjectInternal<DataArray>(std::string_view);
+    template RLOGIC_API AnimationNode*           LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view);
+    template RLOGIC_API TimerNode*               LogicEngine::findLogicObjectInternal<TimerNode>(std::string_view);
 
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<float>(const std::vector<float>&, std::string_view);
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec2f>(const std::vector<vec2f>&, std::string_view);

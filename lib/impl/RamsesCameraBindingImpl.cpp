@@ -26,8 +26,8 @@
 
 namespace rlogic::internal
 {
-    RamsesCameraBindingImpl::RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, std::string_view name)
-        : RamsesBindingImpl(name)
+    RamsesCameraBindingImpl::RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, std::string_view name, uint64_t id)
+        : RamsesBindingImpl(name, id)
         , m_ramsesCamera(ramsesCamera)
     {
         std::vector<TypeData> frustumPlanes = {
@@ -86,6 +86,7 @@ namespace rlogic::internal
 
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
             builder.CreateString(cameraBinding.getName()),
+            cameraBinding.getId(),
             ramsesReference,
             // TODO Violin don't serialize these - they carry no useful information and are redundant
             PropertyImpl::Serialize(*cameraBinding.getInputs()->m_impl, builder, serializationMap));
@@ -106,6 +107,12 @@ namespace rlogic::internal
         if (!cameraBinding.base())
         {
             errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing base class info!", nullptr);
+            return nullptr;
+        }
+
+        if (cameraBinding.base()->id() == 0u)
+        {
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing id!", nullptr);
             return nullptr;
         }
 
@@ -160,7 +167,7 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        auto binding = std::make_unique<RamsesCameraBindingImpl>(*resolvedCamera, name);
+        auto binding = std::make_unique<RamsesCameraBindingImpl>(*resolvedCamera, name, cameraBinding.base()->id());
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         ApplyRamsesValuesToInputProperties(*binding, *resolvedCamera);
@@ -275,10 +282,10 @@ namespace rlogic::internal
     {
         // Initializes input values with values from ramses camera silently (no dirty mechanism triggered)
         PropertyImpl& viewport = *binding.getInputs()->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Viewport))->m_impl;
-        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX))->m_impl->setValue(PropertyValue{ ramsesCamera.getViewportX() }, false);
-        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetY))->m_impl->setValue(PropertyValue{ ramsesCamera.getViewportY() }, false);
-        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortWidth))->m_impl->setValue(PropertyValue{ static_cast<int32_t>(ramsesCamera.getViewportWidth()) }, false);
-        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortHeight))->m_impl->setValue(PropertyValue{ static_cast<int32_t>(ramsesCamera.getViewportHeight()) }, false);
+        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetX))->m_impl->initializeBindingInputValue(PropertyValue{ ramsesCamera.getViewportX() });
+        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortOffsetY))->m_impl->initializeBindingInputValue(PropertyValue{ ramsesCamera.getViewportY() });
+        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortWidth))->m_impl->initializeBindingInputValue(PropertyValue{ static_cast<int32_t>(ramsesCamera.getViewportWidth()) });
+        viewport.getChild(static_cast<size_t>(ECameraViewportPropertyStaticIndex::ViewPortHeight))->m_impl->initializeBindingInputValue(PropertyValue{ static_cast<int32_t>(ramsesCamera.getViewportHeight()) });
 
         PropertyImpl& frustum = *binding.getInputs()->getChild(static_cast<size_t>(ECameraPropertyStructStaticIndex::Frustum))->m_impl;
         const float nearPlane = ramsesCamera.getNearPlane();
@@ -288,19 +295,19 @@ namespace rlogic::internal
         case ramses::ERamsesObjectType::ERamsesObjectType_PerspectiveCamera:
         {
             const auto* perspectiveCam = ramses::RamsesUtils::TryConvert<ramses::PerspectiveCamera>(ramsesCamera);
-            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane))->m_impl->setValue(PropertyValue{ nearPlane }, false);
-            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane))->m_impl->setValue(PropertyValue{ farPlane }, false);
-            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView))->m_impl->setValue(PropertyValue{ perspectiveCam->getVerticalFieldOfView() }, false);
-            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio))->m_impl->setValue(PropertyValue{ perspectiveCam->getAspectRatio() }, false);
+            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::NearPlane))->m_impl->initializeBindingInputValue(PropertyValue{ nearPlane });
+            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FarPlane))->m_impl->initializeBindingInputValue(PropertyValue{ farPlane });
+            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::FieldOfView))->m_impl->initializeBindingInputValue(PropertyValue{ perspectiveCam->getVerticalFieldOfView() });
+            frustum.getChild(static_cast<size_t>(EPerspectiveCameraFrustumPropertyStaticIndex::AspectRatio))->m_impl->initializeBindingInputValue(PropertyValue{ perspectiveCam->getAspectRatio() });
             break;
         }
         case ramses::ERamsesObjectType::ERamsesObjectType_OrthographicCamera:
-            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::NearPlane))->m_impl->setValue(PropertyValue{ nearPlane }, false);
-            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::FarPlane))->m_impl->setValue(PropertyValue{ farPlane }, false);
-            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::LeftPlane))->m_impl->setValue(PropertyValue{ ramsesCamera.getLeftPlane() }, false);
-            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::RightPlane))->m_impl->setValue(PropertyValue{ ramsesCamera.getRightPlane() }, false);
-            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::BottomPlane))->m_impl->setValue(PropertyValue{ ramsesCamera.getBottomPlane() }, false);
-            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::TopPlane))->m_impl->setValue(PropertyValue{ ramsesCamera.getTopPlane() }, false);
+            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::NearPlane))->m_impl->initializeBindingInputValue(PropertyValue{ nearPlane });
+            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::FarPlane))->m_impl->initializeBindingInputValue(PropertyValue{ farPlane });
+            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::LeftPlane))->m_impl->initializeBindingInputValue(PropertyValue{ ramsesCamera.getLeftPlane() });
+            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::RightPlane))->m_impl->initializeBindingInputValue(PropertyValue{ ramsesCamera.getRightPlane() });
+            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::BottomPlane))->m_impl->initializeBindingInputValue(PropertyValue{ ramsesCamera.getBottomPlane() });
+            frustum.getChild(static_cast<size_t>(EOrthographicCameraFrustumPropertyStaticIndex::TopPlane))->m_impl->initializeBindingInputValue(PropertyValue{ ramsesCamera.getTopPlane() });
             break;
         default:
             assert(false && "This should never happen");

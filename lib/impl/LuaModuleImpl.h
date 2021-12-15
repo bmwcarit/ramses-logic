@@ -39,7 +39,7 @@ namespace rlogic::internal
     class LuaModuleImpl : public LogicObjectImpl
     {
     public:
-        LuaModuleImpl(LuaCompiledModule module, std::string_view name);
+        LuaModuleImpl(LuaCompiledModule module, std::string_view name, uint64_t id);
 
         [[nodiscard]] std::string_view getSourceCode() const;
         [[nodiscard]] const sol::table& getModule() const;

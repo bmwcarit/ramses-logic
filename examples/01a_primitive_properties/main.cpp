@@ -22,7 +22,7 @@ int main()
     // Create a simple script which multiplies two numbers and stores the result in a string
     rlogic::LuaScript* multiplyScript = logicEngine.createLuaScript(R"(
         function interface()
-            IN.param1 = INT
+            IN.param1 = INT32
             IN.param2 = FLOAT
 
             OUT.result = STRING

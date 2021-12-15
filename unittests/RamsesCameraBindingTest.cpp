@@ -120,6 +120,12 @@ namespace rlogic::internal
         EXPECT_EQ("CameraBinding", cameraBinding.getName());
     }
 
+    TEST_F(ARamsesCameraBinding, HasAIdAfterCreation)
+    {
+        auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
+        EXPECT_EQ(cameraBinding.getId(), 1u);
+    }
+
     TEST_F(ARamsesCameraBinding, HasInvalidCameraTypeAfterCreation)
     {
         auto& cameraBinding = *m_logicEngine.createRamsesCameraBinding(*m_camera, "");
@@ -745,7 +751,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesCameraBindingImpl binding(*m_camera, "name");
+            RamsesCameraBindingImpl binding(*m_camera, "name", 1u);
             (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -755,6 +761,7 @@ namespace rlogic::internal
         ASSERT_TRUE(serializedBinding.base());
         ASSERT_TRUE(serializedBinding.base()->name());
         EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedBinding.base()->id(), 1u);
 
         ASSERT_TRUE(serializedBinding.base()->rootInput());
         EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -768,6 +775,7 @@ namespace rlogic::internal
 
             ASSERT_TRUE(deserializedBinding);
             EXPECT_EQ(deserializedBinding->getName(), "name");
+            EXPECT_EQ(deserializedBinding->getId(), 1u);
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
             EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
             EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
@@ -779,7 +787,7 @@ namespace rlogic::internal
     {
         // Serialize
         {
-            RamsesCameraBindingImpl binding(*m_camera, "name");
+            RamsesCameraBindingImpl binding(*m_camera, "name", 1u);
             (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -822,7 +830,8 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0 // no name!
+                0, // no name!
+                1u
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
                 m_flatBufferBuilder,
@@ -839,12 +848,31 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing name!");
     }
 
+    TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoBindingId)
+    {
+        {
+            auto base = rlogic_serialization::CreateRamsesBinding(m_flatBufferBuilder,
+                0 // no id (id gets checked before name)!
+            );
+            auto binding = rlogic_serialization::CreateRamsesCameraBinding(m_flatBufferBuilder, base);
+            m_flatBufferBuilder.Finish(binding);
+        }
+
+        const auto&                              serialized   = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing id!");
+    }
+
     TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoRootInput)
     {
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 0 // no root input
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
@@ -868,6 +896,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 0,
                 m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
             );
@@ -897,6 +926,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 ramsesRef,
                 m_testUtils.serializeTestProperty("IN")
             );
@@ -931,6 +961,7 @@ namespace rlogic::internal
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("name"),
+                1u,
                 ramsesRef,
                 m_testUtils.serializeTestProperty("IN")
             );
@@ -990,8 +1021,9 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
-            const auto& loadedCameraBinding = *m_logicEngine.findCameraBinding("CameraBinding");
+            const auto& loadedCameraBinding = *m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding");
             EXPECT_EQ("CameraBinding", loadedCameraBinding.getName());
+            EXPECT_EQ(loadedCameraBinding.getId(), 1u);
             EXPECT_EQ(loadedCameraBinding.getRamsesCamera().getSceneObjectId(), m_perspectiveCam.getSceneObjectId());
 
             const auto& inputs = loadedCameraBinding.getInputs();
@@ -1043,7 +1075,7 @@ namespace rlogic::internal
 
         {
             ASSERT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", m_scene));
-            auto loadedCameraBinding = m_logicEngine.findCameraBinding("CameraBinding");
+            auto loadedCameraBinding = m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding");
             EXPECT_EQ(&loadedCameraBinding->getRamsesCamera(), m_camera);
             EXPECT_EQ(loadedCameraBinding->getInputs()->getChildCount(), 2u);
             EXPECT_EQ(loadedCameraBinding->getOutputs(), nullptr);
@@ -1059,7 +1091,7 @@ namespace rlogic::internal
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
-            const auto& cameraBinding = *m_logicEngine.findCameraBinding("CameraBinding");
+            const auto& cameraBinding = *m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding");
             EXPECT_EQ(&cameraBinding.getRamsesCamera(), &m_perspectiveCam);
         }
     }
@@ -1170,7 +1202,7 @@ namespace rlogic::internal
 
             // Set only one value of viewport struct. Use the same value as the one in cache on purpose!
             // Calling set forces set on ramses regardless of the value used
-            m_logicEngine.findCameraBinding("CameraBinding")->getInputs()->getChild("viewport")->getChild("offsetX")->set<int32_t>(11);
+            m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding")->getInputs()->getChild("viewport")->getChild("offsetX")->set<int32_t>(11);
             EXPECT_TRUE(m_logicEngine.update());
 
             // vpOffsetX changed, the rest is taken from the initially saved inputs, not what was set on the camera!
@@ -1392,15 +1424,13 @@ namespace rlogic::internal
         // Does not touch the frustum because not linked or set at all
         ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
-        // TODO Violin investigate this... There is some problem with dirty handling which causes links to always
-        // re-apply their values, even if nothing changed in the script or in the binding -> this is inefficient
-        // As long as link is active, binding overwrites value which was manually set directly to the ramses camera
+        // Link does not overwrite manually set values as long as the actual value didnt change to avoid causing unnecessary sets on ramses
         m_perspectiveCam.setViewport(9, 8, 1u, 2u);
         m_logicEngine.update();
-        EXPECT_EQ(m_perspectiveCam.getViewportX(), 15);
-        EXPECT_EQ(m_perspectiveCam.getViewportY(), 12);
-        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 13u);
-        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 14u);
+        EXPECT_EQ(m_perspectiveCam.getViewportX(), 9);
+        EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
+        EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
+        EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
         ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
         // Remove link -> value is not overwritten any more

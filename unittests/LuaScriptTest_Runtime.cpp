@@ -49,7 +49,7 @@ namespace rlogic
         ASSERT_EQ(nullptr, script);
 
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in run() function!!");
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Special global symbol 'IN' should not be overwritten with other types in run() function!!"));
     }
 
     TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningVectorComponentsIndividually)
@@ -137,85 +137,15 @@ namespace rlogic
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
-    TEST_F(ALuaScript_Runtime, AppliesNumericChecksToNumericAssignments)
-    {
-        const std::string_view scriptTemplate = (R"(
-            function interface()
-                OUT.float = FLOAT
-                OUT.int = INT
-            end
-            function run()
-                {}
-            end
-        )");
-
-        const std::vector<std::string> invalidStatements
-        {
-            "OUT.float = 1000000000000000000000000000000000000000.0",
-            "OUT.int = 1000000000000000000000000000000000000000",
-        };
-
-        for (const auto& invalidStatement : invalidStatements)
-        {
-            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, invalidStatement));
-
-            ASSERT_NE(nullptr, script);
-            EXPECT_FALSE(m_logicEngine.update());
-
-            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Implicit rounding during assignment"));
-            m_logicEngine.destroy(*script);
-        }
-    }
-
-    TEST_F(ALuaScript_Runtime, AppliesNumericChecksToNumericArrayAssignments)
-    {
-        const std::string_view scriptTemplate = (R"(
-            function interface()
-                OUT.vec2f = VEC2F
-                OUT.a_vec2f = ARRAY(2, VEC2F)
-                OUT.vec2i = VEC2I
-                OUT.a_vec2i = ARRAY(2, VEC2I)
-            end
-            function run()
-                {}
-            end
-        )");
-
-        const std::vector<std::string> invalidStatements
-        {
-            "OUT.vec2f = {1000000000000000000000000000000000000000.0, 0}",
-            "OUT.a_vec2f = {{0, 0}, {1000000000000000000000000000000000000000.0, 0}}",
-            "OUT.vec2i = {1000000000000000000000000000000000000000, 0}",
-            "OUT.a_vec2i = {{0, 0}, {1000000000000000000000000000000000000000, 0}}",
-        };
-
-        for (const auto& invalidStatement : invalidStatements)
-        {
-            auto script = m_logicEngine.createLuaScript(fmt::format(scriptTemplate, invalidStatement));
-
-            ASSERT_NE(nullptr, script);
-            EXPECT_FALSE(m_logicEngine.update());
-
-            ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Unexpected value (type: 'number') at array element # 1"));
-            m_logicEngine.destroy(*script);
-        }
-    }
-
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToAccessPropertiesWithNonStringIndexAtRunTime)
     {
         const std::vector<std::string> wrongIndexTypes = {"[1]", "[true]", "[{x=5}]", "[nil]"};
 
-        const std::string expectedErrorMessageIN = "Only strings supported as table key type!";
-
-        const std::string expectedErrorMessageOUT = "Only strings supported as table key type!";
-
         std::vector<LuaTestError> allErrorCases;
         for (const auto& errorType : wrongIndexTypes)
         {
-            allErrorCases.emplace_back(LuaTestError{"IN" + errorType + " = 5", expectedErrorMessageIN});
-            allErrorCases.emplace_back(LuaTestError{"OUT" + errorType + " = 5", expectedErrorMessageOUT});
+            allErrorCases.emplace_back(LuaTestError{"IN" + errorType + " = 5", "lua: error: Bad access to property 'IN'! Expected a string but got object of type"});
+            allErrorCases.emplace_back(LuaTestError{"OUT" + errorType + " = 5", "lua: error: Bad access to property 'OUT'! Expected a string but got object of type"});
         }
 
         for (const auto& singleCase : allErrorCases)
@@ -587,13 +517,13 @@ namespace rlogic
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 1"));
 
-        EXPECT_EQ(0, *field1->get<int32_t>());
+        EXPECT_EQ(5, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_Overspecified)
     {
-        auto* script = m_logicEngine.createLuaScript(R"(
+        m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.data = {
                     field1 = INT,
@@ -609,16 +539,9 @@ namespace rlogic
             end
         )");
 
-        auto outputs = script->getOutputs();
-        auto field1 = outputs->getChild("data")->getChild("field1");
-        auto field2 = outputs->getChild("data")->getChild("field2");
-
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 3"));
-
-        EXPECT_EQ(0, *field1->get<int32_t>());
-        EXPECT_EQ(0, *field2->get<int32_t>());
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Unexpected property 'not_specified' while assigning values to struct 'data'!"));
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenFieldHasWrongType)
@@ -626,10 +549,10 @@ namespace rlogic
         auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.data = {
-                    field1 = INT,
-                    field2 = INT
+                    field1 = INT32,
+                    field2 = INT32
                 }
-                OUT.field2 = INT
+                OUT.field2 = INT32
             end
             function run()
                 OUT.field2 = "this is no integer"
@@ -646,7 +569,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning string to 'INT' output 'field2'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning string to 'INT32' output 'field2'!"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -693,14 +616,18 @@ namespace rlogic
         std::string_view scriptWithArrays = R"(
             function interface()
                 IN.array_int = ARRAY(2, INT)
+                IN.array_int64 = ARRAY(2, INT64)
                 IN.array_float = ARRAY(3, FLOAT)
                 OUT.array_int = ARRAY(2, INT)
+                OUT.array_int64 = ARRAY(2, INT64)
                 OUT.array_float = ARRAY(3, FLOAT)
             end
 
             function run()
                 OUT.array_int = IN.array_int
                 OUT.array_int[2] = 5
+                OUT.array_int64 = IN.array_int64
+                OUT.array_int64[2] = 5
                 OUT.array_float = IN.array_float
                 OUT.array_float[1] = 1.5
             end
@@ -710,9 +637,12 @@ namespace rlogic
 
         auto inputs = script->getInputs();
         auto in_array_int = inputs->getChild("array_int");
+        auto in_array_int64 = inputs->getChild("array_int64");
         auto in_array_float = inputs->getChild("array_float");
         in_array_int->getChild(0)->set<int32_t>(1);
         in_array_int->getChild(1)->set<int32_t>(2);
+        in_array_int64->getChild(0)->set<int64_t>(3);
+        in_array_int64->getChild(1)->set<int64_t>(4);
         in_array_float->getChild(0)->set<float>(0.1f);
         in_array_float->getChild(1)->set<float>(0.2f);
         in_array_float->getChild(2)->set<float>(0.3f);
@@ -721,10 +651,14 @@ namespace rlogic
 
         auto outputs = script->getOutputs();
         auto out_array_int = outputs->getChild("array_int");
+        auto out_array_int64 = outputs->getChild("array_int64");
         auto out_array_float = outputs->getChild("array_float");
 
         EXPECT_EQ(1, *out_array_int->getChild(0)->get<int32_t>());
         EXPECT_EQ(5, *out_array_int->getChild(1)->get<int32_t>());
+
+        EXPECT_EQ(3, *out_array_int64->getChild(0)->get<int64_t>());
+        EXPECT_EQ(5, *out_array_int64->getChild(1)->get<int64_t>());
 
         EXPECT_FLOAT_EQ(1.5f, *out_array_float->getChild(0)->get<float>());
         EXPECT_FLOAT_EQ(0.2f, *out_array_float->getChild(1)->get<float>());
@@ -766,7 +700,7 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
 
             ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Bad access to property 'array'! Error while extracting integer: expected a number, received"));
             m_logicEngine.destroy(*script);
         }
     }
@@ -788,7 +722,7 @@ namespace rlogic
         {
             std::string errorTemplate =
                 (idx < 0) ?
-                "Only non-negative integers supported as array index type! Received {}" :
+                "Bad access to property 'array'! Error while extracting integer: expected non-negative number, received '-1'" :
                 "Index out of range! Expected 0 < index <= 2 but received index == {}";
 
             for (const auto& prop : std::vector<std::string>{ "IN", "OUT" })
@@ -818,12 +752,14 @@ namespace rlogic
         auto script = m_logicEngine.createLuaScript(R"(
             function interface()
                 OUT.int_array = ARRAY(2, INT)
+                OUT.int64_array = ARRAY(2, INT64)
                 OUT.float_array = ARRAY(2, FLOAT)
                 OUT.vec2i_array = ARRAY(2, VEC2I)
                 OUT.vec3f_array = ARRAY(2, VEC3F)
             end
             function run()
                 OUT.int_array = {1, 2}
+                OUT.int64_array = {3, 4}
                 OUT.float_array = {0.1, 0.2}
                 OUT.vec2i_array = {{11, 12}, {21, 22}}
                 OUT.vec3f_array = {{0.11, 0.12, 0.13}, {0.21, 0.22, 0.23}}
@@ -834,13 +770,16 @@ namespace rlogic
 
         EXPECT_TRUE(m_logicEngine.update());
 
-        auto int_array = script->getOutputs()->getChild("int_array");
-        auto float_array = script->getOutputs()->getChild("float_array");
-        auto vec2i_array = script->getOutputs()->getChild("vec2i_array");
-        auto vec3f_array = script->getOutputs()->getChild("vec3f_array");
+        const auto int_array = script->getOutputs()->getChild("int_array");
+        const auto int64_array = script->getOutputs()->getChild("int64_array");
+        const auto float_array = script->getOutputs()->getChild("float_array");
+        const auto vec2i_array = script->getOutputs()->getChild("vec2i_array");
+        const auto vec3f_array = script->getOutputs()->getChild("vec3f_array");
 
         EXPECT_EQ(1, *int_array->getChild(0)->get<int32_t>());
         EXPECT_EQ(2, *int_array->getChild(1)->get<int32_t>());
+        EXPECT_EQ(3, *int64_array->getChild(0)->get<int64_t>());
+        EXPECT_EQ(4, *int64_array->getChild(1)->get<int64_t>());
         EXPECT_FLOAT_EQ(0.1f, *float_array->getChild(0)->get<float>());
         EXPECT_FLOAT_EQ(0.2f, *float_array->getChild(1)->get<float>());
         EXPECT_THAT(*vec2i_array->getChild(0)->get<vec2i>(), ::testing::ElementsAre(11, 12));
@@ -887,7 +826,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
 
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning array property 'int_array'! Expected: 3 Received: 2"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Error during assignment of array property 'int_array'! Expected a value at index 3"));
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayFromLuaTableWithCorrectSizeButWrongIndices)
@@ -914,7 +853,8 @@ namespace rlogic
     {
         const std::string_view scriptTemplate = (R"(
             function interface()
-                OUT.array_int = ARRAY(2, INT)
+                OUT.array_int = ARRAY(2, INT32)
+                OUT.array_int64 = ARRAY(2, INT64)
                 OUT.array_string = ARRAY(2, STRING)
                 OUT.array_vec2f = ARRAY(2, VEC2F)
             end
@@ -925,20 +865,27 @@ namespace rlogic
 
         // This is a subset of all possible permutations, but should cover most types and cases
         const std::vector<LuaTestError> allErrorCases = {
-            {"OUT.array_int = {}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 0"},
-            {"OUT.array_int = {1}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 1"},
-            {"OUT.array_int = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int'! Expected: 2 Received: 3"},
-            {"OUT.array_int = {1, 2.2}", "Implicit rounding during assignment of integer output"},
-            {"OUT.array_int = {1, true}", "Assigning bool to 'INT' output ''"},
+            {"OUT.array_int = {}", "Error during assignment of array property 'array_int'! Expected a value at index 1"},
+            {"OUT.array_int = {1}", "Error during assignment of array property 'array_int'! Expected a value at index 2"},
+            {"OUT.array_int = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int'! Expected array size: 2"},
+            {"OUT.array_int = {1, 2.2}", "Error while extracting integer: implicit rounding (fractional part '0.20000000000000018' is not negligible)"},
+            {"OUT.array_int = {1, true}", "Assigning bool to 'INT32' output ''"},
             {"OUT.array_int = {nil, 1, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 1"},
             {"OUT.array_int = {1, nil, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 2"},
+            {"OUT.array_int64 = {}", "Error during assignment of array property 'array_int64'! Expected a value at index 1"},
+            {"OUT.array_int64 = {1}", "Error during assignment of array property 'array_int64'! Expected a value at index 2"},
+            {"OUT.array_int64 = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int64'! Expected array size: 2"},
+            {"OUT.array_int64 = {1, 2.2}", "Error while extracting integer: implicit rounding (fractional part '0.20000000000000018' is not negligible)"},
+            {"OUT.array_int64 = {1, true}", "Assigning bool to 'INT64' output ''"},
+            {"OUT.array_int64 = {nil, 1, 3}", "Error during assignment of array property 'array_int64'! Expected a value at index 1"},
+            {"OUT.array_int64 = {1, nil, 3}", "Error during assignment of array property 'array_int64'! Expected a value at index 2"},
             // TODO Violin the messages below are a bit misleading now ... They could contain info which array field failed to be assigned. Need to refactor the code and fix them
             {"OUT.array_string = {'somestring', 2}", "Assigning number to 'STRING' output ''"},
             {"OUT.array_string = {'somestring', {}}", "Assigning table to 'STRING' output ''"},
             {"OUT.array_string = {'somestring', OUT.array_int}", "Can't assign property 'array_int' (type ARRAY) to property '' (type STRING)"},
-            {"OUT.array_vec2f = {1, 2}", "Assigning wrong type (number) to output VEC2 property ''"},
-            {"OUT.array_vec2f = {{1, 2}, {5}}", "Expected 2 array components in table but got 1 instead"},
-            {"OUT.array_vec2f = {{1, 2}, {}}", "Expected 2 array components in table but got 0 instead"},
+            {"OUT.array_vec2f = {1, 2}", "Error while assigning output VEC2 property ''. Expected a Lua table with 2 entries but got object of type number instead!"},
+            {"OUT.array_vec2f = {{1, 2}, {5}}", "Error while assigning output VEC2 property ''. Error while extracting array: expected 2 array components in table but got 1 instead!"},
+            {"OUT.array_vec2f = {{1, 2}, {}}", "Error while assigning output VEC2 property ''. Error while extracting array: expected 2 array components in table but got 0 instead!"},
             {"OUT.array_int = OUT", "Can't assign property 'OUT' (type STRUCT) to property 'array_int' (type ARRAY)"},
             {"OUT.array_int = IN", "Can't assign property 'IN' (type STRUCT) to property 'array_int' (type ARRAY)"},
         };
@@ -1071,9 +1018,9 @@ namespace rlogic
             {"OUT.array_float3 = IN.array_float2", "Can't assign property 'array_float2' (#fields=2) to property 'array_float3' (#fields=3)"},
             {"OUT.array_float3 = IN.array_float4", "Can't assign property 'array_float4' (#fields=4) to property 'array_float3' (#fields=3)!"},
             {"OUT.array_float3 = IN.array_vec3f", "Can't assign property 'array_vec3f' (#fields=1) to property 'array_float3' (#fields=3)"},
-            {"OUT.array_float3 = {0.1, 0.2}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 2"},
-            {"OUT.array_float3 = {0.1, 0.2, 0.3, 0.4}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 4"},
-            {"OUT.array_float3 = {}", "Element size mismatch when assigning array property 'array_float3'! Expected: 3 Received: 0"},
+            {"OUT.array_float3 = {0.1, 0.2}", "Error during assignment of array property 'array_float3'! Expected a value at index 3"},
+            {"OUT.array_float3 = {0.1, 0.2, 0.3, 0.4}", "Element size mismatch when assigning array property 'array_float3'! Expected array size: 3"},
+            {"OUT.array_float3 = {}", "Error during assignment of array property 'array_float3'! Expected a value at index 1"},
         };
 
         for (const auto& aCase : allCases)
@@ -1096,7 +1043,8 @@ namespace rlogic
                 IN.array_float = ARRAY(2, FLOAT)
                 IN.array_vec2f = ARRAY(2, VEC2F)
                 IN.array_vec2i = ARRAY(2, VEC2I)
-                OUT.array_int = ARRAY(2, INT)
+                OUT.array_int = ARRAY(2, INT32)
+                OUT.array_int64 = ARRAY(2, INT64)
             end
 
             function run()
@@ -1106,9 +1054,12 @@ namespace rlogic
 
         const std::vector<LuaTestError> allCases =
         {
-            {"OUT.array_int = IN.array_float", "Can't assign property '' (type FLOAT) to property '' (type INT)!"},
-            {"OUT.array_int = IN.array_vec2f", "Can't assign property '' (type VEC2F) to property '' (type INT)!"},
-            {"OUT.array_int = IN.array_vec2i", "Can't assign property '' (type VEC2I) to property '' (type INT)!"},
+            {"OUT.array_int = IN.array_float", "Can't assign property '' (type FLOAT) to property '' (type INT32)!"},
+            {"OUT.array_int = IN.array_vec2f", "Can't assign property '' (type VEC2F) to property '' (type INT32)!"},
+            {"OUT.array_int = IN.array_vec2i", "Can't assign property '' (type VEC2I) to property '' (type INT32)!"},
+            {"OUT.array_int64 = IN.array_float", "Can't assign property '' (type FLOAT) to property '' (type INT64)!"},
+            {"OUT.array_int64 = IN.array_vec2f", "Can't assign property '' (type VEC2F) to property '' (type INT64)!"},
+            {"OUT.array_int64 = IN.array_vec2i", "Can't assign property '' (type VEC2I) to property '' (type INT64)!"},
         };
 
         for (const auto& aCase : allCases)
@@ -1128,36 +1079,56 @@ namespace rlogic
     {
         auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
-                IN.float = FLOAT
+                IN.float1 = FLOAT
+                IN.float2 = FLOAT
                 OUT.int = INT
+                OUT.int64 = INT64
             end
             function run()
-                OUT.int = IN.float
+                OUT.int = IN.float1
+                OUT.int64 = IN.float2
             end
         )");
 
-        auto floatInput = script->getInputs()->getChild("float");
+        auto float1Input = script->getInputs()->getChild("float1");
+        auto float2Input = script->getInputs()->getChild("float2");
         auto intOutput = script->getOutputs()->getChild("int");
+        auto int64Output = script->getOutputs()->getChild("int64");
 
-        floatInput->set<float>(1.0f);
+        float1Input->set<float>(1.0f);
+        float2Input->set<float>(1.0f);
 
         EXPECT_TRUE(m_logicEngine.update());
         ASSERT_TRUE(m_logicEngine.getErrors().empty());
         EXPECT_EQ(1, *intOutput->get<int32_t>());
+        EXPECT_EQ(1, *int64Output->get<int64_t>());
 
-        floatInput->set<float>(2.5f);
+        float1Input->set<float>(2.5f);
+        float2Input->set<float>(1.f);
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Implicit rounding during assignment of integer output 'int' (value: 2.5)!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+            ::testing::HasSubstr("Error during assignment of property 'int'! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
         EXPECT_EQ(1, *intOutput->get<int32_t>());
+        EXPECT_EQ(1, *int64Output->get<int64_t>());
+
+        float1Input->set<float>(1.f);
+        float2Input->set<float>(2.5f);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+            ::testing::HasSubstr("Error during assignment of property 'int64'! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        EXPECT_EQ(1, *intOutput->get<int32_t>());
+        EXPECT_EQ(1, *int64Output->get<int64_t>());
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNilToIntOutputs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
-                OUT.int = INT
+                OUT.int = INT32
             end
             function run()
                 OUT.int = nil
@@ -1166,7 +1137,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to 'INT' output 'int'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to 'INT32' output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
@@ -1174,7 +1145,7 @@ namespace rlogic
     {
         auto* script = m_logicEngine.createLuaScript(R"(
             function interface()
-                OUT.int = INT
+                OUT.int = INT32
             end
             function run()
                 OUT.int = true
@@ -1183,7 +1154,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'INT' output 'int'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'INT32' output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
@@ -1263,17 +1234,17 @@ namespace rlogic
     {
         const std::vector<LuaTestError> allCases = {
             {"local var = IN[0]",
-            "Only strings supported as table key type!"},
+            "Bad access to property 'IN'! Expected a string but got object of type number instead!"},
             {"var = IN[true]",
-            "Only strings supported as table key type!"},
+            "Bad access to property 'IN'! Expected a string but got object of type bool instead!"},
             {"var = IN[{x = 5}]",
-            "Only strings supported as table key type!"},
+            "Bad access to property 'IN'! Expected a string but got object of type table instead!"},
             {"OUT[0] = 5",
-            "Only strings supported as table key type!"},
+            "Bad access to property 'OUT'! Expected a string but got object of type number instead!"},
             {"OUT[true] = 5",
-            "Only strings supported as table key type!"},
+            "Bad access to property 'OUT'! Expected a string but got object of type bool instead!"},
             {"OUT[{x = 5}] = 5",
-            "Only strings supported as table key type!"},
+            "Bad access to property 'OUT'! Expected a string but got object of type table instead!"},
         };
 
         for (const auto& singleCase : allCases)
@@ -1933,4 +1904,362 @@ namespace rlogic
         EXPECT_EQ("Lua", *script->getOutputs()->getChild("language_of_debug_func")->get<std::string>());
     }
 
+    class ALuaScript_RuntimeIterators : public ALuaScript_Runtime
+    {
+    protected:
+    };
+
+    TEST_F(ALuaScript_RuntimeIterators, ComputesSizeOfCustomPropertiesUsingCustomLengthFunction)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                OUT.struct = {a=INT, b={c = INT}}
+                OUT.array_struct = ARRAY(3, {a=INT, b=FLOAT})
+            end
+
+            function run()
+                if rl_len(IN) ~= 1 then
+                    error("Wrong IN size!")
+                end
+
+                if rl_len(IN.array_int) ~= 2 then
+                    error("Wrong array size!")
+                end
+
+                if rl_len(OUT) ~= 2 then
+                    error("Wrong OUT size!")
+                end
+
+                if rl_len(OUT.struct) ~= 2 then
+                    error("Wrong struct size!")
+                end
+
+                if rl_len(OUT.struct.b) ~= 1 then
+                    error("Wrong nested struct size!")
+                end
+
+                if rl_len(OUT.array_struct) ~= 3 then
+                    error("Wrong array struct size!")
+                end
+
+                if rl_len(OUT.array_struct[1]) ~= 2 then
+                    error("Wrong array struct element size!")
+                end
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({EStandardModule::Base}));
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_RuntimeIterators, CallingCustomLengthFunctionOnNormalLuaTables_YieldsSameResultAsBuiltInSizeOperator)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+            end
+
+            function run()
+                local emptyTable = {}
+                assert(rl_len(emptyTable) == #emptyTable)
+                local numericTable = {1, 2, 3}
+                assert(rl_len(numericTable) == #numericTable)
+                local nonNumericTable = {a=5, b=6}
+                assert(rl_len(nonNumericTable) == #nonNumericTable)
+                local nonNumericTable = {a=5, b=6}
+                assert(rl_len(nonNumericTable) == #nonNumericTable)
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({ EStandardModule::Base }));
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_RuntimeIterators, CustomRlNextFunctionWorksLikeItsBuiltInCounterpart_Structs)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+                IN.struct = {a = INT, b = INT}
+                IN.nested = {
+                    struct = {a = INT, b = INT}
+                }
+                OUT.struct = {a = INT, b = INT}
+                OUT.nested = {
+                    struct = {a = INT, b = INT}
+                }
+            end
+
+            function run()
+                -- propagate data to OUT so that we can test both further down
+                OUT.struct = IN.struct
+                OUT.nested = IN.nested
+
+                local objectsToCheck = {IN.struct, IN.nested.struct, OUT.struct, OUT.nested.struct}
+
+                for unused, container in pairs(objectsToCheck) do
+                    ---- no index specified is the same as providing nil (see below)
+                    k, v = rl_next(container)
+                    assert(k == 'a')
+                    assert(v == 11)
+                    -- index=nil -> yields first element of container and its index
+                    k, v = rl_next(container, nil)
+                    assert(k == 'a')
+                    assert(v == 11)
+                    -- index==N -> yields element N+1 and its index
+                    k, v = rl_next(container, 'a')
+                    assert(k == 'b')
+                    assert(v == 12)
+                    k, v = rl_next(container, 'b')
+                    assert(k == nil)
+                    assert(v == nil)
+                end
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({ EStandardModule::Base, EStandardModule::String }));
+        ASSERT_NE(nullptr, script);
+        script->getInputs()->getChild("struct")->getChild("a")->set<int32_t>(11);
+        script->getInputs()->getChild("struct")->getChild("b")->set<int32_t>(12);
+        script->getInputs()->getChild("nested")->getChild("struct")->getChild("a")->set<int32_t>(11);
+        script->getInputs()->getChild("nested")->getChild("struct")->getChild("b")->set<int32_t>(12);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_RuntimeIterators, CustomRlNextFunctionWorksLikeItsBuiltInCounterpart_Arrays)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                IN.nested = {
+                    array_int = ARRAY(2, INT)
+                }
+                OUT.array_int = ARRAY(2, INT)
+                OUT.nested = {
+                    array_int = ARRAY(2, INT)
+                }
+            end
+
+            function run()
+                -- propagate data to OUT so that we can test both further down
+                OUT.array_int = IN.array_int
+                OUT.nested = IN.nested
+
+                local objectsToCheck = {IN.array_int, IN.nested.array_int, OUT.array_int, OUT.nested.array_int}
+
+                for k, container in pairs(objectsToCheck) do
+                    -- no index specified is the same as providing nil (see below)
+                    a, b = rl_next(container)
+                    assert(a == 1)
+                    assert(b == 11)
+                    -- index=nil -> yields first element of container and its index
+                    a, b = rl_next(container, nil)
+                    assert(a == 1)
+                    assert(b == 11)
+                    -- index==N -> yields element N+1 and its index
+                    a, b = rl_next(container, 1)
+                    assert(a == 2)
+                    assert(b == 12)
+                    a, b = rl_next(container, 2)
+                    assert(a == nil)
+                    assert(b == nil)
+                end
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({ EStandardModule::Base, EStandardModule::String }));
+        ASSERT_NE(nullptr, script);
+        script->getInputs()->getChild("array_int")->getChild(0)->set<int32_t>(11);
+        script->getInputs()->getChild("array_int")->getChild(1)->set<int32_t>(12);
+        script->getInputs()->getChild("nested")->getChild("array_int")->getChild(0)->set<int32_t>(11);
+        script->getInputs()->getChild("nested")->getChild("array_int")->getChild(1)->set<int32_t>(12);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_RuntimeIterators, Custom_IPairs_BehavesTheSameAsStandard_IPairs_Function_ForArrays)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                IN.nested = {
+                    array_int = ARRAY(2, INT)
+                }
+                OUT.array_int = ARRAY(2, INT)
+                OUT.nested = {
+                    array_int = ARRAY(2, INT)
+                }
+            end
+
+            function run()
+                -- propagate data to OUT so that we can test both further down
+                OUT.array_int = IN.array_int
+                OUT.nested = IN.nested
+
+                -- compare iteration results to a static reference table
+                local refTable = {[1] = 11, [2] = 12}
+
+                -- test multiple containers (which all have the same contents)
+                local objectsToCheck = {IN.array_int, IN.nested.array_int, OUT.array_int, OUT.nested.array_int}
+                for k, container in pairs(objectsToCheck) do
+                    -- iterate manually over reference table...
+                    local refKey = 1
+                    for key, value in rl_ipairs(container) do
+                        if type(key) ~= 'number' then
+                            error('Key should be of type number!')
+                        end
+
+                        if key ~= refKey then
+                            error("Expected key==refKey, but found " .. tostring(key) .. " != " .. tostring(refKey))
+                        end
+
+                        local refValue = refTable[refKey]
+                        if value ~= refValue then
+                            error("Expected value==refValue, but found " .. tostring(value) .. " != " .. tostring(refValue))
+                        end
+                        -- progress refTable manually
+                        refKey = refKey + 1
+                    end
+
+                    -- make sure there were exactly as many elements in refTable by checking no element is left to iterate
+                    assert(refKey == 3)
+                    assert(refValue == nil)
+                end
+
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({ EStandardModule::Base, EStandardModule::String }));
+        ASSERT_NE(nullptr, script);
+        script->getInputs()->getChild("array_int")->getChild(0)->set<int32_t>(11);
+        script->getInputs()->getChild("array_int")->getChild(1)->set<int32_t>(12);
+        script->getInputs()->getChild("nested")->getChild("array_int")->getChild(0)->set<int32_t>(11);
+        script->getInputs()->getChild("nested")->getChild("array_int")->getChild(1)->set<int32_t>(12);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_RuntimeIterators, Custom_Pairs_BehavesTheSameAsStandard_Pairs_Function_ForArrays)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+                IN.array_int = ARRAY(2, INT)
+                IN.nested = {
+                    array_int = ARRAY(2, INT)
+                }
+                OUT.array_int = ARRAY(2, INT)
+                OUT.nested = {
+                    array_int = ARRAY(2, INT)
+                }
+            end
+
+            function run()
+                -- propagate data to OUT so that we can test both further down
+                OUT.array_int = IN.array_int
+                OUT.nested = IN.nested
+
+                -- compare iteration results to a static reference table
+                local refTable = {[1] = 11, [2] = 12}
+
+                -- test multiple containers (which all have the same contents)
+                local objectsToCheck = {IN.array_int, IN.nested.array_int, OUT.array_int, OUT.nested.array_int}
+                for k, container in pairs(objectsToCheck) do
+                    -- iterate manually over reference table...
+                    local refKey,refValue = next(refTable)
+                    -- ...and compare to rl_pairs results
+                    for key, value in rl_pairs(container) do
+                        if type(key) ~= 'number' then
+                            error('Key should be of type number!')
+                        end
+
+                        if key ~= refKey then
+                            error("Expected key==refKey, but found " .. tostring(key) .. " != " .. tostring(refKey))
+                        end
+                        if value ~= refValue then
+                            error("Expected value==refValue, but found " .. tostring(value) .. " != " .. tostring(refValue))
+                        end
+                        -- progress refTable manually
+                        refKey,refValue = next(refTable, refKey)
+                    end
+
+                    -- make sure there were exactly as many elements in refTable by checking no element is left to iterate
+                    assert(refKey == nil)
+                    assert(refValue == nil)
+                end
+
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({ EStandardModule::Base, EStandardModule::String }));
+        ASSERT_NE(nullptr, script);
+        script->getInputs()->getChild("array_int")->getChild(0)->set<int32_t>(11);
+        script->getInputs()->getChild("array_int")->getChild(1)->set<int32_t>(12);
+        script->getInputs()->getChild("nested")->getChild("array_int")->getChild(0)->set<int32_t>(11);
+        script->getInputs()->getChild("nested")->getChild("array_int")->getChild(1)->set<int32_t>(12);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScript_RuntimeIterators, Custom_Pairs_BehavesTheSameAsStandard_Pairs_Function_ForStructs)
+    {
+        std::string_view scriptSrc = R"(
+            function interface()
+                IN.int = INT
+                IN.bool = BOOL
+                IN.nested = {
+                    int = INT,
+                    bool = BOOL,
+                    nested = {
+                        notUsed = FLOAT
+                    }
+                }
+                OUT.int = INT
+                OUT.bool = BOOL
+                OUT.nested = {
+                    int = INT,
+                    bool = BOOL,
+                    nested = {
+                        notUsed = FLOAT
+                    }
+                }
+            end
+
+            function run()
+                -- propagate data to OUT so that we can test both further down
+                OUT.int = IN.int
+                OUT.bool = IN.bool
+                OUT.nested = IN.nested
+
+                -- compare iteration results to a static reference table
+                local refTable = {int = 42, bool = false, nested = {int = 42, bool = false, nested = {}}}
+
+                -- test multiple containers (which all have the same contents)
+                local objectsToCheck = {IN, IN.nested, OUT, OUT.nested}
+                for k, container in pairs(objectsToCheck) do
+                    -- iterate manually over reference table...
+                    local refKey,refValue = next(refTable)
+                    -- ...and compare to rl_pairs results
+                    for key, value in rl_pairs(container) do
+                        if type(key) ~= 'string' then
+                            error('Key should be of type string!')
+                        end
+
+                        if key ~= refKey then
+                            error("Expected key==refKey, but found " .. tostring(key) .. " != " .. tostring(refKey))
+                        end
+                        -- compare all values except 'nested', because no value comparison semantics for tables/userdata
+                        if key ~= "nested" and value ~= refValue then
+                            error("Expected value==refValue, but found " .. tostring(value) .. " != " .. tostring(refValue))
+                        end
+                        -- progress refTable manually
+                        refKey,refValue = next(refTable, refKey)
+                    end
+
+                    -- make sure there are no leftover elements in refTable
+                    assert(refKey == nil)
+                    assert(refValue == nil)
+                end
+
+            end
+        )";
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({ EStandardModule::Base, EStandardModule::String }));
+        ASSERT_NE(nullptr, script);
+        script->getInputs()->getChild("int")->set<int32_t>(42);
+        script->getInputs()->getChild("bool")->set<bool>(false);
+        script->getInputs()->getChild("nested")->getChild("int")->set<int32_t>(42);
+        script->getInputs()->getChild("nested")->getChild("bool")->set<bool>(false);
+        EXPECT_TRUE(m_logicEngine.update());
+    }
 }

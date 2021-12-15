@@ -11,6 +11,7 @@ namespace rlogic_serialization;
 table LuaModule
 {
     name:string;
+    id:uint64;
     source:string;
     dependencies:[LuaModuleUsage];
     standardModules:[uint8];

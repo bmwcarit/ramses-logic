@@ -11,7 +11,6 @@
 #include "ramses-logic/AnimationTypes.h"
 
 #include "impl/LogicNodeImpl.h"
-#include "PropertyImpl.h"
 #include <memory>
 
 namespace rlogic_serialization
@@ -29,13 +28,14 @@ namespace rlogic::internal
 {
     class SerializationMap;
     class DeserializationMap;
+    class ErrorReporting;
 
     class AnimationNodeImpl : public LogicNodeImpl
     {
     public:
-        AnimationNodeImpl(AnimationChannels channels, std::string_view name) noexcept;
+        AnimationNodeImpl(AnimationChannels channels, std::string_view name, uint64_t id) noexcept;
 
-        [[nodiscard]] float getDuration() const;
+        [[nodiscard]] float getMaximumChannelDuration() const;
         [[nodiscard]] const AnimationChannels& getChannels() const;
 
         std::optional<LogicNodeRuntimeError> update() override;
@@ -50,7 +50,7 @@ namespace rlogic::internal
             DeserializationMap& deserializationMap);
 
     private:
-        void updateChannel(size_t channelIdx);
+        void updateChannel(size_t channelIdx, float beginOffset);
 
         template <typename T>
         T interpolateKeyframes_linear(T lowerVal, T upperVal, float interpRatio);
@@ -58,7 +58,7 @@ namespace rlogic::internal
         T interpolateKeyframes_cubic(T lowerVal, T upperVal, T lowerTangentOut, T upperTangentIn, float interpRatio, float timeBetweenKeys);
 
         AnimationChannels m_channels;
-        float m_duration = 0.f;
+        float m_maxChannelDuration = 0.f;
         float m_elapsedPlayTime = 0.f;
 
         enum EInputIdx
@@ -66,7 +66,8 @@ namespace rlogic::internal
             EInputIdx_TimeDelta = 0,
             EInputIdx_Play,
             EInputIdx_Loop,
-            EInputIdx_RewindOnStop
+            EInputIdx_RewindOnStop,
+            EInputIdx_TimeRange
         };
 
         enum EOutputIdx

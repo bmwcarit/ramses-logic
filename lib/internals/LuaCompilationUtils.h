@@ -78,6 +78,8 @@ namespace rlogic::internal
             std::string_view source,
             ErrorReporting& errorReporting);
 
+        [[nodiscard]] static sol::table MakeTableReadOnly(SolState& solState, sol::table table);
+
     private:
         [[nodiscard]] static std::string BuildChunkName(std::string_view scriptName);
         [[nodiscard]] static bool CrossCheckDeclaredAndProvidedModules(

@@ -27,7 +27,11 @@ namespace rlogic
             switch (prop.getType())
             {
             case rlogic::EPropertyType::Int32: {
-                prop.set(val.as<int>());
+                prop.set(val.as<int32_t>());
+                break;
+            }
+            case rlogic::EPropertyType::Int64: {
+                prop.set(val.as<int64_t>());
                 break;
             }
             case rlogic::EPropertyType::Struct: {
@@ -88,7 +92,9 @@ namespace rlogic
             switch (prop.getType())
             {
             case rlogic::EPropertyType::Int32:
-                return sol::object(L, sol::in_place, prop.get<int>());
+                return sol::object(L, sol::in_place, prop.get<int32_t>());
+            case rlogic::EPropertyType::Int64:
+                return sol::object(L, sol::in_place, prop.get<int64_t>());
             case rlogic::EPropertyType::Float:
                 return sol::object(L, sol::in_place, prop.get<float>());
             case rlogic::EPropertyType::Vec2f:
@@ -241,13 +247,27 @@ namespace rlogic
     sol::object NodeListWrapper<T>::get(sol::stack_object key, sol::this_state L)
     {
         auto strKey = key.as<sol::optional<std::string>>();
+        rlogic::LogicNode* node = nullptr;
         if (strKey)
         {
-            auto* node = find(*strKey);
-            if (node != nullptr)
+            node = find(*strKey);
+        }
+        else
+        {
+            auto intKey = key.as<sol::optional<int>>();
+            if (intKey)
             {
-                return sol::object(L, sol::in_place, LogicNodeWrapper(*node));
+                auto* obj = m_logicEngine.findLogicObjectById(static_cast<uint64_t>(*intKey));
+                if (obj != nullptr)
+                {
+                    node = obj->as<rlogic::LogicNode>();
+                }
             }
+        }
+
+        if (node != nullptr)
+        {
+            return sol::object(L, sol::in_place, LogicNodeWrapper(*node));
         }
         return sol::object(L, sol::in_place, sol::lua_nil);
     }
@@ -255,31 +275,31 @@ namespace rlogic
     template <>
     LogicNode* NodeListWrapper<LuaScript>::find(const std::string& key)
     {
-        return m_logicEngine.findScript(key);
+        return m_logicEngine.findByName<LuaScript>(key);
     }
 
     template <>
     LogicNode* NodeListWrapper<AnimationNode>::find(const std::string& key)
     {
-        return m_logicEngine.findAnimationNode(key);
+        return m_logicEngine.findByName<AnimationNode>(key);
     }
 
     template <>
     LogicNode* NodeListWrapper<RamsesNodeBinding>::find(const std::string& key)
     {
-        return m_logicEngine.findNodeBinding(key);
+        return m_logicEngine.findByName<RamsesNodeBinding>(key);
     }
 
     template <>
     LogicNode* NodeListWrapper<RamsesAppearanceBinding>::find(const std::string& key)
     {
-        return m_logicEngine.findAppearanceBinding(key);
+        return m_logicEngine.findByName<RamsesAppearanceBinding>(key);
     }
 
     template <>
     LogicNode* NodeListWrapper<RamsesCameraBinding>::find(const std::string& key)
     {
-        return m_logicEngine.findCameraBinding(key);
+        return m_logicEngine.findByName<RamsesCameraBinding>(key);
     }
 
     template <class T>
@@ -288,34 +308,10 @@ namespace rlogic
         return NodeListIterator(collection());
     }
 
-    template <>
-    Collection<LuaScript> NodeListWrapper<LuaScript>::collection()
+    template <class T>
+    Collection<T> NodeListWrapper<T>::collection()
     {
-        return m_logicEngine.scripts();
-    }
-
-    template <>
-    Collection<AnimationNode> NodeListWrapper<AnimationNode>::collection()
-    {
-        return m_logicEngine.animationNodes();
-    }
-
-    template <>
-    Collection<RamsesNodeBinding> NodeListWrapper<RamsesNodeBinding>::collection()
-    {
-        return m_logicEngine.ramsesNodeBindings();
-    }
-
-    template <>
-    Collection<RamsesAppearanceBinding> NodeListWrapper<RamsesAppearanceBinding>::collection()
-    {
-        return m_logicEngine.ramsesAppearanceBindings();
-    }
-
-    template <>
-    Collection<RamsesCameraBinding> NodeListWrapper<RamsesCameraBinding>::collection()
-    {
-        return m_logicEngine.ramsesCameraBindings();
+        return m_logicEngine.getCollection<T>();
     }
 
     template struct NodeListWrapper<AnimationNode>;

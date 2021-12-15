@@ -29,6 +29,7 @@ content = [
         'RamsesBinding',
         'DataArray',
         'AnimationNode',
+        'TimerNode',
         'Iterator',
         'Collection',
         'LuaConfig',
@@ -60,6 +61,7 @@ content = [
     'options': '   :members:',
     'items': [
         'PropertyTypeToEnum',
+        'PropertyEnumToType',
         'IsPrimitiveProperty',
     ]
     },

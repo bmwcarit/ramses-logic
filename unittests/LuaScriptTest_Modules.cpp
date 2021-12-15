@@ -254,6 +254,83 @@ namespace rlogic::internal
         EXPECT_EQ(72, *colorOutput->getChild("blue")->get<int32_t>());
     }
 
+    TEST_F(ALuaScriptWithModule, CanGetTableSizeWithCustomMethod)
+    {
+        const std::string_view modSrc = R"(
+            local mod = {}
+            mod.table1 = { a=1, b=2 }
+            mod.table2 = { 4, 5, 6, 7 }
+            mod.table3 = { a=1, b=2, 42 } -- expected size 1, according to Lua semantics
+            return mod
+        )";
+
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mod")
+            function interface()
+                OUT.table1size = INT
+                OUT.table2size = INT
+                OUT.table3size = INT
+            end
+            function run()
+                OUT.table1size = rl_len(mod.table1)
+                OUT.table2size = rl_len(mod.table2)
+                OUT.table3size = rl_len(mod.table3)
+            end
+        )", createDeps({ { "mod", modSrc } }));
+        ASSERT_TRUE(script);
+
+        m_logicEngine.update();
+        EXPECT_EQ(0, *script->getOutputs()->getChild("table1size")->get<int32_t>());
+        EXPECT_EQ(4, *script->getOutputs()->getChild("table2size")->get<int32_t>());
+        EXPECT_EQ(1, *script->getOutputs()->getChild("table3size")->get<int32_t>());
+    }
+
+    TEST_F(ALuaScriptWithModule, CanGetTableSizeWithCustomMethod_InsideModuleAswell)
+    {
+        const std::string_view modSrc = R"(
+            local mod = {}
+            mod.table = { 4, 6 }
+            mod.tableSize = rl_len(mod.table)
+            return mod
+        )";
+
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mod")
+            function interface()
+                OUT.size = INT
+            end
+            function run()
+                OUT.size = mod.tableSize
+            end
+        )", createDeps({ { "mod", modSrc } }));
+        ASSERT_TRUE(script);
+
+        m_logicEngine.update();
+        EXPECT_EQ(2, *script->getOutputs()->getChild("size")->get<int32_t>());
+    }
+    TEST_F(ALuaScriptWithModule, ReportsErrorWhenCustomLengthFunctionCalledOnInvalidType)
+    {
+        const std::string_view modSrc = R"(
+            local mod = {}
+            mod.invalidTypeForLength = 42
+            return mod
+        )";
+
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mod")
+            function interface()
+                OUT.size = INT
+            end
+            function run()
+                OUT.size = rl_len(mod.invalidTypeForLength)
+            end
+        )", createDeps({ { "mod", modSrc } }));
+        ASSERT_TRUE(script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("lua: error: rl_len() called on an unsupported type 'number'"));
+    }
+
     TEST_F(ALuaScriptWithModule, UsesModuleThatDependsOnAnotherModule)
     {
         const std::string_view wrappedModuleSrc = R"(
@@ -416,10 +493,10 @@ namespace rlogic::internal
         EXPECT_TRUE(m_logicEngine.loadFromFile("scriptmodules.tmp"));
         m_logicEngine.update();
 
-        const auto module1 = m_logicEngine.findLuaModule("mymodule1");
-        const auto module2 = m_logicEngine.findLuaModule("mymodule2");
-        const auto script1 = m_logicEngine.findScript("script1");
-        const auto script2 = m_logicEngine.findScript("script2");
+        const auto module1 = m_logicEngine.findByName<LuaModule>("mymodule1");
+        const auto module2 = m_logicEngine.findByName<LuaModule>("mymodule2");
+        const auto script1 = m_logicEngine.findByName<LuaScript>("script1");
+        const auto script2 = m_logicEngine.findByName<LuaScript>("script2");
         ASSERT_TRUE(module1 && module2 && script1 && script2);
         EXPECT_THAT(script1->m_script.getModules(), UnorderedElementsAre(Pair("mymath", module1), Pair("mymathother", module2)));
         EXPECT_THAT(script2->m_script.getModules(), UnorderedElementsAre(Pair("mymath", module2)));
@@ -697,8 +774,7 @@ namespace rlogic::internal
     protected:
     };
 
-    // This test reflects behavior which will be fixed in a next release (adapt the tests after the fix)
-    TEST_F(ALuaScriptWithModule_Isolation, ScriptOverwritingModuleFunctionAffectsOtherScriptUsingIt_InRunFunction)
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToRunScriptOverwritingModuleFunction_InRunFunction)
     {
         const std::string_view mymathModuleSrc = R"(
             local mymath = {}
@@ -726,31 +802,12 @@ namespace rlogic::internal
         )", config);
         ASSERT_NE(nullptr, script1);
 
-        // This will overwrite the module function floor1 with floor2
-        EXPECT_TRUE(m_logicEngine.update());
-
-        const auto script2 = m_logicEngine.createLuaScript(R"(
-            modules("mymath")
-            function interface()
-                OUT.floor1 = INT
-                OUT.floor2 = INT
-            end
-            function run()
-                OUT.floor1 = mymath.floor1(1.5)
-                OUT.floor2 = mymath.floor2(1.5)
-            end
-        )", config);
-        ASSERT_NE(nullptr, script2);
-
-        EXPECT_TRUE(m_logicEngine.update());
-
-        // Both floor1 and floor2 have the modified code
-        EXPECT_EQ(101, *script2->getOutputs()->getChild("floor1")->get<int32_t>());
-        EXPECT_EQ(101, *script2->getOutputs()->getChild("floor2")->get<int32_t>());
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
     }
 
-    // This test reflects behavior which will be fixed in a next release (adapt the tests after the fix)
-    TEST_F(ALuaScriptWithModule_Isolation, ScriptOverwritingModuleFunctionAffectsOtherScriptUsingIt_InInterfaceFunction)
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToCompileScriptOverwritingModuleFunction_InInterfaceFunction)
     {
         const std::string_view mymathModuleSrc = R"(
             local mymath = {}
@@ -776,33 +833,12 @@ namespace rlogic::internal
             function run()
             end
         )", config);
-        ASSERT_NE(nullptr, script1);
-
-        // This will overwrite the module function floor1 with floor2
-        EXPECT_TRUE(m_logicEngine.update());
-
-        const auto script2 = m_logicEngine.createLuaScript(R"(
-            modules("mymath")
-            function interface()
-                OUT.floor1 = INT
-                OUT.floor2 = INT
-            end
-            function run()
-                OUT.floor1 = mymath.floor1(1.5)
-                OUT.floor2 = mymath.floor2(1.5)
-            end
-        )", config);
-        ASSERT_NE(nullptr, script2);
-
-        EXPECT_TRUE(m_logicEngine.update());
-
-        // Both floor1 and floor2 have the modified code
-        EXPECT_EQ(101, *script2->getOutputs()->getChild("floor1")->get<int32_t>());
-        EXPECT_EQ(101, *script2->getOutputs()->getChild("floor2")->get<int32_t>());
+        EXPECT_EQ(nullptr, script1);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
     }
 
-    // This test reflects behavior which will be fixed in a next release (adapt the tests after the fix)
-    TEST_F(ALuaScriptWithModule_Isolation, ScriptOverwritingModuleDataAffectsOtherScriptUsingIt_InRunFunction)
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToRunScriptOverwritingModuleData_InRunFunction)
     {
         const std::string_view mymathModuleSrc = R"(
             local mymath = {}
@@ -825,28 +861,12 @@ namespace rlogic::internal
         )", config);
         ASSERT_NE(nullptr, script1);
 
-        // This will overwrite the module function floor1 with floor2
-        EXPECT_TRUE(m_logicEngine.update());
-
-        const auto script2 = m_logicEngine.createLuaScript(R"(
-            modules("mymath")
-            function interface()
-                OUT.data = INT
-            end
-            function run()
-                OUT.data = mymath.data
-            end
-        )", config);
-        ASSERT_NE(nullptr, script2);
-
-        EXPECT_TRUE(m_logicEngine.update());
-
-        // data in script2 has modified value from script1
-        EXPECT_EQ(42, *script2->getOutputs()->getChild("data")->get<int32_t>());
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
     }
 
-    // This test reflects behavior which will be fixed in a next release (adapt the tests after the fix)
-    TEST_F(ALuaScriptWithModule_Isolation, ScriptOverwritingModuleDataAffectsOtherScriptUsingIt_InInterfaceFunction)
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToCompileScriptOverwritingModuleData_InInterfaceFunction)
     {
         const std::string_view mymathModuleSrc = R"(
             local mymath = {}
@@ -867,62 +887,12 @@ namespace rlogic::internal
             function run()
             end
         )", config);
-        ASSERT_NE(nullptr, script1);
-
-        // This will overwrite the module function floor1 with floor2
-        EXPECT_TRUE(m_logicEngine.update());
-
-        const auto script2 = m_logicEngine.createLuaScript(R"(
-            modules("mymath")
-            function interface()
-                OUT.data = INT
-            end
-            function run()
-                OUT.data = mymath.data
-            end
-        )", config);
-        ASSERT_NE(nullptr, script2);
-
-        EXPECT_TRUE(m_logicEngine.update());
-
-        // data in script2 has modified value from script1
-        EXPECT_EQ(42, *script2->getOutputs()->getChild("data")->get<int32_t>());
+        EXPECT_EQ(nullptr, script1);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
     }
 
-    // This is something we want to forbid and catch as error. When we do, rewrite this test
-    TEST_F(ALuaScriptWithModule_Isolation, ModuleOfDataCanBeModifiedByScript)
-    {
-        const std::string_view moduleSrc = R"(
-            local mod = {}
-            mod.value = 1
-            function mod.getValue()
-                return mod.value
-            end
-            return mod
-        )";
-
-        const std::string_view scriptSrc = R"(
-            modules("mappedMod")
-            function interface()
-                OUT.fromScript = INT
-                OUT.fromModule = INT
-            end
-
-            function run()
-                mappedMod.value = 5
-                OUT.fromScript = mappedMod.value
-                OUT.fromModule = mappedMod.getValue()
-            end
-        )";
-
-        const auto script = m_logicEngine.createLuaScript(scriptSrc, createDeps({ { "mappedMod", moduleSrc } }));
-
-        EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(5, *script->getOutputs()->getChild("fromScript")->get<int32_t>());
-        EXPECT_EQ(5, *script->getOutputs()->getChild("fromModule")->get<int32_t>());
-    }
-
-    TEST_F(ALuaScriptWithModule_Isolation, ModuleCanModifyOutsideDataWhenExplicitlyPassedAsArgument)
+    TEST_F(ALuaScriptWithModule_Isolation, ModuleCannotModifyItsDataWhenPassedFromScript)
     {
         const std::string_view moduleSrc = R"(
             local mod = {}
@@ -947,14 +917,14 @@ namespace rlogic::internal
             end
         )";
 
-        const auto script = m_logicEngine.createLuaScript(scriptSrc, createDeps({ { "mappedMod", moduleSrc } }));
+        m_logicEngine.createLuaScript(scriptSrc, createDeps({ { "mappedMod", moduleSrc } }));
 
-        EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(42, *script->getOutputs()->getChild("result")->get<int32_t>());
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
     }
 
-    // This test reflects behavior which will be fixed in a next release (adapt the tests after the fix)
-    TEST_F(ALuaScriptWithModule_Isolation, DataIsNotIsolatedBetweenModuleAndScript_WhenNested)
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToRunScriptOverwritingModuleData_WhenDataNested)
     {
         const std::string_view moduleSrc = R"(
             local mod = {}
@@ -980,10 +950,88 @@ namespace rlogic::internal
             end
         )";
 
-        const auto script = m_logicEngine.createLuaScript(scriptSrc, createDeps({ { "mappedMod", moduleSrc } }));
+        m_logicEngine.createLuaScript(scriptSrc, createDeps({ { "mappedMod", moduleSrc } }));
 
-        EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(20, *script->getOutputs()->getChild("resultBeforeMod")->get<int32_t>());
-        EXPECT_EQ(42, *script->getOutputs()->getChild("resultAfterMod")->get<int32_t>());
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
+    }
+
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToRunScriptUsingModuleOverwritingNestedModuleData_InRunFunction)
+    {
+        const std::string_view mymathModuleSrc1 = R"(
+            local mymath = {}
+            mymath.data = 1
+            return mymath
+        )";
+        const auto mymathModule1 = m_logicEngine.createLuaModule(mymathModuleSrc1);
+        ASSERT_NE(nullptr, mymathModule1);
+
+        const std::string_view mymathModuleSrc2 = R"(
+            modules("mymath")
+            local mymathWrap = {}
+            function mymathWrap.modify()
+                mymath.data = 2
+            end
+            return mymathWrap
+        )";
+        LuaConfig configMod;
+        configMod.addDependency("mymath", *mymathModule1);
+        const auto mymathModule2 = m_logicEngine.createLuaModule(mymathModuleSrc2, configMod);
+        ASSERT_NE(nullptr, mymathModule2);
+
+        LuaConfig config;
+        config.addDependency("mymathWrap", *mymathModule2);
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mymathWrap")
+            function interface()
+            end
+            function run()
+                mymathWrap.modify()
+            end
+        )", config);
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
+    }
+
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToRunScriptUsingModuleOverwritingNestedModuleData_InInterfaceFunction)
+    {
+        const std::string_view mymathModuleSrc1 = R"(
+            local mymath = {}
+            mymath.data = 1
+            return mymath
+        )";
+        const auto mymathModule1 = m_logicEngine.createLuaModule(mymathModuleSrc1);
+        ASSERT_NE(nullptr, mymathModule1);
+
+        const std::string_view mymathModuleSrc2 = R"(
+            modules("mymath")
+            local mymathWrap = {}
+            function mymathWrap.modify()
+                mymath.data = 2
+            end
+            return mymathWrap
+        )";
+        LuaConfig configMod;
+        configMod.addDependency("mymath", *mymathModule1);
+        const auto mymathModule2 = m_logicEngine.createLuaModule(mymathModuleSrc2, configMod);
+        ASSERT_NE(nullptr, mymathModule2);
+
+        LuaConfig config;
+        config.addDependency("mymathWrap", *mymathModule2);
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mymathWrap")
+            function interface()
+                mymathWrap.modify()
+            end
+            function run()
+            end
+        )", config);
+        EXPECT_EQ(nullptr, script);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
     }
 }

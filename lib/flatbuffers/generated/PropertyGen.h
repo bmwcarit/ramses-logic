@@ -18,6 +18,8 @@ struct vec4f_s;
 
 struct int32_s;
 
+struct int64_s;
+
 struct vec2i_s;
 
 struct vec3i_s;
@@ -72,16 +74,17 @@ enum class PropertyValue : uint8_t {
   vec3f_s = 3,
   vec4f_s = 4,
   int32_s = 5,
-  vec2i_s = 6,
-  vec3i_s = 7,
-  vec4i_s = 8,
-  string_s = 9,
-  bool_s = 10,
+  int64_s = 6,
+  vec2i_s = 7,
+  vec3i_s = 8,
+  vec4i_s = 9,
+  string_s = 10,
+  bool_s = 11,
   MIN = NONE,
   MAX = bool_s
 };
 
-inline const PropertyValue (&EnumValuesPropertyValue())[11] {
+inline const PropertyValue (&EnumValuesPropertyValue())[12] {
   static const PropertyValue values[] = {
     PropertyValue::NONE,
     PropertyValue::float_s,
@@ -89,6 +92,7 @@ inline const PropertyValue (&EnumValuesPropertyValue())[11] {
     PropertyValue::vec3f_s,
     PropertyValue::vec4f_s,
     PropertyValue::int32_s,
+    PropertyValue::int64_s,
     PropertyValue::vec2i_s,
     PropertyValue::vec3i_s,
     PropertyValue::vec4i_s,
@@ -99,13 +103,14 @@ inline const PropertyValue (&EnumValuesPropertyValue())[11] {
 }
 
 inline const char * const *EnumNamesPropertyValue() {
-  static const char * const names[12] = {
+  static const char * const names[13] = {
     "NONE",
     "float_s",
     "vec2f_s",
     "vec3f_s",
     "vec4f_s",
     "int32_s",
+    "int64_s",
     "vec2i_s",
     "vec3i_s",
     "vec4i_s",
@@ -144,6 +149,10 @@ template<> struct PropertyValueTraits<rlogic_serialization::vec4f_s> {
 
 template<> struct PropertyValueTraits<rlogic_serialization::int32_s> {
   static const PropertyValue enum_value = PropertyValue::int32_s;
+};
+
+template<> struct PropertyValueTraits<rlogic_serialization::int64_s> {
+  static const PropertyValue enum_value = PropertyValue::int64_s;
 };
 
 template<> struct PropertyValueTraits<rlogic_serialization::vec2i_s> {
@@ -283,6 +292,23 @@ FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) int32_s FLATBUFFERS_FINAL_CLASS {
   }
 };
 FLATBUFFERS_STRUCT_END(int32_s, 4);
+
+FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) int64_s FLATBUFFERS_FINAL_CLASS {
+ private:
+  int64_t v_;
+
+ public:
+  int64_s() {
+    memset(static_cast<void *>(this), 0, sizeof(int64_s));
+  }
+  int64_s(int64_t _v)
+      : v_(flatbuffers::EndianScalar(_v)) {
+  }
+  int64_t v() const {
+    return flatbuffers::EndianScalar(v_);
+  }
+};
+FLATBUFFERS_STRUCT_END(int64_s, 8);
 
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(4) vec2i_s FLATBUFFERS_FINAL_CLASS {
  private:
@@ -481,6 +507,9 @@ struct Property FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::int32_s *value_as_int32_s() const {
     return value_type() == rlogic_serialization::PropertyValue::int32_s ? static_cast<const rlogic_serialization::int32_s *>(value()) : nullptr;
   }
+  const rlogic_serialization::int64_s *value_as_int64_s() const {
+    return value_type() == rlogic_serialization::PropertyValue::int64_s ? static_cast<const rlogic_serialization::int64_s *>(value()) : nullptr;
+  }
   const rlogic_serialization::vec2i_s *value_as_vec2i_s() const {
     return value_type() == rlogic_serialization::PropertyValue::vec2i_s ? static_cast<const rlogic_serialization::vec2i_s *>(value()) : nullptr;
   }
@@ -529,6 +558,10 @@ template<> inline const rlogic_serialization::vec4f_s *Property::value_as<rlogic
 
 template<> inline const rlogic_serialization::int32_s *Property::value_as<rlogic_serialization::int32_s>() const {
   return value_as_int32_s();
+}
+
+template<> inline const rlogic_serialization::int64_s *Property::value_as<rlogic_serialization::int64_s>() const {
+  return value_as_int64_s();
 }
 
 template<> inline const rlogic_serialization::vec2i_s *Property::value_as<rlogic_serialization::vec2i_s>() const {
@@ -640,6 +673,9 @@ inline bool VerifyPropertyValue(flatbuffers::Verifier &verifier, const void *obj
     }
     case PropertyValue::int32_s: {
       return verifier.Verify<rlogic_serialization::int32_s>(static_cast<const uint8_t *>(obj), 0);
+    }
+    case PropertyValue::int64_s: {
+      return verifier.Verify<rlogic_serialization::int64_s>(static_cast<const uint8_t *>(obj), 0);
     }
     case PropertyValue::vec2i_s: {
       return verifier.Verify<rlogic_serialization::vec2i_s>(static_cast<const uint8_t *>(obj), 0);

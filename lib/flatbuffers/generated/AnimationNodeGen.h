@@ -183,12 +183,16 @@ struct AnimationNode FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_CHANNELS = 6,
-    VT_ROOTINPUT = 8,
-    VT_ROOTOUTPUT = 10
+    VT_ID = 6,
+    VT_CHANNELS = 8,
+    VT_ROOTINPUT = 10,
+    VT_ROOTOUTPUT = 12
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
+  }
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>> *channels() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>> *>(VT_CHANNELS);
@@ -203,6 +207,7 @@ struct AnimationNode FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
+           VerifyField<uint64_t>(verifier, VT_ID) &&
            VerifyOffset(verifier, VT_CHANNELS) &&
            verifier.VerifyVector(channels()) &&
            verifier.VerifyVectorOfTables(channels()) &&
@@ -220,6 +225,9 @@ struct AnimationNodeBuilder {
   flatbuffers::uoffset_t start_;
   void add_name(flatbuffers::Offset<flatbuffers::String> name) {
     fbb_.AddOffset(AnimationNode::VT_NAME, name);
+  }
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(AnimationNode::VT_ID, id, 0);
   }
   void add_channels(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>>> channels) {
     fbb_.AddOffset(AnimationNode::VT_CHANNELS, channels);
@@ -245,10 +253,12 @@ struct AnimationNodeBuilder {
 inline flatbuffers::Offset<AnimationNode> CreateAnimationNode(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> name = 0,
+    uint64_t id = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>>> channels = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
   AnimationNodeBuilder builder_(_fbb);
+  builder_.add_id(id);
   builder_.add_rootOutput(rootOutput);
   builder_.add_rootInput(rootInput);
   builder_.add_channels(channels);
@@ -264,6 +274,7 @@ struct AnimationNode::Traits {
 inline flatbuffers::Offset<AnimationNode> CreateAnimationNodeDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
+    uint64_t id = 0,
     const std::vector<flatbuffers::Offset<rlogic_serialization::Channel>> *channels = nullptr,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
@@ -272,6 +283,7 @@ inline flatbuffers::Offset<AnimationNode> CreateAnimationNodeDirect(
   return rlogic_serialization::CreateAnimationNode(
       _fbb,
       name__,
+      id,
       channels__,
       rootInput,
       rootOutput);

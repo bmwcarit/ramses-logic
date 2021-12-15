@@ -14,6 +14,7 @@
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/DataArray.h"
+#include "ramses-logic/TimerNode.h"
 
 #include "ramses-client.h"
 #include "ramses-utils.h"
@@ -37,7 +38,7 @@ struct SceneAndNodes
 
 /**
 * Helper method which creates a simple ramses scene. For more ramses
-* examples, check the ramses docs at https://genivi.github.io/ramses
+* examples, check the ramses docs at https://covesa.github.io/ramses
 */
 SceneAndNodes CreateSceneWithTriangles(ramses::RamsesClient& client);
 
@@ -108,22 +109,27 @@ int main(int argc, char* argv[])
         *nodeBinding2->getInputs()->getChild("rotation"));
 
     /**
+    * We need to provide time information to the animation nodes, the easiest way is to create a TimerNode
+    * and link its 'timeDelta' output to all animation nodes' 'timeDelta' input.
+    * Timer node will internally get a system time ticker on every update, it will calculate a 'timeDelta' (time period since last update)
+    * which is exactly what an animation node needs to advance its animation. See TimerNode API for more use cases.
+    */
+    rlogic::TimerNode* timer = logicEngine.createTimerNode();
+    logicEngine.link(
+        *timer->getOutputs()->getChild("timeDelta"),
+        *cubicAnimNode->getInputs()->getChild("timeDelta"));
+    logicEngine.link(
+        *timer->getOutputs()->getChild("timeDelta"),
+        *stepAnimNode->getInputs()->getChild("timeDelta"));
+
+    /**
      * Start the cubic animation right away.
      */
     cubicAnimNode->getInputs()->getChild("play")->set(true);
 
     /**
-     * Store the timeDelta inputs of both animations, because we will be updating these each frame (see the loop below).
-     * For a larger scene with many animations, consider looping over the LogicEngine::animationNodes() collection
-     * and storing all timeDelta properties into an array.
-     */
-    rlogic::Property* timeDeltaInput1 = cubicAnimNode->getInputs()->getChild("timeDelta");
-    rlogic::Property* timeDeltaInput2 = stepAnimNode->getInputs()->getChild("timeDelta");
-
-    /**
      * Simulate an application loop.
      */
-    auto lastFrameTime = std::chrono::steady_clock::now();
     for(int loop = 0; loop < 500; ++loop)
     {
         /**
@@ -135,22 +141,7 @@ int main(int argc, char* argv[])
             stepAnimNode->getInputs()->getChild("play")->set(true);
 
         /**
-         * In every iteration where animation update is desired a 'timeDelta' must be set,
-         * timeDelta represents a time change since last update.
-         * In this example, the time units are seconds measured in float (the time units must match the timestamp data of the animations).
-         * If animation is playing the timeDelta determines how much it will progress in this update,
-         * the actual output value is then calculated by interpolating between the two keyframes closest
-         * to the current (elapsed) play time.
-         */
-        const auto timeNow = std::chrono::steady_clock::now();
-        const float timeDeltaSecs = 0.001f * static_cast<float>(std::chrono::duration_cast<std::chrono::milliseconds>(timeNow - lastFrameTime).count());
-        timeDeltaInput1->set(timeDeltaSecs);
-        timeDeltaInput2->set(timeDeltaSecs);
-
-        lastFrameTime = timeNow;
-
-        /**
-        * Update the LogicEngine. This will apply changes from any running animation which had its timeDelta input set before this update call.
+        * Update the LogicEngine. This will apply changes to Ramses scene from any running animation.
         */
         logicEngine.update();
 

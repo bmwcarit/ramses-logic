@@ -28,6 +28,7 @@ Class Index
     RamsesBinding
     DataArray
     AnimationNode
+    TimerNode
     Iterator
     Collection
     LuaConfig
@@ -56,6 +57,7 @@ Class Index
 
 
     PropertyTypeToEnum
+    PropertyEnumToType
     IsPrimitiveProperty
 
 

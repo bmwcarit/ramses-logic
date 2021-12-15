@@ -52,6 +52,7 @@ namespace rlogic
     class RamsesCameraBinding;
     class DataArray;
     class AnimationNode;
+    class TimerNode;
 }
 
 namespace rlogic::internal
@@ -59,15 +60,9 @@ namespace rlogic::internal
     class SolState;
     class IRamsesObjectResolver;
 
-    using ScriptsContainer = std::vector<LuaScript*>;
-    using LuaModulesContainer = std::vector<LuaModule*>;
-    using NodeBindingsContainer = std::vector<RamsesNodeBinding*>;
-    using AppearanceBindingsContainer = std::vector<RamsesAppearanceBinding*>;
-    using CameraBindingsContainer = std::vector<RamsesCameraBinding*>;
-    using DataArrayContainer = std::vector<DataArray*>;
-    using AnimationNodesContainer = std::vector<AnimationNode*>;
-    using LogicObjectContainer = std::vector<LogicObject*>;
-    using ObjectsOwningContainer = std::vector<std::unique_ptr<LogicObject>>;
+    template <typename T>
+    using ApiObjectContainer = std::vector<T*>;
+    using ApiObjectOwningContainer = std::vector<std::unique_ptr<LogicObject>>;
 
     class ApiObjects
     {
@@ -109,38 +104,28 @@ namespace rlogic::internal
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name);
+        TimerNode* createTimerNode(std::string_view name);
         bool destroy(LogicObject& object, ErrorReporting& errorReporting);
 
         // Invariance checks
         [[nodiscard]] bool checkBindingsReferToSameRamsesScene(ErrorReporting& errorReporting) const;
 
         // Getters
-        [[nodiscard]] LogicObjectContainer& getLogicObjects();
-        [[nodiscard]] const LogicObjectContainer& getLogicObjects() const;
-        [[nodiscard]] ScriptsContainer& getScripts();
-        [[nodiscard]] const ScriptsContainer& getScripts() const;
-        [[nodiscard]] LuaModulesContainer& getLuaModules();
-        [[nodiscard]] const LuaModulesContainer& getLuaModules() const;
-        [[nodiscard]] NodeBindingsContainer& getNodeBindings();
-        [[nodiscard]] const NodeBindingsContainer& getNodeBindings() const;
-        [[nodiscard]] AppearanceBindingsContainer& getAppearanceBindings();
-        [[nodiscard]] const AppearanceBindingsContainer& getAppearanceBindings() const;
-        [[nodiscard]] CameraBindingsContainer& getCameraBindings();
-        [[nodiscard]] const CameraBindingsContainer& getCameraBindings() const;
-        [[nodiscard]] DataArrayContainer& getDataArrays();
-        [[nodiscard]] const DataArrayContainer& getDataArrays() const;
-        [[nodiscard]] AnimationNodesContainer& getAnimationNodes();
-        [[nodiscard]] const AnimationNodesContainer& getAnimationNodes() const;
-        [[nodiscard]] const ObjectsOwningContainer& getOwnedObjects() const;
-
+        template <typename T>
+        [[nodiscard]] const ApiObjectContainer<T>& getApiObjectContainer() const;
+        template <typename T>
+        [[nodiscard]] ApiObjectContainer<T>& getApiObjectContainer();
+        [[nodiscard]] const ApiObjectOwningContainer& getApiObjectOwningContainer() const;
         [[nodiscard]] const LogicNodeDependencies& getLogicNodeDependencies() const;
         [[nodiscard]] LogicNodeDependencies& getLogicNodeDependencies();
 
         [[nodiscard]] LogicNode* getApiObject(LogicNodeImpl& impl) const;
+        [[nodiscard]] LogicObject* getApiObjectById(uint64_t id) const;
 
         // Internally used
         [[nodiscard]] bool isDirty() const;
         [[nodiscard]] bool bindingsDirty() const;
+        [[nodiscard]] uint64_t getNextLogicObjectId();
 
         // Strictly for testing purposes (inverse mappings require extra attention and test coverage)
         [[nodiscard]] const std::unordered_map<LogicNodeImpl*, LogicNode*>& getReverseImplMapping() const;
@@ -164,20 +149,25 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(AnimationNode& node, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(TimerNode& node, ErrorReporting& errorReporting);
 
-        std::unique_ptr<SolState>           m_solState {std::make_unique<SolState>()};
+        std::unique_ptr<SolState> m_solState {std::make_unique<SolState>()};
 
-        ScriptsContainer                    m_scripts;
-        LuaModulesContainer                 m_luaModules;
-        NodeBindingsContainer               m_ramsesNodeBindings;
-        AppearanceBindingsContainer         m_ramsesAppearanceBindings;
-        CameraBindingsContainer             m_ramsesCameraBindings;
-        DataArrayContainer                  m_dataArrays;
-        AnimationNodesContainer             m_animationNodes;
-        LogicNodeDependencies               m_logicNodeDependencies;
-        LogicObjectContainer                m_logicObjects;
-        ObjectsOwningContainer              m_objectsOwningContainer;
+        ApiObjectContainer<LuaScript>               m_scripts;
+        ApiObjectContainer<LuaModule>               m_luaModules;
+        ApiObjectContainer<RamsesNodeBinding>       m_ramsesNodeBindings;
+        ApiObjectContainer<RamsesAppearanceBinding> m_ramsesAppearanceBindings;
+        ApiObjectContainer<RamsesCameraBinding>     m_ramsesCameraBindings;
+        ApiObjectContainer<DataArray>               m_dataArrays;
+        ApiObjectContainer<AnimationNode>           m_animationNodes;
+        ApiObjectContainer<TimerNode>               m_timerNodes;
+        ApiObjectContainer<LogicObject>             m_logicObjects;
+        ApiObjectOwningContainer                    m_objectsOwningContainer;
+
+        LogicNodeDependencies                       m_logicNodeDependencies;
+        uint64_t                                    m_lastObjectId = 0;
 
         std::unordered_map<LogicNodeImpl*, LogicNode*> m_reverseImplMapping;
+        std::unordered_map<uint64_t, LogicObject*>     m_logicObjectIdMapping;
     };
 }

@@ -9,7 +9,6 @@
 #pragma once
 
 #include "internals/DirectedAcyclicGraph.h"
-#include "internals/LogicNodeConnector.h"
 
 #include <unordered_set>
 
@@ -17,6 +16,7 @@ namespace rlogic::internal
 {
     class LogicNodeImpl;
     class ErrorReporting;
+    class PropertyImpl;
 
     using NodeSet = std::unordered_set<LogicNodeImpl*>;
 
@@ -26,7 +26,7 @@ namespace rlogic::internal
     {
     public:
         // The primary purpose of this class
-        [[nodiscard]] std::optional<NodeVector> getTopologicallySortedNodes();
+        [[nodiscard]] const std::optional<NodeVector>& getTopologicallySortedNodes();
 
         // Nodes management
         void addNode(LogicNodeImpl& node);
@@ -36,13 +36,11 @@ namespace rlogic::internal
         bool link(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting);
         bool unlink(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting);
         [[nodiscard]] bool isLinked(const LogicNodeImpl& node) const;
-        [[nodiscard]] const LinksMap& getLinks() const;
-        [[nodiscard]] const PropertyImpl* getLinkedOutput(PropertyImpl& inputProperty) const;
 
     private:
-        // TODO Violin redesign these classes, they have redundant data
         DirectedAcyclicGraph                m_logicNodeDAG;
-        LogicNodeConnector                  m_logicNodeConnector;
+
+        [[nodiscard]] bool isLinked(PropertyImpl& input) const;
 
         // Initial state: no nodes and no need to re-compute node topology
         std::optional<NodeVector> m_cachedTopologicallySortedNodes = NodeVector{};

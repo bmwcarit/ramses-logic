@@ -24,7 +24,7 @@
  * their output is propagated to the linked Ramses scene(s).
  * This example only demonstrates code, for general explanations
  * and more context, check the doc pages at:
- * https://genivi.github.io/ramses-logic/api.html#linking-script-outputs-to-ramses-scenes
+ * https://ramses-logic.readthedocs.io/en/latest/api.html#creating-links-between-scripts
  */
 
 struct SceneAndNode
@@ -36,7 +36,7 @@ struct SceneAndNode
 
 /**
  * Helper method which creates a simple ramses scene. For more ramses
- * examples, check the ramses docs at https://genivi.github.io/ramses
+ * examples, check the ramses docs at https://covesa.github.io/ramses
  */
 SceneAndNode CreateSceneWithTriangle(ramses::RamsesClient& client);
 
@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
      */
     rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function interface()
-            IN.time_msec = INT
+            IN.time_msec = INT32
             OUT.rotationZ = VEC3F
         end
 

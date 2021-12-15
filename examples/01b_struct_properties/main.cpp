@@ -28,14 +28,14 @@ int main()
             IN.struct = {
                 nested = {
                     data1 = STRING,
-                    data2 = INT
+                    data2 = INT32
                 }
             }
 
             OUT.struct = {
                 nested = {
                     data1 = STRING,
-                    data2 = INT
+                    data2 = INT32
                 }
             }
         end

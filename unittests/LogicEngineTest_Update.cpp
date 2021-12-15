@@ -266,6 +266,8 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Update, OnlyUpdatesDirtyLogicNodes)
     {
+        m_logicEngine.enableUpdateReport(true);
+
         auto        scriptSource = R"(
             function interface()
                 IN.inFloat = FLOAT
@@ -273,24 +275,15 @@ namespace rlogic
             end
             function run()
                 OUT.outFloat = IN.inFloat
-                print("executed")
             end
         )";
 
-        auto sourceScript = m_logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
-        auto targetScript = m_logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
+        auto sourceScript = m_logicEngine.createLuaScript(scriptSource, {});
+        auto targetScript = m_logicEngine.createLuaScript(scriptSource, {});
 
         auto sourceInput  = sourceScript->getInputs()->getChild("inFloat");
         auto sourceOutput = sourceScript->getOutputs()->getChild("outFloat");
         auto targetInput  = targetScript->getInputs()->getChild("inFloat");
-
-        std::vector<std::pair<std::string, std::string>> messages;
-        sourceScript->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view message) {
-            messages.emplace_back(std::make_pair(scriptName, message));
-        });
-        targetScript->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view message) {
-            messages.emplace_back(std::make_pair(scriptName, message));
-        });
 
         EXPECT_TRUE(sourceScript->m_impl.isDirty());
         EXPECT_TRUE(targetScript->m_impl.isDirty());
@@ -306,15 +299,14 @@ namespace rlogic
         EXPECT_FALSE(targetScript->m_impl.isDirty());
 
         // both scripts are updated, because its the first update
-        ASSERT_EQ(2u, messages.size());
-        EXPECT_EQ("SourceScript", messages[0].first);
-        EXPECT_EQ("TargetScript", messages[1].first);
+        auto executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+        ASSERT_EQ(2u, executedNodes.size());
+        EXPECT_EQ(sourceScript, executedNodes[0].first);
+        EXPECT_EQ(targetScript, executedNodes[1].first);
 
-        messages.clear();
         m_logicEngine.update();
 
-        EXPECT_TRUE(messages.empty());
-        messages.clear();
+        EXPECT_TRUE(m_logicEngine.getLastUpdateReport().getNodesExecuted().empty());
 
         targetInput->set(42.f);
 
@@ -328,16 +320,16 @@ namespace rlogic
         EXPECT_FALSE(targetScript->m_impl.isDirty());
 
         // Nothing is updated, because targetScript is linked input and cannot be set manually
-        ASSERT_EQ(0u, messages.size());
+        EXPECT_TRUE(m_logicEngine.getLastUpdateReport().getNodesExecuted().empty());
 
         sourceInput->set(24.f);
-        messages.clear();
         m_logicEngine.update();
 
         // Both scripts are updated, because the input of the first script is changed and changes target through link.
-        ASSERT_EQ(2u, messages.size());
-        EXPECT_EQ("SourceScript", messages[0].first);
-        EXPECT_EQ("TargetScript", messages[1].first);
+        executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+        ASSERT_EQ(2u, executedNodes.size());
+        EXPECT_EQ(sourceScript, executedNodes[0].first);
+        EXPECT_EQ(targetScript, executedNodes[1].first);
     }
 
     TEST_F(ALogicEngine_Update, OnlyUpdatesDirtyLogicNodesInAComplexLogicGraph)
@@ -350,14 +342,13 @@ namespace rlogic
             end
             function run()
                 OUT.out = IN.in1 + IN.in2
-                print("executed")
             end
         )";
 
         std::array<LuaScript*, 6> s = {};
-        for (size_t i = 0; i < s.size(); ++i)
+        for(auto& si : s)
         {
-            s[i] = m_logicEngine.createLuaScript(scriptSource, {}, fmt::format("Script{}", i));
+            si = m_logicEngine.createLuaScript(scriptSource);
         }
 
         auto in1S0  = s[0]->getInputs()->getChild("in1");
@@ -366,6 +357,7 @@ namespace rlogic
         auto in2S1  = s[1]->getInputs()->getChild("in2");
         auto out1S1 = s[1]->getOutputs()->getChild("out");
         auto in1S2  = s[2]->getInputs()->getChild("in1");
+        auto in2S2  = s[2]->getInputs()->getChild("in2");
         auto out1S2 = s[2]->getOutputs()->getChild("out");
         auto in1S3  = s[3]->getInputs()->getChild("in1");
         auto in2S3  = s[3]->getInputs()->getChild("in2");
@@ -378,63 +370,57 @@ namespace rlogic
 
         /*
                  s2 -------
-                    \      \
+               /    \      \
             s0 ----- s1 -- s3 - s5
                             \  /
                              s4
          */
 
-        m_logicEngine.link(*out1S0, *in2S1);
-        m_logicEngine.link(*out1S1, *in2S3);
-        m_logicEngine.link(*out1S2, *in1S1);
-        m_logicEngine.link(*out1S2, *in1S3);
-        m_logicEngine.link(*out1S3, *in1S5);
-        m_logicEngine.link(*out1S3, *in1S4);
-        m_logicEngine.link(*out1S4, *in2S5);
+        ASSERT_TRUE(m_logicEngine.link(*out1S0, *in2S2));
+        ASSERT_TRUE(m_logicEngine.link(*out1S0, *in2S1));
+        ASSERT_TRUE(m_logicEngine.link(*out1S1, *in2S3));
+        ASSERT_TRUE(m_logicEngine.link(*out1S2, *in1S1));
+        ASSERT_TRUE(m_logicEngine.link(*out1S2, *in1S3));
+        ASSERT_TRUE(m_logicEngine.link(*out1S3, *in1S5));
+        ASSERT_TRUE(m_logicEngine.link(*out1S3, *in1S4));
+        ASSERT_TRUE(m_logicEngine.link(*out1S4, *in2S5));
 
-        std::vector<std::string> messages;
-        for (auto script : s)
+        m_logicEngine.enableUpdateReport(true);
+
+        auto expectScriptsExecutedInOrder = [&s, this](std::vector<size_t> expectedOrder)
         {
-            script->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view /*message*/) { messages.emplace_back(scriptName); });
-        }
+            m_logicEngine.update();
 
-        m_logicEngine.update();
+            auto executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+            ASSERT_EQ(expectedOrder.size(), executedNodes.size());
+            for (size_t i = 0; i < expectedOrder.size(); ++i)
+            {
+                EXPECT_EQ(s[expectedOrder[i]], executedNodes[i].first) << "Wrong order for script: " << i << "; expected: " << expectedOrder[i];
+            }
+        };
 
-        // All scripts are executed
-        ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({ "Script0", "Script1", "Script2", "Script3", "Script4", "Script5" }));
-        messages.clear();
+        // Based on topology and first script dirty -> executes all scripts
+        expectScriptsExecutedInOrder({0u, 2u, 1u, 3u, 4u, 5u});
+        // Nothing dirty -> executes no scripts
+        expectScriptsExecutedInOrder({});
 
-        m_logicEngine.update();
-        EXPECT_TRUE(messages.empty());
-
+        // Set value of script 4 -> scripts 4 and 5 are executed
         in2S4->set(1);
-        m_logicEngine.update();
-        ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script4", "Script5"}));
-        messages.clear();
-
-        m_logicEngine.update();
-        EXPECT_TRUE(messages.empty());
+        expectScriptsExecutedInOrder({4u, 5u});
+        expectScriptsExecutedInOrder({});
 
         in1S2->set(2);
-        m_logicEngine.update();
-        ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script1", "Script2", "Script3", "Script4", "Script5"}));
-        messages.clear();
-
-        m_logicEngine.update();
-        EXPECT_TRUE(messages.empty());
+        expectScriptsExecutedInOrder({ 2u, 1u, 3u, 4u, 5u });
+        expectScriptsExecutedInOrder({});
 
         in1S0->set(42);
-        m_logicEngine.update();
-        ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script0", "Script1", "Script3", "Script4", "Script5"}));
-        messages.clear();
-
-        m_logicEngine.update();
-        EXPECT_TRUE(messages.empty());
+        expectScriptsExecutedInOrder({ 0u, 2u, 1u, 3u, 4u, 5u });
+        expectScriptsExecutedInOrder({});
 
         in1S0->set(24);
         in1S2->set(23);
-        m_logicEngine.update();
-        ASSERT_THAT(messages, ::testing::UnorderedElementsAreArray({"Script0", "Script1", "Script2", "Script3", "Script4", "Script5"}));
+        expectScriptsExecutedInOrder({ 0u, 2u, 1u, 3u, 4u, 5u });
+        expectScriptsExecutedInOrder({});
     }
 
     TEST_F(ALogicEngine_Update, AlwaysUpdatesNodeIfDirtyHandlingIsDisabled)
@@ -446,9 +432,11 @@ namespace rlogic
             end
             function run()
                 OUT.outFloat = IN.inFloat
-                print("executed")
             end
         )";
+
+        m_logicEngine.m_impl->disableTrackingDirtyNodes();
+        m_logicEngine.enableUpdateReport(true);
 
         auto sourceScript = m_logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
         auto targetScript = m_logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
@@ -457,35 +445,32 @@ namespace rlogic
         auto sourceOutput = sourceScript->getOutputs()->getChild("outFloat");
         auto targetInput  = targetScript->getInputs()->getChild("inFloat");
 
-        std::vector<std::pair<std::string, std::string>> messages;
-        sourceScript->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view message) { messages.emplace_back(std::make_pair(scriptName, message)); });
-        targetScript->overrideLuaPrint([&messages](std::string_view scriptName, std::string_view message) { messages.emplace_back(std::make_pair(scriptName, message)); });
-
         m_logicEngine.link(*sourceOutput, *targetInput);
-        m_logicEngine.m_impl->update(true);
+        m_logicEngine.update();
 
         // both scripts are updated, because its the first update
-        ASSERT_EQ(2u, messages.size());
-        EXPECT_EQ("SourceScript", messages[0].first);
-        EXPECT_EQ("TargetScript", messages[1].first);
+        auto executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+        ASSERT_EQ(2u, executedNodes.size());
+        EXPECT_EQ(sourceScript, executedNodes[0].first);
+        EXPECT_EQ(targetScript, executedNodes[1].first);
 
+        m_logicEngine.unlink(*sourceOutput, *targetInput);
         targetInput->set(42.f);
-        messages.clear();
-        m_logicEngine.m_impl->update(true);
+        m_logicEngine.update();
 
         // Both scripts are updated, because dirty handling is disabled
-        ASSERT_EQ(2u, messages.size());
-        EXPECT_EQ("SourceScript", messages[0].first);
-        EXPECT_EQ("TargetScript", messages[1].first);
+        executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+        ASSERT_EQ(2u, executedNodes.size());
+        EXPECT_EQ(sourceScript, executedNodes[0].first);
+        EXPECT_EQ(targetScript, executedNodes[1].first);
 
         sourceInput->set(24.f);
-        messages.clear();
-        m_logicEngine.m_impl->update(true);
+        m_logicEngine.update();
 
         // Both scripts are updated, because dirty handling is disabled
-        ASSERT_EQ(2u, messages.size());
-        EXPECT_EQ("SourceScript", messages[0].first);
-        EXPECT_EQ("TargetScript", messages[1].first);
+        executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+        ASSERT_EQ(2u, executedNodes.size());
+        EXPECT_EQ(sourceScript, executedNodes[0].first);
+        EXPECT_EQ(targetScript, executedNodes[1].first);
     }
 }
-

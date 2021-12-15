@@ -293,6 +293,8 @@ The animation support in ``Ramses Logic`` is provided by the following two class
 * :class:`rlogic::DataArray` - contains the animation data (keyframes and time stamps)
 * :class:`rlogic::AnimationNode` - provides an interface to control and holds the current state of animations
 
+Consider also using :class`rlogic::TimerNode` for easy way to generate and provide timing information to :class:`rlogic::AnimationNode`.
+
 .. note::
 
     Before implementing a solution for your animation, make sure you understand the nature of animations. Is it a simple easing in/out to/from a value
@@ -322,9 +324,10 @@ The value of these outputs is updated after every :func:`rlogic::LogicEngine::up
 or it can be linked to any other logic node, e.g. :class:`rlogic::RamsesBinding`.
 
 :class:`rlogic::AnimationNode` has a set of control states, most important being ``play`` and ``timeDelta``. Whenever ``play`` is true, the animation
-(all its channels) will advance in time by exactly ``timeDelta`` period everytime update is executed. Animation always starts at time zero of all of its
+(all its channels) will advance in time by exactly ``timeDelta`` period everytime update is executed. Animation starts at time zero of all of its
 channels' timestamps, interpolates keyframes according to the interpolation type chosen for each channel and when the end is reached the value stays equal
-to last keyframe. Animation can be set to looping via ``loop`` or restarted via ``rewindOnStop`` inputs.
+to last keyframe. The default time range [0, end] can be changed by setting custom begin and end via ``timeRange``.
+Animation can be set to looping via ``loop`` or restarted via ``rewindOnStop`` inputs.
 
 -------------------------------
 Time Delta
@@ -393,33 +396,6 @@ in the list, so that the list only ever contains the errors since the last metho
 
 For code samples which demonstrate how compile-time and runtime errors can be gracefully handled,
 have a look at the :ref:`examples <List of all examples>`.
-
-===============================
-Print messages from within Lua
-===============================
-
-In common ``Lua`` code you can print messages e.g. for debugging with the "print" function.
-Because ramses-logic can be used in different environments which not always have a console
-to print messages, the "print" function is overloaded. The default behavior is that your
-message will be piped to std::cout together with the name of the calling script.
-If you need more control of the print messages, you can overload the printing function with
-you own one like this:
-
-.. code-block::
-    :linenos:
-
-    LogicEngine logicEngine;
-    LuaScript* script = logicEngine.createLuaScript(R"(
-        function interface()
-        end
-        function run()
-            print("message")
-        end
-    )");
-
-    script->overrideLuaPrint([](std::string_view scriptName, std::string_view message){
-        std::cout << scriptName << ": " << message << std::endl;
-    });
 
 =====================================
 Iterating over object collections
@@ -662,6 +638,13 @@ the specific use-case which needs optimizing. Refer to the
 `google-benchmark docs <https://github.com/google/benchmark>`_ for hints how to
 design good benchmarks, to set the time measurement units, derive O-complexity, etc.
 
+The SDK also provides means to do basic measuring of logic network update times. See :class:`rlogic::LogicEngineReport`
+which gives several useful statistics, e.g. which nodes where executed and how long it took for each of them.
+We suggest to collect this data over several update cycles in some worst case scenario (performance-wise)
+and investigate which nodes take the most time to update. Also for normal use cases consider taking a look at
+how many nodes were needed to be updated and if the topology could be improved so that this amount is reduced
+to only the necessary nodes.
+
 =========================
 List of all examples
 =========================
@@ -678,7 +661,6 @@ List of all examples
     examples/03_errors_runtime
     examples/04_ramses_scene
     examples/05_serialization
-    examples/06_override_print
     examples/07_links
     examples/08_animation
     examples/09_modules

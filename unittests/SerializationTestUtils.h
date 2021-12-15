@@ -58,24 +58,23 @@ namespace rlogic::internal
                 type);
         }
 
-        flatbuffers::Offset<rlogic_serialization::LuaScript> serializeTestScript(bool withErrors = false)
+        flatbuffers::Offset<rlogic_serialization::LuaScript> serializeTestScriptWithError()
         {
-            if (withErrors)
-            {
-                return rlogic_serialization::CreateLuaScript(
-                    m_builder,
-                    0 // no name -> causes errors
-                );
-            }
-
             return rlogic_serialization::CreateLuaScript(
                 m_builder,
-                m_builder.CreateString("script"),
-                m_builder.CreateString("some/file"),
-                m_builder.CreateString("print('test lua code')"),
-                serializeTestProperty("IN"),
-                serializeTestProperty("OUT"),
-                m_builder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{})
+                0, // no name -> causes errors
+                1u
+            );
+        }
+
+        flatbuffers::Offset<rlogic_serialization::LuaModule> serializeTestModule(bool withError = false)
+        {
+            return rlogic_serialization::CreateLuaModule(m_builder,
+                withError ? 0 : m_builder.CreateString("moduleName"),
+                1u,
+                m_builder.CreateString("{}"),
+                m_builder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
+                m_builder.CreateVector(std::vector<uint8_t>{})
             );
         }
 

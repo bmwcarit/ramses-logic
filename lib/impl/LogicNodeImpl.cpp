@@ -14,8 +14,8 @@
 
 namespace rlogic::internal
 {
-    LogicNodeImpl::LogicNodeImpl(std::string_view name) noexcept
-        : LogicObjectImpl(name)
+    LogicNodeImpl::LogicNodeImpl(std::string_view name, uint64_t id) noexcept
+        : LogicObjectImpl(name, id)
     {
     }
 

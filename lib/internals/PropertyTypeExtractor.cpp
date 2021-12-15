@@ -22,57 +22,92 @@ namespace rlogic::internal
     {
     }
 
-    std::reference_wrapper<PropertyTypeExtractor> PropertyTypeExtractor::index(const sol::object& propertyName)
+    std::reference_wrapper<PropertyTypeExtractor> PropertyTypeExtractor::index(const sol::object& propertyIndex)
     {
-        const std::string_view childName = LuaTypeConversions::GetIndexAsString(propertyName);
-        auto childIter = findChild(childName);
-        if (childIter == m_children.end())
+        auto childIter = m_children.end();
+        if (m_typeData.type == EPropertyType::Struct)
         {
-            sol_helper::throwSolException("Trying to access not available property {} in interface!", childName);
+            const DataOrError<std::string_view> childName = LuaTypeConversions::ExtractSpecificType<std::string_view>(propertyIndex);
+            if (childName.hasError())
+            {
+                sol_helper::throwSolException("Bad index access to struct '{}': {}", m_typeData.name, childName.getError());
+            }
+
+            childIter = findChild(childName.getData());
+
+            if (childIter == m_children.end())
+            {
+                sol_helper::throwSolException("Field '{}' does not exist in struct '{}'!", childName.getData(), m_typeData.name);
+            }
+        }
+        else if(m_typeData.type == EPropertyType::Array)
+        {
+            const DataOrError<size_t> childIndex = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
+
+            if (childIndex.hasError())
+            {
+                sol_helper::throwSolException("Invalid index access in array '{}': {}", m_typeData.name, childIndex.getError());
+            }
+
+            if (childIndex.getData() >= m_children.size())
+            {
+                sol_helper::throwSolException("Invalid index access in array '{}'. Expected index in the range [0, {}] but got {} instead!",
+                    m_typeData.name, m_children.size(), childIndex.getData());
+            }
+
+            childIter = m_children.begin() + static_cast<int>(childIndex.getData());
         }
 
         PropertyTypeExtractor& refToChild = *childIter;
         return refToChild;
     }
 
-    void PropertyTypeExtractor::newIndex(const sol::object& propertyName, const sol::object& propertyValue)
+    void PropertyTypeExtractor::newIndex(const sol::object& idx, const sol::object& value)
     {
-        const std::string_view childName = LuaTypeConversions::GetIndexAsString(propertyName);
-        auto childIter = findChild(childName);
+        const DataOrError<std::string_view> potentiallyIndex = LuaTypeConversions::ExtractSpecificType<std::string_view>(idx);
+
+        if (potentiallyIndex.hasError())
+        {
+            sol_helper::throwSolException("Invalid index for new field on struct '{}': {}", m_typeData.name, potentiallyIndex.getError());
+        }
+
+        const std::string idxAsStr(potentiallyIndex.getData());
+
+        auto childIter = findChild(idxAsStr);
         if (childIter != m_children.end())
         {
-            sol_helper::throwSolException("Property '{}' already exists! Can't declare the same property twice!", childName);
+            sol_helper::throwSolException("Field '{}' already exists! Can't declare the same field twice!", idxAsStr);
         }
 
         // TODO Violin improve error messages below (more specific errors instead of generic 'wrong type' error)
-        const auto solType = propertyValue.get_type();
+        const auto solType = value.get_type();
         if (solType == sol::type::number)
         {
-            const auto type = propertyValue.as<EPropertyType>();
+            const auto type = value.as<EPropertyType>();
             if (TypeUtils::IsValidType(type) && TypeUtils::IsPrimitiveType(type))
             {
-                m_children.emplace_back(PropertyTypeExtractor{ std::string(childName), type });
+                m_children.emplace_back(PropertyTypeExtractor{ std::string(idxAsStr), type });
             }
             else
             {
-                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", childName);
+                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", idxAsStr);
             }
         }
         else if (solType == sol::type::table)
         {
-            PropertyTypeExtractor structProperty(std::string(childName), EPropertyType::Struct);
-            structProperty.extractPropertiesFromTable(propertyValue.as<sol::table>());
+            PropertyTypeExtractor structProperty(idxAsStr, EPropertyType::Struct);
+            structProperty.extractPropertiesFromTable(value.as<sol::table>());
             m_children.emplace_back(std::move(structProperty));
         }
         else if (solType == sol::type::userdata)
         {
-            const sol::optional<ArrayTypeInfo> potentiallyArrayTypeInfo = propertyValue.as<sol::optional<ArrayTypeInfo>>();
+            const sol::optional<ArrayTypeInfo> potentiallyArrayTypeInfo = value.as<sol::optional<ArrayTypeInfo>>();
             if (potentiallyArrayTypeInfo)
             {
                 const ArrayTypeInfo& arrayTypeInfo = *potentiallyArrayTypeInfo;
                 const sol::object& arrayType = arrayTypeInfo.arrayType;
 
-                PropertyTypeExtractor arrayProperty(std::string(childName), EPropertyType::Array);
+                PropertyTypeExtractor arrayProperty(idxAsStr, EPropertyType::Array);
 
                 const sol::type solArrayType = arrayType.get_type();
                 // Handles ARRAY(n, T) where T is a primitive type (int, float etc.)
@@ -85,7 +120,7 @@ namespace rlogic::internal
                     }
                     else
                     {
-                        sol_helper::throwSolException("Unsupported type id '{}' for array property '{}'!", static_cast<uint32_t>(type), childName);
+                        sol_helper::throwSolException("Unsupported type id '{}' for array property '{}'!", static_cast<uint32_t>(type), idxAsStr);
                     }
                 }
                 // Handles ARRAY(n, T) where T is a complex type (only structs currently supported)
@@ -98,19 +133,19 @@ namespace rlogic::internal
                 // TODO Violin consider whether we should add support for nested arrays. Should be easy to implement, and would be more consistent for users
                 else
                 {
-                    sol_helper::throwSolException("Unsupported type '{}' for array property '{}'!", sol_helper::GetSolTypeName(solArrayType), childName);
+                    sol_helper::throwSolException("Unsupported type '{}' for array property '{}'!", sol_helper::GetSolTypeName(solArrayType), idxAsStr);
                 }
 
                 m_children.emplace_back(std::move(arrayProperty));
             }
             else
             {
-                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", childName);
+                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", idxAsStr);
             }
         }
         else
         {
-            sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", childName);
+            sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", idxAsStr);
         }
     }
 
@@ -129,14 +164,14 @@ namespace rlogic::internal
 
     sol::object PropertyTypeExtractor::CreateArray(sol::this_state state, const sol::object& size, std::optional<sol::object> arrayType)
     {
-        const std::optional<size_t> potentialUInt = LuaTypeConversions::ExtractSpecificType<size_t>(size);
-        if (!potentialUInt)
+        const DataOrError<size_t> potentialUInt = LuaTypeConversions::ExtractSpecificType<size_t>(size);
+        if (potentialUInt.hasError())
         {
-            sol_helper::throwSolException("ARRAY(N, T) invoked with size parameter N which is not a positive integer!");
+            sol_helper::throwSolException("ARRAY(N, T) invoked with bad size argument! {}", potentialUInt.getError());
         }
         // TODO Violin/Sven/Tobias discuss max array size
         // Putting a "sane" number here, but maybe worth discussing again
-        const size_t arraySize = *potentialUInt;
+        const size_t arraySize = potentialUInt.getData();
         constexpr size_t MaxArraySize = 255;
         if (arraySize == 0u || arraySize > MaxArraySize)
         {
@@ -160,6 +195,8 @@ namespace rlogic::internal
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3f)] = static_cast<int>(EPropertyType::Vec3f);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4f)] = static_cast<int>(EPropertyType::Vec4f);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Int32)] = static_cast<int>(EPropertyType::Int32);
+        environment["INT"] = static_cast<int>(EPropertyType::Int32); // alias name for INT32
+        environment[GetLuaPrimitiveTypeName(EPropertyType::Int64)] = static_cast<int>(EPropertyType::Int64);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2i)] = static_cast<int>(EPropertyType::Vec2i);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3i)] = static_cast<int>(EPropertyType::Vec3i);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4i)] = static_cast<int>(EPropertyType::Vec4i);
@@ -188,6 +225,22 @@ namespace rlogic::internal
         }
 
         return HierarchicalTypeData(m_typeData, std::move(children));
+    }
+
+    std::reference_wrapper<const PropertyTypeExtractor> PropertyTypeExtractor::getChildReference(size_t childIndex) const
+    {
+        assert(childIndex < m_children.size());
+        return m_children.at(childIndex);
+    }
+
+    TypeData PropertyTypeExtractor::getRootTypeData() const
+    {
+        return m_typeData;
+    }
+
+    const std::vector<PropertyTypeExtractor>& PropertyTypeExtractor::getNestedExtractors() const
+    {
+        return m_children;
     }
 
 }

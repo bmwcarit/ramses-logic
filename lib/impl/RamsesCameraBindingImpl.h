@@ -73,7 +73,7 @@ namespace rlogic::internal
     class RamsesCameraBindingImpl : public RamsesBindingImpl
     {
     public:
-        explicit RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, std::string_view name);
+        explicit RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, std::string_view name, uint64_t id);
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> Serialize(
             const RamsesCameraBindingImpl& cameraBinding,

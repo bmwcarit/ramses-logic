@@ -45,6 +45,10 @@ struct int32_s
 {
     v:int32;
 }
+struct int64_s
+{
+    v:int64;
+}
 struct vec2i_s
 {
     x:int32;
@@ -83,6 +87,7 @@ union PropertyValue
     vec3f_s,
     vec4f_s,
     int32_s,
+    int64_s,
     vec2i_s,
     vec3i_s,
     vec4i_s,

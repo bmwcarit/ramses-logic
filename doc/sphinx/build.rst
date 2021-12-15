@@ -62,7 +62,7 @@ For example, for ``Ubuntu 18.04 LTS`` these can be installed like this:
             libwayland-dev \
             libgles2-mesa-dev
 
-Refer to the `RAMSES build instructions <https://github.com/GENIVI/ramses#building-and-testing>`_ for more details.
+Refer to the `RAMSES build instructions <https://github.com/COVESA/ramses#building-and-testing>`_ for more details.
 
 ========================================
 Build options
@@ -167,7 +167,7 @@ things can be enabled using following CMake options:
     * turns clang's link-time optimizations on (details `here <https://llvm.org/docs/LinkTimeOptimization.html>`_)
 
 * -DCMAKE_TOOLCHAIN_FILE=<file>
-    * options: any of the files in `cmake/toolchain <https://github.com/GENIVI/ramses-logic/tree/master/cmake/toolchain>`_ or your custom cross-compilation toolchain file
+    * options: any of the files in `cmake/toolchain <https://github.com/COVESA/ramses-logic/tree/master/cmake/toolchain>`_ or your custom cross-compilation toolchain file
     * default: not set
     * This is a standard CMake feature. We provide several toolchain files for popular compilers, use them or create your own
 
@@ -191,43 +191,6 @@ Building on Windows
 - Click 'Generate'
 - Open solution in Visual Studio
 
-
-============================================================
-Building in Docker (Windows or Linux)
-============================================================
-
-We prefer to build ``RAMSES logic`` in Docker because it abstracts the dependency installation
-and the ``CMake`` invocations away from the user. Docker itself is installed slightly differently
-on different distributions, check the docker manual for your distro. The instructions below
-are for Ubuntu 18.04 LTS:
-
-.. code-block:: bash
-
-    apt install docker.io
-    groupadd docker             #can fail if already exists
-    usermod –aG docker $USER
-    newgrp docker               #logs you into the new group in the current terminal session
-
-    docker run hello-world      #check that docker works
-
-    cd <ramses-sdk>/ci/docker
-    ./build-image.sh            # builds the docker image locally (will take a while)
-
-    ./start-container.sh        # Starts a docker container
-
-    # We are inside the docker container now
-
-    ./build.sh L64_LLVM Release # Builds with Clang/llvm x64 in Release mode
-
-    ./build.sh L64_GCC Debug    # Builds with GCC x64 in Debug mode
-
-    cd build/L64_GCC-Debug
-    ctest -C Debug -V           # Runs unit tests with CTest
-
-    # Build artifacts are stored in build/<compiler>-<buildtype>
-    # This folder is persistent across docker executions! You can access it from your host after exiting the container
-
-    ./build.sh DOC              # Builds the documentation and puts it into $PACKAGE_DIR as archive
 
 ========================================
 Building on Linux natively

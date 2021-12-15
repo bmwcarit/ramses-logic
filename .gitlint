@@ -70,8 +70,8 @@ line-length=160
 # it in the commit message.
 # files=gitlint/rules.py,README.md
 
-# [soft-body-max-line-length]
-# line-length=80
+[soft-body-max-line-length]
+line-length=160
 
 # [body-match-regex]
 # python like regex (https://docs.python.org/2/library/re.html) that the

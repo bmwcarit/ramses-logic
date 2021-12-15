@@ -10,8 +10,9 @@
 
 namespace rlogic::internal
 {
-    LogicObjectImpl::LogicObjectImpl(std::string_view name) noexcept
+    LogicObjectImpl::LogicObjectImpl(std::string_view name, uint64_t id) noexcept
         : m_name(name)
+        , m_id(id)
     {
     }
 
@@ -25,5 +26,10 @@ namespace rlogic::internal
     void LogicObjectImpl::setName(std::string_view name)
     {
         m_name = name;
+    }
+
+    uint64_t LogicObjectImpl::getId() const
+    {
+        return m_id;
     }
 }

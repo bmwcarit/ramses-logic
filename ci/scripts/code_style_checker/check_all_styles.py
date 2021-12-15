@@ -124,6 +124,7 @@ def main():
         r'.*/AndroidManifest\.xml$',        # Android manifests are difficult to modify with a license header
         r'^android/gradle\.properties$',    # Gradle config file, no license needed
         r'^android/gradlew$',               # Gradle wrapper script, has own Apache 2.0 header (according to Gradle plugin license), exclude check here
+        r'\.spdx$',                         # Spdx archives don't need a license header themselves
     }
 
     files_license_header = common_modules.common.get_all_files_with_filter(root_path, root_path, {r'.*'}, blacklist_license)

@@ -11,23 +11,63 @@
 #include "internals/SolWrapper.h"
 #include "ramses-logic/EPropertyType.h"
 
-#include <optional>
+#include <variant>
 #include <array>
 
 namespace rlogic::internal
 {
+    // Simple implementation of std::expected for the purpose of type conversion
+    template<typename T>
+    class DataOrError
+    {
+    public:
+        explicit DataOrError(T data)
+            : m_data(std::move(data))
+        {
+        }
+
+        explicit DataOrError(std::string errorMessage)
+            : m_data(Error{std::move(errorMessage)})
+        {
+        }
+
+        [[nodiscard]] bool hasError() const
+        {
+            return std::holds_alternative<Error>(m_data);
+        }
+
+        [[nodiscard]] T getData() const
+        {
+            assert(std::holds_alternative<T>(m_data));
+            return std::get<T>(m_data);
+        }
+
+        [[nodiscard]] const std::string& getError() const
+        {
+            assert(std::holds_alternative<Error>(m_data));
+            return std::get<Error>(m_data).message;
+        }
+
+    private:
+        struct Error
+        {
+            std::string message;
+        };
+
+        std::variant<T, Error> m_data;
+    };
+
+
     class LuaTypeConversions
     {
     public:
-        static std::string_view GetIndexAsString (const sol::object& index);
-
         template <typename T>
-        static std::optional<T> ExtractSpecificType(const sol::object& solObject);
+        static DataOrError<T> ExtractSpecificType(const sol::object& solObject);
 
-        static size_t           GetMaxIndexForVectorType(rlogic::EPropertyType type);
+        static size_t         GetMaxIndexForVectorType(rlogic::EPropertyType type);
 
         template <typename T, size_t size>
-        static std::array<T, size> ExtractArray(const sol::table& solTable);
+        static DataOrError<std::array<T, size>> ExtractArray(const sol::object& solObject);
 
         static_assert(std::is_same<LUA_NUMBER, double>::value, "This class assumes that Lua-internal numbers are double precision floats");
     };

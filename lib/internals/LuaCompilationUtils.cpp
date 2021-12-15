@@ -18,6 +18,7 @@
 #include "internals/PropertyTypeExtractor.h"
 #include "internals/EPropertySemantics.h"
 #include "fmt/format.h"
+#include "SolHelper.h"
 
 namespace rlogic::internal
 {
@@ -177,8 +178,35 @@ namespace rlogic::internal
                 stdModules,
                 userModules
             },
-            std::move(moduleTable)
+            LuaCompilationUtils::MakeTableReadOnly(solState, moduleTable)
         };
+    }
+
+    // Implements https://www.lua.org/pil/13.4.4.html
+    sol::table LuaCompilationUtils::MakeTableReadOnly(SolState& solState, sol::table table)
+    {
+        auto denyAccess = []() {
+            sol_helper::throwSolException("Modifying module data is not allowed!");
+        };
+
+        for (auto [childKey, childObject] : table)
+        {
+            if (childObject.is<sol::table>())
+            {
+                table[childKey] = LuaCompilationUtils::MakeTableReadOnly(solState, childObject);
+            }
+        }
+
+        // create metatable which denies write access but allows reading
+        sol::table metatable = solState.createTable();
+        metatable[sol::meta_function::new_index] = denyAccess;
+        metatable[sol::meta_function::index] = table;
+
+        // overwrite assigned module with new table and point its metatable to read-only table
+        sol::table readOnlyTable = solState.createTable();
+        readOnlyTable[sol::metatable_key] = metatable;
+
+        return readOnlyTable;
     }
 
     std::string LuaCompilationUtils::BuildChunkName(std::string_view scriptName)

@@ -26,6 +26,8 @@ namespace rlogic
     *       instances on Ramses logic API, not to access them from a script or to resolve a file on a filesystem
     *     - the module is not supposed to be resolved with the 'require' keyword in Lua scripts where used
     *       (due to security concerns) but must be provided explicitly when creating #rlogic::LuaScript instance
+    *     - modules are read-only in order to prevent data races when accessed from different scripts with undefined
+    *       order of execution
     * #rlogic::LuaModule source code is loaded into its own Lua environment and is accessible in other #rlogic::LuaScript
     * and/or #LuaModule instances in their own environments under the alias name given when creating those.
     *
@@ -47,6 +49,7 @@ namespace rlogic
     *   \endcode
     * And script using above module to define its interface:
     *   \code{.lua}
+    *       modules("mytypes")  -- must declare the dependency explicitly
     *       function interface()
     *           IN.input_struct = mytypes.mystruct()
     *           OUT.output_struct = mytypes.mystruct()

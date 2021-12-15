@@ -22,8 +22,8 @@
 
 namespace rlogic::internal
 {
-    LuaModuleImpl::LuaModuleImpl(LuaCompiledModule module, std::string_view name)
-        : LogicObjectImpl(name)
+    LuaModuleImpl::LuaModuleImpl(LuaCompiledModule module, std::string_view name, uint64_t id)
+        : LogicObjectImpl(name, id)
         , m_sourceCode{ std::move(module.source.sourceCode) }
         , m_module{ std::move(module.moduleTable) }
         , m_dependencies{std::move(module.source.userModules)}
@@ -63,6 +63,7 @@ namespace rlogic::internal
 
         return rlogic_serialization::CreateLuaModule(builder,
             builder.CreateString(module.getName()),
+            module.getId(),
             builder.CreateString(module.getSourceCode()),
             builder.CreateVector(modulesFB),
             builder.CreateVector(stdModules)
@@ -78,6 +79,12 @@ namespace rlogic::internal
         if (!module.name())
         {
             errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing name!", nullptr);
+            return nullptr;
+        }
+
+        if (module.id() == 0u)
+        {
+            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing id!", nullptr);
             return nullptr;
         }
 
@@ -125,7 +132,7 @@ namespace rlogic::internal
 
         return std::make_unique<LuaModuleImpl>(
             std::move(*compiledModule),
-            name);
+            name, module.id());
     }
 
     const ModuleMapping& LuaModuleImpl::getDependencies() const

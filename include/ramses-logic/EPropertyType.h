@@ -26,6 +26,7 @@ namespace rlogic
         Vec3f,  ///< corresponds to [float, float, float]
         Vec4f,  ///< corresponds to [float, float, float, float]
         Int32,  ///< corresponds to int32_t
+        Int64,  ///< corresponds to int64_t (note that Lua cannot handle 64bit integers in full range)
         Vec2i,  ///< corresponds to [int32_t, int32_t]
         Vec3i,  ///< corresponds to [int32_t, int32_t, int32_t]
         Vec4i,  ///< corresponds to [int32_t, int32_t, int32_t, int32_t]
@@ -67,9 +68,14 @@ namespace rlogic
         static const EPropertyType TYPE = EPropertyType::Vec4f;
     };
 
-    template <> struct PropertyTypeToEnum<int>
+    template <> struct PropertyTypeToEnum<int32_t>
     {
         static const EPropertyType TYPE = EPropertyType::Int32;
+    };
+
+    template <> struct PropertyTypeToEnum<int64_t>
+    {
+        static const EPropertyType TYPE = EPropertyType::Int64;
     };
 
     template <> struct PropertyTypeToEnum<vec2i>
@@ -95,6 +101,66 @@ namespace rlogic
     template <> struct PropertyTypeToEnum<bool>
     {
         static const EPropertyType TYPE = EPropertyType::Bool;
+    };
+
+    /**
+    * Type trait which converts #rlogic::EPropertyType enum to a C++ type.
+    */
+    template <EPropertyType T> struct PropertyEnumToType;
+
+    template <> struct PropertyEnumToType<EPropertyType::Float>
+    {
+        using TYPE = float;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Vec2f>
+    {
+        using TYPE = vec2f;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Vec3f>
+    {
+        using TYPE = vec3f;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Vec4f>
+    {
+        using TYPE = vec4f;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Int32>
+    {
+        using TYPE = int32_t;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Int64>
+    {
+        using TYPE = int64_t;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Vec2i>
+    {
+        using TYPE = vec2i;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Vec3i>
+    {
+        using TYPE = vec3i;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Vec4i>
+    {
+        using TYPE = vec4i;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::String>
+    {
+        using TYPE = std::string;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Bool>
+    {
+        using TYPE = bool;
     };
 
     /**
@@ -129,7 +195,12 @@ namespace rlogic
         static const bool value = true;
     };
 
-    template <> struct IsPrimitiveProperty<int>
+    template <> struct IsPrimitiveProperty<int32_t>
+    {
+        static const bool value = true;
+    };
+
+    template <> struct IsPrimitiveProperty<int64_t>
     {
         static const bool value = true;
     };
@@ -179,6 +250,7 @@ namespace rlogic
         case EPropertyType::Struct:
         case EPropertyType::String:
         case EPropertyType::Array:
+        case EPropertyType::Int64:
             return false;
         }
 
@@ -212,7 +284,9 @@ namespace rlogic
         case EPropertyType::Vec4f:
             return "VEC4F";
         case EPropertyType::Int32:
-            return "INT";
+            return "INT32";
+        case EPropertyType::Int64:
+            return "INT64";
         case EPropertyType::Vec2i:
             return "VEC2I";
         case EPropertyType::Vec3i:

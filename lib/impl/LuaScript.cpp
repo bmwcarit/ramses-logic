@@ -19,9 +19,4 @@ namespace rlogic
     }
 
     LuaScript::~LuaScript() noexcept = default;
-
-    void LuaScript::overrideLuaPrint(LuaPrintFunction luaPrintFunction)
-    {
-        m_script.overrideLuaPrint(std::move(luaPrintFunction));
-    }
 }

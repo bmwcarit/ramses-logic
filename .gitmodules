@@ -1,5 +1,5 @@
 [submodule "external/ramses"]
-    url = https://github.com/GENIVI/ramses.git
+    url = https://github.com/COVESA/ramses.git
     path = external/ramses
 [submodule "external/googletest"]
     url = https://github.com/google/googletest.git

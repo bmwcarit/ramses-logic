@@ -19,12 +19,16 @@ struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_SOURCE = 6,
-    VT_DEPENDENCIES = 8,
-    VT_STANDARDMODULES = 10
+    VT_ID = 6,
+    VT_SOURCE = 8,
+    VT_DEPENDENCIES = 10,
+    VT_STANDARDMODULES = 12
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
+  }
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   const flatbuffers::String *source() const {
     return GetPointer<const flatbuffers::String *>(VT_SOURCE);
@@ -39,6 +43,7 @@ struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
+           VerifyField<uint64_t>(verifier, VT_ID) &&
            VerifyOffset(verifier, VT_SOURCE) &&
            verifier.VerifyString(source()) &&
            VerifyOffset(verifier, VT_DEPENDENCIES) &&
@@ -56,6 +61,9 @@ struct LuaModuleBuilder {
   flatbuffers::uoffset_t start_;
   void add_name(flatbuffers::Offset<flatbuffers::String> name) {
     fbb_.AddOffset(LuaModule::VT_NAME, name);
+  }
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(LuaModule::VT_ID, id, 0);
   }
   void add_source(flatbuffers::Offset<flatbuffers::String> source) {
     fbb_.AddOffset(LuaModule::VT_SOURCE, source);
@@ -81,10 +89,12 @@ struct LuaModuleBuilder {
 inline flatbuffers::Offset<LuaModule> CreateLuaModule(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> name = 0,
+    uint64_t id = 0,
     flatbuffers::Offset<flatbuffers::String> source = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies = 0,
     flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0) {
   LuaModuleBuilder builder_(_fbb);
+  builder_.add_id(id);
   builder_.add_standardModules(standardModules);
   builder_.add_dependencies(dependencies);
   builder_.add_source(source);
@@ -100,6 +110,7 @@ struct LuaModule::Traits {
 inline flatbuffers::Offset<LuaModule> CreateLuaModuleDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
+    uint64_t id = 0,
     const char *source = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies = nullptr,
     const std::vector<uint8_t> *standardModules = nullptr) {
@@ -110,6 +121,7 @@ inline flatbuffers::Offset<LuaModule> CreateLuaModuleDirect(
   return rlogic_serialization::CreateLuaModule(
       _fbb,
       name__,
+      id,
       source__,
       dependencies__,
       standardModules__);

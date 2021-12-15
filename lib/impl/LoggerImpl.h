@@ -76,7 +76,7 @@ namespace rlogic::internal
         void log(ELogMessageType messageType, const ARGS&... args);
 
         void setLogVerbosityLimit(ELogMessageType verbosityLimit);
-        ELogMessageType getLogVerbosityLimit() const;
+        [[nodiscard]] ELogMessageType getLogVerbosityLimit() const;
         void setLogHandler(Logger::LogHandlerFunc logHandlerFunc);
         void setDefaultLogging(bool loggingEnabled);
 

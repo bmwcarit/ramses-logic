@@ -20,7 +20,7 @@ namespace rlogic::internal
     {
     public:
         explicit LogicNodeDummyImpl(std::string_view name, bool createNestedProperties = false)
-            : LogicNodeImpl(name)
+            : LogicNodeImpl(name, 1u)
         {
             setRootProperties(
                 std::make_unique<Property>(std::make_unique<PropertyImpl>(CreateTestInputsType(createNestedProperties), EPropertySemantics::ScriptInput)),

@@ -42,7 +42,7 @@ namespace rlogic::internal
     class LogicNodeImpl;
     class ErrorReporting;
 
-    using PropertyValue = std::variant<int32_t, float, bool, std::string, vec2f, vec3f, vec4f, vec2i, vec3i, vec4i>;
+    using PropertyValue = std::variant<int32_t, int64_t, float, bool, std::string, vec2f, vec3f, vec4f, vec2i, vec3i, vec4i>;
     using PropertyList = std::vector<std::unique_ptr<Property>>;
 
     class PropertyImpl
@@ -64,7 +64,7 @@ namespace rlogic::internal
 
 
         // Move-able (noexcept); Not copy-able
-        ~PropertyImpl() noexcept = default;
+        ~PropertyImpl() noexcept;
         PropertyImpl& operator=(PropertyImpl&& other) noexcept = default;
         PropertyImpl(PropertyImpl&& other) noexcept = default;
         PropertyImpl& operator=(const PropertyImpl& other) = delete;
@@ -83,6 +83,7 @@ namespace rlogic::internal
         [[nodiscard]] bool isInput() const;
         [[nodiscard]] bool isOutput() const;
         [[nodiscard]] EPropertySemantics getPropertySemantics() const;
+        [[nodiscard]] bool isLinked() const;
 
         [[nodiscard]] Property* getChild(size_t index);
         [[nodiscard]] Property* getChild(std::string_view name);
@@ -95,7 +96,9 @@ namespace rlogic::internal
         [[nodiscard]] bool setValue_PublicApi(PropertyValue value);
 
         // Generic setter. Can optionally skip dirty-check
-        void setValue(PropertyValue value, bool checkDirty = true);
+        bool setValue(PropertyValue value);
+        // Special setter for binding value init
+        void initializeBindingInputValue(PropertyValue value);
 
         // Generic getter for use in other non-template code
         [[nodiscard]] const PropertyValue& getValue() const;
@@ -106,21 +109,29 @@ namespace rlogic::internal
             return std::get<T>(m_value);
         }
 
-        // Design smells (can fix by changing class design and topology)
-        void setIsLinkedInput(bool isLinkedInput);
-        [[nodiscard]] bool isLinkedInput() const;
         void setLogicNode(LogicNodeImpl& logicNode);
         [[nodiscard]] LogicNodeImpl& getLogicNode();
+        [[nodiscard]] const LogicNodeImpl& getLogicNode() const;
+
+        // Link handling
+        [[nodiscard]] const PropertyImpl* getLinkedIncomingProperty() const;
+        [[nodiscard]] std::vector<PropertyImpl*>& getLinkedOutgoingProperties();
+        [[nodiscard]] const std::vector<PropertyImpl*>& getLinkedOutgoingProperties() const;
+
+        void setLinkedOutput(PropertyImpl& output);
+        void unsetLinkedOutput();
 
     private:
         TypeData        m_typeData;
         PropertyList    m_children;
         PropertyValue   m_value;
 
-        // TODO Violin/Sven consider solving this more elegantly
-        LogicNodeImpl*                                  m_logicNode = nullptr;
+
+        PropertyImpl* m_incomingLinkedProperty = nullptr;
+        std::vector<PropertyImpl*> m_outgoingLinkedProperties;
+        LogicNodeImpl* m_logicNode = nullptr;
+
         bool m_bindingInputHasNewValue = false;
-        bool m_isLinkedInput = false;
         EPropertySemantics                              m_semantics;
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> SerializeRecursive(

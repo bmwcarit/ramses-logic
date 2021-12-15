@@ -34,6 +34,13 @@ namespace rlogic
     *     - rewindOnStop (bool) - if true, whenever animation is stopped (play=false) it will jump
     *                             to the beginning (as if it never started)
     *                           - animation will rewind also if not playing and this input is switched from false to true
+    *     - timeRange (vec2f)   - by default animation is played from time 0 to the last timestamp of its longest channel,
+    *                             this can be changed by using this input by providing vec2f{ timeRangeBegin, timeRangeEnd },
+    *                             animation will then play strictly within this time range (applies also to loop and rewindOnStop)
+    *                           - time range end is optional, if set to 0 or negative then the original maximum duration
+    *                             will be used (#getDuration)
+    *                           - if end is specified (positive value) it must always be larger than begin
+    *                             or else the node update will fail
     * - Fixed outputs:
     *     - progress (float)  - a [0;1] normalized progress of animation where 0 is beginning, 1 is end
     * - Channel outputs: Each animation channel provided at creation time (#rlogic::LogicEngine::createAnimationNode)
@@ -78,11 +85,11 @@ namespace rlogic
         ~AnimationNode() noexcept override;
 
         /**
-        * Gets total duration of this animation.
-        * Total duration is determined by the highest timestamp value in timestamps data of all channels
-        * (#rlogic::AnimationChannel::timeStamps).
+        * Gets maximum duration of this animation's channel data.
+        * The duration is determined by the highest timestamp value in timestamps data of all channels
+        * (#rlogic::AnimationChannel::timeStamps) and is not affected by 'timeRange' property input.
         *
-        * @return total duration of this animation.
+        * @return maximum duration of this animation.
         */
         [[nodiscard]] RLOGIC_API float getDuration() const;
 

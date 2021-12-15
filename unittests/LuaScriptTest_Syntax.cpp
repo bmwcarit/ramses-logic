@@ -173,7 +173,7 @@ namespace rlogic
 
                     if (i < 0)
                     {
-                        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Bad index (type: number). Only non-negative integers supported as array index type!"));
+                        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Only non-negative integers supported as array index type! Error while extracting integer: expected non-negative number, received '-1'"));
                     }
                     else
                     {
@@ -374,31 +374,33 @@ namespace rlogic
         {
             {
                 "OUT.vec2f = {}                 -- none at all",
-                "lua: error: Expected 2 array components in table but got 0 instead!"
+                "Error while assigning output VEC2 property 'vec2f'. Error while extracting array: expected 2 array components in table but got 0 instead!"
             },
             {
                 "OUT.vec3f = {1, 2, 3, 4}       -- more than expected",
-                "lua: error: Expected 3 array components in table but got 4 instead!"
+                "Error while assigning output VEC3 property 'vec3f'. Error while extracting array: expected 3 array components in table but got 4 instead!"
             },
             {
                 "OUT.vec4f = {1, 2, 3}          -- fewer than required",
-                "lua: error: Expected 4 array components in table but got 3 instead!"
+                "Error while assigning output VEC4 property 'vec4f'. Error while extracting array: expected 4 array components in table but got 3 instead!"
             },
             {
                 "OUT.vec2i = {1, 2, 'wrong'}    -- extra component of wrong type",
-                "lua: error: Expected 2 array components in table but got 3 instead!"
+                "Error while assigning output VEC2 property 'vec2i'. Error while extracting array: expected 2 array components in table but got 3 instead!"
             },
             {
                 "OUT.vec3i = {1, 2, {}}         -- extra nested table",
-                "lua: error: Unexpected value (type: 'table') at array element # 3!"
+                "Error while assigning output VEC3 property 'vec3i'. Error while extracting array: unexpected value (type: 'table') at array element # 3! "
+                "Reason: Error while extracting integer: expected a number, received 'table'"
             },
             {
                 "OUT.vec4i = {1, 2, nil, 4}     -- wrong size, nil in-between",
-                "lua: error: Expected 4 array components in table but got 3 instead!"
+                "Error while assigning output VEC4 property 'vec4i'. Error while extracting array: unexpected value (type: 'nil') at array element # 3! "
+                "Reason: Error while extracting integer: expected a number, received 'nil'"
             },
             {
                 "OUT.vec4i = {1, 2, nil, 3, 4}     -- correct size, nil in-between",
-                "lua: error: Unexpected value (type: 'nil') at array element # 3!"
+                "Error while assigning output VEC4 property 'vec4i'. Error while extracting array: expected 4 array components in table but got 5 instead!"
             },
         };
 

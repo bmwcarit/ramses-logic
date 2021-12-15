@@ -46,6 +46,7 @@ namespace rlogic::internal
         // type to Lua, instead we resolve it first to a Lua built-in (e.g. string or number)
         case EPropertyType::Float:
         case EPropertyType::Int32:
+        case EPropertyType::Int64:
         case EPropertyType::String:
         case EPropertyType::Bool:
             sol_helper::throwSolException("Implementation error!");
@@ -82,6 +83,8 @@ namespace rlogic::internal
             return sol::make_object(solState, childProperty.getValueAs<float>());
         case EPropertyType::Int32:
             return sol::make_object(solState, childProperty.getValueAs<int32_t>());
+        case EPropertyType::Int64:
+            return sol::make_object(solState, childProperty.getValueAs<int64_t>());
         case EPropertyType::String:
             return sol::make_object(solState, childProperty.getValueAs<std::string>());
         case EPropertyType::Bool:
@@ -173,6 +176,9 @@ namespace rlogic::internal
             case EPropertyType::Int32:
                 childProperty.setInt32(rhs);
                 break;
+            case EPropertyType::Int64:
+                childProperty.setInt64(rhs);
+                break;
             default:
                 assert(false && "Missing implementation");
             }
@@ -183,38 +189,33 @@ namespace rlogic::internal
     {
         if (m_wrappedProperty.get().getType() == EPropertyType::Struct)
         {
-            std::string_view structFieldName = LuaTypeConversions::GetIndexAsString(propertyIndex);
+            const DataOrError<std::string_view> structFieldName = LuaTypeConversions::ExtractSpecificType<std::string_view>(propertyIndex);
+
+            if (structFieldName.hasError())
+            {
+                sol_helper::throwSolException("Bad access to property '{}'! {}", m_wrappedProperty.get().getName(), structFieldName.getError());
+            }
 
             for (size_t i = 0; i < m_wrappedChildProperties.size(); ++i)
             {
-                if (m_wrappedChildProperties[i].m_wrappedProperty.get().getName() == structFieldName)
+                if (m_wrappedChildProperties[i].m_wrappedProperty.get().getName() == structFieldName.getData())
                 {
                     return i;
                 }
             }
 
-            throw BadStructAccess(std::string(structFieldName), fmt::format("Tried to access undefined struct property '{}'", structFieldName));
+            throw BadStructAccess(std::string(structFieldName.getData()), fmt::format("Tried to access undefined struct property '{}'", structFieldName.getData()));
         }
 
         if (m_wrappedProperty.get().getType() == EPropertyType::Array)
         {
-            const std::optional<size_t> maybeUInt = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
-            if (!maybeUInt)
+            const DataOrError<size_t> maybeUInt = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
+            if (maybeUInt.hasError())
             {
-                std::string indexInfo;
-                if (propertyIndex.get_type() == sol::type::number)
-                {
-                    indexInfo = std::to_string(propertyIndex.as<int>());
-                }
-                else
-                {
-                    indexInfo = sol_helper::GetSolTypeName(propertyIndex.get_type());
-                }
-
-                sol_helper::throwSolException("Only non-negative integers supported as array index type! Received {}", indexInfo);
+                sol_helper::throwSolException("Bad access to property '{}'! {}", m_wrappedProperty.get().getName(), maybeUInt.getError());
             }
             const size_t childCount = m_wrappedChildProperties.size();
-            const size_t indexAsUInt = *maybeUInt;
+            const size_t indexAsUInt = maybeUInt.getData();
             if (indexAsUInt == 0 || indexAsUInt > childCount)
             {
                 sol_helper::throwSolException("Index out of range! Expected 0 < index <= {} but received index == {}", childCount, indexAsUInt);
@@ -232,7 +233,7 @@ namespace rlogic::internal
 
         if (TypeUtils::IsPrimitiveType(m_wrappedProperty.get().getType()))
         {
-            m_wrappedProperty.get().setValue(other.m_wrappedProperty.get().getValue(), false);
+            m_wrappedProperty.get().setValue(other.m_wrappedProperty.get().getValue());
         }
         else
         {
@@ -248,12 +249,12 @@ namespace rlogic::internal
     {
         assert(TypeUtils::IsPrimitiveVectorType(m_wrappedProperty.get().getType()));
 
-        const std::optional<size_t> potentiallyIndex = LuaTypeConversions::ExtractSpecificType<size_t>(index);
-        if (!potentiallyIndex)
+        const DataOrError<size_t> potentiallyIndex = LuaTypeConversions::ExtractSpecificType<size_t>(index);
+        if (potentiallyIndex.hasError())
         {
-            sol_helper::throwSolException("Bad index (type: {}). Only non-negative integers supported as array index type!", sol_helper::GetSolTypeName(index.get_type()));
+            sol_helper::throwSolException("Only non-negative integers supported as array index type! {}", potentiallyIndex.getError());
         }
-        const size_t indexAsInt = *potentiallyIndex;
+        const size_t indexAsInt = potentiallyIndex.getData();
         if (indexAsInt == 0 || indexAsInt > N)
         {
             sol_helper::throwSolException("Bad index '{}', expected 1 <= i <= {}!", indexAsInt, N);
@@ -265,13 +266,16 @@ namespace rlogic::internal
     template<typename T, int N>
     void WrappedLuaProperty::setVectorComponents(const sol::object& rhs)
     {
-        if (!rhs.is<sol::table>())
+        const DataOrError potentialArrayData = LuaTypeConversions::ExtractArray<T, N>(rhs);
+
+        if (potentialArrayData.hasError())
         {
-            sol_helper::throwSolException("Assigning wrong type ({}) to output VEC{} property '{}'",
-                sol_helper::GetSolTypeName(rhs.get_type()), N, m_wrappedProperty.get().getName());
+            sol_helper::throwSolException("Error while assigning output VEC{} property '{}'. {}",
+                N, m_wrappedProperty.get().getName(),
+                potentialArrayData.getError());
         }
 
-        m_wrappedProperty.get().setValue(LuaTypeConversions::ExtractArray<T, N>(rhs.as<sol::table>()), false);
+        m_wrappedProperty.get().setValue(potentialArrayData.getData());
     }
 
     // Overrides the '#' operator in Lua (sol3 template substitution)
@@ -294,12 +298,14 @@ namespace rlogic::internal
         // This is unreachable code (Lua handles size of primitive types)
         case EPropertyType::Float:
         case EPropertyType::Int32:
+        case EPropertyType::Int64:
         case EPropertyType::Bool:
         case EPropertyType::String:
-        default:
-            assert(false && "Unreachable code!");
-            return 0u;
+            break;
         }
+
+        assert(false && "Unreachable code!");
+        return 0u;
     }
 
     void WrappedLuaProperty::badTypeAssignment(const sol::type rhsType)
@@ -317,12 +323,31 @@ namespace rlogic::internal
             badTypeAssignment(rhs.get_type());
         }
 
-        const std::optional<int32_t> potentiallyInt32 = LuaTypeConversions::ExtractSpecificType<int32_t>(rhs);
-        if (!potentiallyInt32)
+        const DataOrError<int32_t> potentiallyInt32 = LuaTypeConversions::ExtractSpecificType<int32_t>(rhs);
+        if (potentiallyInt32.hasError())
         {
-            sol_helper::throwSolException("Implicit rounding during assignment of integer output '{}' (value: {})!", m_wrappedProperty.get().getName(), rhs.as<float>());
+            sol_helper::throwSolException("Error during assignment of property '{}'! {}",
+                m_wrappedProperty.get().getName(),
+                potentiallyInt32.getError());
         }
-        m_wrappedProperty.get().setValue(*potentiallyInt32, false);
+        m_wrappedProperty.get().setValue(potentiallyInt32.getData());
+    }
+
+    void WrappedLuaProperty::setInt64(const sol::object& rhs)
+    {
+        if (rhs.get_type() != sol::type::number)
+        {
+            badTypeAssignment(rhs.get_type());
+        }
+
+        const DataOrError<int64_t> potentiallyInt64 = LuaTypeConversions::ExtractSpecificType<int64_t>(rhs);
+        if (potentiallyInt64.hasError())
+        {
+            sol_helper::throwSolException("Error during assignment of property '{}'! {}",
+                m_wrappedProperty.get().getName(),
+                potentiallyInt64.getError());
+        }
+        m_wrappedProperty.get().setValue(potentiallyInt64.getData());
     }
 
     void WrappedLuaProperty::setFloat(const sol::object& rhs)
@@ -332,12 +357,14 @@ namespace rlogic::internal
             badTypeAssignment(rhs.get_type());
         }
 
-        const std::optional<float> potentiallyFloat = LuaTypeConversions::ExtractSpecificType<float>(rhs);
-        if (!potentiallyFloat)
+        const DataOrError<float> potentiallyFloat = LuaTypeConversions::ExtractSpecificType<float>(rhs);
+        if (potentiallyFloat.hasError())
         {
-            sol_helper::throwSolException("Implicit rounding during assignment of float output '{}' (value: {})!", m_wrappedProperty.get().getName(), rhs.as<float>());
+            sol_helper::throwSolException("Error during assignment of property '{}'! {}",
+                m_wrappedProperty.get().getName(),
+                potentiallyFloat.getError());
         }
-        m_wrappedProperty.get().setValue(*potentiallyFloat, false);
+        m_wrappedProperty.get().setValue(potentiallyFloat.getData());
     }
 
     void WrappedLuaProperty::setString(const sol::object& rhs)
@@ -347,7 +374,7 @@ namespace rlogic::internal
             badTypeAssignment(rhs.get_type());
         }
 
-        m_wrappedProperty.get().setValue(rhs.as<std::string>(), false);
+        m_wrappedProperty.get().setValue(rhs.as<std::string>());
     }
 
     void WrappedLuaProperty::setBool(const sol::object& rhs)
@@ -357,21 +384,34 @@ namespace rlogic::internal
             badTypeAssignment(rhs.get_type());
         }
 
-        m_wrappedProperty.get().setValue(rhs.as<bool>(), false);
+        m_wrappedProperty.get().setValue(rhs.as<bool>());
     }
 
     void WrappedLuaProperty::setStruct(const sol::object& rhs)
     {
-        if (!rhs.is<sol::table>())
+        if (!rhs.is<sol::lua_table>())
         {
             sol_helper::throwSolException("Unexpected type ({}) while assigning value of struct field '{}' (expected a table or another struct)!",
                 sol_helper::GetSolTypeName(rhs.get_type()),
                 m_wrappedProperty.get().getName());
         }
 
-        const sol::table& table = rhs.as<sol::table>();
-        verifyTableSize(table);
+        sol::lua_table table = rhs.as<sol::lua_table>();
 
+        sol::object potentiallyMetatable = table[sol::metatable_key];
+
+        // Identify read-only data
+        if (potentiallyMetatable.valid() && potentiallyMetatable.is<sol::table>())
+        {
+            sol::object moduleTable = potentiallyMetatable.as<sol::table>()[sol::meta_function::index];
+
+            if (moduleTable.valid() && moduleTable.is<sol::lua_table>())
+            {
+                table = moduleTable.as<sol::lua_table>();
+            }
+        }
+
+        size_t assignedKeys = 0;
         for (const auto& tableEntry : table)
         {
             size_t childIndex = 0;
@@ -383,55 +423,52 @@ namespace rlogic::internal
             }
 
             setChildValue(childIndex, tableEntry.second);
+            ++assignedKeys;
+        }
+
+        if (assignedKeys != m_wrappedChildProperties.size())
+        {
+            sol_helper::throwSolException("Element size mismatch when assigning struct property '{}'! Expected: {} Received: {}",
+                m_wrappedProperty.get().getName(),
+                m_wrappedChildProperties.size(),
+                assignedKeys);
         }
     }
 
     void WrappedLuaProperty::setArray(const sol::object& rhs)
     {
-        if (!rhs.is<sol::table>())
+        if (!rhs.is<sol::lua_table>())
         {
             sol_helper::throwSolException("Unexpected type ({}) while assigning value of array field '{}' (expected a table or another array)!",
                 sol_helper::GetSolTypeName(rhs.get_type()),
                 m_wrappedProperty.get().getName());
         }
 
-        const sol::table& table = rhs.as<sol::table>();
-        verifyTableSize(table);
+        const sol::lua_table& table = rhs.as<sol::lua_table>();
 
-        for (size_t i = 0u; i < m_wrappedChildProperties.size(); ++i)
+        for (size_t i = 1u; i <= m_wrappedChildProperties.size(); ++i)
         {
-            const size_t luaIndex = i + 1;
-            const sol::object& field = table[luaIndex];
+            const sol::object& field = table[i];
 
             if (field == sol::nil)
             {
                 sol_helper::throwSolException("Error during assignment of array property '{}'! Expected a value at index {}",
-                    m_wrappedProperty.get().getName(), luaIndex);
+                    m_wrappedProperty.get().getName(), i);
             }
 
-            setChildValue(i, field);
+            // Convert to C+style index by subtracting 1
+            setChildValue(i-1, field);
         }
-    }
 
-    void WrappedLuaProperty::verifyTableSize(const sol::table& rhs) const
-    {
-        assert(TypeUtils::CanHaveChildren(m_wrappedProperty.get().getType()));
-
-        size_t tableFieldCount = 0u;
-        rhs.for_each([&](const std::pair<sol::object, sol::object>& /*key_value*/) {
-            ++tableFieldCount;
-        });
-
-        if (tableFieldCount != m_wrappedChildProperties.size())
+        // According to Lua semantics, table size is N iff table[N+1] is nil -> this check mimics that semantics
+        const sol::object potentiallySuperfluousField = table[m_wrappedChildProperties.size()+1];
+        if (potentiallySuperfluousField != sol::nil)
         {
-            const std::string_view containerTypeName = m_wrappedProperty.get().getType() == EPropertyType::Struct ? "struct" : "array";
-
-            sol_helper::throwSolException("Element size mismatch when assigning {} property '{}'! Expected: {} Received: {}",
-                containerTypeName,
+            sol_helper::throwSolException("Element size mismatch when assigning array property '{}'! Expected array size: {}",
                 m_wrappedProperty.get().getName(),
-                m_wrappedChildProperties.size(),
-                tableFieldCount);
+                m_wrappedChildProperties.size());
         }
+
     }
 
     void WrappedLuaProperty::RegisterTypes(sol::state& state)
@@ -487,6 +524,11 @@ namespace rlogic::internal
         {
             m_wrappedChildProperties[0].verifyTypeCompatibility(other.m_wrappedChildProperties[0]);
         }
+    }
+
+    const PropertyImpl& WrappedLuaProperty::getWrappedProperty() const
+    {
+        return m_wrappedProperty.get();
     }
 
 }

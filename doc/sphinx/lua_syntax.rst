@@ -16,14 +16,15 @@ Quick start
 
 The ``Logic Engine`` uses an extended Lua syntax to declare what should happen with the attached Ramses scene when application
 inputs/signals/configuration changes. If you prefer learning by example and/or have previous experience with scripting languages,
-you could have a look at the `Ramses Composer examples <https://github.com/GENIVI/ramses-composer-docs>`_ and come back to these docs for details.
-If not, we suggest reading through the docs and trying out the presented concepts on your own in a freshly created `Ramses Composer <https://github.com/GENIVI/ramses-composer>`_ project.
+you could have a look at the `Ramses Composer examples <https://github.com/COVESA/ramses-composer-docs>`_ and come back to these docs for details.
+If not, we suggest reading through the docs and trying out the presented concepts on your own in a freshly created `Ramses Composer <https://github.com/COVESA/ramses-composer>`_ project.
 Just create a new LuaScript object (right-clicking the resource menu), set its URI to a file on your local machine, and start jamming!
 
 .. todo: (Violin) maybe create a dedicated "test" binary, a-la "Lua shell" which can read a lua file and execute/print result? Or maybe have a special mode in the IMgui tool?
 
 Alternatively, if you have a C++ compiler/IDE, you can use some of the :ref:`examples <List of all examples>`, e.g. :ref:`the structs example <Example with structured properties>`
 as a sandbox to compile and try out the code presented here.
+
 
 =========================
 Basics of Lua
@@ -225,6 +226,37 @@ two functions - ``interface()`` and ``run()``.
 You can also use modules in ``init()``, see the :ref:`modules section <Using Lua modules>`.
 
 ==============================================
+Custom functions
+==============================================
+
+The ``Logic Engine`` provides additional methods to work with extended types and modules, which are otherwise not possible with
+standard Lua. Here is a list of these methods:
+
+* `modules` function: declares dependencies to modules, can be called in Lua scripts and in modules themselves.
+  Accepts a variable set of arguments, which have to be all of type string
+* `rl_len` implements the `#` semantics, but also works on custom types (``IN``, ``OUT`` and their child types) and modules
+    * use to obtain the size of IN, OUT or their sub-types (structs, arrays etc.) or data tables coming from modules
+* `rl_next` custom stateless iterator similar to ``Lua`` built-in `next`
+    * provides a way to iterate over custom types (``IN``, ``OUT``, etc.) and Logic engine custom modules' data
+    * semantically behaves exactly like next()
+* `rl_pairs` iterates over custom types, similar to ``Lua`` built-in `pairs`
+    * uses `rl_next` internally to loop over built-ins, see above
+    * semantically behaves like pairs(), yields integers [1, N] for array keys and strings for struct keys
+* `rl_ipairs` behaves exactly the same as rl_pairs when used on arrays
+    * it's there for better readibility and compatibility to plain Lua
+    * rl_ipairs(array) yields the same result as rl_pairs(array)
+
+All of the ``rl_*`` functions also work on plain Lua tables. However, we suggest to use the built-in Lua versions
+for better performance if you know that the underlying type is a plain Lua table and not a usertype (IN, OUT, a Logic Engine module, etc.).
+An exception to this is the length (``#``) operator for module data - you have to use rl_len instead as modules are write-protected and
+the ``#`` operator in Lua 5.1 does not support write-protected tables.
+
+.. warning::
+    The iterator functions work in the ``interface()`` phase as well. However, properties there are mutable (you can add a new
+    property to any container). Changing containers while iterating over them can result in undefined behavior and crashes, similar
+    to other iterator implementations in C++!
+
+==============================================
 Environments and isolation
 ==============================================
 
@@ -411,12 +443,8 @@ It is also possible to use modules in other modules, like this:
 In the example above, the ``rotationHelper`` module uses another module ``quaternions`` to provide
 a new function which computes a rotation matrix using quaternions as an intermediate step.
 
-.. warning::
-    Modules are supposed to read-only to prevent misuse and guarantee safe usage. However, this is not
-    implemented yet! This means that there is no mechanism (yet) which forbids modifying module data. We strongly advise against
-    modifying module data because a) it will produce errors in an upcoming release and b) it can introduce undefined behavior
-    when different module try to write the same data, or if one module writes and another one reads the
-    same data in undefined order.
+.. note::
+    Modules are read-only to prevent misuse and guarantee safe usage.
 
 =====================================
 Additional Lua syntax specifics

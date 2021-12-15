@@ -78,6 +78,7 @@ namespace rlogic
     template RLOGIC_API std::optional<vec3f>       Property::getInternal<vec3f>() const;
     template RLOGIC_API std::optional<vec4f>       Property::getInternal<vec4f>() const;
     template RLOGIC_API std::optional<int32_t>     Property::getInternal<int32_t>() const;
+    template RLOGIC_API std::optional<int64_t>     Property::getInternal<int64_t>() const;
     template RLOGIC_API std::optional<vec2i>       Property::getInternal<vec2i>() const;
     template RLOGIC_API std::optional<vec3i>       Property::getInternal<vec3i>() const;
     template RLOGIC_API std::optional<vec4i>       Property::getInternal<vec4i>() const;
@@ -89,6 +90,7 @@ namespace rlogic
     template RLOGIC_API bool Property::setInternal<vec3f>(vec3f /*value*/);
     template RLOGIC_API bool Property::setInternal<vec4f>(vec4f /*value*/);
     template RLOGIC_API bool Property::setInternal<int32_t>(int32_t /*value*/);
+    template RLOGIC_API bool Property::setInternal<int64_t>(int64_t /*value*/);
     template RLOGIC_API bool Property::setInternal<vec2i>(vec2i /*value*/);
     template RLOGIC_API bool Property::setInternal<vec3i>(vec3i /*value*/);
     template RLOGIC_API bool Property::setInternal<vec4i>(vec4i /*value*/);
@@ -98,13 +100,7 @@ namespace rlogic
 
     bool Property::isLinked() const
     {
-        if (!m_impl->isInput())
-        {
-            LOG_ERROR("Property '{}' is not an input! Call 'Property::isLinked' only with input properties!", m_impl->getName());
-            return false;
-        }
-
-        return m_impl->isLinkedInput();
+        return m_impl->isLinked();
     }
 
 }

@@ -72,6 +72,15 @@ namespace rlogic::internal
         EXPECT_FALSE(env["OUT"].valid());
     }
 
+    TEST_F(ASolState, CreatesCustomMethods)
+    {
+        sol::environment env = m_solState.createEnvironment({}, {});
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_TRUE(env["modules"].valid());
+        EXPECT_TRUE(env["rl_len"].valid());
+    }
+
     // Those are created on-demand in the interface() function and during runtime
     TEST_F(ASolState, NewEnvironment_HasNo_IN_OUT_globals)
     {

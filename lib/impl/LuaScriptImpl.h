@@ -48,7 +48,7 @@ namespace rlogic::internal
     class LuaScriptImpl : public LogicNodeImpl
     {
     public:
-        explicit LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name);
+        explicit LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name, uint64_t id);
         ~LuaScriptImpl() noexcept override = default;
         LuaScriptImpl(const LuaScriptImpl & other) = delete;
         LuaScriptImpl& operator=(const LuaScriptImpl & other) = delete;
@@ -68,18 +68,12 @@ namespace rlogic::internal
 
         [[nodiscard]] const ModuleMapping& getModules() const;
 
-        void luaPrint(sol::variadic_args args);
-        void overrideLuaPrint(LuaPrintFunction luaPrintFunction);
-
     private:
         std::string             m_source;
-        LuaPrintFunction        m_luaPrintFunction;
         WrappedLuaProperty      m_wrappedRootInput;
         WrappedLuaProperty      m_wrappedRootOutput;
         sol::protected_function m_solFunction;
         ModuleMapping           m_modules;
         StandardModules         m_stdModules;
-
-        static void DefaultLuaPrintFunction(std::string_view scriptName, std::string_view message);
     };
 }

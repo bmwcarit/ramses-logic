@@ -1,6 +1,6 @@
 ..
     -------------------------------------------------------------------------
-    Copyright (C) 2020 BMW AG
+    Copyright (C) 2021 BMW AG
     -------------------------------------------------------------------------
     This Source Code Form is subject to the terms of the Mozilla Public
     License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -10,10 +10,9 @@
 .. default-domain:: cpp
 .. highlight:: cpp
 
-================================
-Override print function example
-================================
+=========================
+TimerNode
+=========================
 
-.. literalinclude:: ../../../examples/06_override_print/main.cpp
-    :start-after: #include <iostream>
-
+.. doxygenclass:: rlogic::TimerNode
+   :members:

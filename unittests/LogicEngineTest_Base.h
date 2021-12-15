@@ -21,6 +21,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 #include "ramses-client-api/OrthographicCamera.h"
 #include "ramses-client-api/Appearance.h"
 #include "ramses-utils.h"

@@ -21,15 +21,16 @@
 
 namespace rlogic::internal
 {
-    AnimationNodeImpl::AnimationNodeImpl(AnimationChannels channels, std::string_view name) noexcept
-        : LogicNodeImpl(name)
+    AnimationNodeImpl::AnimationNodeImpl(AnimationChannels channels, std::string_view name, uint64_t id) noexcept
+        : LogicNodeImpl(name, id)
         , m_channels{ std::move(channels) }
     {
         HierarchicalTypeData inputs = MakeStruct("IN", {
             {"timeDelta", EPropertyType::Float},   // EInputIdx_TimeDelta
             {"play", EPropertyType::Bool},         // EInputIdx_Play
             {"loop", EPropertyType::Bool},         // EInputIdx_Loop
-            {"rewindOnStop", EPropertyType::Bool}  // EInputIdx_RewindOnStop
+            {"rewindOnStop", EPropertyType::Bool}, // EInputIdx_RewindOnStop
+            {"timeRange", EPropertyType::Vec2f}    // EInputIdx_TimeRange
             });
         auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::AnimationInput);
 
@@ -44,16 +45,16 @@ namespace rlogic::internal
             assert(!channel.tangentsOut || channel.timeStamps->getNumElements() == channel.tangentsOut->getNumElements());
             outputs.children.push_back(MakeType(std::string{ channel.name }, channel.keyframes->getDataType()));
             // overall duration equals longest channel in animation
-            m_duration = std::max(m_duration, channel.timeStamps->getData<float>()->back());
+            m_maxChannelDuration = std::max(m_maxChannelDuration, channel.timeStamps->getData<float>()->back());
         }
         auto outputsImpl = std::make_unique<PropertyImpl>(std::move(outputs), EPropertySemantics::AnimationOutput);
 
         setRootProperties(std::make_unique<Property>(std::move(inputsImpl)), std::make_unique<Property>(std::move(outputsImpl)));
     }
 
-    float AnimationNodeImpl::getDuration() const
+    float AnimationNodeImpl::getMaximumChannelDuration() const
     {
-        return m_duration;
+        return m_maxChannelDuration;
     }
 
     const AnimationChannels& AnimationNodeImpl::getChannels() const
@@ -82,8 +83,20 @@ namespace rlogic::internal
             }
         }
 
+        // determine duration from time range input property
+        const vec2f userProvidedTimeRange = *getInputs()->getChild(EInputIdx_TimeRange)->get<vec2f>();
+        vec2f timeRange = userProvidedTimeRange;
+        if (timeRange[1] <= 0.f) // end range not set, set to animation duration
+            timeRange[1] = m_maxChannelDuration;
+        if (timeRange[0] < 0.f || timeRange[0] >= timeRange[1])
+        {
+            return LogicNodeRuntimeError{ fmt::format("AnimationNode '{}' failed to update - time range begin must be smaller than end and not negative (given time range [{}, {}])",
+                getName(), userProvidedTimeRange[0], userProvidedTimeRange[1]) };
+        }
+        const float duration = timeRange[1] - timeRange[0];
+
         const bool loop = *getInputs()->getChild(EInputIdx_Loop)->get<bool>();
-        if (m_elapsedPlayTime >= m_duration && !loop)
+        if (m_elapsedPlayTime >= duration && !loop)
             return std::nullopt;
 
         m_elapsedPlayTime += timeDelta;
@@ -93,27 +106,31 @@ namespace rlogic::internal
             // when looping enabled and elapsed time passed total duration,
             // wrap it around and start from beginning (by calculating a remainder
             // after dividing by duration)
-            m_elapsedPlayTime = fmodf(m_elapsedPlayTime, m_duration);
+            m_elapsedPlayTime = fmodf(m_elapsedPlayTime, duration);
         }
 
-        const float progress = std::min(m_elapsedPlayTime / m_duration, 1.f);
+        // elapsed play time must stay within duration of animation
+        m_elapsedPlayTime = std::min(m_elapsedPlayTime, duration);
+
+        const float progress = m_elapsedPlayTime / duration;
 
         for (size_t i = 0u; i < m_channels.size(); ++i)
-            updateChannel(i);
+            updateChannel(i, timeRange[0]);
 
-        getOutputs()->getChild(EOutputIdx_Progress)->m_impl->setValue(progress, true);
+        getOutputs()->getChild(EOutputIdx_Progress)->m_impl->setValue(progress);
 
         return std::nullopt;
     }
 
-    void AnimationNodeImpl::updateChannel(size_t channelIdx)
+    void AnimationNodeImpl::updateChannel(size_t channelIdx, float beginOffset)
     {
         const auto& channel = m_channels[channelIdx];
         assert(channel.timeStamps->getDataType() == EPropertyType::Float && channel.timeStamps->getNumElements() > 0);
         const auto& timeStamps = *channel.timeStamps->getData<float>();
+        const float elapsedChannelPlayTime = m_elapsedPlayTime + beginOffset;
 
         // find upper/lower timestamp neighbor of elapsed timestamp
-        auto tsUpperIt = std::upper_bound(timeStamps.cbegin(), timeStamps.cend(), m_elapsedPlayTime);
+        auto tsUpperIt = std::upper_bound(timeStamps.cbegin(), timeStamps.cend(), elapsedChannelPlayTime);
         const auto tsLowerIt = (tsUpperIt == timeStamps.cbegin() ? timeStamps.cbegin() : tsUpperIt - 1);
         tsUpperIt = (tsUpperIt == timeStamps.cend() ? tsUpperIt - 1 : tsUpperIt);
 
@@ -127,7 +144,7 @@ namespace rlogic::internal
         float interpRatio = 0.f;
         float timeBetweenKeys = *tsUpperIt - *tsLowerIt;
         if (tsUpperIt != tsLowerIt)
-            interpRatio = (m_elapsedPlayTime - *tsLowerIt) / timeBetweenKeys;
+            interpRatio = (elapsedChannelPlayTime - *tsLowerIt) / timeBetweenKeys;
         // no clamping needed mathematically but to avoid float precision issues
         interpRatio = std::clamp(interpRatio, 0.f, 1.f);
 
@@ -170,7 +187,7 @@ namespace rlogic::internal
         }
 
         // 'progress' is at index 0, channel outputs are shifted by one
-        getOutputs()->getChild(channelIdx + EOutputIdx_ChannelsBegin)->m_impl->setValue(std::move(interpolatedValue), true);
+        getOutputs()->getChild(channelIdx + EOutputIdx_ChannelsBegin)->m_impl->setValue(std::move(interpolatedValue));
     }
 
     template <typename T>
@@ -292,6 +309,7 @@ namespace rlogic::internal
         return rlogic_serialization::CreateAnimationNode(
             builder,
             builder.CreateString(animNode.getName()),
+            animNode.getId(),
             builder.CreateVector(channelsFB),
             PropertyImpl::Serialize(*animNode.getInputs()->m_impl, builder, serializationMap),
             PropertyImpl::Serialize(*animNode.getOutputs()->m_impl, builder, serializationMap)
@@ -303,11 +321,12 @@ namespace rlogic::internal
         ErrorReporting& errorReporting,
         DeserializationMap& deserializationMap)
     {
-        if (!animNodeFB.name() || !animNodeFB.channels() || !animNodeFB.rootInput() || !animNodeFB.rootOutput())
+        if (!animNodeFB.name() || animNodeFB.id() == 0u || !animNodeFB.channels() || !animNodeFB.rootInput() || !animNodeFB.rootOutput())
         {
-            errorReporting.add("Fatal error during loading of AnimationNode from serialized data: missing name, channels or in/out property data!", nullptr);
+            errorReporting.add("Fatal error during loading of AnimationNode from serialized data: missing name, id, channels or in/out property data!", nullptr);
             return nullptr;
         }
+
         const auto name = animNodeFB.name()->string_view();
 
         AnimationChannels channels;
@@ -365,7 +384,7 @@ namespace rlogic::internal
             channels.push_back(std::move(channel));
         }
 
-        auto deserialized = std::make_unique<AnimationNodeImpl>(std::move(channels), name);
+        auto deserialized = std::make_unique<AnimationNodeImpl>(std::move(channels), name, animNodeFB.id());
 
         // deserialize and overwrite constructor generated properties
         auto rootInProperty = PropertyImpl::Deserialize(*animNodeFB.rootInput(), EPropertySemantics::AnimationInput, errorReporting, deserializationMap);
@@ -374,6 +393,7 @@ namespace rlogic::internal
             !rootInProperty->getChild(EInputIdx_Play) || rootInProperty->getChild(EInputIdx_Play)->getName() != "play" ||
             !rootInProperty->getChild(EInputIdx_Loop) || rootInProperty->getChild(EInputIdx_Loop)->getName() != "loop" ||
             !rootInProperty->getChild(EInputIdx_RewindOnStop) || rootInProperty->getChild(EInputIdx_RewindOnStop)->getName() != "rewindOnStop" ||
+            !rootInProperty->getChild(EInputIdx_TimeRange) || rootInProperty->getChild(EInputIdx_TimeRange)->getName() != "timeRange" ||
             !rootOutProperty->getChild(EOutputIdx_Progress) || rootOutProperty->getChild(EOutputIdx_Progress)->getName() != "progress" ||
             rootOutProperty->getChildCount() != deserialized->getChannels().size() + 1)
         {

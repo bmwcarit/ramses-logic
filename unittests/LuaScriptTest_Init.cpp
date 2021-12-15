@@ -224,7 +224,7 @@ namespace rlogic
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("withGlobals.bin"));
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(5, *m_logicEngine.findScript("withGlobals")->getOutputs()->getChild("globalValueBefore")->get<int32_t>());
-        EXPECT_EQ(42, *m_logicEngine.findScript("withGlobals")->getOutputs()->getChild("globalValueAfter")->get<int32_t>());
+        EXPECT_EQ(5, *m_logicEngine.findByName<LuaScript>("withGlobals")->getOutputs()->getChild("globalValueBefore")->get<int32_t>());
+        EXPECT_EQ(42, *m_logicEngine.findByName<LuaScript>("withGlobals")->getOutputs()->getChild("globalValueAfter")->get<int32_t>());
     }
 }

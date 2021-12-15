@@ -51,7 +51,7 @@ namespace rlogic::internal
     {
     public:
         // Move-able (noexcept); Not copy-able
-        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
+        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name, uint64_t id);
         ~RamsesNodeBindingImpl() noexcept override = default;
         RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other) = delete;
         RamsesNodeBindingImpl& operator=(const RamsesNodeBindingImpl& other) = delete;

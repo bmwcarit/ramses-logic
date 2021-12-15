@@ -28,6 +28,23 @@
 #pragma GCC diagnostic pop
 #endif
 
+template <> struct fmt::formatter<std::chrono::microseconds>
+{
+    template <typename ParseContext> constexpr auto parse(ParseContext& ctx)
+    {
+        return ctx.begin();
+    }
+
+    template <typename FormatContext> constexpr auto format(const std::chrono::microseconds value, FormatContext& ctx)
+    {
+        const auto c = value.count();
+        if (c == 0)
+            return fmt::format_to(ctx.out(), "0");
+        return fmt::format_to(ctx.out(), "{}.{:03}", c / 1000, c % 1000);
+    }
+};
+
+
 namespace rlogic
 {
     namespace
@@ -95,6 +112,47 @@ namespace rlogic
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
             return ImGui::TreeNode(ptr_id, "%s", text.c_str());
         }
+
+        const char* TypeName(const LogicNode* node)
+        {
+            const char* name = "Unknown";
+            if (node->as<LuaScript>() != nullptr)
+            {
+                name = "LuaScript";
+            }
+            else if (node->as<AnimationNode>() != nullptr)
+            {
+                name = "Animation";
+            }
+            else if (node->as<RamsesNodeBinding>() != nullptr)
+            {
+                name = "NodeBinding";
+            }
+            else if (node->as<RamsesAppearanceBinding>() != nullptr)
+            {
+                name = "AppearanceBinding";
+            }
+            else if (node->as<RamsesCameraBinding>() != nullptr)
+            {
+                name = "CameraBinding";
+            }
+            return name;
+        }
+
+        template <typename... Args>
+        void HelpMarker(const char* desc, Args&& ... args)
+        {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+            ImGui::TextDisabled("(?)");
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::PushTextWrapPos(ImGui::GetFontSize() * 35.0f);
+                ImGui::TextUnformatted(fmt::format(desc, args...).c_str());
+                ImGui::PopTextWrapPos();
+                ImGui::EndTooltip();
+            }
+        }
     }
 
     LogicViewerGui::LogicViewerGui(rlogic::LogicViewer& viewer)
@@ -113,6 +171,7 @@ namespace rlogic
 
         ImGui::LoadIniSettingsFromDisk(ImGui::GetIO().IniFilename);
         m_persistentSettings = m_settings;
+        m_viewer.enableUpdateReport(m_settings.showUpdateReport, m_updateReportInterval);
 
         // filename proposal if there is no lua file found at startup
         fs::path p = m_viewer.getLogicFilename();
@@ -223,7 +282,7 @@ namespace rlogic
 
     void LogicViewerGui::copyScriptInputs()
     {
-        copyInputs(LogicViewer::ltnScript, m_logicEngine.scripts());
+        copyInputs(LogicViewer::ltnScript, m_logicEngine.getCollection<LuaScript>());
     }
 
     void LogicViewerGui::drawGlobalContextMenu()
@@ -298,7 +357,7 @@ namespace rlogic
 
         if (m_settings.showDataArrays && ImGui::CollapsingHeader("Data Arrays"))
         {
-            for (auto* obj : m_logicEngine.dataArrays())
+            for (auto* obj : m_logicEngine.getCollection<DataArray>())
             {
                 DrawDataArray(obj);
             }
@@ -309,6 +368,11 @@ namespace rlogic
             drawAppearanceBindings();
             drawNodeBindings();
             drawCameraBindings();
+        }
+
+        if (m_settings.showUpdateReport)
+        {
+            drawUpdateReport();
         }
 
         ImGui::End();
@@ -333,9 +397,16 @@ namespace rlogic
                 ImGui::MenuItem("Show Animation Nodes", nullptr, &m_settings.showAnimationNodes);
                 ImGui::MenuItem("Show Data Arrays", nullptr, &m_settings.showDataArrays);
                 ImGui::MenuItem("Show Ramses Bindings", nullptr, &m_settings.showRamsesBindings);
+                if(ImGui::MenuItem("Show Update Report", nullptr, &m_settings.showUpdateReport))
+                {
+                    m_viewer.enableUpdateReport(m_settings.showUpdateReport, m_updateReportInterval);
+                }
                 ImGui::Separator();
                 ImGui::MenuItem("Show Linked Inputs", nullptr, &m_settings.showLinkedInputs);
                 ImGui::MenuItem("Show Outputs", nullptr, &m_settings.showOutputs);
+                ImGui::Separator();
+                ImGui::MenuItem("Lua: prefer identifiers (scripts.foo)", nullptr, &m_settings.luaPreferIdentifiers);
+                ImGui::MenuItem("Lua: prefer object ids (scripts[1])", nullptr, &m_settings.luaPreferObjectIds);
                 ImGui::EndMenu();
             }
             ImGui::EndMenuBar();
@@ -380,6 +451,19 @@ namespace rlogic
         {
             ImGui::TextUnformatted("no views defined in configuration file");
         }
+
+        if (m_settings.showUpdateReport)
+        {
+            ImGui::Separator();
+            ImGui::TextUnformatted(fmt::format("Average Update Time: {} ms", m_viewer.getUpdateReport().getTotalTime().average).c_str());
+            ImGui::SameLine();
+            HelpMarker("Time it took to update the whole logic nodes network (LogicEngine::update()).");
+        }
+    }
+
+    bool LogicViewerGui::DrawTreeNode(rlogic::LogicObject* obj)
+    {
+        return TreeNode(obj, fmt::format("[{}]: {}", obj->getId(), obj->getName()));
     }
 
     void LogicViewerGui::drawScripts()
@@ -395,9 +479,9 @@ namespace rlogic
         }
         if (openScripts)
         {
-            for (auto* script : m_logicEngine.scripts())
+            for (auto* script : m_logicEngine.getCollection<LuaScript>())
             {
-                const bool open = TreeNode(script, script->getName());
+                const bool open = DrawTreeNode(script);
                 drawNodeContextMenu(script, LogicViewer::ltnScript);
                 if (open)
                 {
@@ -415,15 +499,15 @@ namespace rlogic
         {
             if (ImGui::MenuItem("Copy all Animation Node inputs"))
             {
-                copyInputs(LogicViewer::ltnAnimation, m_logicEngine.animationNodes());
+                copyInputs(LogicViewer::ltnAnimation, m_logicEngine.getCollection<AnimationNode>());
             }
             ImGui::EndPopup();
         }
         if (openAnimationNodes)
         {
-            for (auto* obj : m_logicEngine.animationNodes())
+            for (auto* obj : m_logicEngine.getCollection<AnimationNode>())
             {
-                const bool open = TreeNode(obj, obj->getName());
+                const bool open = DrawTreeNode(obj);
                 drawNodeContextMenu(obj, LogicViewer::ltnAnimation);
                 if (open)
                 {
@@ -458,15 +542,15 @@ namespace rlogic
         {
             if (ImGui::MenuItem("Copy all Node Binding inputs"))
             {
-                copyInputs(LogicViewer::ltnNode, m_logicEngine.ramsesNodeBindings());
+                copyInputs(LogicViewer::ltnNode, m_logicEngine.getCollection<RamsesNodeBinding>());
             }
             ImGui::EndPopup();
         }
         if (openBindings)
         {
-            for (auto* obj : m_logicEngine.ramsesNodeBindings())
+            for (auto* obj : m_logicEngine.getCollection<RamsesNodeBinding>())
             {
-                const bool open = TreeNode(obj, obj->getName());
+                const bool open = DrawTreeNode(obj);
                 drawNodeContextMenu(obj, LogicViewer::ltnNode);
                 if (open)
                 {
@@ -486,15 +570,15 @@ namespace rlogic
         {
             if (ImGui::MenuItem("Copy all Camera Binding inputs"))
             {
-                copyInputs(LogicViewer::ltnCamera, m_logicEngine.ramsesCameraBindings());
+                copyInputs(LogicViewer::ltnCamera, m_logicEngine.getCollection<RamsesCameraBinding>());
             }
             ImGui::EndPopup();
         }
         if (openBindings)
         {
-            for (auto* obj : m_logicEngine.ramsesCameraBindings())
+            for (auto* obj : m_logicEngine.getCollection<RamsesCameraBinding>())
             {
-                const bool open = TreeNode(obj, obj->getName());
+                const bool open = DrawTreeNode(obj);
                 drawNodeContextMenu(obj, LogicViewer::ltnCamera);
                 if (open)
                 {
@@ -506,6 +590,81 @@ namespace rlogic
         }
     }
 
+    void LogicViewerGui::drawUpdateReport()
+    {
+        const bool open = ImGui::CollapsingHeader("Update Report");
+        if (open)
+        {
+            auto interval = static_cast<int>(m_updateReportInterval);
+            bool refresh = m_viewer.isUpdateReportEnabled();
+            if (ImGui::Checkbox("Auto Refresh", &refresh))
+            {
+                m_viewer.enableUpdateReport(refresh, m_updateReportInterval);
+            }
+            ImGui::SetNextItemWidth(100);
+            if (ImGui::DragInt("Refresh Interval", &interval, 0.5f, 1, 1000, "%d Frames"))
+            {
+                m_updateReportInterval = static_cast<size_t>(interval);
+                m_viewer.enableUpdateReport(refresh, m_updateReportInterval);
+            }
+            const auto& report = m_viewer.getUpdateReport();
+            const auto& executed = report.getNodesExecuted();
+            const auto& skipped  = report.getNodesSkippedExecution();
+            const auto longest = report.getTotalTime().maxValue;
+
+            ImGui::Separator();
+            ImGui::TextUnformatted("Summary:");
+            ImGui::SameLine();
+            HelpMarker("Timing data is collected and summarized for {} frames.\n'min', 'max', 'avg' show the minimum, maximum, and average value for the measured interval.", m_updateReportInterval);
+            ImGui::Indent();
+
+            const auto& updateTime = report.getTotalTime();
+            ImGui::TextUnformatted(fmt::format("Total Update Time  (ms): max:{} min:{} avg:{}", updateTime.maxValue, updateTime.minValue, updateTime.average).c_str());
+            ImGui::SameLine();
+            HelpMarker("Time it took to update the whole logic nodes network (LogicEngine::update()).");
+
+            const auto& sortTime = report.getSortTime();
+            ImGui::TextUnformatted(fmt::format("Topology Sort Time (ms): max:{} min:{} avg:{}", sortTime.maxValue, sortTime.minValue, sortTime.average).c_str());
+            ImGui::SameLine();
+            HelpMarker("Time it took to sort logic nodes by their topology during update (see rlogic::LogicEngineReport::getTopologySortExecutionTime()");
+
+            const auto& links = report.getLinkActivations();
+            ImGui::TextUnformatted(fmt::format("Activated Links: max:{} min:{} avg:{}", links.maxValue, links.minValue, links.average).c_str());
+            ImGui::SameLine();
+            HelpMarker("Number of input properties that had been updated by an output property (see rlogic::LogicEngineReport::getTotalLinkActivations()).");
+            ImGui::Unindent();
+
+            ImGui::TextUnformatted(fmt::format("Details for the longest update ({} ms):", longest).c_str());
+            if (TreeNode("Executed", fmt::format("Executed Nodes ({}):", executed.size())))
+            {
+                for (auto& timedNode : executed)
+                {
+                    auto* node = timedNode.first;
+                    const auto percentage = (longest.count() > 0u) ? (100u * timedNode.second / longest) : 0u;
+                    if (TreeNode(node, fmt::format("{}[{}]: {} [time:{} ms, {}%]", TypeName(node), node->getId(), node->getName(), timedNode.second, percentage)))
+                    {
+                        drawNode(node);
+                        ImGui::TreePop();
+                    }
+                }
+                ImGui::TreePop();
+            }
+
+            if (TreeNode("Skipped", fmt::format("Skipped Nodes ({}):", skipped.size())))
+            {
+                for (auto& node : skipped)
+                {
+                    if (TreeNode(node, fmt::format("{}[{}]: {}", TypeName(node), node->getId(), node->getName())))
+                    {
+                        drawNode(node);
+                        ImGui::TreePop();
+                    }
+                }
+                ImGui::TreePop();
+            }
+        }
+    }
+
     void LogicViewerGui::drawAppearanceBindings()
     {
         const bool openBindings = ImGui::CollapsingHeader("Appearance Bindings");
@@ -513,15 +672,15 @@ namespace rlogic
         {
             if (ImGui::MenuItem("Copy all Appearance Binding inputs"))
             {
-                copyInputs(LogicViewer::ltnAppearance, m_logicEngine.ramsesAppearanceBindings());
+                copyInputs(LogicViewer::ltnAppearance, m_logicEngine.getCollection<RamsesAppearanceBinding>());
             }
             ImGui::EndPopup();
         }
         if (openBindings)
         {
-            for (auto* obj : m_logicEngine.ramsesAppearanceBindings())
+            for (auto* obj : m_logicEngine.getCollection<RamsesAppearanceBinding>())
             {
-                const bool open = TreeNode(obj, obj->getName());
+                const bool open = DrawTreeNode(obj);
                 drawNodeContextMenu(obj, LogicViewer::ltnAppearance);
                 if (open)
                 {
@@ -649,6 +808,18 @@ namespace rlogic
                 ImGui::TextUnformatted(fmt::format("{}: {}", name, value).c_str());
             }
             else if (ImGui::DragInt(name, &value, 0.1f))
+            {
+                prop->set(value);
+            }
+            break;
+        }
+        case rlogic::EPropertyType::Int64: {
+            auto value = prop->get<int64_t>().value();
+            if (isLinked)
+            {
+                ImGui::TextUnformatted(fmt::format("{}: {}", name, value).c_str());
+            }
+            else if (ImGui::DragScalar(name, ImGuiDataType_S64, &value, 0.1f, nullptr, nullptr, "%ll"))
             {
                 prop->set(value);
             }
@@ -801,6 +972,11 @@ namespace rlogic
             ImGui::TextUnformatted(fmt::format("{}: {}", name, value).c_str());
             break;
         }
+        case rlogic::EPropertyType::Int64: {
+            auto value = prop->get<int64_t>().value();
+            ImGui::TextUnformatted(fmt::format("{}: {}", name, value).c_str());
+            break;
+        }
         case rlogic::EPropertyType::Float: {
             auto value = prop->get<float>().value();
             ImGui::TextUnformatted(fmt::format("{}: {}", name, value).c_str());
@@ -887,26 +1063,50 @@ namespace rlogic
         }
     }
 
-    void LogicViewerGui::logInputs(rlogic::LogicNode* obj, PathVector& path)
+    void LogicViewerGui::logInputs(rlogic::LogicNode* obj, const PathVector& path)
     {
-        path.push_back(obj->getName());
-        logProperty(obj->getInputs(), path);
-        path.pop_back();
+        const auto joinedPath = fmt::format("{}", fmt::join(path.begin(), path.end(), "."));
+        std::string prefix;
+        if ((m_settings.luaPreferObjectIds) || obj->getName().empty())
+        {
+            prefix = fmt::format("{}[{}]", joinedPath, obj->getId());
+        }
+        else if (m_settings.luaPreferIdentifiers)
+        {
+            prefix = fmt::format("{}.{}", joinedPath, obj->getName());
+        }
+        else
+        {
+            prefix = fmt::format("{}[\"{}\"]", joinedPath, obj->getName());
+        }
+        PathVector propertyPath;
+        logProperty(obj->getInputs(), prefix, propertyPath);
     }
 
-    void LogicViewerGui::logProperty(rlogic::Property* prop, PathVector& path)
+    void LogicViewerGui::logProperty(rlogic::Property* prop, const std::string& prefix, PathVector& path)
     {
         if (prop->isLinked())
             return;
 
         path.push_back(prop->getName());
 
-        auto strPath = fmt::format("{}[\"{}\"].value", path.front(), fmt::join(path.begin() + 1, path.end(), "\"][\""));
+        std::string strPath;
+        if (m_settings.luaPreferIdentifiers)
+        {
+            strPath = fmt::format("{}.{}.value", prefix, fmt::join(path.begin(), path.end(), "."));
+        }
+        else
+        {
+            strPath = fmt::format("{}[\"{}\"].value", prefix, fmt::join(path.begin(), path.end(), "\"][\""));
+        }
 
         switch (prop->getType())
         {
         case rlogic::EPropertyType::Int32:
             LogText(fmt::format("{} = {}\n", strPath, prop->get<int32_t>().value()));
+            break;
+        case rlogic::EPropertyType::Int64:
+            LogText(fmt::format("{} = {}\n", strPath, prop->get<int64_t>().value()));
             break;
         case rlogic::EPropertyType::Float:
             LogText(fmt::format("{} = {}\n", strPath, prop->get<float>().value()));
@@ -944,7 +1144,7 @@ namespace rlogic
         case rlogic::EPropertyType::Struct:
             for (size_t i = 0U; i < prop->getChildCount(); ++i)
             {
-                logProperty(prop->getChild(i), path);
+                logProperty(prop->getChild(i), prefix, path);
             }
             break;
         case rlogic::EPropertyType::Bool: {
@@ -952,7 +1152,7 @@ namespace rlogic
             break;
         }
         case rlogic::EPropertyType::String:
-            LogText(fmt::format("{} = {}\n", strPath, prop->get<std::string>().value()));
+            LogText(fmt::format("{} = '{}'\n", strPath, prop->get<std::string>().value()));
             break;
         case rlogic::EPropertyType::Array:
             break;
@@ -989,6 +1189,10 @@ namespace rlogic
         {
             gui->m_settings.showRamsesBindings = (flag != 0);
         }
+        else if (IniReadFlag(line, "ShowUpdateReport=%d", &flag))
+        {
+            gui->m_settings.showUpdateReport = (flag != 0);
+        }
         else if (IniReadFlag(line, "ShowLinkedInputs=%d", &flag))
         {
             gui->m_settings.showLinkedInputs = (flag != 0);
@@ -996,6 +1200,14 @@ namespace rlogic
         else if (IniReadFlag(line, "ShowOutputs=%d", &flag))
         {
             gui->m_settings.showOutputs = (flag != 0);
+        }
+        else if (IniReadFlag(line, "LuaPreferObjectIds=%d", &flag))
+        {
+            gui->m_settings.luaPreferObjectIds = (flag != 0);
+        }
+        else if (IniReadFlag(line, "LuaPreferIdentifiers=%d", &flag))
+        {
+            gui->m_settings.luaPreferIdentifiers = (flag != 0);
         }
     }
 
@@ -1016,9 +1228,15 @@ namespace rlogic
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowRamsesBindings=%d\n", gui->m_settings.showRamsesBindings ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+        buf->appendf("ShowUpdateReport=%d\n", gui->m_settings.showUpdateReport ? 1 : 0);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowLinkedInputs=%d\n", gui->m_settings.showLinkedInputs ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowOutputs=%d\n", gui->m_settings.showOutputs ? 1 : 0);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+        buf->appendf("LuaPreferObjectIds=%d\n", gui->m_settings.luaPreferObjectIds ? 1 : 0);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+        buf->appendf("LuaPreferIdentifiers=%d\n", gui->m_settings.luaPreferIdentifiers ? 1 : 0);
         buf->append("\n");
     }
 
@@ -1030,7 +1248,7 @@ namespace rlogic
         PathVector path;
         std::string name = std::string("    ") + LogicViewer::ltnModule + "." + LogicViewer::ltnScript;
         path.push_back(name);
-        for (auto* script : m_logicEngine.scripts())
+        for (auto* script : m_logicEngine.getCollection<LuaScript>())
         {
             logInputs(script, path);
         }

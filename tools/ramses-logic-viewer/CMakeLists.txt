@@ -17,6 +17,7 @@ add_executable(ramses-logic-viewer
     LogicViewerLuaTypes.cpp
     Arguments.h
     SceneSetup.h
+    UpdateReportSummary.h
     )
 
 target_include_directories(ramses-logic-viewer
@@ -33,3 +34,9 @@ else()
 endif()
 
 folderize_target(ramses-logic-viewer "tools")
+
+if (ramses-logic_ENABLE_INSTALL)
+    install(
+        TARGETS ramses-logic-viewer
+        DESTINATION ${RLOGIC_INSTALL_RUNTIME_PATH})
+endif()

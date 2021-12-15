@@ -24,10 +24,9 @@
 
 namespace rlogic::internal
 {
-    LuaScriptImpl::LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name)
-        : LogicNodeImpl(name)
+    LuaScriptImpl::LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name, uint64_t id)
+        : LogicNodeImpl(name, id)
         , m_source(std::move(compiledScript.source.sourceCode))
-        , m_luaPrintFunction(&LuaScriptImpl::DefaultLuaPrintFunction)
         , m_wrappedRootInput(*compiledScript.rootInput->m_impl)
         , m_wrappedRootOutput(*compiledScript.rootOutput->m_impl)
         , m_solFunction(std::move(compiledScript.mainFunction))
@@ -40,8 +39,6 @@ namespace rlogic::internal
 
         env["IN"] = std::ref(m_wrappedRootInput);
         env["OUT"] = std::ref(m_wrappedRootOutput);
-        // override the lua print function to handle it by ourselves
-        env.set_function("print", &LuaScriptImpl::luaPrint, this);
     }
 
     flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap)
@@ -49,20 +46,14 @@ namespace rlogic::internal
         // TODO Violin investigate options to save byte code, instead of plain text, e.g.:
         //sol::bytecode scriptCode = m_solFunction.dump();
 
-        flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> modulesOffset = 0;
-        if (!luaScript.m_modules.empty())
+        std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> userModules;
+        userModules.reserve(luaScript.m_modules.size());
+        for (const auto& module : luaScript.m_modules)
         {
-            std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> modulesFB;
-            modulesFB.reserve(luaScript.m_modules.size());
-            for (const auto& module : luaScript.m_modules)
-            {
-                modulesFB.push_back(
-                    rlogic_serialization::CreateLuaModuleUsage(builder,
-                        builder.CreateString(module.first),
-                        serializationMap.resolveLuaModuleOffset(*module.second)));
-            }
-
-            modulesOffset = builder.CreateVector(modulesFB);
+            userModules.push_back(
+                rlogic_serialization::CreateLuaModuleUsage(builder,
+                    builder.CreateString(module.first),
+                    serializationMap.resolveLuaModuleOffset(*module.second)));
         }
 
         std::vector<uint8_t> stdModules;
@@ -74,12 +65,12 @@ namespace rlogic::internal
 
         auto script = rlogic_serialization::CreateLuaScript(builder,
             builder.CreateString(luaScript.getName()),
-            0,
+            luaScript.getId(),
             builder.CreateString(luaScript.m_source),
+            builder.CreateVector(userModules),
+            builder.CreateVector(stdModules),
             PropertyImpl::Serialize(*luaScript.getInputs()->m_impl, builder, serializationMap),
-            PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap),
-            modulesOffset,
-            builder.CreateVector(stdModules)
+            PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap)
         );
         builder.Finish(script);
 
@@ -92,14 +83,18 @@ namespace rlogic::internal
         ErrorReporting& errorReporting,
         DeserializationMap& deserializationMap)
     {
+        if (luaScript.id() == 0u)
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing id!", nullptr);
+            return nullptr;
+        }
+
         // TODO Violin make optional - no need to always serialize string if not used
         if (!luaScript.name())
         {
             errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing name!", nullptr);
             return nullptr;
         }
-
-        static_assert(g_FileFormatVersion == 2, "Remove filename from schema - search for 'VersionBreak' in schema files");
 
         const std::string_view name = luaScript.name()->string_view();
 
@@ -155,37 +150,33 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        StandardModules stdModules;
-        if (luaScript.standardModules())
+        if (!luaScript.userModules())
         {
-            stdModules.reserve(luaScript.standardModules()->size());
-            for (const uint8_t stdModule : *luaScript.standardModules())
-            {
-                stdModules.push_back(static_cast<EStandardModule>(stdModule));
-            }
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing user module dependencies!", nullptr);
+            return nullptr;
         }
-        else
+        ModuleMapping userModules;
+        userModules.reserve(luaScript.userModules()->size());
+        for (const auto* module : *luaScript.userModules())
         {
-            static_assert(g_FileFormatVersion == 2, "Remove this with next file version break; also consider making stdModules required");
-            stdModules = { EStandardModule::Base, EStandardModule::String, EStandardModule::Table, EStandardModule::Math, EStandardModule::Debug };
+            if (!module->name() || !module->module_())
+            {
+                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: missing name or module!", name), nullptr);
+                return nullptr;
+            }
+            const LuaModule& moduleUsed = deserializationMap.resolveLuaModule(*module->module_());
+            userModules.emplace(module->name()->str(), &moduleUsed);
         }
 
-        static_assert(g_FileFormatVersion == 2, "Consider making modules mandatory with next file version break");
-        ModuleMapping userModules;
-        if (luaScript.dependencies())
+        if (!luaScript.standardModules())
         {
-            userModules.reserve(luaScript.dependencies()->size());
-            for (const auto* module : *luaScript.dependencies())
-            {
-                if (!module->name() || !module->module_())
-                {
-                    errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: missing name or module!", name), nullptr);
-                    return nullptr;
-                }
-                const LuaModule& moduleUsed = deserializationMap.resolveLuaModule(*module->module_());
-                userModules.emplace(module->name()->str(), &moduleUsed);
-            }
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing standard module dependencies!", nullptr);
+            return nullptr;
         }
+        StandardModules stdModules;
+        stdModules.reserve(luaScript.standardModules()->size());
+        for (const uint8_t stdModule : *luaScript.standardModules())
+            stdModules.push_back(static_cast<EStandardModule>(stdModule));
 
         sol::protected_function mainFunction = load_result;
         sol::environment env = solState.createEnvironment(stdModules, userModules);
@@ -227,7 +218,7 @@ namespace rlogic::internal
                 std::make_unique<Property>(std::move(rootInput)),
                 std::make_unique<Property>(std::move(rootOutput))
             },
-            name);
+            name, luaScript.id());
     }
 
     std::optional<LogicNodeRuntimeError> LuaScriptImpl::update()
@@ -243,32 +234,6 @@ namespace rlogic::internal
         }
 
         return std::nullopt;
-    }
-
-    void LuaScriptImpl::DefaultLuaPrintFunction(std::string_view scriptName, std::string_view message)
-    {
-        std::cout << scriptName << ": " << message << std::endl;
-    }
-
-    void LuaScriptImpl::luaPrint(sol::variadic_args args)
-    {
-        for (uint32_t i = 0; i < args.size(); ++i)
-        {
-            const auto solType = args.get_type(i);
-            if(solType == sol::type::string)
-            {
-                m_luaPrintFunction(getName(), args.get<std::string_view>(i));
-            }
-            else
-            {
-                sol_helper::throwSolException("Called 'print' with wrong argument type '{}'. Only string is allowed", sol_helper::GetSolTypeName(solType));
-            }
-        }
-    }
-
-    void LuaScriptImpl::overrideLuaPrint(LuaPrintFunction luaPrintFunction)
-    {
-        m_luaPrintFunction = std::move(luaPrintFunction);
     }
 
     const ModuleMapping& LuaScriptImpl::getModules() const

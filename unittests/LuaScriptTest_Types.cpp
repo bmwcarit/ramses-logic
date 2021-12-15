@@ -114,29 +114,31 @@ namespace rlogic
 
         auto inputs = script->getInputs();
 
-        ASSERT_EQ(10u, inputs->getChildCount());
+        ASSERT_EQ(11u, inputs->getChildCount());
         EXPECT_EQ("enabled", inputs->getChild(0)->getName());
         EXPECT_EQ(EPropertyType::Bool, inputs->getChild(0)->getType());
         EXPECT_EQ("name", inputs->getChild(1)->getName());
         EXPECT_EQ(EPropertyType::String, inputs->getChild(1)->getType());
         EXPECT_EQ("speed", inputs->getChild(2)->getName());
         EXPECT_EQ(EPropertyType::Int32, inputs->getChild(2)->getType());
-        EXPECT_EQ("temp", inputs->getChild(3)->getName());
-        EXPECT_EQ(EPropertyType::Float, inputs->getChild(3)->getType());
+        EXPECT_EQ("speed2", inputs->getChild(3)->getName());
+        EXPECT_EQ(EPropertyType::Int64, inputs->getChild(3)->getType());
+        EXPECT_EQ("temp", inputs->getChild(4)->getName());
+        EXPECT_EQ(EPropertyType::Float, inputs->getChild(4)->getType());
 
         // Vec2/3/4 f/i
-        EXPECT_EQ("vec2f", inputs->getChild(4)->getName());
-        EXPECT_EQ(EPropertyType::Vec2f, inputs->getChild(4)->getType());
-        EXPECT_EQ("vec2i", inputs->getChild(5)->getName());
-        EXPECT_EQ(EPropertyType::Vec2i, inputs->getChild(5)->getType());
-        EXPECT_EQ("vec3f", inputs->getChild(6)->getName());
-        EXPECT_EQ(EPropertyType::Vec3f, inputs->getChild(6)->getType());
-        EXPECT_EQ("vec3i", inputs->getChild(7)->getName());
-        EXPECT_EQ(EPropertyType::Vec3i, inputs->getChild(7)->getType());
-        EXPECT_EQ("vec4f", inputs->getChild(8)->getName());
-        EXPECT_EQ(EPropertyType::Vec4f, inputs->getChild(8)->getType());
-        EXPECT_EQ("vec4i", inputs->getChild(9)->getName());
-        EXPECT_EQ(EPropertyType::Vec4i, inputs->getChild(9)->getType());
+        EXPECT_EQ("vec2f", inputs->getChild(5)->getName());
+        EXPECT_EQ(EPropertyType::Vec2f, inputs->getChild(5)->getType());
+        EXPECT_EQ("vec2i", inputs->getChild(6)->getName());
+        EXPECT_EQ(EPropertyType::Vec2i, inputs->getChild(6)->getType());
+        EXPECT_EQ("vec3f", inputs->getChild(7)->getName());
+        EXPECT_EQ(EPropertyType::Vec3f, inputs->getChild(7)->getType());
+        EXPECT_EQ("vec3i", inputs->getChild(8)->getName());
+        EXPECT_EQ(EPropertyType::Vec3i, inputs->getChild(8)->getType());
+        EXPECT_EQ("vec4f", inputs->getChild(9)->getName());
+        EXPECT_EQ(EPropertyType::Vec4f, inputs->getChild(9)->getType());
+        EXPECT_EQ("vec4i", inputs->getChild(10)->getName());
+        EXPECT_EQ(EPropertyType::Vec4i, inputs->getChild(10)->getType());
     }
 
     TEST_F(ALuaScript_Types, ProvidesFullTypeInformationOnArrayProperties)

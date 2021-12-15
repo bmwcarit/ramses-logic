@@ -11,11 +11,13 @@
 #include "ramses-framework-api/RamsesVersion.h"
 #include "ramses-logic/LogicNode.h"
 #include "ramses-logic/DataArray.h"
+#include "ramses-logic/TimerNode.h"
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
 #include "impl/LuaModuleImpl.h"
 #include "impl/LuaConfigImpl.h"
+#include "impl/LogicEngineReportImpl.h"
 
 #include "internals/FileUtils.h"
 #include "internals/TypeUtils.h"
@@ -103,7 +105,7 @@ namespace rlogic::internal
         m_errors.clear();
 
         auto containsDataArray = [this](const DataArray* da) {
-            const auto& dataArrays = m_apiObjects->getDataArrays();
+            const auto& dataArrays = m_apiObjects->getApiObjectContainer<DataArray>();
             const auto it = std::find_if(dataArrays.cbegin(), dataArrays.cend(),
                 [da](const auto& d) { return d == da; });
             return it != dataArrays.cend();
@@ -190,6 +192,12 @@ namespace rlogic::internal
         return m_apiObjects->createAnimationNode(channels, name);
     }
 
+    TimerNode* LogicEngineImpl::createTimerNode(std::string_view name)
+    {
+        m_errors.clear();
+        return m_apiObjects->createTimerNode(name);
+    }
+
     bool LogicEngineImpl::destroy(LogicObject& object)
     {
         m_errors.clear();
@@ -201,70 +209,112 @@ namespace rlogic::internal
         return m_apiObjects->getLogicNodeDependencies().isLinked(logicNode.m_impl);
     }
 
-    void LogicEngineImpl::updateLinksRecursive(Property& inputProperty)
+    size_t LogicEngineImpl::activateLinksRecursive(PropertyImpl& output)
     {
-        // TODO Violin consider providing property iterator - seems it's needed quite often, would make access more convenient also for users
-        const auto inputCount = inputProperty.getChildCount();
-        for (size_t i = 0; i < inputCount; ++i)
+        size_t activatedLinks = 0u;
+
+        const auto childCount = output.getChildCount();
+        for (size_t i = 0; i < childCount; ++i)
         {
-            Property& child = *inputProperty.getChild(i);
+            PropertyImpl& child = *output.getChild(i)->m_impl;
 
             if (TypeUtils::CanHaveChildren(child.getType()))
             {
-                updateLinksRecursive(child);
+                activatedLinks += activateLinksRecursive(child);
             }
             else
             {
-                const PropertyImpl* output = m_apiObjects->getLogicNodeDependencies().getLinkedOutput(*child.m_impl);
-                if (nullptr != output)
+                std::vector<PropertyImpl*>& outgoingProperties = child.getLinkedOutgoingProperties();
+
+                for (auto* linkedInput : outgoingProperties)
                 {
-                    child.m_impl->setValue(output->getValue(), true);
+                    const bool valueChanged = linkedInput->setValue(child.getValue());
+                    if (valueChanged || linkedInput->getPropertySemantics() == EPropertySemantics::AnimationInput)
+                    {
+                        linkedInput->getLogicNode().setDirty(true);
+                        ++activatedLinks;
+                    }
                 }
             }
         }
+
+        return activatedLinks;
     }
 
-    bool LogicEngineImpl::update(bool disableDirtyTracking)
+    bool LogicEngineImpl::update()
     {
         m_errors.clear();
-        LOG_DEBUG("Begin update");
 
-        const std::optional<NodeVector> sortedNodes = m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes();
+        if (m_updateReportEnabled)
+        {
+            m_updateReport.clear();
+            m_updateReport.sectionStarted(UpdateReport::ETimingSection::TotalUpdate);
+            m_updateReport.sectionStarted(UpdateReport::ETimingSection::TopologySort);
+        }
+
+        const std::optional<NodeVector>& sortedNodes = m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes();
         if (!sortedNodes)
         {
             m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!", nullptr);
             return false;
         }
 
-        for (LogicNodeImpl* logicNode : *sortedNodes)
-        {
-            if (!updateLogicNodeInternal(*logicNode, disableDirtyTracking))
-            {
-                return false;
-            }
-        }
+        if (m_updateReportEnabled)
+            m_updateReport.sectionFinished(UpdateReport::ETimingSection::TopologySort);
 
-        return true;
+        // force dirty all timer nodes so they update their tickers
+        for (TimerNode* timerNode : m_apiObjects->getApiObjectContainer<TimerNode>())
+            timerNode->m_impl.setDirty(true);
+
+        const bool success = updateNodes(*sortedNodes);
+
+        if (m_updateReportEnabled)
+            m_updateReport.sectionFinished(UpdateReport::ETimingSection::TotalUpdate);
+
+        return success;
     }
 
-    bool LogicEngineImpl::updateLogicNodeInternal(LogicNodeImpl& node, bool disableDirtyTracking)
+    bool LogicEngineImpl::updateNodes(const NodeVector& sortedNodes)
     {
-        updateLinksRecursive(*node.getInputs());
-        if (disableDirtyTracking || node.isDirty())
+        for (LogicNodeImpl* nodeIter : sortedNodes)
         {
-            LOG_DEBUG("Updating LogicNode '{}'", node.getName());
+            LogicNodeImpl& node = *nodeIter;
+            LogicNode* hlNode = m_updateReportEnabled ? m_apiObjects->getApiObject(node) : nullptr;
+
+            if (!node.isDirty())
+            {
+                if (m_updateReportEnabled)
+                    m_updateReport.nodeSkippedExecution(hlNode);
+
+                if(m_nodeDirtyMechanismEnabled)
+                    continue;
+            }
+
+            if (m_updateReportEnabled)
+                m_updateReport.nodeExecutionStarted(hlNode);
+
             const std::optional<LogicNodeRuntimeError> potentialError = node.update();
             if (potentialError)
             {
                 m_errors.add(potentialError->message, m_apiObjects->getApiObject(node));
                 return false;
             }
+
+            Property* outputs = node.getOutputs();
+            if (outputs != nullptr)
+            {
+                const size_t activatedLinks = activateLinksRecursive(*outputs->m_impl);
+
+                if (m_updateReportEnabled)
+                    m_updateReport.linksActivated(activatedLinks);
+            }
+
+            if (m_updateReportEnabled)
+                m_updateReport.nodeExecutionFinished();
+
+            node.setDirty(false);
         }
-        else
-        {
-            LOG_DEBUG("Skip update of LogicNode '{}' because no input has changed since the last update", node.getName());
-        }
-        node.setDirty(false);
+
         return true;
     }
 
@@ -457,6 +507,23 @@ namespace rlogic::internal
     ApiObjects& LogicEngineImpl::getApiObjects()
     {
         return *m_apiObjects;
+    }
+
+    void LogicEngineImpl::disableTrackingDirtyNodes()
+    {
+        m_nodeDirtyMechanismEnabled = false;
+    }
+
+    void LogicEngineImpl::enableUpdateReport(bool enable)
+    {
+        m_updateReportEnabled = enable;
+        if (!m_updateReportEnabled)
+            m_updateReport.clear();
+    }
+
+    LogicEngineReport LogicEngineImpl::getLastUpdateReport() const
+    {
+        return LogicEngineReport{ std::make_unique<LogicEngineReportImpl>(m_updateReport) };
     }
 
     template DataArray* LogicEngineImpl::createDataArray<float>(const std::vector<float>&, std::string_view name);

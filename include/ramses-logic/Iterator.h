@@ -19,9 +19,7 @@ namespace rlogic
      * An STL-style iterator for various object types (T) with forward-semantics. See also:
      *
      * - #rlogic::Collection
-     * - #rlogic::LogicEngine::scripts()
-     * - #rlogic::LogicEngine::ramsesNodeBindings()
-     * - #rlogic::LogicEngine::ramsesAppearanceBindings()
+     * - #rlogic::LogicEngine::getCollection
      *
      * Template parameters:
      * - T: the object type to iterate over, e.g. #rlogic::LuaScript

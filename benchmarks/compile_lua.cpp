@@ -14,15 +14,18 @@
 
 namespace rlogic
 {
-    static void CompileLua(LogicEngine& logicEngine, std::string_view src)
+    static void CompileLua(LogicEngine& logicEngine, std::string_view src, const LuaConfig& config)
     {
-        LuaScript* script = logicEngine.createLuaScript(src);
+        LuaScript* script = logicEngine.createLuaScript(src, config);
         logicEngine.destroy(*script);
     }
 
     static void BM_CompileLua_Interface(benchmark::State& state)
     {
         LogicEngine logicEngine;
+
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Base);
 
         const int64_t scriptSize = state.range(0);
 
@@ -38,7 +41,7 @@ namespace rlogic
 
         for (auto _ : state) // NOLINT(clang-analyzer-deadcode.DeadStores) False positive
         {
-            CompileLua(logicEngine, scriptSrc);
+            CompileLua(logicEngine, scriptSrc, config);
         }
     }
 

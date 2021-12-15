@@ -19,7 +19,7 @@ namespace rlogic::internal
     public:
         // Forwarding constructor
         explicit LogicNodeImplMock(std::string_view name)
-            : LogicNodeImpl(name)
+            : LogicNodeImpl(name, 1u)
         {
         }
 

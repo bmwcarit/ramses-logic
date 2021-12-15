@@ -19,11 +19,15 @@ struct RamsesBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_BOUNDRAMSESOBJECT = 6,
-    VT_ROOTINPUT = 8
+    VT_ID = 6,
+    VT_BOUNDRAMSESOBJECT = 8,
+    VT_ROOTINPUT = 10
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
+  }
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   const rlogic_serialization::RamsesReference *boundRamsesObject() const {
     return GetPointer<const rlogic_serialization::RamsesReference *>(VT_BOUNDRAMSESOBJECT);
@@ -35,6 +39,7 @@ struct RamsesBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
+           VerifyField<uint64_t>(verifier, VT_ID) &&
            VerifyOffset(verifier, VT_BOUNDRAMSESOBJECT) &&
            verifier.VerifyTable(boundRamsesObject()) &&
            VerifyOffset(verifier, VT_ROOTINPUT) &&
@@ -49,6 +54,9 @@ struct RamsesBindingBuilder {
   flatbuffers::uoffset_t start_;
   void add_name(flatbuffers::Offset<flatbuffers::String> name) {
     fbb_.AddOffset(RamsesBinding::VT_NAME, name);
+  }
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(RamsesBinding::VT_ID, id, 0);
   }
   void add_boundRamsesObject(flatbuffers::Offset<rlogic_serialization::RamsesReference> boundRamsesObject) {
     fbb_.AddOffset(RamsesBinding::VT_BOUNDRAMSESOBJECT, boundRamsesObject);
@@ -71,9 +79,11 @@ struct RamsesBindingBuilder {
 inline flatbuffers::Offset<RamsesBinding> CreateRamsesBinding(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> name = 0,
+    uint64_t id = 0,
     flatbuffers::Offset<rlogic_serialization::RamsesReference> boundRamsesObject = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0) {
   RamsesBindingBuilder builder_(_fbb);
+  builder_.add_id(id);
   builder_.add_rootInput(rootInput);
   builder_.add_boundRamsesObject(boundRamsesObject);
   builder_.add_name(name);
@@ -88,12 +98,14 @@ struct RamsesBinding::Traits {
 inline flatbuffers::Offset<RamsesBinding> CreateRamsesBindingDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
+    uint64_t id = 0,
     flatbuffers::Offset<rlogic_serialization::RamsesReference> boundRamsesObject = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   return rlogic_serialization::CreateRamsesBinding(
       _fbb,
       name__,
+      id,
       boundRamsesObject,
       rootInput);
 }

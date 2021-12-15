@@ -11,6 +11,7 @@
 #include "impl/PropertyImpl.h"
 #include "ramses-logic/Property.h"
 #include "internals/WrappedLuaProperty.h"
+#include "LogTestUtils.h"
 
 #include "fmt/format.h"
 
@@ -36,34 +37,37 @@ namespace rlogic::internal
             switch (prop.getType())
             {
             case EPropertyType::Float:
-                prop.setValue(0.5f, false);
+                prop.setValue(0.5f);
                 break;
             case EPropertyType::Int32:
-                prop.setValue(42, false);
+                prop.setValue(42);
+                break;
+            case EPropertyType::Int64:
+                prop.setValue(int64_t{ 421 });
                 break;
             case EPropertyType::String:
-                prop.setValue(std::string("hello"), false);
+                prop.setValue(std::string("hello"));
                 break;
             case EPropertyType::Bool:
-                prop.setValue(false, false);
+                prop.setValue(false);
                 break;
             case EPropertyType::Vec2f:
-                prop.setValue(vec2f{ 0.1f, 0.2f }, false);
+                prop.setValue(vec2f{ 0.1f, 0.2f });
                 break;
             case EPropertyType::Vec3f:
-                prop.setValue(vec3f{ 1.1f, 1.2f, 1.3f }, false);
+                prop.setValue(vec3f{ 1.1f, 1.2f, 1.3f });
                 break;
             case EPropertyType::Vec4f:
-                prop.setValue(vec4f{ 2.1f, 2.2f, 2.3f, 1500000.4f }, false);
+                prop.setValue(vec4f{ 2.1f, 2.2f, 2.3f, 1500000.4f });
                 break;
             case EPropertyType::Vec2i:
-                prop.setValue(vec2i{ 11, -12 }, false);
+                prop.setValue(vec2i{ 11, -12 });
                 break;
             case EPropertyType::Vec3i:
-                prop.setValue(vec3i{ 11, 12, 13 }, false);
+                prop.setValue(vec3i{ 11, 12, 13 });
                 break;
             case EPropertyType::Vec4i:
-                prop.setValue(vec4i{ 11, 12, 13, 14000000 }, false);
+                prop.setValue(vec4i{ 11, 12, 13, 14000000 });
                 break;
             case EPropertyType::Array:
             case EPropertyType::Struct:
@@ -89,6 +93,7 @@ namespace rlogic::internal
             TypeData{"Vec3f", EPropertyType::Vec3f},
             TypeData{"Vec4f", EPropertyType::Vec4f},
             TypeData{"Int32", EPropertyType::Int32},
+            TypeData{"Int64", EPropertyType::Int64},
             TypeData{"Vec2i", EPropertyType::Vec2i},
             TypeData{"Vec3i", EPropertyType::Vec3i},
             TypeData{"Vec4i", EPropertyType::Vec4i},
@@ -96,6 +101,7 @@ namespace rlogic::internal
             TypeData{"Bool", EPropertyType::Bool}});
 
         sol::state m_sol;
+        ScopedLogContextLevel m_silenceLogs = ScopedLogContextLevel{ELogMessageType::Off};
     };
 
     class AWrappedLuaProperty_Access : public AWrappedLuaProperty
@@ -132,7 +138,7 @@ namespace rlogic::internal
         // Use sol access overloads to check that type resolving works
         WrappedLuaProperty& innerStructRef = m_sol["Nested"]["ROOT"];
         // size() is the only externally exposed property of the wrapper, use it to verify the type resolving worked
-        EXPECT_EQ(10u, innerStructRef.size());
+        EXPECT_EQ(11u, innerStructRef.size());
     }
 
     TEST_F(AWrappedLuaProperty_Access, ResolvesPrimitiveTypes)
@@ -211,7 +217,7 @@ namespace rlogic::internal
             m_sol["Nested"] = std::ref(wrapped);
 
             //Set second element to a different value
-            nestedArray.getChild("array")->getChild(1)->m_impl->setValue(vec3f{15, 16, 17}, false);
+            nestedArray.getChild("array")->getChild(1)->m_impl->setValue(vec3f{15, 16, 17});
 
             EXPECT_FLOAT_EQ(1.1f, extractValue<float>("Nested.array[1][1]"));
             EXPECT_FLOAT_EQ(1.2f, extractValue<float>("Nested.array[1][2]"));
@@ -281,6 +287,7 @@ namespace rlogic::internal
                 Vec3f = {11.1, 11.2, 11.3},
                 Vec4f = {11.1, 11.2, 11.3, 11.4},
                 Int32 = 42,
+                Int64 = 421,
                 Vec2i = {21, 22},
                 Vec3i = {31, 32, 33},
                 Vec4i = {41, 42, 43, 44},
@@ -297,6 +304,7 @@ namespace rlogic::internal
         EXPECT_TRUE(extractValue<bool>("S2.ROOT.Bool"));
         EXPECT_EQ("abc", extractValue<std::string>("S2.ROOT.String"));
         EXPECT_EQ(42, extractValue<int32_t>("S2.ROOT.Int32"));
+        EXPECT_EQ(421, extractValue<int64_t>("S2.ROOT.Int64"));
 
         EXPECT_EQ(21, extractValue<int32_t>("S2.ROOT.Vec2i[1]"));
         EXPECT_EQ(22, extractValue<int32_t>("S2.ROOT.Vec2i[2]"));
@@ -374,7 +382,7 @@ namespace rlogic::internal
 
     TEST_F(AWrappedLuaProperty_Assignment, OfInvalidTypeToPrimitiveCausesError)
     {
-        for (auto fieldType : std::vector<EPropertyType>{ EPropertyType::Float, EPropertyType::Int32, EPropertyType::String, EPropertyType::Bool })
+        for (auto fieldType : std::vector<EPropertyType>{ EPropertyType::Float, EPropertyType::Int32, EPropertyType::Int64, EPropertyType::String, EPropertyType::Bool })
         {
             PropertyImpl root(HierarchicalTypeData{ TypeData("A", EPropertyType::Struct), {MakeType("field", fieldType)} }, EPropertySemantics::ScriptOutput);
             WrappedLuaProperty wrapped(root);
@@ -461,5 +469,65 @@ namespace rlogic::internal
         EXPECT_THAT(err.what(), ::testing::HasSubstr("Error while writing to 'idx: 1'. Writing input values is not allowed, only outputs!"));
     }
 
-    // TODO Violin migrate more tests from Script/Syntax and Script/Runtime to this fixture
+    TEST_F(AWrappedLuaProperty_Assignment, AppliesNumericChecks_StructFields)
+    {
+        PropertyImpl root(m_structWithAllPrimitiveTypes, EPropertySemantics::ScriptOutput);
+        WrappedLuaProperty wrapped(root);
+        m_sol["ROOT"] = std::ref(wrapped);
+
+        sol::error err = run_WithResult(R"(
+            ROOT.Int32 = 1000000000000000000000000000000000000000
+        )");
+
+        EXPECT_THAT(err.what(),
+            ::testing::HasSubstr("Error during assignment of property 'Int32'! Error while extracting integer: integral part too large to fit in a signed 32-bit integer"));
+
+        err = run_WithResult(R"(
+            ROOT.Int64 = 1000000000000000000000000000000000000000
+        )");
+
+        EXPECT_THAT(err.what(),
+            ::testing::HasSubstr("Error during assignment of property 'Int64'! Error while extracting integer: integral part too large to fit in a signed 64-bit integer"));
+
+        err = run_WithResult(R"(
+            ROOT.Float = 1000000000000000000000000000000000000000.0
+        )");
+
+        EXPECT_THAT(err.what(),
+            ::testing::HasSubstr("Error during assignment of property 'Float'! Error while extracting floating point number: value would cause overflow in float"));
+    }
+
+    TEST_F(AWrappedLuaProperty_Assignment, AppliesNumericChecks_StructFields_Vec)
+    {
+        PropertyImpl root(m_structWithAllPrimitiveTypes, EPropertySemantics::ScriptOutput);
+        WrappedLuaProperty wrapped(root);
+        m_sol["ROOT"] = std::ref(wrapped);
+
+        sol::error err = run_WithResult(R"(
+            ROOT.Vec2f = {1000000000000000000000000000000000000000.0, 0}
+        )");
+
+        EXPECT_THAT(err.what(),
+            ::testing::HasSubstr(
+                "lua: error: Error while assigning output VEC2 property 'Vec2f'. "
+                "Error while extracting array: unexpected value (type: 'number') at array element # 1! "
+                "Reason: Error while extracting floating point number: value would cause overflow in float"));
+    }
+
+    TEST_F(AWrappedLuaProperty_Assignment, AppliesNumericChecks_Array)
+    {
+        PropertyImpl nestedStruct(HierarchicalTypeData{ TypeData("ROOT", EPropertyType::Struct), {MakeArray("array", 2, EPropertyType::Int32)} }, EPropertySemantics::ScriptOutput);
+        WrappedLuaProperty wrapped(nestedStruct);
+        m_sol["ROOT"] = std::ref(wrapped);
+
+        sol::error err = run_WithResult(R"(
+            ROOT.array = {1.5, 0}
+        )");
+
+        EXPECT_THAT(err.what(),
+            ::testing::HasSubstr(
+                "lua: error: Error during assignment of property ''! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+    }
+
+
 }

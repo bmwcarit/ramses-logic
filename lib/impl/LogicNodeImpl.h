@@ -29,7 +29,7 @@ namespace rlogic::internal
     class LogicNodeImpl : public LogicObjectImpl
     {
     public:
-        explicit LogicNodeImpl(std::string_view name) noexcept;
+        explicit LogicNodeImpl(std::string_view name, uint64_t id) noexcept;
         LogicNodeImpl(const LogicNodeImpl& other) = delete;
         LogicNodeImpl& operator=(const LogicNodeImpl& other) = delete;
         ~LogicNodeImpl() noexcept override;
@@ -51,6 +51,7 @@ namespace rlogic::internal
     private:
         std::unique_ptr<Property> m_inputs;
         std::unique_ptr<Property> m_outputs;
+        // Dirty after creation (every node gets executed at least once after creation)
         bool                      m_dirty = true;
     };
 }

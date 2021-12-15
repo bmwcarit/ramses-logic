@@ -14,8 +14,8 @@
 
 namespace rlogic::internal
 {
-    RamsesBindingImpl::RamsesBindingImpl(std::string_view name) noexcept
-        : LogicNodeImpl(name)
+    RamsesBindingImpl::RamsesBindingImpl(std::string_view name, uint64_t id) noexcept
+        : LogicNodeImpl(name, id)
     {
     }
 

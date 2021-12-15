@@ -19,11 +19,7 @@ namespace rlogic
 {
     /**
      * A Collection which allows STL-style algorithm with forward semantics to be executed (e.g. find_if, for_each etc.).
-     * A Collection should not be instantiated directly, instead use one of the #rlogic::LogicEngine methods:
-     *
-     * - #rlogic::LogicEngine::scripts()
-     * - #rlogic::LogicEngine::ramsesNodeBindings()
-     * - #rlogic::LogicEngine::ramsesAppearanceBindings()
+     * A Collection cannot be instantiated directly, it can only be obtained using #rlogic::LogicEngine::getCollection.
      *
      * See also #rlogic::Iterator for more info on the iterator objects returned by #begin and #end.
      *
@@ -129,8 +125,8 @@ namespace rlogic
 
         /**
          * Default constructor is deleted because a collection is supposed to provide read-only access to
-         * internal data of the #rlogic::LogicEngine class, therefore it has to be obtained by calling methods
-         * of the #rlogic::LogicEngine which return such collections, e.g. #rlogic::LogicEngine::scripts()
+         * internal data of the #rlogic::LogicEngine class, therefore it can only be obtained by calling
+         * #rlogic::LogicEngine::getCollection
          */
         Collection() = delete;
 

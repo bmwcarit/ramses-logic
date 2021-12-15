@@ -32,30 +32,26 @@ int main()
         function run()
             OUT.vec4f = "this is not a table with 4 floats and will trigger a runtime error!"
         end
-    )");
+    )", {}, "faultyScript");
 
     // Script is successfully created, as it is syntactically correct
     assert(faultyScript != nullptr);
 
     /**
-     * Update the logic engine including our script
-     * Because there is a runtime error in the script, the execution will return "false"
+     * Update the logic engine including the faulty script above.
+     * Because there is a runtime error in the script, the execution will return "false" and print
+     * the error alongside stacktrace in the logs.
+     * The stack trace is coming from the Lua VM and has limited information on the error. See
+     * https://ramses-logic.readthedocs.io/en/latest/lua_syntax.html#the-global-in-and-out-objects for more information
+     * how to read the stack trace
      */
-    assert(!logicEngine.update());
+    logicEngine.update();
 
-    // To get further information about the issue, fetch errors from LogicEngine
-    auto errors = logicEngine.getErrors();
-    assert(!errors.empty());
-
-    // Print out the error information
-    for (const auto& error : errors)
-    {
-        /**
-         * The stack trace is coming from the Lua VM and has limited information on the error. See the
-         * docs at https://ramses-logic.readthedocs.io/en/latest/api.html#additional-lua-syntax-specifics for more information
-         */
-        std::cout << "Script '" << error.object->getName() << "' caused a runtime error:\n" << error.message << std::endl;
-    }
+    // The LogicEngine provides a list of errors from the last call. Use it to get
+    // the error message and a pointer to the object which causes the error.
+    assert(
+        logicEngine.getErrors().size() == 1u &&
+        logicEngine.getErrors()[0].object == faultyScript);
 
     logicEngine.destroy(*faultyScript);
 

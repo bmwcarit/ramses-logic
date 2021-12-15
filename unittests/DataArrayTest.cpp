@@ -52,7 +52,7 @@ namespace rlogic::internal
         const auto dataArray = this->m_logicEngine.createDataArray(data, "dataarray");
         EXPECT_TRUE(this->m_logicEngine.getErrors().empty());
         ASSERT_NE(nullptr, dataArray);
-        EXPECT_EQ(dataArray, this->m_logicEngine.findDataArray("dataarray"));
+        EXPECT_EQ(dataArray, this->m_logicEngine.template findByName<DataArray>("dataarray"));
 
         EXPECT_EQ("dataarray", dataArray->getName());
         EXPECT_EQ(EPropertyType(PropertyTypeToEnum<TypeParam>::TYPE), dataArray->getDataType());
@@ -75,7 +75,7 @@ namespace rlogic::internal
 
         EXPECT_TRUE(this->m_logicEngine.destroy(*dataArray));
         EXPECT_TRUE(this->m_logicEngine.getErrors().empty());
-        EXPECT_EQ(nullptr, this->m_logicEngine.findDataArray("dataarray"));
+        EXPECT_EQ(nullptr, this->m_logicEngine.template findByName<DataArray>("dataarray"));
     }
 
     TYPED_TEST(ADataArray, FailsToBeDestroyedIfFromOtherLogicInstance)
@@ -94,7 +94,7 @@ namespace rlogic::internal
 
         dataArray->setName("da");
         EXPECT_EQ("da", dataArray->getName());
-        EXPECT_EQ(dataArray, this->m_logicEngine.findDataArray("da"));
+        EXPECT_EQ(dataArray, this->m_logicEngine.template findByName<DataArray>("da"));
         EXPECT_TRUE(this->m_logicEngine.getErrors().empty());
     }
 
@@ -131,11 +131,11 @@ namespace rlogic::internal
         ASSERT_TRUE(this->m_logicEngine.loadFromFile("LogicEngine.bin"));
         EXPECT_TRUE(this->m_logicEngine.getErrors().empty());
 
-        EXPECT_EQ(4u, this->m_logicEngine.dataArrays().size());
-        const auto dataArray1 = this->m_logicEngine.findDataArray("dataarray1");
-        const auto dataArray2 = this->m_logicEngine.findDataArray("dataarray2");
-        const auto dataArray3 = this->m_logicEngine.findDataArray("dataarray3");
-        const auto dataArray4 = this->m_logicEngine.findDataArray("dataarray4");
+        EXPECT_EQ(4u, this->m_logicEngine.template getCollection<DataArray>().size());
+        const auto dataArray1 = this->m_logicEngine.template findByName<DataArray>("dataarray1");
+        const auto dataArray2 = this->m_logicEngine.template findByName<DataArray>("dataarray2");
+        const auto dataArray3 = this->m_logicEngine.template findByName<DataArray>("dataarray3");
+        const auto dataArray4 = this->m_logicEngine.template findByName<DataArray>("dataarray4");
         ASSERT_TRUE(dataArray1 && dataArray2 && dataArray3 && dataArray4);
 
         EXPECT_EQ(data1.size(), dataArray1->getNumElements());
@@ -164,6 +164,7 @@ namespace rlogic::internal
         {
             AllValid,
             NameMissing,
+            IdMissing,
             NoData,
             WrongDataType,
             CorruptArrayDataType,
@@ -199,6 +200,7 @@ namespace rlogic::internal
             auto dataArrayFB = rlogic_serialization::CreateDataArray(
                 builder,
                 builder.CreateString("dataarray"),
+                1u,
                 dataType,
                 unionType,
                 dataOffset
@@ -230,6 +232,7 @@ namespace rlogic::internal
             const auto dataArrayFB = rlogic_serialization::CreateDataArray(
                 flatBufferBuilder,
                 issue == ESerializationIssue::NameMissing ? 0 : flatBufferBuilder.CreateString("dataArray"),
+                issue == ESerializationIssue::IdMissing ? 0 : 1u,
                 issue == ESerializationIssue::CorruptArrayDataType ? static_cast<rlogic_serialization::EDataArrayType>(128) : rlogic_serialization::EDataArrayType::Vec2f,
                 unionType,
                 issue == ESerializationIssue::NoData ? 0 : rlogic_serialization::CreatefloatArr(flatBufferBuilder, dataOffset).Union()
@@ -255,6 +258,13 @@ namespace rlogic::internal
         EXPECT_FALSE(deserializeSerializedDataWithIssue(ADataArray_SerializationLifecycle::ESerializationIssue::NameMissing));
         EXPECT_FALSE(this->m_errorReporting.getErrors().empty());
         EXPECT_EQ("Fatal error during loading of DataArray from serialized data: missing name!", this->m_errorReporting.getErrors().front().message);
+    }
+
+    TEST_F(ADataArray_SerializationLifecycle, ReportsErrorWhenDeserializedWithoutId)
+    {
+        EXPECT_FALSE(deserializeSerializedDataWithIssue(ADataArray_SerializationLifecycle::ESerializationIssue::IdMissing));
+        EXPECT_FALSE(this->m_errorReporting.getErrors().empty());
+        EXPECT_EQ("Fatal error during loading of DataArray from serialized data: missing id!", this->m_errorReporting.getErrors().front().message);
     }
 
     TEST_F(ADataArray_SerializationLifecycle, ReportsErrorWhenDeserializedWithoutData)

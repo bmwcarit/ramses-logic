@@ -16,8 +16,8 @@
 namespace rlogic::internal
 {
     template <typename T>
-    DataArrayImpl::DataArrayImpl(std::vector<T>&& data, std::string_view name)
-        : LogicObjectImpl(name)
+    DataArrayImpl::DataArrayImpl(std::vector<T>&& data, std::string_view name, uint64_t id)
+        : LogicObjectImpl(name, id)
         , m_dataType{ PropertyTypeToEnum<T>::TYPE }
         , m_data{ std::move(data) }
     {
@@ -121,6 +121,7 @@ namespace rlogic::internal
         auto animDataFB = rlogic_serialization::CreateDataArray(
             builder,
             builder.CreateString(data.getName()),
+            data.getId(),
             arrayType,
             unionType,
             dataOffset
@@ -162,11 +163,18 @@ namespace rlogic::internal
 
     std::unique_ptr<DataArrayImpl> DataArrayImpl::Deserialize(const rlogic_serialization::DataArray& data, ErrorReporting& errorReporting)
     {
+        if (data.id() == 0u)
+        {
+            errorReporting.add("Fatal error during loading of DataArray from serialized data: missing id!", nullptr);
+            return nullptr;
+        }
+
         if (!data.name())
         {
             errorReporting.add("Fatal error during loading of DataArray from serialized data: missing name!", nullptr);
             return nullptr;
         }
+
         const auto name = data.name()->string_view();
 
         switch (data.type())
@@ -177,28 +185,28 @@ namespace rlogic::internal
                 return nullptr;
             const auto& fbData = *data.data_as<rlogic_serialization::floatArr>()->data();
             auto dataVec = std::vector<float>{ fbData.cbegin(), fbData.cend() };
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Vec2f:
         {
             if (!checkFlatbufferVectorValidity<vec2f, float, rlogic_serialization::floatArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec2f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Vec3f:
         {
             if (!checkFlatbufferVectorValidity<vec3f, float, rlogic_serialization::floatArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec3f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Vec4f:
         {
             if (!checkFlatbufferVectorValidity<vec4f, float, rlogic_serialization::floatArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec4f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Int32:
         {
@@ -206,28 +214,28 @@ namespace rlogic::internal
                 return nullptr;
             const auto& fbData = *data.data_as<rlogic_serialization::intArr>()->data();
             auto dataVec = std::vector<int32_t>{ fbData.cbegin(), fbData.cend() };
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Vec2i:
         {
             if (!checkFlatbufferVectorValidity<vec2i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec2i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Vec3i:
         {
             if (!checkFlatbufferVectorValidity<vec3i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec3i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         case rlogic_serialization::EDataArrayType::Vec4i:
         {
             if (!checkFlatbufferVectorValidity<vec4i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec4i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name);
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
         }
         default:
             errorReporting.add(fmt::format("Fatal error during loading of DataArray from serialized data: unsupported or corrupt data type '{}'!", data.type()), nullptr);
@@ -247,14 +255,14 @@ namespace rlogic::internal
         return m_data;
     }
 
-    template DataArrayImpl::DataArrayImpl(std::vector<float>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<vec2f>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<vec3f>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<vec4f>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<int32_t>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<vec2i>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<vec3i>&& data, std::string_view name);
-    template DataArrayImpl::DataArrayImpl(std::vector<vec4i>&& data, std::string_view name);
+    template DataArrayImpl::DataArrayImpl(std::vector<float>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<vec2f>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<vec3f>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<vec4f>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<int32_t>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<vec2i>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<vec3i>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<vec4i>&& data, std::string_view name, uint64_t id);
 
     template const std::vector<float>* DataArrayImpl::getData<float>() const;
     template const std::vector<vec2f>* DataArrayImpl::getData<vec2f>() const;

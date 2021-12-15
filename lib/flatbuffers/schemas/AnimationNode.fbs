@@ -33,6 +33,7 @@ table Channel
 table AnimationNode
 {
     name:string;
+    id:uint64;
     channels:[Channel];
     rootInput:Property;
     rootOutput:Property;

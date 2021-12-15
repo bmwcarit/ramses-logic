@@ -39,6 +39,8 @@ namespace rlogic::internal
                 return EPropertyType::Vec4f;
             case rlogic_serialization::PropertyValue::int32_s:
                 return EPropertyType::Int32;
+            case rlogic_serialization::PropertyValue::int64_s:
+                return EPropertyType::Int64;
             case rlogic_serialization::PropertyValue::vec2i_s:
                 return EPropertyType::Vec2i;
             case rlogic_serialization::PropertyValue::vec3i_s:

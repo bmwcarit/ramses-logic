@@ -26,6 +26,7 @@ namespace rlogic
         std::string_view m_minimalScriptWithInputs = R"(
             function interface()
                 IN.speed = INT
+                IN.speed2 = INT64
                 IN.temp = FLOAT
                 IN.name = STRING
                 IN.enabled = BOOL
@@ -44,6 +45,7 @@ namespace rlogic
         std::string_view m_minimalScriptWithOutputs = R"(
             function interface()
                 OUT.speed = INT
+                OUT.speed2 = INT64
                 OUT.temp = FLOAT
                 OUT.name = STRING
                 OUT.enabled = BOOL

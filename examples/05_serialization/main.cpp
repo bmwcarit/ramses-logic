@@ -60,8 +60,8 @@ int main()
     /**
      * rlogic::LogicEngine provides iterable collections to its objects. We can use them to resolve objects after loading
      */
-    rlogic::Collection<rlogic::LuaScript> loadedScripts = logicEngine.scripts();
-    rlogic::Collection<rlogic::RamsesNodeBinding> loadedNodeBindings = logicEngine.ramsesNodeBindings();
+    rlogic::Collection<rlogic::LuaScript> loadedScripts = logicEngine.getCollection<rlogic::LuaScript>();
+    rlogic::Collection<rlogic::RamsesNodeBinding> loadedNodeBindings = logicEngine.getCollection<rlogic::RamsesNodeBinding>();
 
     /**
      * We can use any STL algorithm on the collections.
@@ -111,7 +111,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
 {
     /**
      * Boilerplate Ramses code which saves a red triangle scene in a file. For more ramses
-     * examples and details, check the ramses docs at https://genivi.github.io/ramses
+     * examples and details, check the ramses docs at https://covesa.github.io/ramses
      */
     ramses::RamsesFramework ramsesFramework;
     ramses::RamsesClient& client = *ramsesFramework.createClient("example client");
@@ -188,7 +188,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
      */
     rlogic::LuaScript* simpleScript = logicEngine.createLuaScript(R"(
             function interface()
-                IN.time_msec = INT
+                IN.time_msec = INT32
                 OUT.rotationZ = VEC3F
             end
 

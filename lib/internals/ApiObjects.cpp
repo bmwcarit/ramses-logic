@@ -21,6 +21,7 @@
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 
 #include "impl/PropertyImpl.h"
 #include "impl/LuaScriptImpl.h"
@@ -30,6 +31,7 @@
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/DataArrayImpl.h"
 #include "impl/AnimationNodeImpl.h"
+#include "impl/TimerNodeImpl.h"
 
 #include "ramses-client-api/Node.h"
 #include "ramses-client-api/Appearance.h"
@@ -43,8 +45,10 @@
 #include "generated/LinkGen.h"
 #include "generated/DataArrayGen.h"
 #include "generated/AnimationNodeGen.h"
+#include "generated/TimerNodeGen.h"
 
 #include "fmt/format.h"
+#include "TypeUtils.h"
 
 namespace rlogic::internal
 {
@@ -55,7 +59,7 @@ namespace rlogic::internal
     {
         for (const auto& module : moduleMapping)
         {
-            if (getLuaModules().cend() == std::find_if(getLuaModules().cbegin(), getLuaModules().cend(),
+            if (m_luaModules.cend() == std::find_if(m_luaModules.cbegin(), m_luaModules.cend(),
                 [&module](const auto& m) { return m == module.second; }))
             {
                 errorReporting.add(fmt::format("Failed to map Lua module '{}'! It was created on a different instance of LogicEngine.", module.first), module.second);
@@ -87,7 +91,7 @@ namespace rlogic::internal
         if (!compiledScript)
             return nullptr;
 
-        std::unique_ptr<LuaScript> up     = std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(*compiledScript), scriptName));
+        std::unique_ptr<LuaScript> up     = std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(*compiledScript), scriptName, getNextLogicObjectId()));
         LuaScript*                 script = up.get();
         m_scripts.push_back(script);
         registerLogicObject(std::move(up));
@@ -115,7 +119,7 @@ namespace rlogic::internal
         if (!compiledModule)
             return nullptr;
 
-        std::unique_ptr<LuaModule> up        = std::make_unique<LuaModule>(std::make_unique<LuaModuleImpl>(std::move(*compiledModule), moduleName));
+        std::unique_ptr<LuaModule> up        = std::make_unique<LuaModule>(std::make_unique<LuaModuleImpl>(std::move(*compiledModule), moduleName, getNextLogicObjectId()));
         LuaModule*                 luaModule = up.get();
         m_luaModules.push_back(luaModule);
         registerLogicObject(std::move(up));
@@ -124,7 +128,7 @@ namespace rlogic::internal
 
     RamsesNodeBinding* ApiObjects::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
     {
-        std::unique_ptr<RamsesNodeBinding> up = std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(ramsesNode, rotationType, name));
+        std::unique_ptr<RamsesNodeBinding> up = std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(ramsesNode, rotationType, name, getNextLogicObjectId()));
         RamsesNodeBinding*                 binding = up.get();
         m_ramsesNodeBindings.push_back(binding);
         registerLogicObject(std::move(up));
@@ -133,7 +137,7 @@ namespace rlogic::internal
 
     RamsesAppearanceBinding* ApiObjects::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
     {
-        std::unique_ptr<RamsesAppearanceBinding> up      = std::make_unique<RamsesAppearanceBinding>(std::make_unique<RamsesAppearanceBindingImpl>(ramsesAppearance, name));
+        std::unique_ptr<RamsesAppearanceBinding> up      = std::make_unique<RamsesAppearanceBinding>(std::make_unique<RamsesAppearanceBindingImpl>(ramsesAppearance, name, getNextLogicObjectId()));
         RamsesAppearanceBinding*                 binding = up.get();
         m_ramsesAppearanceBindings.push_back(binding);
         registerLogicObject(std::move(up));
@@ -142,7 +146,7 @@ namespace rlogic::internal
 
     RamsesCameraBinding* ApiObjects::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
-        std::unique_ptr<RamsesCameraBinding> up      = std::make_unique<RamsesCameraBinding>(std::make_unique<RamsesCameraBindingImpl>(ramsesCamera, name));
+        std::unique_ptr<RamsesCameraBinding> up      = std::make_unique<RamsesCameraBinding>(std::make_unique<RamsesCameraBindingImpl>(ramsesCamera, name, getNextLogicObjectId()));
         RamsesCameraBinding*                 binding = up.get();
         m_ramsesCameraBindings.push_back(binding);
         registerLogicObject(std::move(up));
@@ -155,7 +159,7 @@ namespace rlogic::internal
         static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
         // make copy of users data and move into data array
         std::vector<T> dataCopy = data;
-        auto impl = std::make_unique<DataArrayImpl>(std::move(dataCopy), name);
+        auto                       impl      = std::make_unique<DataArrayImpl>(std::move(dataCopy), name, getNextLogicObjectId());
         std::unique_ptr<DataArray> up        = std::make_unique<DataArray>(std::move(impl));
         DataArray*                 dataArray = up.get();
         m_dataArrays.push_back(dataArray);
@@ -165,11 +169,20 @@ namespace rlogic::internal
 
     AnimationNode* ApiObjects::createAnimationNode(const AnimationChannels& channels, std::string_view name)
     {
-        std::unique_ptr<AnimationNode> up = std::make_unique<AnimationNode>(std::make_unique<AnimationNodeImpl>(channels, name));
+        std::unique_ptr<AnimationNode> up        = std::make_unique<AnimationNode>(std::make_unique<AnimationNodeImpl>(channels, name, getNextLogicObjectId()));
         AnimationNode*                 animation = up.get();
         m_animationNodes.push_back(animation);
         registerLogicObject(std::move(up));
         return animation;
+    }
+
+    TimerNode* ApiObjects::createTimerNode(std::string_view name)
+    {
+        std::unique_ptr<TimerNode> up = std::make_unique<TimerNode>(std::make_unique<TimerNodeImpl>(name, getNextLogicObjectId()));
+        TimerNode* timer = up.get();
+        m_timerNodes.push_back(timer);
+        registerLogicObject(std::move(up));
+        return timer;
     }
 
     void ApiObjects::registerLogicNode(LogicNode& logicNode)
@@ -217,6 +230,10 @@ namespace rlogic::internal
         auto dataArray = dynamic_cast<DataArray*>(&object);
         if (dataArray)
             return destroyInternal(*dataArray, errorReporting);
+
+        auto timer = dynamic_cast<TimerNode*>(&object);
+        if (timer)
+            return destroyInternal(*timer, errorReporting);
 
         errorReporting.add(fmt::format("Tried to destroy object '{}' with unknown type", object.getName()), &object);
 
@@ -368,6 +385,24 @@ namespace rlogic::internal
         return true;
     }
 
+    bool ApiObjects::destroyInternal(TimerNode& node, ErrorReporting& errorReporting)
+    {
+        auto nodeIt = find_if(m_timerNodes.begin(), m_timerNodes.end(), [&](const auto& n) {
+            return n == &node;
+        });
+
+        if (nodeIt == m_timerNodes.end())
+        {
+            errorReporting.add("Can't find TimerNode in logic engine!", &node);
+            return false;
+        }
+
+        unregisterLogicObject(node);
+        m_timerNodes.erase(nodeIt);
+
+        return true;
+    }
+
     void ApiObjects::registerLogicObject(std::unique_ptr<LogicObject> obj)
     {
         m_logicObjects.push_back(obj.get());
@@ -376,6 +411,7 @@ namespace rlogic::internal
         {
             registerLogicNode(*logicNode);
         }
+        m_logicObjectIdMapping.emplace(obj->getId(), obj.get());
         m_objectsOwningContainer.push_back(move(obj));
     }
 
@@ -392,6 +428,7 @@ namespace rlogic::internal
         {
             unregisterLogicNode(*logicNode);
         }
+        m_logicObjectIdMapping.erase(objToDelete.getId());
         m_objectsOwningContainer.erase(findOwnedObj);
         m_logicObjects.erase(findLogicNode);
     }
@@ -455,87 +492,55 @@ namespace rlogic::internal
         return true;
     }
 
-    LogicObjectContainer& ApiObjects::getLogicObjects()
+    template <typename T>
+    const ApiObjectContainer<T>& ApiObjects::getApiObjectContainer() const
     {
-        return m_logicObjects;
+        if constexpr (std::is_same_v<T, LogicObject>)
+        {
+            return m_logicObjects;
+        }
+        else if constexpr (std::is_same_v<T, LuaScript>)
+        {
+            return m_scripts;
+        }
+        else if constexpr (std::is_same_v<T, LuaModule>)
+        {
+            return m_luaModules;
+        }
+        else if constexpr (std::is_same_v<T, RamsesNodeBinding>)
+        {
+            return m_ramsesNodeBindings;
+        }
+        else if constexpr (std::is_same_v<T, RamsesAppearanceBinding>)
+        {
+            return m_ramsesAppearanceBindings;
+        }
+        else if constexpr (std::is_same_v<T, RamsesCameraBinding>)
+        {
+            return m_ramsesCameraBindings;
+        }
+        else if constexpr (std::is_same_v<T, DataArray>)
+        {
+            return m_dataArrays;
+        }
+        else if constexpr (std::is_same_v<T, AnimationNode>)
+        {
+            return m_animationNodes;
+        }
+        else if constexpr (std::is_same_v<T, TimerNode>)
+        {
+            return m_timerNodes;
+        }
     }
 
-    const LogicObjectContainer& ApiObjects::getLogicObjects() const
+    template <typename T>
+    ApiObjectContainer<T>& ApiObjects::getApiObjectContainer()
     {
-        return m_logicObjects;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast) non-const version of getApiObjectContainer cast to its const version to avoid duplicating code
+        return const_cast<ApiObjectContainer<T>&>((const_cast<const ApiObjects&>(*this)).getApiObjectContainer<T>());
     }
 
-    ScriptsContainer& ApiObjects::getScripts()
-    {
-        return m_scripts;
-    }
-
-    const ScriptsContainer& ApiObjects::getScripts() const
-    {
-        return m_scripts;
-    }
-
-    LuaModulesContainer& ApiObjects::getLuaModules()
-    {
-        return m_luaModules;
-    }
-
-    const LuaModulesContainer& ApiObjects::getLuaModules() const
-    {
-        return m_luaModules;
-    }
-
-    NodeBindingsContainer& ApiObjects::getNodeBindings()
-    {
-        return m_ramsesNodeBindings;
-    }
-
-    const NodeBindingsContainer& ApiObjects::getNodeBindings() const
-    {
-        return m_ramsesNodeBindings;
-    }
-
-    AppearanceBindingsContainer& ApiObjects::getAppearanceBindings()
-    {
-        return m_ramsesAppearanceBindings;
-    }
-
-    const AppearanceBindingsContainer& ApiObjects::getAppearanceBindings() const
-    {
-        return m_ramsesAppearanceBindings;
-    }
-
-    CameraBindingsContainer& ApiObjects::getCameraBindings()
-    {
-        return m_ramsesCameraBindings;
-    }
-
-    const CameraBindingsContainer& ApiObjects::getCameraBindings() const
-    {
-        return m_ramsesCameraBindings;
-    }
-
-    DataArrayContainer& ApiObjects::getDataArrays()
-    {
-        return m_dataArrays;
-    }
-
-    const DataArrayContainer& ApiObjects::getDataArrays() const
-    {
-        return m_dataArrays;
-    }
-
-    AnimationNodesContainer& ApiObjects::getAnimationNodes()
-    {
-        return m_animationNodes;
-    }
-
-    const AnimationNodesContainer& ApiObjects::getAnimationNodes() const
-    {
-        return m_animationNodes;
-    }
-
-    const ObjectsOwningContainer& ApiObjects::getOwnedObjects() const
+    const ApiObjectOwningContainer& ApiObjects::getApiObjectOwningContainer() const
     {
         return m_objectsOwningContainer;
     }
@@ -557,6 +562,17 @@ namespace rlogic::internal
         return apiObjectIter->second;
     }
 
+    LogicObject* ApiObjects::getApiObjectById(uint64_t id) const
+    {
+        auto apiObjectIter = m_logicObjectIdMapping.find(id);
+        if (apiObjectIter != m_logicObjectIdMapping.end())
+        {
+            assert(apiObjectIter->second->getId() == id);
+            return apiObjectIter->second;
+        }
+        return nullptr;
+    }
+
     const std::unordered_map<LogicNodeImpl*, LogicNode*>& ApiObjects::getReverseImplMapping() const
     {
         return m_reverseImplMapping;
@@ -566,18 +582,12 @@ namespace rlogic::internal
     {
         SerializationMap serializationMap;
 
-        flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>> luaModulesOffset = 0;
-        if (!apiObjects.m_luaModules.empty())
+        std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>> luaModules;
+        luaModules.reserve(apiObjects.m_luaModules.size());
+        for (const auto& luaModule : apiObjects.m_luaModules)
         {
-            std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>> luaModules;
-            luaModules.reserve(apiObjects.m_luaModules.size());
-            for (const auto& luaModule : apiObjects.m_luaModules)
-            {
-                luaModules.push_back(LuaModuleImpl::Serialize(luaModule->m_impl, builder, serializationMap));
-                serializationMap.storeLuaModule(*luaModule, luaModules.back());
-            }
-
-            luaModulesOffset = builder.CreateVector(luaModules);
+            luaModules.push_back(LuaModuleImpl::Serialize(luaModule->m_impl, builder, serializationMap));
+            serializationMap.storeLuaModule(*luaModule, luaModules.back());
         }
 
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> luascripts;
@@ -628,27 +638,54 @@ namespace rlogic::internal
         for (const auto& animNode : apiObjects.m_animationNodes)
             animationNodes.push_back(AnimationNodeImpl::Serialize(animNode->m_animationNodeImpl, builder, serializationMap));
 
+        std::vector<flatbuffers::Offset<rlogic_serialization::TimerNode>> timerNodes;
+        timerNodes.reserve(apiObjects.m_timerNodes.size());
+        for (const auto& timerNode : apiObjects.m_timerNodes)
+            timerNodes.push_back(TimerNodeImpl::Serialize(timerNode->m_timerNodeImpl, builder, serializationMap));
+
         // links must go last due to dependency on serialized properties
-        const LinksMap& allLinks = apiObjects.m_logicNodeDependencies.getLinks();
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
-        links.reserve(allLinks.size());
-        for (const auto& link : allLinks)
+
+        std::function<void(const Property& input)> serializeLinks = [&serializeLinks, &links, &serializationMap, &builder](const Property& input){
+            const auto inputCount = input.getChildCount();
+            for (size_t i = 0; i < inputCount; ++i)
+            {
+                const auto child = input.getChild(i);
+
+                if (TypeUtils::CanHaveChildren(child->getType()))
+                {
+                    serializeLinks(*child);
+                }
+                else
+                {
+                    assert(TypeUtils::IsPrimitiveType(child->getType()));
+                    const PropertyImpl* potentialLinkedOutput = child->m_impl->getLinkedIncomingProperty();
+                    if (potentialLinkedOutput != nullptr)
+                    {
+                        links.emplace_back(rlogic_serialization::CreateLink(builder,
+                            serializationMap.resolvePropertyOffset(*potentialLinkedOutput),
+                            serializationMap.resolvePropertyOffset(*child->m_impl)));
+                    }
+                }
+            }
+        };
+
+        for (const auto& item : apiObjects.m_reverseImplMapping)
         {
-            links.emplace_back(rlogic_serialization::CreateLink(builder,
-                serializationMap.resolvePropertyOffset(*link.second),
-                serializationMap.resolvePropertyOffset(*link.first)));
+            serializeLinks(*item.first->getInputs());
         }
 
         const auto logicEngine = rlogic_serialization::CreateApiObjects(
             builder,
+            builder.CreateVector(luaModules),
             builder.CreateVector(luascripts),
             builder.CreateVector(ramsesnodebindings),
             builder.CreateVector(ramsesappearancebindings),
             builder.CreateVector(ramsescamerabindings),
             builder.CreateVector(dataArrays),
             builder.CreateVector(animationNodes),
-            builder.CreateVector(links),
-            luaModulesOffset
+            builder.CreateVector(timerNodes),
+            builder.CreateVector(links)
         );
 
         builder.Finish(logicEngine);
@@ -667,6 +704,12 @@ namespace rlogic::internal
 
         // Collect deserialized object mappings to resolve dependencies
         DeserializationMap deserializationMap;
+
+        if (!apiObjects.luaModules())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing Lua modules container!", nullptr);
+            return nullptr;
+        }
 
         if (!apiObjects.luaScripts())
         {
@@ -710,34 +753,38 @@ namespace rlogic::internal
             return nullptr;
         }
 
+        if (!apiObjects.timerNodes())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing timer nodes container!", nullptr);
+            return nullptr;
+        }
+
         const size_t logicObjectsTotalSize =
-            static_cast<size_t>(apiObjects.luaModules() ? apiObjects.luaModules()->size() : 0u) +
+            static_cast<size_t>(apiObjects.luaModules()->size()) +
             static_cast<size_t>(apiObjects.luaScripts()->size()) +
             static_cast<size_t>(apiObjects.nodeBindings()->size()) +
             static_cast<size_t>(apiObjects.appearanceBindings()->size()) +
             static_cast<size_t>(apiObjects.cameraBindings()->size()) +
             static_cast<size_t>(apiObjects.dataArrays()->size()) +
-            static_cast<size_t>(apiObjects.animationNodes()->size());
+            static_cast<size_t>(apiObjects.animationNodes()->size()) +
+            static_cast<size_t>(apiObjects.timerNodes()->size());
 
         deserialized->m_objectsOwningContainer.reserve(logicObjectsTotalSize);
         deserialized->m_logicObjects.reserve(logicObjectsTotalSize);
 
-        if (apiObjects.luaModules())
+        const auto& luaModules = *apiObjects.luaModules();
+        deserialized->m_luaModules.reserve(luaModules.size());
+        for (const auto* module : luaModules)
         {
-            const auto& luaModules = *apiObjects.luaModules();
-            deserialized->m_luaModules.reserve(luaModules.size());
-            for (const auto* module : luaModules)
-            {
-                std::unique_ptr<LuaModuleImpl> deserializedModule = LuaModuleImpl::Deserialize(*deserialized->m_solState, *module, errorReporting, deserializationMap);
-                if (!deserializedModule)
-                    return nullptr;
+            std::unique_ptr<LuaModuleImpl> deserializedModule = LuaModuleImpl::Deserialize(*deserialized->m_solState, *module, errorReporting, deserializationMap);
+            if (!deserializedModule)
+                return nullptr;
 
-                std::unique_ptr<LuaModule> up        = std::make_unique<LuaModule>(std::move(deserializedModule));
-                LuaModule*                 luaModule = up.get();
-                deserialized->m_luaModules.push_back(luaModule);
-                deserialized->registerLogicObject(std::move(up));
-                deserializationMap.storeLuaModule(*module, *deserialized->m_luaModules.back());
-            }
+            std::unique_ptr<LuaModule> up        = std::make_unique<LuaModule>(std::move(deserializedModule));
+            LuaModule*                 luaModule = up.get();
+            deserialized->m_luaModules.push_back(luaModule);
+            deserialized->registerLogicObject(std::move(up));
+            deserializationMap.storeLuaModule(*module, *deserialized->m_luaModules.back());
         }
 
         const auto& luascripts = *apiObjects.luaScripts();
@@ -751,7 +798,7 @@ namespace rlogic::internal
 
             if (deserializedScript)
             {
-                std::unique_ptr<LuaScript> up     = std::make_unique<LuaScript>(std::move(deserializedScript));
+                std::unique_ptr<LuaScript> up             = std::make_unique<LuaScript>(std::move(deserializedScript));
                 LuaScript*                 luascript = up.get();
                 deserialized->m_scripts.push_back(luascript);
                 deserialized->registerLogicObject(std::move(up));
@@ -854,6 +901,20 @@ namespace rlogic::internal
             deserialized->registerLogicObject(std::move(up));
         }
 
+        const auto& timerNodes = *apiObjects.timerNodes();
+        deserialized->m_timerNodes.reserve(timerNodes.size());
+        for (const auto* fbData : timerNodes)
+        {
+            assert(fbData);
+            auto deserializedTimer = TimerNodeImpl::Deserialize(*fbData, errorReporting, deserializationMap);
+            if (!deserializedTimer)
+                return nullptr;
+
+            auto up = std::make_unique<TimerNode>(std::move(deserializedTimer));
+            deserialized->m_timerNodes.push_back(up.get());
+            deserialized->registerLogicObject(std::move(up));
+        }
+
         // links must go last due to dependency on deserialized properties
         const auto& links = *apiObjects.links();
         // TODO Violin move this code (serialization parts too) to LogicNodeDependencies
@@ -914,6 +975,11 @@ namespace rlogic::internal
             std::any_of(m_ramsesCameraBindings.cbegin(), m_ramsesCameraBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); });
     }
 
+    uint64_t ApiObjects::getNextLogicObjectId()
+    {
+        return ++m_lastObjectId;
+    }
+
     template DataArray* ApiObjects::createDataArray<float>(const std::vector<float>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec2f>(const std::vector<vec2f>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec3f>(const std::vector<vec3f>&, std::string_view);
@@ -922,4 +988,24 @@ namespace rlogic::internal
     template DataArray* ApiObjects::createDataArray<vec2i>(const std::vector<vec2i>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec3i>(const std::vector<vec3i>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec4i>(const std::vector<vec4i>&, std::string_view);
+
+    template ApiObjectContainer<LogicObject>&             ApiObjects::getApiObjectContainer<LogicObject>();
+    template ApiObjectContainer<LuaScript>&               ApiObjects::getApiObjectContainer<LuaScript>();
+    template ApiObjectContainer<LuaModule>&               ApiObjects::getApiObjectContainer<LuaModule>();
+    template ApiObjectContainer<RamsesNodeBinding>&       ApiObjects::getApiObjectContainer<RamsesNodeBinding>();
+    template ApiObjectContainer<RamsesAppearanceBinding>& ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>();
+    template ApiObjectContainer<RamsesCameraBinding>&     ApiObjects::getApiObjectContainer<RamsesCameraBinding>();
+    template ApiObjectContainer<DataArray>&               ApiObjects::getApiObjectContainer<DataArray>();
+    template ApiObjectContainer<AnimationNode>&           ApiObjects::getApiObjectContainer<AnimationNode>();
+    template ApiObjectContainer<TimerNode>&               ApiObjects::getApiObjectContainer<TimerNode>();
+
+    template const ApiObjectContainer<LogicObject>&             ApiObjects::getApiObjectContainer<LogicObject>() const;
+    template const ApiObjectContainer<LuaScript>&               ApiObjects::getApiObjectContainer<LuaScript>() const;
+    template const ApiObjectContainer<LuaModule>&               ApiObjects::getApiObjectContainer<LuaModule>() const;
+    template const ApiObjectContainer<RamsesNodeBinding>&       ApiObjects::getApiObjectContainer<RamsesNodeBinding>() const;
+    template const ApiObjectContainer<RamsesAppearanceBinding>& ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>() const;
+    template const ApiObjectContainer<RamsesCameraBinding>&     ApiObjects::getApiObjectContainer<RamsesCameraBinding>() const;
+    template const ApiObjectContainer<DataArray>&               ApiObjects::getApiObjectContainer<DataArray>() const;
+    template const ApiObjectContainer<AnimationNode>&           ApiObjects::getApiObjectContainer<AnimationNode>() const;
+    template const ApiObjectContainer<TimerNode>&               ApiObjects::getApiObjectContainer<TimerNode>() const;
 }

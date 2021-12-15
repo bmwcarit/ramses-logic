@@ -24,7 +24,7 @@ namespace rlogic::internal
 
     // For short: DAG
     // This DAG is used to represent the "property links" in LogicNode's, but abstracts the individual links and only
-    // counts the number of links between two nodes, not the actual properties which are linked (this info is stored in LogicNodeConnector).
+    // counts the number of links between two nodes, not the actual properties which are linked (this info is stored in PropertyImpl).
     // Edge direction is equivalent to direction of data flow
     // inside the logic engine (outputs -> inputs). Node outgoing degree represent the
     // number of total links of node properties to other nodes' properties, i.e. if two nodes A and B have three connected

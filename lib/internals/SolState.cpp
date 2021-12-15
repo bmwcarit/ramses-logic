@@ -11,6 +11,7 @@
 #include "ramses-logic/LuaModule.h"
 #include "impl/LuaModuleImpl.h"
 
+#include "internals/LuaCustomizations.h"
 #include "internals/PropertyTypeExtractor.h"
 #include "internals/WrappedLuaProperty.h"
 
@@ -65,6 +66,8 @@ namespace rlogic::internal
 
         // TODO Violin only register wrappers to runtime environments, not in the global environment
         WrappedLuaProperty::RegisterTypes(m_solState);
+
+        LuaCustomizations::RegisterTypes(m_solState);
     }
 
     sol::load_result SolState::loadScript(std::string_view source, std::string_view scriptName)
@@ -93,6 +96,8 @@ namespace rlogic::internal
         // if using 'modules' call to declare dependencies - resolve it to noop
         auto dummyFunc = [](const std::string& /*unused*/) {};
         newEnv["modules"] = dummyFunc;
+
+        LuaCustomizations::MapToEnvironment(m_solState, newEnv);
 
         return newEnv;
     }

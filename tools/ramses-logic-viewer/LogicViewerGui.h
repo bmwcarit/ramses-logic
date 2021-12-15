@@ -22,6 +22,7 @@ namespace rlogic
 {
     class LogicEngine;
     class Property;
+    class LogicObject;
     class LogicNode;
     class LogicViewer;
     class DataArray;
@@ -49,8 +50,11 @@ namespace rlogic
         void drawAnimationNodes();
         void drawNodeBindings();
         void drawCameraBindings();
+        void drawUpdateReport();
         void drawAppearanceBindings();
         void drawSaveDefaultLuaFile();
+
+        static bool DrawTreeNode(rlogic::LogicObject* obj);
 
         void drawNodeContextMenu(rlogic::LogicNode* obj, const std::string_view& ns);
         void drawNode(rlogic::LogicNode* obj);
@@ -68,8 +72,8 @@ namespace rlogic
         void copyScriptInputs();
 
         using PathVector = std::vector<std::string_view>;
-        void logInputs(rlogic::LogicNode* obj, PathVector& path);
-        void logProperty(rlogic::Property* prop, PathVector& path);
+        void logInputs(rlogic::LogicNode* obj, const PathVector& path);
+        void logProperty(rlogic::Property* prop, const std::string& prefix, PathVector& path);
 
         static void* IniReadOpen(ImGuiContext* context, ImGuiSettingsHandler* handler, const char* name);
         static void IniReadLine(ImGuiContext* context, ImGuiSettingsHandler* handler, void* entry, const char* line);
@@ -89,10 +93,14 @@ namespace rlogic
             bool showAnimationNodes = false;
             bool showDataArrays     = false;
             bool showRamsesBindings = false;
+            bool showUpdateReport   = true;
+            bool luaPreferObjectIds   = false;
+            bool luaPreferIdentifiers = false;
 
             bool operator==(const Settings& rhs) const {
                 return showWindow == rhs.showWindow && showOutputs == rhs.showOutputs && showLinkedInputs == rhs.showLinkedInputs && showScripts == rhs.showScripts &&
-                       showAnimationNodes == rhs.showAnimationNodes && showDataArrays == rhs.showDataArrays && showRamsesBindings == rhs.showRamsesBindings;
+                       showAnimationNodes == rhs.showAnimationNodes && showDataArrays == rhs.showDataArrays && showRamsesBindings == rhs.showRamsesBindings &&
+                       showUpdateReport == rhs.showUpdateReport && luaPreferObjectIds == rhs.luaPreferObjectIds && luaPreferIdentifiers == rhs.luaPreferIdentifiers;
             }
 
             bool operator!=(const Settings& rhs) const {
@@ -108,6 +116,7 @@ namespace rlogic
 
         std::string m_lastErrorMessage;
         std::string m_filename;
+        size_t m_updateReportInterval = 60u;
 
         ramses::TextureSampler* m_sampler = nullptr;
         ImVec2 m_samplerSize;

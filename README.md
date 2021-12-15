@@ -1,7 +1,7 @@
 # Introduction
 
 
-[![build status](https://github.com/GENIVI/ramses-logic/workflows/CMake/badge.svg?branch=master)](https://github.com/GENIVI/ramses-logic/actions?query=branch%3Amaster) [![docs status](https://readthedocs.org/projects/ramses-logic/badge/?style=flat)](https://ramses-logic.readthedocs.io/en/latest/)
+[![build status](https://github.com/COVESA/ramses-logic/workflows/CMake/badge.svg?branch=master)](https://github.com/COVESA/ramses-logic/actions?query=branch%3Amaster) [![docs status](https://readthedocs.org/projects/ramses-logic/badge/?style=flat)](https://ramses-logic.readthedocs.io/en/latest/)
 
 `RAMSES logic` extends the [RAMSES rendering ecosystem](https://ramses-sdk.readthedocs.io/) with scripting support based on
 [Lua](https://github.com/lua/lua). `RAMSES` is designed to be minimalistic and closely aligned to OpenGL, which can be a
@@ -16,7 +16,7 @@ You can find the full documentation of `RAMSES logic` [here](https://ramses-logi
 Clone RAMSES logic along with its dependencies:
 
 ```bash
-$ git clone https://github.com/GENIVI/ramses-logic <path>
+$ git clone https://github.com/COVESA/ramses-logic <path>
 $ cd <path>
 $ git submodule update --init --recursive
 ```
@@ -34,20 +34,21 @@ Prefer to learn by example? Have a look at our [self-contained example snippets]
 
 |Logic    | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
 |---------|-------------------------------|------------------------------------|------------------------------|
-|0.12.0   | 27.0.113                      | same as 0.6.0                      | 0.9.x                        |
-|0.11.0   | 27.0.113                      | same as 0.6.0                      | 0.9.x                        |
-|0.10.2   | 27.0.112                      | same as 0.6.0                      | 0.9.x                        |
-|0.10.1   | 27.0.111                      | same as 0.6.0                      | 0.9.x                        |
-|0.10.0   | 27.0.111                      | same as 0.6.0                      | 0.9.x                        |
-|0.9.1    | 27.0.111                      | same as 0.6.0                      | 0.9.x                        |
-|0.9.0    | 27.0.110                      | same as 0.6.0                      | 0.9.x                        |
-|0.8.1    | 27.0.110                      | same as 0.6.0                      | 0.7.x or 0.8.x               |
-|0.8.0    | 27.0.110                      | same as 0.6.0                      | 0.7.x or 0.8.x               |
-|0.7.0    | 27.0.105                      | same as 0.6.0                      | 0.7.x                        |
-|0.6.2    | 27.0.105                      | same as 0.6.0                      | 0.6.x                        |
-|0.6.1    | 27.0.103 (includes 27.0.11)   | same as 0.6.0                      | 0.6.x                        |
+|0.13.0   | 27.0.114                      | 27.0.102                           | >= 0.13.0                    |
+|0.12.0   | 27.0.113                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.11.0   | 27.0.113                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.10.2   | 27.0.112                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.10.1   | 27.0.111                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.10.0   | 27.0.111                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.9.1    | 27.0.111                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.9.0    | 27.0.110                      | 27.0.102                           | 0.9.0 - 0.12.0               |
+|0.8.1    | 27.0.110                      | 27.0.102                           | 0.7.x or 0.8.x               |
+|0.8.0    | 27.0.110                      | 27.0.102                           | 0.7.x or 0.8.x               |
+|0.7.0    | 27.0.105                      | 27.0.102                           | 0.7.x                        |
+|0.6.2    | 27.0.105                      | 27.0.102                           | 0.6.x                        |
+|0.6.1    | 27.0.103 (includes 27.0.11)   | 27.0.102                           | 0.6.x                        |
 |0.6.0    | 27.0.102 (includes 27.0.10)   | 27.0.100                           | 0.6.x                        |
-|0.5.3    | 27.0.101                      | 27.0.100                           | 0.5.x                        |
+|0.5.3    | 27.0.101                      | 27.0.100                           | 0.5.3                        |
 
 # License
 

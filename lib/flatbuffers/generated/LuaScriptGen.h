@@ -19,21 +19,27 @@ struct LuaScript FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_FILENAME = 6,
+    VT_ID = 6,
     VT_LUASOURCECODE = 8,
-    VT_ROOTINPUT = 10,
-    VT_ROOTOUTPUT = 12,
-    VT_DEPENDENCIES = 14,
-    VT_STANDARDMODULES = 16
+    VT_USERMODULES = 10,
+    VT_STANDARDMODULES = 12,
+    VT_ROOTINPUT = 14,
+    VT_ROOTOUTPUT = 16
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
   }
-  const flatbuffers::String *filename() const {
-    return GetPointer<const flatbuffers::String *>(VT_FILENAME);
+  uint64_t id() const {
+    return GetField<uint64_t>(VT_ID, 0);
   }
   const flatbuffers::String *luaSourceCode() const {
     return GetPointer<const flatbuffers::String *>(VT_LUASOURCECODE);
+  }
+  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *userModules() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *>(VT_USERMODULES);
+  }
+  const flatbuffers::Vector<uint8_t> *standardModules() const {
+    return GetPointer<const flatbuffers::Vector<uint8_t> *>(VT_STANDARDMODULES);
   }
   const rlogic_serialization::Property *rootInput() const {
     return GetPointer<const rlogic_serialization::Property *>(VT_ROOTINPUT);
@@ -41,29 +47,22 @@ struct LuaScript FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::Property *rootOutput() const {
     return GetPointer<const rlogic_serialization::Property *>(VT_ROOTOUTPUT);
   }
-  const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *>(VT_DEPENDENCIES);
-  }
-  const flatbuffers::Vector<uint8_t> *standardModules() const {
-    return GetPointer<const flatbuffers::Vector<uint8_t> *>(VT_STANDARDMODULES);
-  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
-           VerifyOffset(verifier, VT_FILENAME) &&
-           verifier.VerifyString(filename()) &&
+           VerifyField<uint64_t>(verifier, VT_ID) &&
            VerifyOffset(verifier, VT_LUASOURCECODE) &&
            verifier.VerifyString(luaSourceCode()) &&
+           VerifyOffset(verifier, VT_USERMODULES) &&
+           verifier.VerifyVector(userModules()) &&
+           verifier.VerifyVectorOfTables(userModules()) &&
+           VerifyOffset(verifier, VT_STANDARDMODULES) &&
+           verifier.VerifyVector(standardModules()) &&
            VerifyOffset(verifier, VT_ROOTINPUT) &&
            verifier.VerifyTable(rootInput()) &&
            VerifyOffset(verifier, VT_ROOTOUTPUT) &&
            verifier.VerifyTable(rootOutput()) &&
-           VerifyOffset(verifier, VT_DEPENDENCIES) &&
-           verifier.VerifyVector(dependencies()) &&
-           verifier.VerifyVectorOfTables(dependencies()) &&
-           VerifyOffset(verifier, VT_STANDARDMODULES) &&
-           verifier.VerifyVector(standardModules()) &&
            verifier.EndTable();
   }
 };
@@ -75,23 +74,23 @@ struct LuaScriptBuilder {
   void add_name(flatbuffers::Offset<flatbuffers::String> name) {
     fbb_.AddOffset(LuaScript::VT_NAME, name);
   }
-  void add_filename(flatbuffers::Offset<flatbuffers::String> filename) {
-    fbb_.AddOffset(LuaScript::VT_FILENAME, filename);
+  void add_id(uint64_t id) {
+    fbb_.AddElement<uint64_t>(LuaScript::VT_ID, id, 0);
   }
   void add_luaSourceCode(flatbuffers::Offset<flatbuffers::String> luaSourceCode) {
     fbb_.AddOffset(LuaScript::VT_LUASOURCECODE, luaSourceCode);
+  }
+  void add_userModules(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> userModules) {
+    fbb_.AddOffset(LuaScript::VT_USERMODULES, userModules);
+  }
+  void add_standardModules(flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules) {
+    fbb_.AddOffset(LuaScript::VT_STANDARDMODULES, standardModules);
   }
   void add_rootInput(flatbuffers::Offset<rlogic_serialization::Property> rootInput) {
     fbb_.AddOffset(LuaScript::VT_ROOTINPUT, rootInput);
   }
   void add_rootOutput(flatbuffers::Offset<rlogic_serialization::Property> rootOutput) {
     fbb_.AddOffset(LuaScript::VT_ROOTOUTPUT, rootOutput);
-  }
-  void add_dependencies(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies) {
-    fbb_.AddOffset(LuaScript::VT_DEPENDENCIES, dependencies);
-  }
-  void add_standardModules(flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules) {
-    fbb_.AddOffset(LuaScript::VT_STANDARDMODULES, standardModules);
   }
   explicit LuaScriptBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -108,19 +107,19 @@ struct LuaScriptBuilder {
 inline flatbuffers::Offset<LuaScript> CreateLuaScript(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> name = 0,
-    flatbuffers::Offset<flatbuffers::String> filename = 0,
+    uint64_t id = 0,
     flatbuffers::Offset<flatbuffers::String> luaSourceCode = 0,
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> userModules = 0,
+    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
-    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies = 0,
-    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0) {
+    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
   LuaScriptBuilder builder_(_fbb);
-  builder_.add_standardModules(standardModules);
-  builder_.add_dependencies(dependencies);
+  builder_.add_id(id);
   builder_.add_rootOutput(rootOutput);
   builder_.add_rootInput(rootInput);
+  builder_.add_standardModules(standardModules);
+  builder_.add_userModules(userModules);
   builder_.add_luaSourceCode(luaSourceCode);
-  builder_.add_filename(filename);
   builder_.add_name(name);
   return builder_.Finish();
 }
@@ -133,26 +132,25 @@ struct LuaScript::Traits {
 inline flatbuffers::Offset<LuaScript> CreateLuaScriptDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
-    const char *filename = nullptr,
+    uint64_t id = 0,
     const char *luaSourceCode = nullptr,
+    const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *userModules = nullptr,
+    const std::vector<uint8_t> *standardModules = nullptr,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
-    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0,
-    const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies = nullptr,
-    const std::vector<uint8_t> *standardModules = nullptr) {
+    flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
-  auto filename__ = filename ? _fbb.CreateString(filename) : 0;
   auto luaSourceCode__ = luaSourceCode ? _fbb.CreateString(luaSourceCode) : 0;
-  auto dependencies__ = dependencies ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>(*dependencies) : 0;
+  auto userModules__ = userModules ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>(*userModules) : 0;
   auto standardModules__ = standardModules ? _fbb.CreateVector<uint8_t>(*standardModules) : 0;
   return rlogic_serialization::CreateLuaScript(
       _fbb,
       name__,
-      filename__,
+      id,
       luaSourceCode__,
+      userModules__,
+      standardModules__,
       rootInput,
-      rootOutput,
-      dependencies__,
-      standardModules__);
+      rootOutput);
 }
 
 }  // namespace rlogic_serialization

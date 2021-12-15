@@ -34,7 +34,7 @@ namespace rlogic::internal
     {
     public:
         template <typename T>
-        DataArrayImpl(std::vector<T>&& data, std::string_view name);
+        DataArrayImpl(std::vector<T>&& data, std::string_view name, uint64_t id);
 
         template <typename T>
         [[nodiscard]] const std::vector<T>* getData() const;

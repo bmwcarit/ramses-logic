@@ -62,6 +62,7 @@ int main(int argc, char* argv[])
     rlogic::LuaScript* script1 = logicEngine.createLuaScript(R"(
         function interface()
             IN.intInput =      INT
+            IN.int64Input =    INT64
             IN.vec2iInput =    VEC2I
             IN.vec3iInput =    VEC3I
             IN.vec4iInput =    VEC4I
@@ -69,7 +70,7 @@ int main(int argc, char* argv[])
             IN.vec2fInput =    VEC2F
             IN.vec3fInput =    VEC3F
             IN.vec4fInput =    VEC4F
-            IN.boolInput  =     BOOL
+            IN.boolInput  =    BOOL
             IN.stringInput =   STRING
             IN.structInput = {
                 nested = {
@@ -93,12 +94,13 @@ int main(int argc, char* argv[])
                 return a - b
             end
             return mymath
-        )");
+        )", {}, "nestedModuleMath");
 
     rlogic::LuaConfig config;
     config.addDependency("nestedMath", *luaNestedModuleMath);
 
     const auto luaModuleMath = logicEngine.createLuaModule(R"(
+            modules('nestedMath')
             local mymath = {}
             mymath.sub=nestedMath.sub
             function mymath.add(a,b)
@@ -126,6 +128,7 @@ int main(int argc, char* argv[])
     config.addStandardModuleDependency(rlogic::EStandardModule::Math);
 
     rlogic::LuaScript* script2 = logicEngine.createLuaScript(R"(
+        modules("modulemath", "moduletypes")
         function interface()
             IN.floatInput = FLOAT
             OUT.cameraViewport = moduletypes.camViewport()
@@ -154,6 +157,7 @@ int main(int argc, char* argv[])
     rlogic::RamsesAppearanceBinding* appBinding = logicEngine.createRamsesAppearanceBinding(*appearance, "appearancebinding");
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
     const auto animNode = logicEngine.createAnimationNode({ { "channel", dataArray, dataArray, rlogic::EInterpolationType::Linear } }, "animNode");
+    logicEngine.createTimerNode("timerNode");
 
     logicEngine.link(*script1->getOutputs()->getChild("floatOutput"), *script2->getInputs()->getChild("floatInput"));
     logicEngine.link(*script1->getOutputs()->getChild("nodeTranslation"), *nodeBinding->getInputs()->getChild("translation"));

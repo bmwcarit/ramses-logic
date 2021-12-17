@@ -105,6 +105,11 @@ int main(int argc, char* argv[])
         displayConfig.setWindowRectangle(0, 0, width, height);
     }
 
+    if (args.multiSampleRate > 0)
+    {
+        displayConfig.setMultiSampling(args.multiSampleRate);
+    }
+
     int32_t    winX = 0;
     int32_t    winY = 0;
     displayConfig.getWindowRectangle(winX, winY, width, height);

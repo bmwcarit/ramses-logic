@@ -11,6 +11,7 @@
 #include "internals/StdFilesystemWrapper.h"
 #include <iostream>
 #include <vector>
+#include <string>
 
 struct Arguments
 {
@@ -65,12 +66,18 @@ struct Arguments
         }
 
         const std::string argExec = "--exec=";
+        const std::string argMultiSample = "--multi-sample=";
 
         for (const std::string argString : args)
         {
             if (argString == "--no-offscreen")
             {
                 noOffscreen = true;
+            }
+            else if (argString.find(argMultiSample, 0) == 0)
+            {
+                std::string sampleValue = argString.substr(argString.find("=") + 1);
+                multiSampleRate = std::stoi(sampleValue);
             }
             else if (argString.rfind(argExec, 0) == 0)
             {
@@ -103,7 +110,7 @@ struct Arguments
 
     [[nodiscard]] bool valid() const
     {
-        return !sceneFile.empty() && !logicFile.empty();
+        return !sceneFile.empty() && !logicFile.empty() && multiSampleRate >= 0 && (multiSampleRate <= 2 || multiSampleRate == 4);
     }
 
     void printErrorMessage(std::ostream& out) const
@@ -116,6 +123,11 @@ struct Arguments
         {
             out << "<logicfile> is missing" << std::endl;
         }
+        else if (multiSampleRate < 0 || multiSampleRate > 4 || multiSampleRate == 3)
+        {
+            out << "invalid multi sampling rate" << std::endl;
+        }
+
         out << std::endl;
     }
 
@@ -128,6 +140,8 @@ struct Arguments
             << "Options:" << std::endl
             << "--no-offscreen" << std::endl
             << "  Renders the scene directly to the window's framebuffer. Screenshot size will be the current window size." << std::endl
+            << "--multi-sample=<rate>" << std::endl
+            << "  Instructs the renderer to apply multi-sampling. Valid rates are 1, 2 and 4." << std::endl
             << "--exec=<luaFunction>" << std::endl
             << "  Calls the given lua function and exits." << std::endl;
     }
@@ -138,6 +152,7 @@ struct Arguments
 
     bool noOffscreen = false;
     bool autoDetectViewportSize = true;
+    uint32_t    multiSampleRate = 0;
     std::string luaFunction;
 };
 

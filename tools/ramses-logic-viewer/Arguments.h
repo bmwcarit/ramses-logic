@@ -76,7 +76,7 @@ struct Arguments
             }
             else if (argString.find(argMultiSample, 0) == 0)
             {
-                std::string sampleValue = argString.substr(argString.find("=") + 1);
+                std::string sampleValue = argString.substr(argString.find('=') + 1);
                 multiSampleRate = std::stoi(sampleValue);
             }
             else if (argString.rfind(argExec, 0) == 0)

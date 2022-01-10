@@ -154,6 +154,16 @@ namespace rlogic
         return m_impl->getLastUpdateReport();
     }
 
+    void LogicEngine::setStatisticsLoggingRate(size_t loggingRate)
+    {
+        m_impl->setStatisticsLoggingRate(loggingRate);
+    }
+
+    void LogicEngine::setStatisticsLogLevel(ELogMessageType logLevel)
+    {
+        m_impl->setStatisticsLogLevel(logLevel);
+    }
+
     bool LogicEngine::loadFromFile(std::string_view filename, ramses::Scene* ramsesScene /* = nullptr*/, bool enableMemoryVerification /* = true */)
     {
         return m_impl->loadFromFile(filename, ramsesScene, enableMemoryVerification);

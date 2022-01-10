@@ -13,11 +13,16 @@
 
 namespace rlogic::internal
 {
+    class ApiObjects;
+
     class LogicEngineReportImpl
     {
     public:
+        using LogicNodesTimed = std::vector<std::pair<LogicNode*, UpdateReport::ReportTimeUnits>>;
+        using LogicNodes = std::vector<LogicNode*>;
+
         LogicEngineReportImpl();
-        explicit LogicEngineReportImpl(UpdateReport reportData);
+        explicit LogicEngineReportImpl(const UpdateReport& reportData, const ApiObjects& apiObjects);
 
         [[nodiscard]] const LogicNodesTimed& getNodesExecuted() const;
         [[nodiscard]] const LogicNodes& getNodesSkippedExecution() const;
@@ -26,6 +31,10 @@ namespace rlogic::internal
         [[nodiscard]] size_t getTotalLinkActivations() const;
 
     private:
-        UpdateReport m_reportData;
+        LogicNodesTimed m_nodesExecuted;
+        LogicNodes m_nodesSkippedExecution;
+        UpdateReport::ReportTimeUnits m_totalUpdateExecutionTime{ 0 };
+        UpdateReport::ReportTimeUnits m_topologySortExecutionTime{ 0 };
+        size_t m_activatedLinks = 0u;
     };
 }

@@ -120,26 +120,6 @@ namespace rlogic::internal
             return arrayData;
         }
 
-    private:
-        // LOGICTYPE == float, int32, ... (arithmetic types)
-        template <typename RAMSESTYPE, typename LOGICTYPE>
-        inline typename std::enable_if<std::is_arithmetic<LOGICTYPE>::value, void>::type
-        static FlattenElementIntoArray(std::vector<RAMSESTYPE>& ramsesArray, LOGICTYPE logicElement)
-        {
-            ramsesArray.emplace_back(logicElement);
-        }
-
-        // LOGICTYPE == vec2f, vec3i, ... (array types)
-        template <typename RAMSESTYPE, typename LOGICTYPE>
-        inline typename std::enable_if<!std::is_arithmetic<LOGICTYPE>::value, void>::type
-        static FlattenElementIntoArray(std::vector<RAMSESTYPE>& ramsesArray, LOGICTYPE logicElement)
-        {
-            for (size_t i = 0; i < logicElement.size(); ++i)
-            {
-                ramsesArray.emplace_back(logicElement[i]);
-            }
-        }
-
         static size_t ComponentsSizeForPropertyType(EPropertyType propertyType)
         {
             switch (propertyType)
@@ -164,6 +144,26 @@ namespace rlogic::internal
                 assert(false && "This should never happen");
             }
             return 0u;
+        }
+
+    private:
+        // LOGICTYPE == float, int32, ... (arithmetic types)
+        template <typename RAMSESTYPE, typename LOGICTYPE>
+        inline typename std::enable_if<std::is_arithmetic<LOGICTYPE>::value, void>::type
+        static FlattenElementIntoArray(std::vector<RAMSESTYPE>& ramsesArray, LOGICTYPE logicElement)
+        {
+            ramsesArray.emplace_back(logicElement);
+        }
+
+        // LOGICTYPE == vec2f, vec3i, ... (array types)
+        template <typename RAMSESTYPE, typename LOGICTYPE>
+        inline typename std::enable_if<!std::is_arithmetic<LOGICTYPE>::value, void>::type
+        static FlattenElementIntoArray(std::vector<RAMSESTYPE>& ramsesArray, LOGICTYPE logicElement)
+        {
+            for (size_t i = 0; i < logicElement.size(); ++i)
+            {
+                ramsesArray.emplace_back(logicElement[i]);
+            }
         }
     };
 }

@@ -1,5 +1,26 @@
 # master
 
+# v0.14.0
+
+Summary:
+* Fixed clang-tidy jobs for older clang-tidy versions
+* File compatible, but ABI-incompatible to v0.13.0
+
+**API Changes**
+
+* [[nodiscard]] properly applied to pure const API getters
+
+**Features**
+
+* Logic engine viewer supports TimerNodes
+* Added LogicEngine::setStatisticsLoggingRate and LogicEngine::setStatisticsLogLevel which periodically logs statistics about updated nodes.
+
+**Bugfixes**
+
+* Improved error message when assigning structs with less than required number of fields
+* Fixed potential stack overflow problem when assigning large structs
+* Reading VECxF and VECxI values from modules works (was broken in 0.13.0 because of read-only protection)
+
 # v0.13.0
 
 Summary:

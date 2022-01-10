@@ -245,10 +245,13 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
-        if (m_updateReportEnabled)
+        if (m_statisticsEnabled || m_updateReportEnabled)
         {
             m_updateReport.clear();
             m_updateReport.sectionStarted(UpdateReport::ETimingSection::TotalUpdate);
+        }
+        if (m_updateReportEnabled)
+        {
             m_updateReport.sectionStarted(UpdateReport::ETimingSection::TopologySort);
         }
 
@@ -268,8 +271,13 @@ namespace rlogic::internal
 
         const bool success = updateNodes(*sortedNodes);
 
-        if (m_updateReportEnabled)
+        if (m_statisticsEnabled || m_updateReportEnabled)
+        {
             m_updateReport.sectionFinished(UpdateReport::ETimingSection::TotalUpdate);
+            m_statistics.collect(m_updateReport, sortedNodes->size());
+            if (m_statistics.checkUpdateFrameFinished())
+                m_statistics.calculateAndLog();
+        }
 
         return success;
     }
@@ -279,19 +287,20 @@ namespace rlogic::internal
         for (LogicNodeImpl* nodeIter : sortedNodes)
         {
             LogicNodeImpl& node = *nodeIter;
-            LogicNode* hlNode = m_updateReportEnabled ? m_apiObjects->getApiObject(node) : nullptr;
 
             if (!node.isDirty())
             {
                 if (m_updateReportEnabled)
-                    m_updateReport.nodeSkippedExecution(hlNode);
+                    m_updateReport.nodeSkippedExecution(node);
 
                 if(m_nodeDirtyMechanismEnabled)
                     continue;
             }
 
             if (m_updateReportEnabled)
-                m_updateReport.nodeExecutionStarted(hlNode);
+                m_updateReport.nodeExecutionStarted(node);
+            if (m_statisticsEnabled)
+                m_statistics.nodeExecuted();
 
             const std::optional<LogicNodeRuntimeError> potentialError = node.update();
             if (potentialError)
@@ -305,7 +314,7 @@ namespace rlogic::internal
             {
                 const size_t activatedLinks = activateLinksRecursive(*outputs->m_impl);
 
-                if (m_updateReportEnabled)
+                if (m_statisticsEnabled || m_updateReportEnabled)
                     m_updateReport.linksActivated(activatedLinks);
             }
 
@@ -523,7 +532,18 @@ namespace rlogic::internal
 
     LogicEngineReport LogicEngineImpl::getLastUpdateReport() const
     {
-        return LogicEngineReport{ std::make_unique<LogicEngineReportImpl>(m_updateReport) };
+        return LogicEngineReport{ std::make_unique<LogicEngineReportImpl>(m_updateReport, *m_apiObjects) };
+    }
+
+    void LogicEngineImpl::setStatisticsLoggingRate(size_t loggingRate)
+    {
+        m_statistics.setLoggingRate(loggingRate);
+        m_statisticsEnabled = (loggingRate != 0u);
+    }
+
+    void LogicEngineImpl::setStatisticsLogLevel(ELogMessageType logLevel)
+    {
+        m_statistics.setLogLevel(logLevel);
     }
 
     template DataArray* LogicEngineImpl::createDataArray<float>(const std::vector<float>&, std::string_view name);

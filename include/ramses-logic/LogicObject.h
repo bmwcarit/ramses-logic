@@ -45,7 +45,7 @@ namespace rlogic
         *
         * @return the id of this object
         */
-        RLOGIC_API uint64_t getId() const;
+        [[nodiscard]] RLOGIC_API uint64_t getId() const;
 
         /**
         * Casts this object to given type.

@@ -26,8 +26,8 @@ namespace rlogic::internal
         {
         }
 
-        explicit DataOrError(std::string errorMessage)
-            : m_data(Error{std::move(errorMessage)})
+        explicit DataOrError(const std::string& errorMessage)
+            : m_data(Error{errorMessage})
         {
         }
 
@@ -61,13 +61,15 @@ namespace rlogic::internal
     class LuaTypeConversions
     {
     public:
-        template <typename T>
-        static DataOrError<T> ExtractSpecificType(const sol::object& solObject);
+        [[nodiscard]] static std::optional<sol::lua_table> ExtractLuaTable(const sol::object& object);
 
-        static size_t         GetMaxIndexForVectorType(rlogic::EPropertyType type);
+        template <typename T>
+        [[nodiscard]] static DataOrError<T> ExtractSpecificType(const sol::object& solObject);
+
+        [[nodiscard]] static size_t         GetMaxIndexForVectorType(rlogic::EPropertyType type);
 
         template <typename T, size_t size>
-        static DataOrError<std::array<T, size>> ExtractArray(const sol::object& solObject);
+        [[nodiscard]] static DataOrError<std::array<T, size>> ExtractArray(const sol::object& solObject);
 
         static_assert(std::is_same<LUA_NUMBER, double>::value, "This class assumes that Lua-internal numbers are double precision floats");
     };

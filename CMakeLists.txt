@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 13)
+set(RLOGIC_VERSION_MINOR 14)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
@@ -41,6 +41,7 @@ option(ramses-logic_ALLOW_RAMSES_BUILD "Set this to OFF to explicitly disable Ra
 option(ramses-logic_FIND_RAMSES_FROM_SYSTEM "Set this to ON if you want to use an existing installation or package of Ramses (find_package)" OFF)
 set(ramses-logic_PLATFORM "" CACHE
     STRING "Use this in conjunction with ramses-logic_FIND_RAMSES_FROM_SYSTEM or ramses-logic_BUILD_RAMSES_RENDERER to search for a specific Ramses platform")
+set(ramses-logic_PACKAGE_TYPE "TGZ" CACHE STRING "Passed to CPack to determine the type of package to be created. Default is TGZ.")
 option(ramses-logic_BUILD_SHARED_LIB "Enable/disable build of Ramses Logic shared lib target" ON)
 option(ramses-logic_BUILD_STATIC_LIB "Enable/disable build of Ramses Logic static lib target" OFF)
 option(ramses-logic_ENABLE_INSTALL "Enable/disable installation of Ramses Logic" ON)
@@ -317,17 +318,20 @@ if(ramses-logic_ENABLE_INSTALL)
     )
 endif()
 
-set(CPACK_GENERATOR "TGZ")
+set(CPACK_GENERATOR ${ramses-logic_PACKAGE_TYPE})
 set(CPACK_SOURCE_GENERATOR "TGZ")
 set(CPACK_PACKAGE_VENDOR "ramses")
-set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Ramses scripting engine")
+set(CPACK_PACKAGE_CONTACT "ramses-oss@list.bmw.com")
+set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "Ramses scripting and animation library")
+set(CPACK_PACKAGE_DESCRIPTION "A packaged version of the logic and animation library for ramses. Generated using CPack.")
 set(CPACK_PACKAGE_VERSION_MAJOR ${PROJECT_VERSION_MAJOR})
 set(CPACK_PACKAGE_VERSION_MINOR ${PROJECT_VERSION_MINOR})
 set(CPACK_PACKAGE_VERSION_PATCH ${PROJECT_VERSION_PATCH})
 set(CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE.txt")
 set(CPACK_RESOURCE_FILE_README "${CMAKE_CURRENT_SOURCE_DIR}/README.md")
 
-set(CPACK_SOURCE_STRIP_FILES             TRUE)
-set(CPACK_STRIP_FILES                    FALSE)
+set(CPACK_SOURCE_STRIP_FILES    TRUE)
+set(CPACK_STRIP_FILES           FALSE)
+set(CPACK_PACKAGE_ICON          "${CMAKE_CURRENT_SOURCE_DIR}/doc/sphinx/_static/logo.png")
 
 include(CPack)

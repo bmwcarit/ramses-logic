@@ -171,6 +171,12 @@ things can be enabled using following CMake options:
     * default: not set
     * This is a standard CMake feature. We provide several toolchain files for popular compilers, use them or create your own
 
+* -Dramses-logic_PACKAGE_TYPE=<type>
+    * options: any of the `supported CPack generators <https://cmake.org/cmake/help/latest/manual/cpack-generators.7.html>`_
+    * default: TGZ
+    * Allows to control which type of package is built by CMake/CPack when the 'package' target is built. See CPack docs for 'CPACK_GENERATOR' for details
+
+
 
 =======================================
 Project version

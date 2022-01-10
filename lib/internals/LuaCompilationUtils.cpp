@@ -114,6 +114,9 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
+        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptInput));
+        auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(outputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptOutput));
+
         return LuaCompiledScript{
             LuaSource{
                 std::move(source),
@@ -122,8 +125,8 @@ namespace rlogic::internal
                 userModules
             },
             std::move(load_result),
-            std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptInput)),
-            std::make_unique<Property>(std::make_unique<PropertyImpl>(outputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptOutput))
+            std::move(inputs),
+            std::move(outputs)
         };
     }
 

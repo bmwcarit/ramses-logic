@@ -14,6 +14,7 @@
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
 #include "internals/UpdateReport.h"
+#include "internals/LogicNodeUpdateStatistics.h"
 
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 
@@ -43,6 +44,7 @@ namespace rlogic
     class LuaModule;
     class LogicNode;
     class Property;
+    enum class ELogMessageType;
 }
 
 namespace rlogic_serialization
@@ -105,6 +107,9 @@ namespace rlogic::internal
         void enableUpdateReport(bool enable);
         [[nodiscard]] LogicEngineReport getLastUpdateReport() const;
 
+        void setStatisticsLoggingRate(size_t loggingRate);
+        void setStatisticsLogLevel(ELogMessageType logLevel);
+
     private:
         size_t activateLinksRecursive(PropertyImpl& output);
 
@@ -120,6 +125,8 @@ namespace rlogic::internal
         bool m_nodeDirtyMechanismEnabled = true;
 
         bool m_updateReportEnabled = false;
+        bool m_statisticsEnabled   = true;
         UpdateReport m_updateReport;
+        LogicNodeUpdateStatistics m_statistics;
     };
 }

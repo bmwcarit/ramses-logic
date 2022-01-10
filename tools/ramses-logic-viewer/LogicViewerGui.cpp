@@ -12,6 +12,7 @@
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
@@ -135,6 +136,10 @@ namespace rlogic
             else if (node->as<RamsesCameraBinding>() != nullptr)
             {
                 name = "CameraBinding";
+            }
+            else if (node->as<TimerNode>() != nullptr)
+            {
+                name = "Timer";
             }
             return name;
         }
@@ -355,6 +360,11 @@ namespace rlogic
             drawAnimationNodes();
         }
 
+        if (m_settings.showTimerNodes)
+        {
+            drawTimerNodes();
+        }
+
         if (m_settings.showDataArrays && ImGui::CollapsingHeader("Data Arrays"))
         {
             for (auto* obj : m_logicEngine.getCollection<DataArray>())
@@ -395,6 +405,7 @@ namespace rlogic
                 ImGui::Separator();
                 ImGui::MenuItem("Show Scripts", nullptr, &m_settings.showScripts);
                 ImGui::MenuItem("Show Animation Nodes", nullptr, &m_settings.showAnimationNodes);
+                ImGui::MenuItem("Show Timer Nodes", nullptr, &m_settings.showTimerNodes);
                 ImGui::MenuItem("Show Data Arrays", nullptr, &m_settings.showDataArrays);
                 ImGui::MenuItem("Show Ramses Bindings", nullptr, &m_settings.showRamsesBindings);
                 if(ImGui::MenuItem("Show Update Report", nullptr, &m_settings.showUpdateReport))
@@ -528,6 +539,32 @@ namespace rlogic
                         }
                         ImGui::TreePop();
                     }
+                    drawNode(obj);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
+    void LogicViewerGui::drawTimerNodes()
+    {
+        const bool openTimerNodes = ImGui::CollapsingHeader("Timer Nodes");
+        if (ImGui::BeginPopupContextItem("TimerNodesContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all Timer Node inputs"))
+            {
+                copyInputs(LogicViewer::ltnTimer, m_logicEngine.getCollection<TimerNode>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openTimerNodes)
+        {
+            for (auto* obj : m_logicEngine.getCollection<TimerNode>())
+            {
+                const bool open = DrawTreeNode(obj);
+                drawNodeContextMenu(obj, LogicViewer::ltnTimer);
+                if (open)
+                {
                     drawNode(obj);
                     ImGui::TreePop();
                 }
@@ -819,7 +856,7 @@ namespace rlogic
             {
                 ImGui::TextUnformatted(fmt::format("{}: {}", name, value).c_str());
             }
-            else if (ImGui::DragScalar(name, ImGuiDataType_S64, &value, 0.1f, nullptr, nullptr, "%ll"))
+            else if (ImGui::DragScalar(name, ImGuiDataType_S64, &value, 0.1f, nullptr, nullptr))
             {
                 prop->set(value);
             }
@@ -1181,6 +1218,10 @@ namespace rlogic
         {
             gui->m_settings.showAnimationNodes = (flag != 0);
         }
+        else if (IniReadFlag(line, "ShowTimerNodes=%d", &flag))
+        {
+            gui->m_settings.showTimerNodes = (flag != 0);
+        }
         else if (IniReadFlag(line, "ShowDataArrays=%d", &flag))
         {
             gui->m_settings.showDataArrays = (flag != 0);
@@ -1223,6 +1264,8 @@ namespace rlogic
         buf->appendf("ShowScripts=%d\n", gui->m_settings.showScripts ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowAnimationNodes=%d\n", gui->m_settings.showAnimationNodes ? 1 : 0);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+        buf->appendf("ShowTimerNodes=%d\n", gui->m_settings.showTimerNodes ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowDataArrays=%d\n", gui->m_settings.showDataArrays ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface

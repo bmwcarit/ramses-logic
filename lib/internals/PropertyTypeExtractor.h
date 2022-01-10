@@ -23,15 +23,15 @@ namespace rlogic::internal
         [[nodiscard]] HierarchicalTypeData getExtractedTypeData() const;
 
         // Used for iteration from rl_(i)pairs functions
-        std::reference_wrapper<const PropertyTypeExtractor> getChildReference(size_t childIndex) const;
+        [[nodiscard]] std::reference_wrapper<const PropertyTypeExtractor> getChildReference(size_t childIndex) const;
         [[nodiscard]] TypeData getRootTypeData() const;
         [[nodiscard]] const std::vector<PropertyTypeExtractor>& getNestedExtractors() const;
 
 
         // Lua overloads
-        std::reference_wrapper<PropertyTypeExtractor> index(const sol::object& propertyIndex);
+        [[nodiscard]] std::reference_wrapper<PropertyTypeExtractor> index(const sol::object& propertyIndex);
         void newIndex(const sol::object& idx, const sol::object& value);
-        static sol::object CreateArray(sol::this_state state, const sol::object& size, std::optional<sol::object> arrayType);
+        [[nodiscard]] static sol::object CreateArray(sol::this_state state, const sol::object& size, std::optional<sol::object> arrayType);
 
         // Register symbols for type extraction to sol environment
         static void RegisterTypes(sol::environment& environment);

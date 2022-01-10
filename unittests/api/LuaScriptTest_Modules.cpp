@@ -285,6 +285,48 @@ namespace rlogic::internal
         EXPECT_EQ(1, *script->getOutputs()->getChild("table3size")->get<int32_t>());
     }
 
+    TEST_F(ALuaScriptWithModule, ReadsVecTypeLengthAndValues)
+    {
+        const std::string_view modSrc = R"(
+            local mod = {}
+            mod.vec4i = { 4, 5, 6, 7 }
+            mod.vec2f = { 0.1, -0.3 }
+            return mod
+        )";
+
+        auto dependencies = createDeps({ { "mod", modSrc } });
+        dependencies.addStandardModuleDependency(EStandardModule::Base);
+
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mod")
+            function interface()
+                OUT.vec4isize = INT
+                OUT.vec2fsize = INT
+                OUT.vec4i = VEC4I
+                OUT.vec2f = VEC2F
+
+                -- test that vec can be also read during interface extraction
+                local vec4i = mod.vec4i
+                assert(rl_len(vec4i) == 4)
+                assert(vec4i[4] == 7)
+            end
+            function run()
+                OUT.vec4isize = rl_len(mod.vec4i)
+                OUT.vec2fsize = rl_len(mod.vec2f)
+                OUT.vec4i = mod.vec4i
+                OUT.vec2f = mod.vec2f
+            end
+        )", dependencies);
+        ASSERT_TRUE(script);
+
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(4, *script->getOutputs()->getChild("vec4isize")->get<int32_t>());
+        EXPECT_EQ(2, *script->getOutputs()->getChild("vec2fsize")->get<int32_t>());
+        EXPECT_THAT(*script->getOutputs()->getChild("vec4i")->get<vec4i>(), ::testing::ElementsAre(4, 5, 6, 7));
+        EXPECT_FLOAT_EQ(0.1f, (*script->getOutputs()->getChild("vec2f")->get<vec2f>())[0]);
+        EXPECT_FLOAT_EQ(-0.3f, (*script->getOutputs()->getChild("vec2f")->get<vec2f>())[1]);
+    }
+
     TEST_F(ALuaScriptWithModule, CanGetTableSizeWithCustomMethod_InsideModuleAswell)
     {
         const std::string_view modSrc = R"(

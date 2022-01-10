@@ -29,6 +29,7 @@ namespace rlogic
         static const char* const ltnModule;
         static const char* const ltnScript;
         static const char* const ltnAnimation;
+        static const char* const ltnTimer;
         static const char* const ltnNode;
         static const char* const ltnAppearance;
         static const char* const ltnCamera;

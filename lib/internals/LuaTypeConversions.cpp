@@ -13,6 +13,33 @@
 
 namespace rlogic::internal
 {
+    // extracts a plain Lua table, or one which was made read-only (e.g. module data tables)
+    std::optional<sol::lua_table> LuaTypeConversions::ExtractLuaTable(const sol::object& object)
+    {
+        auto potentialTable = object.as<std::optional<sol::lua_table>>();
+        if (potentialTable)
+        {
+            sol::lua_table table = *potentialTable;
+            sol::object metaContent = table[sol::metatable_key];
+
+            // Identify read-only data (e.g. logic engine read-only module tables)
+            // This is basically a reverse-test for this: https://www.lua.org/pil/13.4.4.html
+            // See also LuaCompilationUtils::MakeTableReadOnly for the counterpart
+            auto potentialMetatable = metaContent.as<std::optional<sol::lua_table>>();
+            if (potentialMetatable)
+            {
+                sol::object metaIndex = (*potentialMetatable)[sol::meta_function::index];
+                auto potentialModuleTable = metaIndex.as<std::optional<sol::lua_table>>();
+                if (potentialModuleTable)
+                {
+                    potentialTable = potentialModuleTable;
+                }
+            }
+        }
+
+        return potentialTable;
+    }
+
     size_t LuaTypeConversions::GetMaxIndexForVectorType(rlogic::EPropertyType type)
     {
         switch (type)
@@ -196,14 +223,15 @@ namespace rlogic::internal
     template <typename T, size_t size >
     DataOrError< std::array<T, size> > LuaTypeConversions::ExtractArray(const sol::object& solObject)
     {
-        if (!solObject.is<sol::lua_table>())
+        const std::optional<sol::lua_table> potentialLuaTable = ExtractLuaTable(solObject);
+        if (!potentialLuaTable)
         {
             return DataOrError<std::array<T, size>>(fmt::format("Expected a Lua table with {} entries but got object of type {} instead!",
                 size,
                 sol_helper::GetSolTypeName(solObject.get_type())));
         }
 
-        const sol::lua_table& solTable = solObject.as<sol::lua_table>();
+        const sol::lua_table& solTable = *potentialLuaTable;
 
         const size_t tableFieldCount = solTable.size();
 

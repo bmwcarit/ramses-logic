@@ -104,6 +104,32 @@ namespace rlogic::internal
         return sol::lua_nil;
     }
 
+    sol::object WrappedLuaProperty::resolveVectorElement(sol::this_state solState, size_t elementIndex) const
+    {
+        const EPropertyType vecType = m_wrappedProperty.get().getType();
+        assert(TypeUtils::IsPrimitiveVectorType(vecType));
+        assert(elementIndex > 0 && elementIndex <= TypeUtils::ComponentsSizeForPropertyType(vecType));
+
+        switch (vecType)
+        {
+        case EPropertyType::Vec2f:
+            return sol::make_object(solState, m_wrappedProperty.get().getValueAs<PropertyEnumToType<EPropertyType::Vec2f>::TYPE>()[elementIndex - 1]);
+        case EPropertyType::Vec3f:
+            return sol::make_object(solState, m_wrappedProperty.get().getValueAs<PropertyEnumToType<EPropertyType::Vec3f>::TYPE>()[elementIndex - 1]);
+        case EPropertyType::Vec4f:
+            return sol::make_object(solState, m_wrappedProperty.get().getValueAs<PropertyEnumToType<EPropertyType::Vec4f>::TYPE>()[elementIndex - 1]);
+        case EPropertyType::Vec2i:
+            return sol::make_object(solState, m_wrappedProperty.get().getValueAs<PropertyEnumToType<EPropertyType::Vec2i>::TYPE>()[elementIndex - 1]);
+        case EPropertyType::Vec3i:
+            return sol::make_object(solState, m_wrappedProperty.get().getValueAs<PropertyEnumToType<EPropertyType::Vec3i>::TYPE>()[elementIndex - 1]);
+        case EPropertyType::Vec4i:
+            return sol::make_object(solState, m_wrappedProperty.get().getValueAs<PropertyEnumToType<EPropertyType::Vec4i>::TYPE>()[elementIndex - 1]);
+        default:
+            assert(false && "unexpected");
+            return sol::lua_nil;
+        }
+    }
+
     void WrappedLuaProperty::newIndex(const sol::object& index, const sol::object& rhs)
     {
         if (TypeUtils::IsPrimitiveVectorType(m_wrappedProperty.get().getType()))
@@ -187,7 +213,8 @@ namespace rlogic::internal
 
     size_t WrappedLuaProperty::resolvePropertyIndex(const sol::object& propertyIndex) const
     {
-        if (m_wrappedProperty.get().getType() == EPropertyType::Struct)
+        const EPropertyType propertyType = m_wrappedProperty.get().getType();
+        if (propertyType == EPropertyType::Struct)
         {
             const DataOrError<std::string_view> structFieldName = LuaTypeConversions::ExtractSpecificType<std::string_view>(propertyIndex);
 
@@ -207,7 +234,7 @@ namespace rlogic::internal
             throw BadStructAccess(std::string(structFieldName.getData()), fmt::format("Tried to access undefined struct property '{}'", structFieldName.getData()));
         }
 
-        if (m_wrappedProperty.get().getType() == EPropertyType::Array)
+        if (propertyType == EPropertyType::Array)
         {
             const DataOrError<size_t> maybeUInt = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
             if (maybeUInt.hasError())
@@ -221,6 +248,20 @@ namespace rlogic::internal
                 sol_helper::throwSolException("Index out of range! Expected 0 < index <= {} but received index == {}", childCount, indexAsUInt);
             }
             return indexAsUInt - 1;
+        }
+
+        if (TypeUtils::IsPrimitiveVectorType(propertyType))
+        {
+            const DataOrError<size_t> elementIdx = LuaTypeConversions::ExtractSpecificType<size_t>(propertyIndex);
+            if (elementIdx.hasError())
+                sol_helper::throwSolException("Bad access to property '{}'! {}", m_wrappedProperty.get().getName(), elementIdx.getError());
+
+            const size_t numElements = TypeUtils::ComponentsSizeForPropertyType(propertyType);
+            const size_t indexAsUInt = elementIdx.getData();
+            if (indexAsUInt == 0 || indexAsUInt > numElements)
+                sol_helper::throwSolException("Index out of range! Expected 0 < index <= {} but received index == {}", numElements, indexAsUInt);
+
+            return indexAsUInt;
         }
 
         sol_helper::throwSolException("Implementation error");
@@ -389,30 +430,23 @@ namespace rlogic::internal
 
     void WrappedLuaProperty::setStruct(const sol::object& rhs)
     {
-        if (!rhs.is<sol::lua_table>())
+        const std::optional<sol::lua_table> potentialLuaTable = LuaTypeConversions::ExtractLuaTable(rhs);
+        if (!potentialLuaTable)
         {
             sol_helper::throwSolException("Unexpected type ({}) while assigning value of struct field '{}' (expected a table or another struct)!",
                 sol_helper::GetSolTypeName(rhs.get_type()),
                 m_wrappedProperty.get().getName());
         }
 
-        sol::lua_table table = rhs.as<sol::lua_table>();
+        const sol::lua_table& solTable = *potentialLuaTable;
 
-        sol::object potentiallyMetatable = table[sol::metatable_key];
+        const size_t expectedTableEntries = m_wrappedChildProperties.size();
 
-        // Identify read-only data
-        if (potentiallyMetatable.valid() && potentiallyMetatable.is<sol::table>())
-        {
-            sol::object moduleTable = potentiallyMetatable.as<sol::table>()[sol::meta_function::index];
+        // Collect values first before applying to avoid modify-on-iteration (causes stack overflows)
+        std::vector<sol::object> childValuesOrderedByIndex(expectedTableEntries);
 
-            if (moduleTable.valid() && moduleTable.is<sol::lua_table>())
-            {
-                table = moduleTable.as<sol::lua_table>();
-            }
-        }
-
-        size_t assignedKeys = 0;
-        for (const auto& tableEntry : table)
+        size_t actualTableEntries = 0u;
+        for (const auto& tableEntry : solTable)
         {
             size_t childIndex = 0;
             try {
@@ -422,16 +456,30 @@ namespace rlogic::internal
                 sol_helper::throwSolException("Unexpected property '{}' while assigning values to struct '{}'!", badAccess.fieldName, m_wrappedProperty.get().getName());
             }
 
-            setChildValue(childIndex, tableEntry.second);
-            ++assignedKeys;
+            // Sanity check, not possible have two properties resolve to the same field index
+            assert (childValuesOrderedByIndex[childIndex] == sol::nil);
+            childValuesOrderedByIndex[childIndex] = tableEntry.second;
+            ++actualTableEntries;
+
+            if (actualTableEntries > expectedTableEntries)
+            {
+                sol_helper::throwSolException("Element size mismatch when assigning struct property '{}'! Expected: {} entries, received more",
+                    m_wrappedProperty.get().getName(),
+                    expectedTableEntries);
+            }
         }
 
-        if (assignedKeys != m_wrappedChildProperties.size())
+        for (size_t i = 0; i < childValuesOrderedByIndex.size(); ++i)
         {
-            sol_helper::throwSolException("Element size mismatch when assigning struct property '{}'! Expected: {} Received: {}",
-                m_wrappedProperty.get().getName(),
-                m_wrappedChildProperties.size(),
-                assignedKeys);
+            if (childValuesOrderedByIndex[i] == sol::nil)
+            {
+                sol_helper::throwSolException("Error while assigning struct '{}', expected a value for property '{}' but found none!",
+                    m_wrappedProperty.get().getName(),
+                    m_wrappedChildProperties[i].getWrappedProperty().getName()
+                );
+            }
+
+            setChildValue(i, childValuesOrderedByIndex[i]);
         }
     }
 
@@ -530,5 +578,4 @@ namespace rlogic::internal
     {
         return m_wrappedProperty.get();
     }
-
 }

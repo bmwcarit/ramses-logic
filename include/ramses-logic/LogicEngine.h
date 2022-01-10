@@ -45,6 +45,7 @@ namespace rlogic
     class DataArray;
     class AnimationNode;
     class TimerNode;
+    enum class ELogMessageType;
 
     /**
     * Central object which creates and manages the lifecycle and execution
@@ -313,6 +314,39 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API LogicEngineReport getLastUpdateReport() const;
 
         /**
+        * Set the logging rate, i.e. how often statistics will be logged. Logging rate of \c N means
+        * every \c Nth call to #update statistics will be logged.
+        * Whether the the logs are actually logged is also influenced by the statistics log level that can be set with #setStatisticsLogLevel.
+        * The logging rate also determines how many collected sets will be used to calculate min/max and average.
+        * These statistics include:
+        *  - \p Time since last log in seconds
+        *  - \p Update execution time in microseconds (Avg, Min, Max)
+        *  - \p Time between #update calls in microseconds (Avg, Min, Max)
+        *  - \p Count of nodes executed in percentage of total count (Avg, Min, Max)
+        *  - \p Links activated (Avg, Min, Max)
+        * When loggingRate is set to 0 the logging of statistics is disabled.
+        * Note that there is a slight performance overhead for collecting the statistics data,
+        * however on most platforms this should be marginal.
+        * To get more detailed information about update execution timings see #getLastUpdateReport.
+        *
+        * @param loggingRate rate of \c N means statistics will be logged every \c Nth call to #update. By default loggingRate is 60.
+        */
+        RLOGIC_API void setStatisticsLoggingRate(size_t loggingRate);
+
+        /**
+        * Update statistics default logLevel is #ELogMessageType::Debug. For the statistics to be logged the logLevel
+        * has to be <= then the result returned from #rlogic::Logger::GetLogVerbosityLimit.
+        * For example if #rlogic::Logger::GetLogVerbosityLimit returns #ELogMessageType::Info you have to
+        * set statistics logLevel to #ELogMessageType::Info or a smaller level (e.g. #ELogMessageType::Warn) to display statistics.
+        * Note that setting the statistics log level only influences the periodic statistic logs. All other logs are not influenced
+        * by this method.
+        * To control the rate after how many updates a log is produced refer to #setStatisticsLoggingRate.
+        *
+        * @param logLevel the logLevel of statistics messages
+        */
+        RLOGIC_API void setStatisticsLogLevel(ELogMessageType logLevel);
+
+        /**
          * Links a property of a #rlogic::LogicNode to another #rlogic::Property of another #rlogic::LogicNode.
          * After linking, calls to #update will propagate the value of \p sourceProperty to
          * the \p targetProperty. Creating links influences the order in which scripts
@@ -502,7 +536,7 @@ namespace rlogic
         * @return collection of objects
         */
         template <typename T>
-        RLOGIC_API Collection<T> getLogicObjectsInternal() const;
+        [[nodiscard]] RLOGIC_API Collection<T> getLogicObjectsInternal() const;
 
         /**
         * Internal implementation of object finder
@@ -510,7 +544,7 @@ namespace rlogic
         * @return found object
         */
         template <typename T>
-        RLOGIC_API const T* findLogicObjectInternal(std::string_view name) const;
+        [[nodiscard]] RLOGIC_API const T* findLogicObjectInternal(std::string_view name) const;
 
         /**
         * Internal implementation of object finder
@@ -518,7 +552,7 @@ namespace rlogic
         * @return found object
         */
         template <typename T>
-        RLOGIC_API T* findLogicObjectInternal(std::string_view name);
+        [[nodiscard]] RLOGIC_API T* findLogicObjectInternal(std::string_view name);
 
         /**
         * Internal implementation of #createDataArray
@@ -528,7 +562,7 @@ namespace rlogic
         * @return a pointer to the created object or nullptr on error
         */
         template <typename T>
-        RLOGIC_API DataArray* createDataArrayInternal(const std::vector<T>& data, std::string_view name);
+        [[nodiscard]] RLOGIC_API DataArray* createDataArrayInternal(const std::vector<T>& data, std::string_view name);
 
         /// Internal static helper to validate type
         template <typename T>

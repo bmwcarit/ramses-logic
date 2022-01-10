@@ -41,6 +41,7 @@ namespace rlogic::internal
         // Called on '#obj'
         [[nodiscard]] size_t size() const;
         [[nodiscard]] sol::object resolveChild(sol::this_state solState, size_t childIndex) const;
+        [[nodiscard]] sol::object resolveVectorElement(sol::this_state solState, size_t elementIndex) const;
         [[nodiscard]] size_t resolvePropertyIndex(const sol::object& propertyIndex) const;
 
         [[nodiscard]] const PropertyImpl& getWrappedProperty() const;

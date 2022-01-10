@@ -27,11 +27,11 @@ namespace rlogic::internal
         sectionTiming.reset();
     }
 
-    void UpdateReport::nodeExecutionStarted(LogicNode* node)
+    void UpdateReport::nodeExecutionStarted(LogicNodeImpl& node)
     {
         assert(!m_nodeExecutionStarted);
         m_nodeExecutionStarted = Clock::now();
-        m_nodesExecuted.push_back({ node, ReportTimeUnits{ 0u } });
+        m_nodesExecuted.push_back({ &node, ReportTimeUnits{ 0u } });
     }
 
     void UpdateReport::nodeExecutionFinished()
@@ -41,9 +41,9 @@ namespace rlogic::internal
         m_nodeExecutionStarted.reset();
     }
 
-    void UpdateReport::nodeSkippedExecution(LogicNode* node)
+    void UpdateReport::nodeSkippedExecution(LogicNodeImpl& node)
     {
-        m_nodesSkippedExecution.push_back(node);
+        m_nodesSkippedExecution.push_back(&node);
     }
 
     void UpdateReport::clear()
@@ -60,17 +60,17 @@ namespace rlogic::internal
             s.reset();
     }
 
-    const LogicNodesTimed& UpdateReport::getNodesExecuted() const
+    const UpdateReport::LogicNodesTimed& UpdateReport::getNodesExecuted() const
     {
         return m_nodesExecuted;
     }
 
-    const LogicNodes& UpdateReport::getNodesSkippedExecution() const
+    const UpdateReport::LogicNodes& UpdateReport::getNodesSkippedExecution() const
     {
         return m_nodesSkippedExecution;
     }
 
-    ReportTimeUnits UpdateReport::getSectionExecutionTime(ETimingSection section) const
+    UpdateReport::ReportTimeUnits UpdateReport::getSectionExecutionTime(ETimingSection section) const
     {
         return m_sectionExecutionTime[static_cast<size_t>(section)];
     }

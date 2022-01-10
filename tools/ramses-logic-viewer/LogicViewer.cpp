@@ -10,6 +10,7 @@
 #include "LogicViewerLuaTypes.h"
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
@@ -55,6 +56,7 @@ namespace rlogic
             : views(sol.create_table())
             , scripts(logicEngine)
             , animations(logicEngine)
+            , timers(logicEngine)
             , nodeBindings(logicEngine)
             , appearanceBindings(logicEngine)
             , cameraBindings(logicEngine)
@@ -65,6 +67,7 @@ namespace rlogic
 
         NodeListWrapper<LuaScript> scripts;
         NodeListWrapper<AnimationNode> animations;
+        NodeListWrapper<TimerNode> timers;
         NodeListWrapper<RamsesNodeBinding> nodeBindings;
         NodeListWrapper<RamsesAppearanceBinding> appearanceBindings;
         NodeListWrapper<RamsesCameraBinding> cameraBindings;
@@ -73,6 +76,7 @@ namespace rlogic
     const char* const LogicViewer::ltnModule     = "rlogic";
     const char* const LogicViewer::ltnScript     = "scripts";
     const char* const LogicViewer::ltnAnimation  = "animationNodes";
+    const char* const LogicViewer::ltnTimer      = "timerNodes";
     const char* const LogicViewer::ltnNode       = "nodeBindings";
     const char* const LogicViewer::ltnAppearance = "appearanceBindings";
     const char* const LogicViewer::ltnCamera     = "cameraBindings";
@@ -108,6 +112,7 @@ namespace rlogic
         m_sol.set_exception_handler(&solExceptionHandler);
         registerNodeListType<LuaScript>(m_sol, "LuaScripts");
         registerNodeListType<AnimationNode>(m_sol, "AnimationNodes");
+        registerNodeListType<TimerNode>(m_sol, "TimerNodes");
         registerNodeListType<RamsesNodeBinding>(m_sol, "NodeBindings");
         registerNodeListType<RamsesAppearanceBinding>(m_sol, "AppearanceBindings");
         registerNodeListType<RamsesCameraBinding>(m_sol, "CameraBindings");
@@ -133,6 +138,8 @@ namespace rlogic
             sol::readonly(&LogicWrapper::scripts),
             ltnAnimation,
             sol::readonly(&LogicWrapper::animations),
+            ltnTimer,
+            sol::readonly(&LogicWrapper::timers),
             ltnNode,
             sol::readonly(&LogicWrapper::nodeBindings),
             ltnAppearance,

@@ -206,6 +206,9 @@ namespace rlogic::internal
             }
         }
 
+        auto inputs = std::make_unique<Property>(std::move(rootInput));
+        auto outputs = std::make_unique<Property>(std::move(rootOutput));
+
         return std::make_unique<LuaScriptImpl>(
             LuaCompiledScript{
                 LuaSource{
@@ -215,8 +218,8 @@ namespace rlogic::internal
                     std::move(userModules)
                 },
                 sol::protected_function(std::move(load_result)),
-                std::make_unique<Property>(std::move(rootInput)),
-                std::make_unique<Property>(std::move(rootOutput))
+                std::move(inputs),
+                std::move(outputs)
             },
             name, luaScript.id());
     }

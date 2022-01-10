@@ -17,21 +17,23 @@ Class Index
     :caption: API classes
 
 
+    AnimationNode
+    Collection
+    DataArray
+    Iterator
     LogicEngine
+    LogicEngineReport
+    LogicNode
+    LogicObject
+    LuaConfig
     LuaModule
     LuaScript
-    RamsesNodeBinding
-    RamsesAppearanceBinding
-    RamsesCameraBinding
     Property
-    LogicNode
+    RamsesAppearanceBinding
     RamsesBinding
-    DataArray
-    AnimationNode
+    RamsesCameraBinding
+    RamsesNodeBinding
     TimerNode
-    Iterator
-    Collection
-    LuaConfig
 
 
 .. toctree::

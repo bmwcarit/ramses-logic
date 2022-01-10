@@ -87,7 +87,7 @@ class ClangTidyIssue:
 
 
 def parse_issues_from_output(clangtidy_stdout, compdb_entry=None):
-    rx = r'^(?P<file>/[^:]+):(?P<line>\d+):(?P<column>\d+):\s+(?P<summary>[^\n[]+)\s+\[(?P<checks>(?:\w|-|,)+)\]$'
+    rx = r'^(?P<file>/[^:]+):(?P<line>\d+):(?P<column>\d+):\s+(?P<summary>[^\n]+)\s+\[(?P<checks>[^ \]]+)\]$'
     ms = [m for m in re.finditer(rx, clangtidy_stdout, flags=re.MULTILINE)]
     return [ClangTidyIssue(**cur.groupdict(),
                            text=clangtidy_stdout[cur.span()[0]:

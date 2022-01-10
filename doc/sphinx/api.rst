@@ -629,21 +629,52 @@ by the user. The application must ensure that this size does not exceed the size
 Performance
 =========================
 
-The ``Logic Engine`` is designed to be fast and efficient, as long as the performance improvements are
-not made at cost of unreadable code. In order to be able to track and improve
+------------------------------
+Profiling logic update cycles
+------------------------------
+
+The SDK provides means to do basic measuring of logic network update times. See :class:`rlogic::LogicEngineReport`
+which gives several useful statistics, e.g. which nodes where executed and how long it took for each of them.
+We suggest to collect this data over several update cycles in some worst case scenario (performance-wise)
+and investigate which nodes take the most time to update. Also for normal use cases consider taking a look at
+how many nodes were needed to be updated and if the topology could be improved so that this amount is reduced
+to only the necessary nodes.
+
+.. note::
+    An easy way to quickly get insight what happens inside a logic network is to use the :ref:`GUI viewer <ramses-logic-viewer>`.
+    The viewer displays the stats reported by the :class:`rlogic::LogicEngineReport` dynamically or statically over multiple
+    update cycles.
+
+.. note::
+    Another easy way to quickly get insight what happens inside a logic network is to look at the ``periodically logged node update statistics``
+    in the Ramses Shell. These are calculated over the last ``N`` updates which is adjustable.
+    Included are e.g. ``update execution time in microseconds`` or ``count of nodes executed in percentage of total`` (both Average, Min and Max).
+
+-------------------------
+Optimizing Lua code
+-------------------------
+
+Lua is one of the fastest interpreted languages, especially when used efficiently. One of the best reading
+we could recommend is the `second chapter <https://www.lua.org/gems/sample.pdf>`_ of the ``Lua programming gems`` by Roberto Ierusalimschy.
+It's short, and provides a very hands-on overview of what to do and what not to do when processing data with Lua.
+
+The ``Logic Engine`` extends plain lua with a way to interact with Ramses and with other scripts and modules. This is mostly
+done by providing so-called `userdata` types and objects - those work like Lua tables, but have C++ implementation behind them.
+Working with these generally costs more than working with plain Lua, since Lua knows how to optimize table accesses better than
+usertypes. Try to minimize the access to `userdata` such as ``IN``, ``OUT`` and modules as much as possible. The :ref:`benchmarks <Benchmarks>`
+provide more info on the difference between standard Lua and the Logic Engine dialect.
+
+-------------------------
+Benchmarks
+-------------------------
+
+In order to be able to track and improve
 the runtime of the ``Logic Engine``, we maintain a set of benchmarks based on the google-benchmark library.
 These benchmarks can be used to measure the time it takes for specific operations under different loads.
 We kindly ask our users and developers to report performance problems by creating a benchmark which describes
 the specific use-case which needs optimizing. Refer to the
 `google-benchmark docs <https://github.com/google/benchmark>`_ for hints how to
 design good benchmarks, to set the time measurement units, derive O-complexity, etc.
-
-The SDK also provides means to do basic measuring of logic network update times. See :class:`rlogic::LogicEngineReport`
-which gives several useful statistics, e.g. which nodes where executed and how long it took for each of them.
-We suggest to collect this data over several update cycles in some worst case scenario (performance-wise)
-and investigate which nodes take the most time to update. Also for normal use cases consider taking a look at
-how many nodes were needed to be updated and if the topology could be improved so that this amount is reduced
-to only the necessary nodes.
 
 =========================
 List of all examples

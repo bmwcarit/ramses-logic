@@ -9,6 +9,7 @@
 #include "internals/LuaCustomizations.h"
 
 #include "ramses-logic/Property.h"
+#include "ramses-logic/EPropertyType.h"
 
 #include "internals/SolHelper.h"
 #include "internals/WrappedLuaProperty.h"
@@ -37,7 +38,7 @@ namespace rlogic::internal
     size_t LuaCustomizations::rl_len(const sol::object& obj)
     {
         // Check if normal lua table, or read-only module table
-        const std::optional<sol::lua_table> potentialTable = extractLuaTable(obj);
+        const std::optional<sol::lua_table> potentialTable = LuaTypeConversions::ExtractLuaTable(obj);
         if (potentialTable)
         {
             return potentialTable->size();
@@ -53,7 +54,13 @@ namespace rlogic::internal
 
             if (obj.is<PropertyTypeExtractor>())
             {
-                return obj.as<PropertyTypeExtractor>().getNestedExtractors().size();
+                const auto& extractor = obj.as<PropertyTypeExtractor>();
+                const EPropertyType rootType = extractor.getRootTypeData().type;
+                if (TypeUtils::CanHaveChildren(rootType))
+                    return extractor.getNestedExtractors().size();
+
+                // all other custom types are not countable during type extraction
+                sol_helper::throwSolException("rl_len() called on an unsupported type '{}'", GetLuaPrimitiveTypeName(rootType));
             }
         }
 
@@ -71,25 +78,28 @@ namespace rlogic::internal
             const WrappedLuaProperty& wrappedProperty = container.as<WrappedLuaProperty>();
             const EPropertyType propType = wrappedProperty.getWrappedProperty().getType();
 
-            // Safe to assert, not possible to obtain a non-container object currently
-            assert(TypeUtils::CanHaveChildren(propType));
-
-            // Valid case! If container empty, next() is required to return a tuple of nil's
-            if (wrappedProperty.size() == 0u)
+            if (TypeUtils::CanHaveChildren(propType))
             {
-                return std::make_tuple(sol::lua_nil, sol::lua_nil);
+                assert(propType == EPropertyType::Struct || propType == EPropertyType::Array);
+
+                // Valid case for struct and array! If container empty, next() is required to return a tuple of nil's
+                if (wrappedProperty.size() == 0u)
+                    return std::make_tuple(sol::lua_nil, sol::lua_nil);
+
+                if (propType == EPropertyType::Array)
+                    return rl_next_runtime_array(state, wrappedProperty, indexObject);
+                if (propType == EPropertyType::Struct)
+                    return rl_next_runtime_struct(state, wrappedProperty, indexObject);
             }
 
-            if (propType == EPropertyType::Array)
-            {
-                return rl_next_runtime_array(state, wrappedProperty, indexObject);
-            }
+            if (TypeUtils::IsPrimitiveVectorType(propType))
+                return rl_next_runtime_vector(state, wrappedProperty, indexObject);
 
-            return rl_next_runtime_struct(state, wrappedProperty, indexObject);
+            sol_helper::throwSolException("rl_next() called on an unsupported type '{}'", GetLuaPrimitiveTypeName(propType));
         }
 
         // Standard Lua table or a read-only module
-        std::optional<sol::lua_table> potentialModuleTable = extractLuaTable(container);
+        std::optional<sol::lua_table> potentialModuleTable = LuaTypeConversions::ExtractLuaTable(container);
         if (potentialModuleTable)
         {
             sol::function stdNext = sol::state_view(state)["next"];
@@ -105,20 +115,20 @@ namespace rlogic::internal
             const EPropertyType rootType = typeExtractor.getRootTypeData().type;
 
             // Not possible to get non-iteratable types during extraction, safe to assert here
-            assert(TypeUtils::CanHaveChildren(rootType));
-
-            // Valid case! If container empty, next() is required to return a tuple of nil's
-            if (typeExtractor.getNestedExtractors().empty())
+            if (TypeUtils::CanHaveChildren(rootType))
             {
-                return std::make_tuple(sol::lua_nil, sol::lua_nil);
+                // Valid case! If container empty, next() is required to return a tuple of nil's
+                if (typeExtractor.getNestedExtractors().empty())
+                    return std::make_tuple(sol::lua_nil, sol::lua_nil);
+
+                if (rootType == EPropertyType::Array)
+                    return rl_next_array_extractor(state, typeExtractor, indexObject);
+
+                return rl_next_struct_extractor(state, typeExtractor, indexObject);
             }
 
-            if (rootType == EPropertyType::Array)
-            {
-                return rl_next_array_extractor(state, typeExtractor, indexObject);
-            }
-
-            return rl_next_struct_extractor(state, typeExtractor, indexObject);
+            // all other custom types are not iteratable during type extraction
+            sol_helper::throwSolException("rl_next() called on an unsupported type '{}'", GetLuaPrimitiveTypeName(rootType));
         }
 
         sol_helper::throwSolException("rl_next() called on an unsupported type '{}'", sol_helper::GetSolTypeName(container.get_type()));
@@ -183,6 +193,24 @@ namespace rlogic::internal
         return std::make_tuple(
             sol::make_object(state, wrappedStruct.getWrappedProperty().getChild(structFieldIndex + 1)->getName()),
             wrappedStruct.resolveChild(state, structFieldIndex + 1));
+    }
+
+    std::tuple<sol::object, sol::object> LuaCustomizations::rl_next_runtime_vector(sol::this_state state, const WrappedLuaProperty& wrappedVec, const sol::object& indexObject)
+    {
+        assert(TypeUtils::IsPrimitiveVectorType(wrappedVec.getWrappedProperty().getType()));
+
+        // If index is nil, return the first element
+        if (indexObject.get_type() == sol::type::lua_nil)
+            return std::make_tuple(sol::make_object(state, 1u), wrappedVec.resolveVectorElement(state, 1u));
+
+        const size_t elementIndex = wrappedVec.resolvePropertyIndex(indexObject);
+        const size_t numElements = TypeUtils::ComponentsSizeForPropertyType(wrappedVec.getWrappedProperty().getType());
+
+        // This is valid - when index is the last element, the 'next' one is idx=nil, value=nil
+        if (elementIndex == numElements)
+            return std::make_tuple(sol::lua_nil, sol::lua_nil);
+
+        return std::make_tuple(sol::make_object(state, elementIndex + 1), wrappedVec.resolveVectorElement(state, elementIndex + 1));
     }
 
     std::tuple<sol::object, sol::object> LuaCustomizations::rl_next_array_extractor(sol::this_state state, const PropertyTypeExtractor& arrayExtractor, const sol::object& indexObject)
@@ -264,34 +292,23 @@ namespace rlogic::internal
     {
         if (iterableObject.get_type() == sol::type::userdata)
         {
-            // catch error case rl_ipairs(struct)
-            sol::optional<const WrappedLuaProperty&> wrappedProperty = iterableObject.as<sol::optional<const WrappedLuaProperty&>>();
-            if (wrappedProperty && wrappedProperty->getWrappedProperty().getType() != EPropertyType::Array)
-            {
-                const std::string_view typeInfo =
-                    wrappedProperty ?
-                    GetLuaPrimitiveTypeName(wrappedProperty->getWrappedProperty().getType()) :
-                    (sol_helper::GetSolTypeName(iterableObject.get_type()));
-                sol_helper::throwSolException("rl_ipairs() called on an unsupported type '{}'. Use only with array-like built-in types or modules!", typeInfo);
-            }
-
-            sol::optional<const PropertyTypeExtractor&> propertyExtractor = iterableObject.as<sol::optional<const PropertyTypeExtractor&>>();
-            if (propertyExtractor && propertyExtractor->getRootTypeData().type != EPropertyType::Array)
-            {
-                const std::string_view typeInfo =
-                    propertyExtractor ?
-                    GetLuaPrimitiveTypeName(propertyExtractor->getRootTypeData().type) :
-                    (sol_helper::GetSolTypeName(iterableObject.get_type()));
-                sol_helper::throwSolException("rl_ipairs() called on an unsupported type '{}'. Use only with array-like built-in types or modules!", typeInfo);
-            }
-
+            auto wrappedProperty = iterableObject.as<sol::optional<const WrappedLuaProperty&>>();
+            auto propertyExtractor = iterableObject.as<sol::optional<const PropertyTypeExtractor&>>();
             // Assert that one of the types were found
             assert(wrappedProperty || propertyExtractor);
 
-            return std::make_tuple(sol::state_view(s)["rl_next"], std::move(iterableObject), sol::nil);
+            const EPropertyType propertyType = (wrappedProperty ? wrappedProperty->getWrappedProperty().getType() : propertyExtractor->getRootTypeData().type);
+            if (propertyType == EPropertyType::Array || // ARRAY types can be iterated both in runtime and extraction
+                (TypeUtils::IsPrimitiveVectorType(propertyType) && wrappedProperty)) // VEC types can be iterated only in runtime, not during property extraction
+            {
+                return std::make_tuple(sol::state_view(s)["rl_next"], std::move(iterableObject), sol::nil);
+            }
+
+            // no other custom types can be iterated using rl_ipairs
+            sol_helper::throwSolException("rl_ipairs() called on an unsupported type '{}'. Use only with array-like built-in types or modules!", GetLuaPrimitiveTypeName(propertyType));
         }
 
-        std::optional<sol::lua_table> potentialModuleTable = extractLuaTable(iterableObject);
+        std::optional<sol::lua_table> potentialModuleTable = LuaTypeConversions::ExtractLuaTable(iterableObject);
         if (potentialModuleTable)
         {
             return std::make_tuple(sol::state_view(s)["next"], std::move(*potentialModuleTable), sol::nil);
@@ -308,7 +325,7 @@ namespace rlogic::internal
             return std::make_tuple(sol::state_view(s)["rl_next"], std::move(iterableObject), sol::nil);
         }
 
-        std::optional<sol::lua_table> potentialModuleTable = extractLuaTable(iterableObject);
+        std::optional<sol::lua_table> potentialModuleTable = LuaTypeConversions::ExtractLuaTable(iterableObject);
         if (potentialModuleTable)
         {
             return std::make_tuple(sol::state_view(s)["next"], std::move(*potentialModuleTable), sol::nil);
@@ -337,32 +354,5 @@ namespace rlogic::internal
             sol::make_object(s, field);
 
         return std::make_tuple(std::move(key), std::move(value));
-    }
-
-    // extracts a plain Lua table, or one which was made read-only (e.g. module data tables)
-    std::optional<sol::lua_table> LuaCustomizations::extractLuaTable(const sol::object& object)
-    {
-        auto potentialTable = object.as<std::optional<sol::lua_table>>();
-        if (potentialTable)
-        {
-            sol::lua_table table = *potentialTable;
-            sol::object metaContent = table[sol::metatable_key];
-
-            // Identify read-only data (e.g. logic engine read-only module tables)
-            // This is basically a reverse-test for this: https://www.lua.org/pil/13.4.4.html
-            // See also LuaCompilationUtils::MakeTableReadOnly for the counterpart
-            auto potentialMetatable = metaContent.as<std::optional<sol::lua_table>>();
-            if (potentialMetatable)
-            {
-                sol::object metaIndex = (*potentialMetatable)[sol::meta_function::index];
-                auto potentialModuleTable = metaIndex.as<std::optional<sol::lua_table>>();
-                if (potentialModuleTable)
-                {
-                    potentialTable = potentialModuleTable;
-                }
-            }
-        }
-
-        return potentialTable;
     }
 }

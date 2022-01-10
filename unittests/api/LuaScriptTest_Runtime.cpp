@@ -515,7 +515,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Element size mismatch when assigning struct property 'data'! Expected: 2 Received: 1"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("lua: error: Error while assigning struct 'data', expected a value for property 'field2' but found none!"));
 
         EXPECT_EQ(5, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());

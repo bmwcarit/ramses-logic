@@ -43,7 +43,7 @@ namespace rlogic
         *
         * @return list of updated nodes with update execution time, sorted by execution order
         */
-        RLOGIC_API const std::vector<LogicNodeTimed>& getNodesExecuted() const;
+        [[nodiscard]] RLOGIC_API const std::vector<LogicNodeTimed>& getNodesExecuted() const;
 
         /**
         * List of logic nodes that were not updated because their inputs did not change therefore there was no need to.
@@ -52,7 +52,7 @@ namespace rlogic
         *
         * @return list of nodes which did not need update
         */
-        RLOGIC_API const std::vector<LogicNode*>& getNodesSkippedExecution() const;
+        [[nodiscard]] RLOGIC_API const std::vector<LogicNode*>& getNodesSkippedExecution() const;
 
         /**
         * Time it took to sort logic nodes by their topology during update.
@@ -124,6 +124,6 @@ namespace rlogic
         /**
         * Implementation detail of LogicEngineReport
         */
-        std::unique_ptr<internal::LogicEngineReportImpl> m_impl;
+        std::unique_ptr<internal::LogicEngineReportImpl> m_impl; //NOLINT(modernize-use-default-member-init) fixing this would break pimpl pattern
     };
 }

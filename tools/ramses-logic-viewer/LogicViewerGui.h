@@ -48,6 +48,7 @@ namespace rlogic
         void drawCurrentView();
         void drawScripts();
         void drawAnimationNodes();
+        void drawTimerNodes();
         void drawNodeBindings();
         void drawCameraBindings();
         void drawUpdateReport();
@@ -91,6 +92,7 @@ namespace rlogic
             bool showLinkedInputs   = true;
             bool showScripts        = false;
             bool showAnimationNodes = false;
+            bool showTimerNodes     = false;
             bool showDataArrays     = false;
             bool showRamsesBindings = false;
             bool showUpdateReport   = true;
@@ -99,8 +101,9 @@ namespace rlogic
 
             bool operator==(const Settings& rhs) const {
                 return showWindow == rhs.showWindow && showOutputs == rhs.showOutputs && showLinkedInputs == rhs.showLinkedInputs && showScripts == rhs.showScripts &&
-                       showAnimationNodes == rhs.showAnimationNodes && showDataArrays == rhs.showDataArrays && showRamsesBindings == rhs.showRamsesBindings &&
-                       showUpdateReport == rhs.showUpdateReport && luaPreferObjectIds == rhs.luaPreferObjectIds && luaPreferIdentifiers == rhs.luaPreferIdentifiers;
+                       showAnimationNodes == rhs.showAnimationNodes && showTimerNodes == rhs.showTimerNodes && showDataArrays == rhs.showDataArrays &&
+                       showRamsesBindings == rhs.showRamsesBindings && showUpdateReport == rhs.showUpdateReport && luaPreferObjectIds == rhs.luaPreferObjectIds &&
+                       luaPreferIdentifiers == rhs.luaPreferIdentifiers;
             }
 
             bool operator!=(const Settings& rhs) const {

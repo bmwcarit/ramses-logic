@@ -13,20 +13,17 @@
 #include <optional>
 #include <array>
 
-namespace rlogic
-{
-    class LogicNode;
-}
-
 namespace rlogic::internal
 {
-    using ReportTimeUnits = std::chrono::microseconds;
-    using LogicNodesTimed = std::vector<std::pair<rlogic::LogicNode*, ReportTimeUnits>>;
-    using LogicNodes = std::vector<rlogic::LogicNode*>;
+    class LogicNodeImpl;
 
     class UpdateReport
     {
     public:
+        using ReportTimeUnits = std::chrono::microseconds;
+        using LogicNodesTimed = std::vector<std::pair<LogicNodeImpl*, ReportTimeUnits>>;
+        using LogicNodes = std::vector<LogicNodeImpl*>;
+
         enum class ETimingSection
         {
             TotalUpdate = 0,
@@ -35,13 +32,10 @@ namespace rlogic::internal
 
         void sectionStarted(ETimingSection section);
         void sectionFinished(ETimingSection section);
-        void nodeExecutionStarted(LogicNode* node);
+        void nodeExecutionStarted(LogicNodeImpl& node);
         void nodeExecutionFinished();
-        void nodeSkippedExecution(LogicNode* node);
-        inline void linksActivated(size_t activatedLinks)
-        {
-            m_activatedLinks += activatedLinks;
-        }
+        void nodeSkippedExecution(LogicNodeImpl& node);
+        void linksActivated(size_t activatedLinks);
         void clear();
 
         [[nodiscard]] const LogicNodesTimed& getNodesExecuted() const;
@@ -61,4 +55,9 @@ namespace rlogic::internal
         std::optional<TimePoint> m_nodeExecutionStarted;
         std::array<std::optional<TimePoint>, 2u> m_sectionStarted;
     };
+
+    inline void UpdateReport::linksActivated(size_t activatedLinks)
+    {
+        m_activatedLinks += activatedLinks;
+    }
 }

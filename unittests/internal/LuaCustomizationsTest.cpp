@@ -15,6 +15,7 @@
 #include "internals/LuaCompilationUtils.h"
 #include "internals/ErrorReporting.h"
 #include "internals/PropertyTypeExtractor.h"
+#include <numeric>
 
 namespace rlogic::internal
 {
@@ -43,14 +44,14 @@ namespace rlogic::internal
                 m_arrayProp.getChild(2)->m_impl->setValue(13);
             }
 
-            sol::protected_function_result  run_WithResult(std::string_view source)
+            sol::protected_function_result run_WithResult(std::string_view source)
             {
                 sol::protected_function loaded = m_sol.load(source);
                 assert(loaded.valid());
                 return loaded();
             }
 
-            sol::protected_function_result  run_WithResult_InEnv(std::string_view source)
+            sol::protected_function_result run_WithResult_InEnv(std::string_view source)
             {
                 sol::protected_function loaded = m_sol.load(source);
                 m_interfaceEnvironment.set_on(loaded);
@@ -104,6 +105,30 @@ namespace rlogic::internal
                 m_sol[name] = std::ref(m_wrappedArray);
             }
 
+            template <EPropertyType TYPE, typename VALUE>
+            void createTestProperty(const std::string& name, const VALUE& value)
+            {
+                HierarchicalTypeData type = { MakeType("V", TYPE) };
+                auto prop = std::make_unique<PropertyImpl>(type, EPropertySemantics::ScriptInput);
+                auto wrappedProp = std::make_unique<WrappedLuaProperty>(*prop);
+                m_sol[name] = std::ref(*wrappedProp);
+
+                prop->setValue(value);
+
+                m_propertyImpls.push_back(std::move(prop));
+                m_wrappedProperties.push_back(std::move(wrappedProp));
+            }
+
+            template <EPropertyType VECTYPE>
+            void createTestVec(const std::string& name)
+            {
+                using VecClassType = typename PropertyEnumToType<VECTYPE>::TYPE;
+                VecClassType vecData;
+                std::iota(vecData.begin(), vecData.end(), static_cast<typename VecClassType::value_type>(100));
+
+                createTestProperty<VECTYPE>(name, vecData);
+            }
+
             sol::state m_sol;
             sol::environment m_interfaceEnvironment;
             // Initialize test content with dummy data
@@ -114,6 +139,9 @@ namespace rlogic::internal
             WrappedLuaProperty m_wrappedStruct = WrappedLuaProperty{ m_structProp };
             WrappedLuaProperty m_wrappedArray = WrappedLuaProperty{ m_arrayProp };
             PropertyTypeExtractor m_structExtractor = { "S", EPropertyType::Struct };
+            // to manage ownership
+            std::vector<std::unique_ptr<PropertyImpl>> m_propertyImpls;
+            std::vector<std::unique_ptr<WrappedLuaProperty>> m_wrappedProperties;
     };
 
     TEST_F(TheLuaCustomizations, RegistersFunctions)
@@ -142,6 +170,14 @@ namespace rlogic::internal
         createTestArray("A");
         expectNoErrors(R"(
             assert(rl_len(A) == 3)
+        )");
+    }
+
+    TEST_F(TheLuaCustomizations_Len, ComputesLengthOfVec_DuringRuntime)
+    {
+        createTestVec<EPropertyType::Vec4i>("V");
+        expectNoErrors(R"(
+            assert(rl_len(V) == 4)
         )");
     }
 
@@ -178,6 +214,27 @@ namespace rlogic::internal
         expectError("rl_len(5)", "lua: error: rl_len() called on an unsupported type 'number'");
         expectError("rl_len(\"a string\")", "lua: error: rl_len() called on an unsupported type 'string'");
         expectError("rl_len(true)", "lua: error: rl_len() called on an unsupported type 'bool'");
+    }
+
+    TEST_F(TheLuaCustomizations_Len, ProducesErrorWhenCallingCustomLengthFunctionOnUnsupportedInterfaceTypes)
+    {
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.v = INT32
+            print(rl_len(S.v))
+        )", "rl_len() called on an unsupported type 'INT32'");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.vec = VEC2I
+            print(rl_len(S.vec))
+        )", "rl_len() called on an unsupported type 'VEC2I'");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.s = STRING
+            print(rl_len(S.s))
+        )", "rl_len() called on an unsupported type 'STRING'");
     }
 
     class TheLuaCustomizations_Next : public TheLuaCustomizations
@@ -256,6 +313,105 @@ namespace rlogic::internal
         )");
     }
 
+    TEST_F(TheLuaCustomizations_Next, IteratesOverVec_DuringRuntime)
+    {
+        createTestVec<EPropertyType::Vec2i>("V");
+        expectNoErrors(R"(
+            k,v = rl_next(V)
+            assert(k == 1)
+            assert(v == 100)
+            k,v = rl_next(V, 1)
+            assert(k == 2)
+            assert(v == 101)
+            k,v = rl_next(V, 2)
+            assert(k == nil)
+            assert(v == nil)
+        )");
+
+        createTestVec<EPropertyType::Vec3i>("V");
+        expectNoErrors(R"(
+            k,v = rl_next(V)
+            assert(k == 1)
+            assert(v == 100)
+            k,v = rl_next(V, 1)
+            assert(k == 2)
+            assert(v == 101)
+            k,v = rl_next(V, 2)
+            assert(k == 3)
+            assert(v == 102)
+            k,v = rl_next(V, 3)
+            assert(k == nil)
+            assert(v == nil)
+        )");
+
+        createTestVec<EPropertyType::Vec4i>("V");
+        expectNoErrors(R"(
+            k,v = rl_next(V)
+            assert(k == 1)
+            assert(v == 100)
+            k,v = rl_next(V, 1)
+            assert(k == 2)
+            assert(v == 101)
+            k,v = rl_next(V, 2)
+            assert(k == 3)
+            assert(v == 102)
+            k,v = rl_next(V, 3)
+            assert(k == 4)
+            assert(v == 103)
+            k,v = rl_next(V, 4)
+            assert(k == nil)
+            assert(v == nil)
+        )");
+
+        createTestVec<EPropertyType::Vec2f>("V");
+        expectNoErrors(R"(
+            k,v = rl_next(V)
+            assert(k == 1)
+            assert(v == 100)
+            k,v = rl_next(V, 1)
+            assert(k == 2)
+            assert(v == 101)
+            k,v = rl_next(V, 2)
+            assert(k == nil)
+            assert(v == nil)
+        )");
+
+        createTestVec<EPropertyType::Vec3f>("V");
+        expectNoErrors(R"(
+            k,v = rl_next(V)
+            assert(k == 1)
+            assert(v == 100)
+            k,v = rl_next(V, 1)
+            assert(k == 2)
+            assert(v == 101)
+            k,v = rl_next(V, 2)
+            assert(k == 3)
+            assert(v == 102)
+            k,v = rl_next(V, 3)
+            assert(k == nil)
+            assert(v == nil)
+        )");
+
+        createTestVec<EPropertyType::Vec4f>("V");
+        expectNoErrors(R"(
+            k,v = rl_next(V)
+            assert(k == 1)
+            assert(v == 100)
+            k,v = rl_next(V, 1)
+            assert(k == 2)
+            assert(v == 101)
+            k,v = rl_next(V, 2)
+            assert(k == 3)
+            assert(v == 102)
+            k,v = rl_next(V, 3)
+            assert(k == 4)
+            assert(v == 103)
+            k,v = rl_next(V, 4)
+            assert(k == nil)
+            assert(v == nil)
+        )");
+    }
+
     TEST_F(TheLuaCustomizations_Next, ReportsErrorsWhenCalledOnWrongType)
     {
         expectError("rl_next('string')", "lua: error: rl_next() called on an unsupported type 'string'");
@@ -294,6 +450,19 @@ namespace rlogic::internal
         expectError("rl_next(A, true)", "Invalid key to rl_next() of type: Error while extracting integer: expected a number, received 'bool'");
         expectError("rl_next(A, 1.5)", "Invalid key to rl_next() of type: Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)");
         expectError("rl_next(A, 1.001)", "Invalid key to rl_next() of type: Error while extracting integer: implicit rounding (fractional part '0.0009999999999998899' is not negligible)");
+    }
+
+    TEST_F(TheLuaCustomizations_Next, ReportsErrorsWhenBadVecIndexGiven_DuringRuntime)
+    {
+        createTestVec<EPropertyType::Vec2f>("V");
+
+        expectError("rl_next(V, 0)", "Index out of range! Expected 0 < index <= 2 but received index == 0");
+        expectError("rl_next(V, 3)", "Index out of range! Expected 0 < index <= 2 but received index == 3");
+        expectError("rl_next(V, 'string')", "Bad access to property 'V'! Error while extracting integer: expected a number, received 'string'");
+        expectError("rl_next(V, {})", "Bad access to property 'V'! Error while extracting integer: expected a number, received 'table'");
+        expectError("rl_next(V, true)", "Bad access to property 'V'! Error while extracting integer: expected a number, received 'bool'");
+        expectError("rl_next(V, 1.5)", "Bad access to property 'V'! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)");
+        expectError("rl_next(V, 1.001)", "Bad access to property 'V'! Error while extracting integer: implicit rounding (fractional part '0.0009999999999998899' is not negligible)");
     }
 
     TEST_F(TheLuaCustomizations_Next, ReportsErrorsWhenBadArrayIndexGiven_DuringInterfaceExtraction)
@@ -341,6 +510,27 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv("S.field = INT");
         expectError_WithEnv("rl_next(S, 'no such field')", "lua: error: Could not find field named 'no such field' in struct object 'S'");
+    }
+
+    TEST_F(TheLuaCustomizations_Next, ProducesErrorWhenUsedOnUnsupportedInterfaceTypes)
+    {
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.v = INT32
+            rl_next(S.v)
+        )", "rl_next() called on an unsupported type 'INT32'");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.vec = VEC2I
+            rl_next(S.vec)
+        )", "rl_next() called on an unsupported type 'VEC2I'");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.s = STRING
+            rl_next(S.s)
+        )", "rl_next() called on an unsupported type 'STRING'");
     }
 
     TEST_F(TheLuaCustomizations_Next, WorksForWriteProtectedModules)
@@ -423,6 +613,81 @@ namespace rlogic::internal
             end
             assert(keys == '1,2,3,')
             assert(values == '11,12,13,')
+        )");
+    }
+
+    TEST_F(TheLuaCustomizations_Pairs, IteratesOverVecElements_DuringRuntime)
+    {
+        createTestVec<EPropertyType::Vec2i>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_pairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,')
+            assert(values == '100,101,')
+        )");
+
+        createTestVec<EPropertyType::Vec3i>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_pairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,')
+            assert(values == '100,101,102,')
+        )");
+
+        createTestVec<EPropertyType::Vec4i>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_pairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,4,')
+            assert(values == '100,101,102,103,')
+        )");
+
+        createTestVec<EPropertyType::Vec2f>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_pairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,')
+            assert(values == '100,101,')
+        )");
+
+        createTestVec<EPropertyType::Vec3f>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_pairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,')
+            assert(values == '100,101,102,')
+        )");
+
+        createTestVec<EPropertyType::Vec4f>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_pairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,4,')
+            assert(values == '100,101,102,103,')
         )");
     }
 
@@ -531,6 +796,36 @@ namespace rlogic::internal
         expectError("rl_pairs(1.5)", "lua: error: rl_pairs() called on an unsupported type 'number'. Use only with user types like IN/OUT, modules etc.!");
     }
 
+    TEST_F(TheLuaCustomizations_Pairs, ProducesErrorWhenUsedOnUnsupportedInterfaceTypes)
+    {
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.v = INT32
+            for k,v in rl_pairs(S.v) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+        )", "rl_next() called on an unsupported type 'INT32'");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.vec = VEC2I
+            for k,v in rl_pairs(S.vec) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+        )", "rl_next() called on an unsupported type 'VEC2I'");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.s = STRING
+            for k,v in rl_pairs(S.s) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+        )", "rl_next() called on an unsupported type 'STRING'");
+    }
+
 
     class TheLuaCustomizations_IPairs : public TheLuaCustomizations
     {
@@ -548,6 +843,81 @@ namespace rlogic::internal
             end
             assert(keys == '1,2,3,')
             assert(values == '11,12,13,')
+        )");
+    }
+
+    TEST_F(TheLuaCustomizations_IPairs, IteratesOverVecElements_DuringRuntime)
+    {
+        createTestVec<EPropertyType::Vec2i>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_ipairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,')
+            assert(values == '100,101,')
+        )");
+
+        createTestVec<EPropertyType::Vec3i>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_ipairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,')
+            assert(values == '100,101,102,')
+        )");
+
+        createTestVec<EPropertyType::Vec4i>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_ipairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,4,')
+            assert(values == '100,101,102,103,')
+        )");
+
+        createTestVec<EPropertyType::Vec2f>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_ipairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,')
+            assert(values == '100,101,')
+        )");
+
+        createTestVec<EPropertyType::Vec3f>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_ipairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,')
+            assert(values == '100,101,102,')
+        )");
+
+        createTestVec<EPropertyType::Vec4f>("V");
+        expectNoErrors(R"(
+            local keys = ""
+            local values = ""
+            for k,v in rl_ipairs(V) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+            assert(keys == '1,2,3,4,')
+            assert(values == '100,101,102,103,')
         )");
     }
 
@@ -639,5 +1009,35 @@ namespace rlogic::internal
         expectError("rl_ipairs('string')", "lua: error: rl_ipairs() called on an unsupported type 'string'. Use only with user types like IN/OUT, modules etc.!");
         expectError("rl_ipairs(true)", "lua: error: rl_ipairs() called on an unsupported type 'bool'. Use only with user types like IN/OUT, modules etc.!");
         expectError("rl_ipairs(1.5)", "lua: error: rl_ipairs() called on an unsupported type 'number'. Use only with user types like IN/OUT, modules etc.!");
+    }
+
+    TEST_F(TheLuaCustomizations_Pairs, ProducesErrorWhenUsedUnsupportedInterfaceTypes_DuringInterfaceExtraction)
+    {
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.v = INT32
+            for k,v in rl_ipairs(S.v) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+        )", "rl_ipairs() called on an unsupported type 'INT32'. Use only with array-like built-in types or modules!");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.vec = VEC2I
+            for k,v in rl_ipairs(S.vec) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+        )", "rl_ipairs() called on an unsupported type 'VEC2I'. Use only with array-like built-in types or modules!");
+
+        createTestStruct("S", EWrappedType::Extractor);
+        expectError_WithEnv(R"(
+            S.s = STRING
+            for k,v in rl_ipairs(S.s) do
+                keys = keys .. tostring(k) .. ","
+                values = values .. tostring(v) .. ","
+            end
+        )", "rl_ipairs() called on an unsupported type 'STRING'. Use only with array-like built-in types or modules!");
     }
 }

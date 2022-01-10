@@ -11,6 +11,7 @@
 #include "ramses-logic/LogicNode.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/TimerNode.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
@@ -285,6 +286,12 @@ namespace rlogic
     }
 
     template <>
+    LogicNode* NodeListWrapper<TimerNode>::find(const std::string& key)
+    {
+        return m_logicEngine.findByName<TimerNode>(key);
+    }
+
+    template <>
     LogicNode* NodeListWrapper<RamsesNodeBinding>::find(const std::string& key)
     {
         return m_logicEngine.findByName<RamsesNodeBinding>(key);
@@ -315,6 +322,7 @@ namespace rlogic
     }
 
     template struct NodeListWrapper<AnimationNode>;
+    template struct NodeListWrapper<TimerNode>;
     template struct NodeListWrapper<LuaScript>;
     template struct NodeListWrapper<RamsesNodeBinding>;
     template struct NodeListWrapper<RamsesAppearanceBinding>;

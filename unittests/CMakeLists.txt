@@ -8,12 +8,17 @@
 
 add_subdirectory(testAssetProducer)
 
-file(GLOB ramses-logic-test_SRC *.cpp)
-file(GLOB ramses-logic-test_INC *.h)
+file(GLOB src
+    api/*.cpp
+    api/*.h
+    internal/*.cpp
+    internal/*.h
+    shared/*.cpp
+    shared/*.h
+)
 
 add_executable(ramses-logic-test
-    ${ramses-logic-test_INC}
-    ${ramses-logic-test_SRC}
+    ${src}
 )
 
 # TODO split tests into API tests (no sol/lua) and impl tests (with sol/lua)
@@ -33,6 +38,7 @@ target_include_directories(ramses-logic-test
     PRIVATE
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib/flatbuffers>
         $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/unittests/shared>
         $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/BuildConfig>
 )
 

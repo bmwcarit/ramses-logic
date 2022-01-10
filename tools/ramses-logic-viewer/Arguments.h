@@ -110,7 +110,7 @@ struct Arguments
 
     [[nodiscard]] bool valid() const
     {
-        return !sceneFile.empty() && !logicFile.empty() && multiSampleRate >= 0 && (multiSampleRate <= 2 || multiSampleRate == 4);
+        return !sceneFile.empty() && !logicFile.empty() && (multiSampleRate <= 2 || multiSampleRate == 4);
     }
 
     void printErrorMessage(std::ostream& out) const
@@ -123,7 +123,7 @@ struct Arguments
         {
             out << "<logicfile> is missing" << std::endl;
         }
-        else if (multiSampleRate < 0 || multiSampleRate > 4 || multiSampleRate == 3)
+        else if (multiSampleRate > 4 || multiSampleRate == 3)
         {
             out << "invalid multi sampling rate" << std::endl;
         }
@@ -141,7 +141,7 @@ struct Arguments
             << "--no-offscreen" << std::endl
             << "  Renders the scene directly to the window's framebuffer. Screenshot size will be the current window size." << std::endl
             << "--multi-sample=<rate>" << std::endl
-            << "  Instructs the renderer to apply multi-sampling. Valid rates are 1, 2 and 4." << std::endl
+            << "  Instructs the renderer to apply multi-sampling. Valid rates are 0 (disabled), 1, 2 and 4." << std::endl
             << "--exec=<luaFunction>" << std::endl
             << "  Calls the given lua function and exits." << std::endl;
     }

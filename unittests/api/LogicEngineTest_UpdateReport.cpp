@@ -30,8 +30,11 @@ namespace rlogic
         }
     };
 
-    TEST_F(ALogicEngine_UpdateReport, UpdateReportIsEmptyIfDisabled)
+    TEST_F(ALogicEngine_UpdateReport, UpdateReportIsEmptyIfDisabledAndStatisticsAlsoDisabled)
     {
+        // statistics are implicitly disabled
+        m_logicEngine.setStatisticsLoggingRate(0u);
+
         constexpr auto scriptSource = R"(
             function interface()
                 IN.param = INT

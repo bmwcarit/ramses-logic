@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Fetch submodules windows
+      # Recursively checkout submodules
+      # TODO Violin use ssh and shallow clone to save resources
+      run: |
+        git submodule update --init --recursive
+      if: ${{ matrix.os == 'windows-latest' }}
+
+    - name: Fetch submodules linux
+      # Recursively checkout submodules
+      # TODO Violin use ssh and shallow clone to save resources
+      run: |
+        auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+        git submodule sync --recursive
+        git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+
+    - name: Create Build Environment
+      run: cmake -E make_directory ${{runner.workspace}}/build
+
+    - name: Build and package (Linux)
+      shell: bash
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        sudo apt-get install libgles2-mesa-dev libx11-dev
+        cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -Dramses-logic_PACKAGE_TYPE=DEB \
+            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain
+        cmake --build . --target package --config $BUILD_TYPE
+      if: ${{ matrix.os == 'ubuntu-latest' }}
+
+    - name: Build and package (Windows)
+      shell: bash
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
+            -Dramses-logic_PACKAGE_TYPE=ZIP \
+            -DCMAKE_CONFIGURATION_TYPES=Release
+        cmake --build . --target package --config $BUILD_TYPE
+      if: ${{ matrix.os == 'windows-latest' }}
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ${{runner.workspace}}/build/RamsesLogic-*.deb
+          ${{runner.workspace}}/build/RamsesLogic-*.zip

@@ -1,4 +1,4 @@
-name: CMake
+name: Test
 
 # This is derived from the standard CMake template for github actions.
 # For more details on the settings used, have a look at the template in the marketplace
@@ -22,6 +22,11 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+
+    - name: Install GL/X11 packages for rendering (Linux only)
+      run: |
+        sudo apt-get install libgles2-mesa-dev libx11-dev
+      if: ${{ matrix.os == 'ubuntu-latest' }}
 
     - name: Fetch submodules windows
       # Recursively checkout submodules
@@ -53,9 +58,7 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         cmake $GITHUB_WORKSPACE \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-            -Dramses-logic_BUILD_TOOLS=0 \
-            -Dramses-logic_BUILD_RAMSES_RENDERER=0
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
       if: ${{ matrix.os == 'windows-latest' }}
 
     - name: Configure CMake (Linux)
@@ -65,9 +68,7 @@ jobs:
         cmake $GITHUB_WORKSPACE \
             -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-            -Dramses-logic_BUILD_TOOLS=0 \
-            -Dramses-logic_BUILD_RAMSES_RENDERER=0
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
       if: ${{ matrix.os == 'ubuntu-latest' }}
 
     - name: Build

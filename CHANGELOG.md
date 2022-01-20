@@ -1,5 +1,17 @@
 # master
 
+# v0.14.1
+
+Fully compatible to Logic Engine 0.14.0.
+
+**Features**
+
+* Prebuilt packages for Windows and Debian available with each release from now on
+
+**Bugfixes**
+
+* Package generation for Debian works correctly
+
 # v0.14.0
 
 Summary:

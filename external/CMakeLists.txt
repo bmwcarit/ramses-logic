@@ -132,7 +132,10 @@ if(NOT TARGET sol2)
 
     ensure_submodule_exists(sol)
 
-    add_subdirectory(sol)
+    # TODO Violin remove EXCLUDE_FROM_ALL when upgrading to the next official sol version
+    # Currently its's needed because otherwise sol is installed automatically and also
+    # lands in the packaged version of ramses logic
+    add_subdirectory(sol EXCLUDE_FROM_ALL)
 
     # Ensure sol is expecting c++ compiled lua
     target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALWAYS_UNSAFE=1 SOL_SAFE_NUMERICS=1)

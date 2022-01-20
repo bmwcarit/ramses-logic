@@ -19,7 +19,7 @@ namespace rlogic::internal
     void DirectedAcyclicGraph::addNode(Node& node)
     {
         assert(!containsNode(node));
-        m_nodeOutgoingEdges.insert({ &node, std::vector<Edge>() });
+        m_nodeOutgoingEdges.insert({ &node, {} });
     }
 
     void DirectedAcyclicGraph::removeNode(Node& nodeToRemove)
@@ -32,16 +32,14 @@ namespace rlogic::internal
             if (nodeEntry.first != &nodeToRemove)
             {
                 EdgeList& otherNodeOutgoingEdges = nodeEntry.second;
-
-                otherNodeOutgoingEdges.erase(std::remove_if(otherNodeOutgoingEdges.begin(), otherNodeOutgoingEdges.end(), [&nodeToRemove](const Edge& edge)
-                    {
-                        return (edge.target == &nodeToRemove);
-                    }), otherNodeOutgoingEdges.end());
+                const auto it = std::remove_if(otherNodeOutgoingEdges.begin(), otherNodeOutgoingEdges.end(),
+                    [&nodeToRemove](const auto& e) { return e.target == &nodeToRemove; });
+                otherNodeOutgoingEdges.erase(it, otherNodeOutgoingEdges.end());
             }
         }
 
         // Remove outgoing edges by simply removing the node from m_nodeOutgoingEdges
-        assert(m_nodeOutgoingEdges.find(&nodeToRemove) != m_nodeOutgoingEdges.end());
+        assert(containsNode(nodeToRemove));
         m_nodeOutgoingEdges.erase(&nodeToRemove);
     }
 
@@ -143,70 +141,52 @@ namespace rlogic::internal
     bool DirectedAcyclicGraph::addEdge(Node& source, Node& target)
     {
         auto nodeEdges = m_nodeOutgoingEdges.find(&source);
-        assert (nodeEdges != m_nodeOutgoingEdges.end());
-
-        auto outgoingEdgeIter = std::find_if(nodeEdges->second.begin(), nodeEdges->second.end(), [&target](const Edge& edge) {
-            return &target == edge.target;
-        });
-
-        // Did not find outgoing edge to target node? Create one, with weight 0 (will be increased to one in next step)
-        bool isNewEdge = false;
-        if (outgoingEdgeIter == nodeEdges->second.end())
+        assert(nodeEdges != m_nodeOutgoingEdges.end());
+        auto edgeBetweenNodes = FindEdgeToNode(nodeEdges->second, target);
+        const bool isNewConnection = (edgeBetweenNodes == nodeEdges->second.end());
+        if (isNewConnection)
         {
-            nodeEdges->second.push_back({ &target, 0 });
-            outgoingEdgeIter = std::prev(nodeEdges->second.end());
-            isNewEdge = true;
+            nodeEdges->second.push_back({ &target, 1u });
+        }
+        else
+        {
+            edgeBetweenNodes->multiplicity++;
         }
 
-        // Increase weight (we have one more link between these two nodes)
-        outgoingEdgeIter->multiplicity++;
-        return isNewEdge;
+        return isNewConnection;
     }
 
     void DirectedAcyclicGraph::removeEdge(Node& source, const Node& target)
     {
         const auto srcNodeEdges = m_nodeOutgoingEdges.find(&source);
-        assert (srcNodeEdges != m_nodeOutgoingEdges.end());
-        const auto outgoingEdge = std::find_if(srcNodeEdges->second.begin(), srcNodeEdges->second.end(), [&target](const Edge& edge) {
-            return &target == edge.target;
-        });
-
-        assert (outgoingEdge != srcNodeEdges->second.end());
-        assert(outgoingEdge->multiplicity > 0);
-        outgoingEdge->multiplicity--;
+        assert(srcNodeEdges != m_nodeOutgoingEdges.end());
+        auto outgoingEdge = FindEdgeToNode(srcNodeEdges->second, target);
+        assert(outgoingEdge != srcNodeEdges->second.end());
+        assert(outgoingEdge->multiplicity > 0u);
+        --outgoingEdge->multiplicity;
         if (outgoingEdge->multiplicity == 0)
-        {
             srcNodeEdges->second.erase(outgoingEdge);
-        }
     }
 
     size_t DirectedAcyclicGraph::getInDegree(Node& node) const
     {
-        // "reduces" (sums up in arbitrary order) outgoing edges of node
-        // TODO Violin This can be done much simpler with a standard adjacency matrix, if we redesign the class a bit more
-        return std::accumulate(m_nodeOutgoingEdges.begin(), m_nodeOutgoingEdges.end(), size_t(0u),
-            [&node](size_t sum, const std::pair<Node*, EdgeList>& edgeList)
-            {
-                auto potentialLinkToNode = std::find_if(edgeList.second.begin(), edgeList.second.end(), [&node](const Edge& edge){return edge.target == &node;});
-                if (potentialLinkToNode != edgeList.second.end())
-                {
-                    sum += potentialLinkToNode->multiplicity;
-                }
-
-                return sum;
-            });
+        assert(containsNode(node));
+        // count in-going edges of node
+        return std::accumulate(m_nodeOutgoingEdges.cbegin(), m_nodeOutgoingEdges.cend(), size_t(0u), [&node](size_t sum, const auto& edgeIt) {
+            const auto it = FindEdgeToNode(edgeIt.second, node);
+            if (it != edgeIt.second.cend())
+                sum += it->multiplicity;
+            return sum;
+        });
     }
 
     size_t DirectedAcyclicGraph::getOutDegree(Node& node) const
     {
-        const auto nodeOutgoingEdges = m_nodeOutgoingEdges.find(&node);
-        assert(nodeOutgoingEdges != m_nodeOutgoingEdges.end());
-        // sums up outgoing edge count to other nodes
-        return std::accumulate(nodeOutgoingEdges->second.begin(), nodeOutgoingEdges->second.end(), size_t(0u),
-            [](size_t sum, const Edge& edge)
-            {
-                return sum + edge.multiplicity;
-            });
+        assert(containsNode(node));
+        const auto it = m_nodeOutgoingEdges.find(&node);
+        return std::accumulate(it->second.cbegin(), it->second.cend(), size_t(0u), [](size_t sum, const Edge& e) {
+            return sum + e.multiplicity;
+        });
     }
 
     NodeVector DirectedAcyclicGraph::collectRootNodes() const
@@ -245,4 +225,13 @@ namespace rlogic::internal
         return m_nodeOutgoingEdges.find(&node) != m_nodeOutgoingEdges.end();
     }
 
+    DirectedAcyclicGraph::EdgeList::const_iterator DirectedAcyclicGraph::FindEdgeToNode(const EdgeList& vec, const Node& node)
+    {
+        return std::find_if(vec.begin(), vec.end(), [&node](const auto& e) { return e.target == &node; });
+    }
+
+    DirectedAcyclicGraph::EdgeList::iterator DirectedAcyclicGraph::FindEdgeToNode(EdgeList& vec, const Node& node)
+    {
+        return std::find_if(vec.begin(), vec.end(), [&node](const auto& e) { return e.target == &node; });
+    }
 }

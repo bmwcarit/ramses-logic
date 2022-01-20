@@ -34,10 +34,10 @@ namespace rlogic::internal
     // executed once before update()
     class DirectedAcyclicGraph
     {
-    private:
-        // Mask the LogicNodeImpl type as Node for easier readability inside the class
-        using Node = LogicNodeImpl;
     public:
+        // this could be template parameter for this class, for now it is the only type used with it
+        using Node = LogicNodeImpl;
+
         void addNode(Node& node);
         void removeNode(Node& node);
         [[nodiscard]] bool containsNode(Node& node) const;
@@ -48,20 +48,21 @@ namespace rlogic::internal
         [[nodiscard]] std::optional<NodeVector> getTopologicallySortedNodes() const;
 
         // For testing only
-        size_t getInDegree(Node& node) const;
-        size_t getOutDegree(Node& node) const;
+        [[nodiscard]] size_t getInDegree(Node& node) const;
+        [[nodiscard]] size_t getOutDegree(Node& node) const;
 
     private:
         struct Edge
         {
-            Node* target;
-            // A "ref count" which remembers how many times addEdge() was called on a pair of nodes
-            size_t multiplicity;
+            Node* target = nullptr;
+            size_t multiplicity = 0u;
         };
-
         using EdgeList = std::vector<Edge>;
 
-        std::vector<Node*> collectRootNodes() const;
+        NodeVector collectRootNodes() const;
+
+        static EdgeList::const_iterator FindEdgeToNode(const EdgeList& vec, const Node& node);
+        static EdgeList::iterator FindEdgeToNode(EdgeList& vec, const Node& node);
 
         // Stores both nodes and their edges in one hashmap
         // If a node has no outgoing links, the 'EdgeList' is empty

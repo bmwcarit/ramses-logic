@@ -659,12 +659,13 @@ namespace rlogic::internal
                 else
                 {
                     assert(TypeUtils::IsPrimitiveType(child->getType()));
-                    const PropertyImpl* potentialLinkedOutput = child->m_impl->getLinkedIncomingProperty();
-                    if (potentialLinkedOutput != nullptr)
+                    const auto& incomingLink = child->m_impl->getIncomingLink();
+                    if (incomingLink.property != nullptr)
                     {
                         links.emplace_back(rlogic_serialization::CreateLink(builder,
-                            serializationMap.resolvePropertyOffset(*potentialLinkedOutput),
-                            serializationMap.resolvePropertyOffset(*child->m_impl)));
+                            serializationMap.resolvePropertyOffset(*incomingLink.property),
+                            serializationMap.resolvePropertyOffset(*child->m_impl),
+                            incomingLink.isWeakLink));
                     }
                 }
             }
@@ -940,6 +941,7 @@ namespace rlogic::internal
             const bool success = deserialized->m_logicNodeDependencies.link(
                 deserializationMap.resolvePropertyImpl(*sourceProp),
                 deserializationMap.resolvePropertyImpl(*targetProp),
+                rLink->isWeak(),
                 errorReporting);
             // TODO Violin handle (and unit test!) this error properly. Consider these error cases:
             // - maliciously forged properties (not attached to any node anywhere)

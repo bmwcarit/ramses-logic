@@ -1259,6 +1259,53 @@ namespace rlogic
         EXPECT_FALSE(*nodeVisibility->get<bool>());
     }
 
+    TEST_F(ALogicEngine_Linking, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLink)
+    {
+        auto scriptSource = R"(
+            function interface()
+                IN.inString1 = STRING
+                IN.inString2 = STRING
+                OUT.outString = STRING
+            end
+            function run()
+                OUT.outString = IN.inString1 .. IN.inString2
+            end
+        )";
+
+        auto script1 = m_logicEngine.createLuaScript(scriptSource);
+        auto script2 = m_logicEngine.createLuaScript(scriptSource);
+        auto script3 = m_logicEngine.createLuaScript(scriptSource);
+
+        auto script1Input1 = script1->getInputs()->getChild("inString1");
+        auto script1Input2 = script1->getInputs()->getChild("inString2");
+        auto script2Input1 = script2->getInputs()->getChild("inString1");
+        auto script2Input2 = script2->getInputs()->getChild("inString2");
+        auto script3Input1 = script3->getInputs()->getChild("inString1");
+        auto script3Input2 = script3->getInputs()->getChild("inString2");
+        auto script1Output = script1->getOutputs()->getChild("outString");
+        auto script2Output = script2->getOutputs()->getChild("outString");
+        auto script3Output = script3->getOutputs()->getChild("outString");
+
+        m_logicEngine.link(*script1Output, *script2Input1);
+        m_logicEngine.link(*script2Output, *script3Input1);
+        m_logicEngine.linkWeak(*script3Output, *script1Input1);
+
+        script1Input2->set(std::string("A"));
+        script2Input2->set(std::string("B"));
+        script3Input2->set(std::string("C"));
+
+        // during 1st update the weak link has no value yet but will mark script1 dirty
+        m_logicEngine.update();
+        EXPECT_EQ("ABC", script3Output->get<std::string>());
+        // every upcoming update will concatenate result from previous update with this update
+        m_logicEngine.update();
+        EXPECT_EQ("ABCABC", script3Output->get<std::string>());
+        m_logicEngine.update();
+        EXPECT_EQ("ABCABCABC", script3Output->get<std::string>());
+        m_logicEngine.update();
+        EXPECT_EQ("ABCABCABCABC", script3Output->get<std::string>());
+    }
+
     class ALogicEngine_Linking_WithFiles : public ALogicEngine_Linking
     {
     protected:
@@ -1313,7 +1360,7 @@ namespace rlogic
             auto scriptC_concatenate_AB = scriptC->getOutputs()->getChild("concatenate_AB");
 
             tmpLogicEngine.link(*scriptAOutput, *scriptBInput);
-            tmpLogicEngine.link(*scriptAOutput, *scriptC_fromA);
+            tmpLogicEngine.linkWeak(*scriptAOutput, *scriptC_fromA);
             tmpLogicEngine.link(*scriptBOutput, *scriptC_fromB);
 
             scriptAInput->set<std::string>("'From A'");
@@ -1344,13 +1391,19 @@ namespace rlogic
             auto scriptC_concatenate_AB = scriptC->getOutputs()->getChild("concatenate_AB");
 
             // Internal check that deserialization did not result in more link copies
-            EXPECT_EQ(scriptBInput->m_impl->getLinkedIncomingProperty(), scriptAOutput->m_impl.get());
-            EXPECT_EQ(scriptC_fromA->m_impl->getLinkedIncomingProperty(), scriptAOutput->m_impl.get());
-            EXPECT_EQ(scriptC_fromB->m_impl->getLinkedIncomingProperty(), scriptBOutput->m_impl.get());
-            EXPECT_THAT(scriptAOutput->m_impl->getLinkedOutgoingProperties(), ::testing::UnorderedElementsAreArray({ scriptBInput->m_impl.get(), scriptC_fromA->m_impl.get() }));
-            EXPECT_EQ(scriptBOutput->m_impl->getLinkedOutgoingProperties().size(), 1u);
-            EXPECT_EQ(scriptBOutput->m_impl->getLinkedOutgoingProperties()[0], scriptC_fromB->m_impl.get());
-            EXPECT_TRUE(scriptC_concatenate_AB->m_impl->getLinkedOutgoingProperties().empty());
+            EXPECT_EQ(scriptBInput->m_impl->getIncomingLink().property, scriptAOutput->m_impl.get());
+            EXPECT_EQ(scriptC_fromA->m_impl->getIncomingLink().property, scriptAOutput->m_impl.get());
+            EXPECT_EQ(scriptC_fromB->m_impl->getIncomingLink().property, scriptBOutput->m_impl.get());
+            EXPECT_FALSE(scriptBInput->m_impl->getIncomingLink().isWeakLink);
+            EXPECT_TRUE(scriptC_fromA->m_impl->getIncomingLink().isWeakLink);
+            EXPECT_FALSE(scriptC_fromB->m_impl->getIncomingLink().isWeakLink);
+            ASSERT_EQ(scriptAOutput->m_impl->getOutgoingLinks().size(), 2u);
+            const std::vector<rlogic::internal::PropertyImpl*> outLinks{ scriptAOutput->m_impl->getOutgoingLinks()[0].property, scriptAOutput->m_impl->getOutgoingLinks()[1].property };
+            const std::vector<rlogic::internal::PropertyImpl*> expectedOutLinks{ scriptBInput->m_impl.get(), scriptC_fromA->m_impl.get() };
+            EXPECT_TRUE(std::is_permutation(outLinks.cbegin(), outLinks.cend(), expectedOutLinks.cbegin()));
+            ASSERT_EQ(scriptBOutput->m_impl->getOutgoingLinks().size(), 1u);
+            EXPECT_EQ(scriptBOutput->m_impl->getOutgoingLinks()[0].property, scriptC_fromB->m_impl.get());
+            EXPECT_TRUE(scriptC_concatenate_AB->m_impl->getOutgoingLinks().empty());
 
             // Before update, values should be still as before saving
             EXPECT_EQ(std::string("forward 'From A'"), *scriptAOutput->get<std::string>());
@@ -1453,15 +1506,15 @@ namespace rlogic
             auto scriptB_concatenated = scriptB->getOutputs()->getChild("concat_all");
 
             // Internal check that deserialization did not result in more link copies
-            EXPECT_EQ(scriptBnested_str1->m_impl->getLinkedIncomingProperty(), scriptAOutput->m_impl.get());
-            EXPECT_EQ(scriptBInput->m_impl->getLinkedIncomingProperty(), scriptAnested_str1->m_impl.get());
-            EXPECT_EQ(scriptBnested_str2->m_impl->getLinkedIncomingProperty(), scriptAnested_str2->m_impl.get());
-            EXPECT_EQ(scriptAOutput->m_impl->getLinkedOutgoingProperties().size(), 1u);
-            EXPECT_EQ(scriptAnested_str1->m_impl->getLinkedOutgoingProperties().size(), 1u);
-            EXPECT_EQ(scriptAnested_str2->m_impl->getLinkedOutgoingProperties().size(), 1u);
-            EXPECT_EQ(scriptAOutput->m_impl->getLinkedOutgoingProperties()[0], scriptBnested_str1->m_impl.get());
-            EXPECT_EQ(scriptAnested_str1->m_impl->getLinkedOutgoingProperties()[0], scriptBInput->m_impl.get());
-            EXPECT_EQ(scriptAnested_str2->m_impl->getLinkedOutgoingProperties()[0], scriptBnested_str2->m_impl.get());
+            EXPECT_EQ(scriptBnested_str1->m_impl->getIncomingLink().property, scriptAOutput->m_impl.get());
+            EXPECT_EQ(scriptBInput->m_impl->getIncomingLink().property, scriptAnested_str1->m_impl.get());
+            EXPECT_EQ(scriptBnested_str2->m_impl->getIncomingLink().property, scriptAnested_str2->m_impl.get());
+            ASSERT_EQ(scriptAOutput->m_impl->getOutgoingLinks().size(), 1u);
+            ASSERT_EQ(scriptAnested_str1->m_impl->getOutgoingLinks().size(), 1u);
+            ASSERT_EQ(scriptAnested_str2->m_impl->getOutgoingLinks().size(), 1u);
+            EXPECT_EQ(scriptAOutput->m_impl->getOutgoingLinks()[0].property, scriptBnested_str1->m_impl.get());
+            EXPECT_EQ(scriptAnested_str1->m_impl->getOutgoingLinks()[0].property, scriptBInput->m_impl.get());
+            EXPECT_EQ(scriptAnested_str2->m_impl->getOutgoingLinks()[0].property, scriptBnested_str2->m_impl.get());
 
             // Before update, values should be still as before saving
             EXPECT_EQ(std::string("foo"), *scriptAOutput->get<std::string>());
@@ -1489,6 +1542,65 @@ namespace rlogic
 
             EXPECT_EQ(std::string("str1 {foo, str2!bar}"), *scriptB_concatenated->get<std::string>());
         }
+    }
+
+    TEST_F(ALogicEngine_Linking_WithFiles, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLinkAfterSavingAndLoading)
+    {
+        {
+            constexpr auto scriptSource = R"(
+            function interface()
+                IN.inString1 = STRING
+                IN.inString2 = STRING
+                OUT.outString = STRING
+            end
+            function run()
+                OUT.outString = IN.inString1 .. IN.inString2
+            end)";
+
+            LogicEngine tmpLogicEngine;
+            auto script1 = tmpLogicEngine.createLuaScript(scriptSource, {}, "scriptA");
+            auto script2 = tmpLogicEngine.createLuaScript(scriptSource, {}, "scriptB");
+            auto script3 = tmpLogicEngine.createLuaScript(scriptSource, {}, "scriptC");
+
+            auto script1Input1 = script1->getInputs()->getChild("inString1");
+            auto script1Input2 = script1->getInputs()->getChild("inString2");
+            auto script2Input1 = script2->getInputs()->getChild("inString1");
+            auto script2Input2 = script2->getInputs()->getChild("inString2");
+            auto script3Input1 = script3->getInputs()->getChild("inString1");
+            auto script3Input2 = script3->getInputs()->getChild("inString2");
+            auto script1Output = script1->getOutputs()->getChild("outString");
+            auto script2Output = script2->getOutputs()->getChild("outString");
+            auto script3Output = script3->getOutputs()->getChild("outString");
+
+            tmpLogicEngine.link(*script1Output, *script2Input1);
+            tmpLogicEngine.link(*script2Output, *script3Input1);
+            tmpLogicEngine.linkWeak(*script3Output, *script1Input1);
+
+            script1Input2->set(std::string("A"));
+            script2Input2->set(std::string("B"));
+            script3Input2->set(std::string("C"));
+
+            tmpLogicEngine.update();
+            // during 1st update the weak link has no value yet so there is no concatenation from previous update
+            EXPECT_STREQ("ABC", script3Output->get<std::string>()->c_str());
+
+            tmpLogicEngine.saveToFile("weaklinks.bin");
+        }
+
+        m_logicEngine.loadFromFile("weaklinks.bin");
+        const auto script3 = m_logicEngine.findByName<LuaScript>("scriptC");
+        const auto script3Output = script3->getOutputs()->getChild("outString");
+        EXPECT_STREQ("ABC", script3Output->get<std::string>()->c_str());
+
+        // right after deserialization the weak link will propagate whatever value was serialized
+        // therefore already 1st update after loading concatenates
+        m_logicEngine.update();
+        EXPECT_STREQ("ABCABC", script3Output->get<std::string>()->c_str());
+        // every upcoming update will concatenate result from previous update with this update
+        m_logicEngine.update();
+        EXPECT_STREQ("ABCABCABC", script3Output->get<std::string>()->c_str());
+        m_logicEngine.update();
+        EXPECT_STREQ("ABCABCABCABC", script3Output->get<std::string>()->c_str());
     }
 
     class ALogicEngine_Linking_WithBindings : public ALogicEngine_Linking_WithFiles

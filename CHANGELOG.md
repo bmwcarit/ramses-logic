@@ -1,5 +1,14 @@
 # master
 
+# v0.14.2
+
+Fully compatible to Logic Engine 0.14.0.
+
+**Features**
+
+* Weak links - ability to form a cycle in node dependency graph, see LogicEngine::linkWeak.
+* Updates inline Ramses version to 27.0.115 (fully backwards compatible)
+
 # v0.14.1
 
 Fully compatible to Logic Engine 0.14.0.

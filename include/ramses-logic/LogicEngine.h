@@ -362,9 +362,9 @@ namespace rlogic
          * - either \p sourceProperty or \p targetProperty is not a primitive property (you have to link sub-properties
          *   of structs and arrays individually)
          *
-         * Creating link loops will cause the next call to #update() to fail with an error. Loops
-         * are directional, it is OK to have A->B, A->C and B->C, but is not OK to have
-         * A->B->C->A.
+         * Creating links which form a cycle in the node dependency graph will not fail right away but during the next call
+         * to #update(). Links are directional, it is OK to have A->B, A->C and B->C, but is not OK to have
+         * A->B->C->A. Cycles are allowed only under special conditions when using a weak link (see #linkWeak).
          *
          * After calling #link, the value of the \p targetProperty will not change until the next call to #update. Creating
          * and destroying links generally has no effect until #update is called.
@@ -377,6 +377,37 @@ namespace rlogic
          * error information use #getErrors()
          */
         RLOGIC_API bool link(const Property& sourceProperty, const Property& targetProperty);
+
+        /**
+        * A weak link is for the most part equivalent to #link - it has the same requirements and data propagation behavior,
+        * but with one crucial difference. Weak link is not considered for node dependency graph (logic node topology)
+        * which determines the order of nodes execution during #update. This allows to form a cycle using weak link
+        * within the dependency graph, which can be helpful when some feedback data is required (e.g. a controller
+        * node managing a worker node using normal links, worker node reports progress back to controller via weak link).
+        * However there are important things to consider to avoid unexpected problems:
+        *   1. The value propagated from a weak link is old, it is the value that was calculated in previous #update.
+        *      Example: consider A->B->C using normal links and a back loop C->A using weak link. When #update is called,
+        *               the nodes are executed exactly in the order defined by normal link dependency: A, B, C (remember
+        *               that weak links are not considered for execution order). This means however that when A is executed
+        *               its input value from weak linked C is only from previous update because C is executed last.
+        *   2. During first update (after creation or load from file) there is no value applied from weak link, instead
+        *      the initial input property value will be used at the weak link target. This is a logical consequence of the
+        *      limitation described above - during first update there was no previous update and therefore no value from weak link.
+        *   3. Avoid infinite update loops - #update has an optimization to execute only nodes with modified inputs,
+        *      this can greatly simplify update of complex node hierarchies. When using weak links there is a risk that
+        *      there will be a never ending need of executions of nodes involved in a node graph cycle. Consider the last
+        *      node providing new value via weak link to first node, which then generates again new value propagated
+        *      to the last node, this will result in the need to execute those nodes in all upcoming #update calls.
+        *      Try to avoid such case and if it is not possible at least try to limit this update loop to a minimum of nodes.
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param sourceProperty the output property which will provide data for \p targetProperty
+        * @param targetProperty the target property which will receive its value from \p sourceProperty
+        * @return true if linking was successful, false otherwise. To get more detailed
+        * error information use #getErrors()
+        */
+        RLOGIC_API bool linkWeak(const Property& sourceProperty, const Property& targetProperty);
 
         /**
          * Unlinks two properties which were linked with #link. After a link is destroyed,

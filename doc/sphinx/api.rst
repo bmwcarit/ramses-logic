@@ -237,6 +237,10 @@ will cause an error:
 * Creating a link from node A to node B if node B is linked to node A (links have a direction and this creates a two-node loop!)
 * Any set of :class:`rlogic::LogicNode` instances whose links form a (directed) circle, e.g. A->B->C->A (this is caught at update time, not at link creation time)
 
+There is an exception to the 'no cycles' rule if using weak links. These allow data propagation in a cycle which would not be
+possible with regular links. Weak links should be used only if absolutely necessary and it is essential to fully understand their caveats
+and limitations first before using them. See :func:`rlogic::LogicEngine::linkWeak` for details.
+
 A link can be removed in a similar fashion:
 
 .. code-block::

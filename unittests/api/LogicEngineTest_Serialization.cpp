@@ -31,6 +31,7 @@
 #include "impl/LogicNodeImpl.h"
 #include "impl/LogicEngineImpl.h"
 #include "impl/DataArrayImpl.h"
+#include "impl/PropertyImpl.h"
 #include "internals/ApiObjects.h"
 #include "internals/FileUtils.h"
 #include "internals/FileFormatVersions.h"
@@ -517,14 +518,19 @@ namespace rlogic::internal
             )";
 
             LogicEngine logicEngine;
-            auto sourceScript = logicEngine.createLuaScript(scriptSource, {}, "SourceScript");
-            auto targetScript = logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
+            auto sourceScript1 = logicEngine.createLuaScript(scriptSource, {}, "SourceScript1");
+            auto targetScript1 = logicEngine.createLuaScript(scriptSource, {}, "TargetScript1");
+            auto sourceScript2 = logicEngine.createLuaScript(scriptSource, {}, "SourceScript2");
+            auto targetScript2 = logicEngine.createLuaScript(scriptSource, {}, "TargetScript2");
             logicEngine.createLuaScript(scriptSource, {}, "NotLinkedScript");
 
-            auto output = sourceScript->getOutputs()->getChild("output");
-            auto input  = targetScript->getInputs()->getChild("input");
+            auto srcOutput1 = sourceScript1->getOutputs()->getChild("output");
+            auto tgtInput1 = targetScript1->getInputs()->getChild("input");
+            auto srcOutput2 = sourceScript2->getOutputs()->getChild("output");
+            auto tgtInput2 = targetScript2->getInputs()->getChild("input");
 
-            logicEngine.link(*output, *input);
+            EXPECT_TRUE(logicEngine.link(*srcOutput1, *tgtInput1));
+            EXPECT_TRUE(logicEngine.linkWeak(*srcOutput2, *tgtInput2));
 
             logicEngine.saveToFile("LogicEngine.bin");
         }
@@ -532,18 +538,40 @@ namespace rlogic::internal
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
 
-            auto sourceScript    = m_logicEngine.findByName<LuaScript>("SourceScript");
-            auto targetScript    = m_logicEngine.findByName<LuaScript>("TargetScript");
+            auto sourceScript1 = m_logicEngine.findByName<LuaScript>("SourceScript1");
+            auto targetScript1 = m_logicEngine.findByName<LuaScript>("TargetScript1");
+            auto sourceScript2 = m_logicEngine.findByName<LuaScript>("SourceScript2");
+            auto targetScript2 = m_logicEngine.findByName<LuaScript>("TargetScript2");
             auto notLinkedScript = m_logicEngine.findByName<LuaScript>("NotLinkedScript");
 
-            EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript));
-            EXPECT_TRUE(m_logicEngine.isLinked(*targetScript));
+            EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript1));
+            EXPECT_TRUE(m_logicEngine.isLinked(*targetScript1));
+            EXPECT_TRUE(m_logicEngine.isLinked(*sourceScript2));
+            EXPECT_TRUE(m_logicEngine.isLinked(*targetScript2));
             EXPECT_FALSE(m_logicEngine.isLinked(*notLinkedScript));
 
             const internal::LogicNodeDependencies& internalNodeDependencies = m_logicEngine.m_impl->getApiObjects().getLogicNodeDependencies();
+            EXPECT_TRUE(internalNodeDependencies.isLinked(sourceScript1->m_impl));
+            EXPECT_TRUE(internalNodeDependencies.isLinked(targetScript1->m_impl));
+            EXPECT_TRUE(internalNodeDependencies.isLinked(sourceScript2->m_impl));
+            EXPECT_TRUE(internalNodeDependencies.isLinked(targetScript2->m_impl));
 
-            EXPECT_TRUE(internalNodeDependencies.isLinked(sourceScript->m_impl));
-            EXPECT_TRUE(internalNodeDependencies.isLinked(targetScript->m_impl));
+            const auto srcOutput1 = sourceScript1->getOutputs()->getChild("output");
+            const auto tgtInput1 = targetScript1->getInputs()->getChild("input");
+            const auto srcOutput2 = sourceScript2->getOutputs()->getChild("output");
+            const auto tgtInput2 = targetScript2->getInputs()->getChild("input");
+            const auto& srcOutLinks1 = srcOutput1->m_impl->getOutgoingLinks();
+            const auto& srcOutLinks2 = srcOutput2->m_impl->getOutgoingLinks();
+            ASSERT_EQ(1u, srcOutLinks1.size());
+            ASSERT_EQ(1u, srcOutLinks2.size());
+            EXPECT_EQ(tgtInput1->m_impl.get(), srcOutLinks1[0].property);
+            EXPECT_EQ(tgtInput2->m_impl.get(), srcOutLinks2[0].property);
+            EXPECT_FALSE(srcOutLinks1[0].isWeakLink);
+            EXPECT_TRUE(srcOutLinks2[0].isWeakLink);
+            EXPECT_EQ(srcOutput1->m_impl.get(), tgtInput1->m_impl->getIncomingLink().property);
+            EXPECT_EQ(srcOutput2->m_impl.get(), tgtInput2->m_impl->getIncomingLink().property);
+            EXPECT_FALSE(tgtInput1->m_impl->getIncomingLink().isWeakLink);
+            EXPECT_TRUE(tgtInput2->m_impl->getIncomingLink().isWeakLink);
         }
     }
 

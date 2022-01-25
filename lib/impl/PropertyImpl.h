@@ -114,25 +114,29 @@ namespace rlogic::internal
         [[nodiscard]] const LogicNodeImpl& getLogicNode() const;
 
         // Link handling
-        [[nodiscard]] const PropertyImpl* getLinkedIncomingProperty() const;
-        [[nodiscard]] std::vector<PropertyImpl*>& getLinkedOutgoingProperties();
-        [[nodiscard]] const std::vector<PropertyImpl*>& getLinkedOutgoingProperties() const;
+        struct Link
+        {
+            PropertyImpl* property = nullptr;
+            bool isWeakLink = false;
+        };
 
-        void setLinkedOutput(PropertyImpl& output);
-        void unsetLinkedOutput();
+        [[nodiscard]] const Link& getIncomingLink() const;
+        [[nodiscard]] const std::vector<Link>& getOutgoingLinks() const;
+
+        void setIncomingLink(PropertyImpl& output, bool isWeakLink);
+        void resetIncomingLink();
 
     private:
         TypeData        m_typeData;
         PropertyList    m_children;
         PropertyValue   m_value;
 
-
-        PropertyImpl* m_incomingLinkedProperty = nullptr;
-        std::vector<PropertyImpl*> m_outgoingLinkedProperties;
+        Link m_incomingLink;
+        std::vector<Link> m_outgoingLinks;
         LogicNodeImpl* m_logicNode = nullptr;
 
         bool m_bindingInputHasNewValue = false;
-        EPropertySemantics                              m_semantics;
+        EPropertySemantics m_semantics;
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::Property> SerializeRecursive(
             const PropertyImpl& prop,

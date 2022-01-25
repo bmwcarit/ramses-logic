@@ -224,14 +224,14 @@ namespace rlogic::internal
             }
             else
             {
-                std::vector<PropertyImpl*>& outgoingProperties = child.getLinkedOutgoingProperties();
-
-                for (auto* linkedInput : outgoingProperties)
+                const auto& outgoingLinks = child.getOutgoingLinks();
+                for (const auto& outLink : outgoingLinks)
                 {
-                    const bool valueChanged = linkedInput->setValue(child.getValue());
-                    if (valueChanged || linkedInput->getPropertySemantics() == EPropertySemantics::AnimationInput)
+                    PropertyImpl* linkedProp = outLink.property;
+                    const bool valueChanged = linkedProp->setValue(child.getValue());
+                    if (valueChanged || linkedProp->getPropertySemantics() == EPropertySemantics::AnimationInput)
                     {
-                        linkedInput->getLogicNode().setDirty(true);
+                        linkedProp->getLogicNode().setDirty(true);
                         ++activatedLinks;
                     }
                 }
@@ -503,7 +503,14 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
-        return m_apiObjects->getLogicNodeDependencies().link(*sourceProperty.m_impl, *targetProperty.m_impl, m_errors);
+        return m_apiObjects->getLogicNodeDependencies().link(*sourceProperty.m_impl, *targetProperty.m_impl, false, m_errors);
+    }
+
+    bool LogicEngineImpl::linkWeak(const Property& sourceProperty, const Property& targetProperty)
+    {
+        m_errors.clear();
+
+        return m_apiObjects->getLogicNodeDependencies().link(*sourceProperty.m_impl, *targetProperty.m_impl, true, m_errors);
     }
 
     bool LogicEngineImpl::unlink(const Property& sourceProperty, const Property& targetProperty)

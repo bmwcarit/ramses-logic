@@ -97,7 +97,7 @@ namespace rlogic::internal
         return m_cachedTopologicallySortedNodes;
     }
 
-    bool LogicNodeDependencies::link(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting)
+    bool LogicNodeDependencies::link(PropertyImpl& output, PropertyImpl& input, bool isWeakLink, ErrorReporting& errorReporting)
     {
         if (!m_logicNodeDAG.containsNode(output.getLogicNode()))
         {
@@ -142,7 +142,7 @@ namespace rlogic::internal
             return false;
         }
 
-        const PropertyImpl* linkedIncomingProperty = input.getLinkedIncomingProperty();
+        const PropertyImpl* linkedIncomingProperty = input.getIncomingLink().property;
         if (linkedIncomingProperty != nullptr)
         {
             errorReporting.add(fmt::format("The property '{}' of LogicNode '{}' is already linked (to property '{}' of LogicNode '{}')",
@@ -154,13 +154,17 @@ namespace rlogic::internal
             return false;
         }
 
-        input.setLinkedOutput(output);
+        input.setIncomingLink(output, isWeakLink);
 
-        const bool isNewEdge = m_logicNodeDAG.addEdge(output.getLogicNode(), input.getLogicNode());
-        if (isNewEdge)
+        if (!isWeakLink)
         {
-            m_nodeTopologyChanged = true;
+            const bool isNewEdge = m_logicNodeDAG.addEdge(output.getLogicNode(), input.getLogicNode());
+            if (isNewEdge)
+            {
+                m_nodeTopologyChanged = true;
+            }
         }
+
         // TODO Violin don't set anything dirty here, handle dirtiness purely in update()
         input.getLogicNode().setDirty(true);
         output.getLogicNode().setDirty(true);
@@ -176,7 +180,7 @@ namespace rlogic::internal
             return false;
         }
 
-        const PropertyImpl* linkedIncomingProperty = input.getLinkedIncomingProperty();
+        const PropertyImpl* linkedIncomingProperty = input.getIncomingLink().property;
         if (linkedIncomingProperty == nullptr)
         {
             errorReporting.add(fmt::format("Input property '{}' is not currently linked!", input.getName()), nullptr);
@@ -189,11 +193,14 @@ namespace rlogic::internal
             return false;
         }
 
-        auto& node = output.getLogicNode();
-        auto& targetNode = input.getLogicNode();
-        input.unsetLinkedOutput();
+        if (!input.getIncomingLink().isWeakLink)
+        {
+            auto& node = output.getLogicNode();
+            auto& targetNode = input.getLogicNode();
+            m_logicNodeDAG.removeEdge(node, targetNode);
+        }
 
-        m_logicNodeDAG.removeEdge(node, targetNode);
+        input.resetIncomingLink();
 
         return true;
     }

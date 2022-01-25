@@ -90,15 +90,15 @@ namespace rlogic::internal
     PropertyImpl::~PropertyImpl() noexcept
     {
         // TODO Violin/Vaclav discuss if we want to handle this here
-        if (m_incomingLinkedProperty != nullptr)
+        if (m_incomingLink.property != nullptr)
         {
-            unsetLinkedOutput();
+            resetIncomingLink();
         }
 
-        for (auto outgoingLink : m_outgoingLinkedProperties)
+        for (auto outgoingLink : m_outgoingLinks)
         {
-            assert(outgoingLink->m_incomingLinkedProperty == this);
-            outgoingLink->m_incomingLinkedProperty = nullptr;
+            assert(outgoingLink.property->m_incomingLink.property == this);
+            outgoingLink.property->m_incomingLink = { nullptr, false };
         }
     }
 
@@ -504,9 +504,9 @@ namespace rlogic::internal
             return false;
         }
 
-        if (m_incomingLinkedProperty != nullptr)
+        if (m_incomingLink.property != nullptr)
         {
-            LOG_ERROR(fmt::format("Property '{}' is currently linked (to property '{}'). Unlink it first before setting its value!", m_typeData.name, m_incomingLinkedProperty->getName()));
+            LOG_ERROR(fmt::format("Property '{}' is currently linked (to property '{}'). Unlink it first before setting its value!", m_typeData.name, m_incomingLink.property->getName()));
             return false;
         }
 
@@ -622,45 +622,41 @@ namespace rlogic::internal
 
     bool PropertyImpl::isLinked() const
     {
-        return (m_incomingLinkedProperty != nullptr) || !m_outgoingLinkedProperties.empty();
+        return (m_incomingLink.property != nullptr) || !m_outgoingLinks.empty();
     }
 
-    const PropertyImpl* PropertyImpl::getLinkedIncomingProperty() const
+    const PropertyImpl::Link& PropertyImpl::getIncomingLink() const
     {
         assert(isInput());
-        return m_incomingLinkedProperty;
+        return m_incomingLink;
     }
 
-    std::vector<PropertyImpl*>& PropertyImpl::getLinkedOutgoingProperties()
+    const std::vector<PropertyImpl::Link>& PropertyImpl::getOutgoingLinks() const
     {
         assert(isOutput());
-        return m_outgoingLinkedProperties;
+        return m_outgoingLinks;
     }
 
-    const std::vector<PropertyImpl*>& PropertyImpl::getLinkedOutgoingProperties() const
-    {
-        assert(isOutput());
-        return m_outgoingLinkedProperties;
-    }
-
-    void PropertyImpl::setLinkedOutput(PropertyImpl& output)
+    void PropertyImpl::setIncomingLink(PropertyImpl& output, bool isWeakLink)
     {
         assert(TypeUtils::IsPrimitiveType(getType()));
         assert(TypeUtils::IsPrimitiveType(output.getType()));
-        assert (m_incomingLinkedProperty == nullptr);
+        assert(m_incomingLink.property == nullptr);
+        assert(std::find_if(output.m_outgoingLinks.begin(), output.m_outgoingLinks.end(), [this](const auto& p) {
+            return p.property == this; }) == output.m_outgoingLinks.end());
 
-        assert(std::find(output.m_outgoingLinkedProperties.begin(), output.m_outgoingLinkedProperties.end(), this) == output.m_outgoingLinkedProperties.end());
-        output.m_outgoingLinkedProperties.push_back(this);
-        m_incomingLinkedProperty = &output;
+        output.m_outgoingLinks.push_back({ this, isWeakLink });
+        m_incomingLink = { &output, isWeakLink };
     }
 
-    void PropertyImpl::unsetLinkedOutput()
+    void PropertyImpl::resetIncomingLink()
     {
-        assert(isInput() && m_incomingLinkedProperty != nullptr);
-        auto linkIter = std::find(m_incomingLinkedProperty->m_outgoingLinkedProperties.begin(), m_incomingLinkedProperty->m_outgoingLinkedProperties.end(), this);
-        assert(linkIter != m_incomingLinkedProperty->m_outgoingLinkedProperties.end());
-        m_incomingLinkedProperty->m_outgoingLinkedProperties.erase(linkIter);
-        m_incomingLinkedProperty = nullptr;
+        assert(isInput() && m_incomingLink.property != nullptr);
+        auto& srcPropertyLinks = m_incomingLink.property->m_outgoingLinks;
+        auto linkIter = std::find_if(srcPropertyLinks.begin(), srcPropertyLinks.end(), [this](const auto& p) { return p.property == this; });
+        assert(linkIter != srcPropertyLinks.end());
+        srcPropertyLinks.erase(linkIter);
+        m_incomingLink = { nullptr, false };
     }
 
     void PropertyImpl::initializeBindingInputValue(PropertyValue value)

@@ -28,24 +28,34 @@ namespace rlogic::internal
             EXPECT_THAT(*m_dependencies.getTopologicallySortedNodes(), ::testing::UnorderedElementsAreArray(nodes));
         }
 
-        static void expectLink(const PropertyImpl& output, std::initializer_list<const PropertyImpl*> inputs)
+        static void expectLink(const PropertyImpl& output, std::initializer_list<PropertyImpl::Link> inputs)
         {
-            for (auto input : inputs)
+            // check that linked destinations all point to source
+            for (auto& input : inputs)
             {
-                EXPECT_EQ(&output, input->getLinkedIncomingProperty());
+                EXPECT_EQ(&output, input.property->getIncomingLink().property);
+                EXPECT_EQ(input.isWeakLink, input.property->getIncomingLink().isWeakLink);
             }
-            EXPECT_THAT(output.getLinkedOutgoingProperties(), ::testing::UnorderedElementsAreArray(inputs));
+            // check that source points to all destinations
+            ASSERT_EQ(output.getOutgoingLinks().size(), inputs.size());
+            auto srcOutputIt = output.getOutgoingLinks().cbegin();
+            for (auto& input : inputs)
+            {
+                EXPECT_EQ(srcOutputIt->property, input.property);
+                EXPECT_EQ(srcOutputIt->isWeakLink, input.isWeakLink);
+                ++srcOutputIt;
+            }
         }
 
         static void expectNoLinks(const PropertyImpl& property)
         {
             if (property.isInput())
             {
-                EXPECT_EQ(nullptr, property.getLinkedIncomingProperty());
+                EXPECT_EQ(nullptr, property.getIncomingLink().property);
             }
             if (property.isOutput())
             {
-                EXPECT_TRUE(property.getLinkedOutgoingProperties().empty());
+                EXPECT_TRUE(property.getOutgoingLinks().empty());
             }
         }
 
@@ -84,13 +94,30 @@ namespace rlogic::internal
         PropertyImpl& output = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
         PropertyImpl& input = *m_nodeB.getInputs()->getChild("input1")->m_impl;
 
-        EXPECT_TRUE(m_dependencies.link(output, input, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(output, input, false, m_errorReporting));
 
         // Sorted topologically
         expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
 
         // Has exactly one link
-        expectLink(output, {&input});
+        expectLink(output, { {&input, false} });
+    }
+
+    TEST_F(ALogicNodeDependencies, ConnectingTwoNodes_CreatesABackLink)
+    {
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(m_nodeB);
+
+        PropertyImpl& output = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
+        PropertyImpl& input = *m_nodeB.getInputs()->getChild("input1")->m_impl;
+
+        EXPECT_TRUE(m_dependencies.link(output, input, true, m_errorReporting));
+
+        // Back links do not affect topological order
+        expectUnsortedNodeOrder({ &m_nodeA, &m_nodeB });
+
+        // Has exactly one link
+        expectLink(output, { {&input, true} });
     }
 
     TEST_F(ALogicNodeDependencies, DisconnectingTwoNodes_RemovesLinks)
@@ -101,7 +128,7 @@ namespace rlogic::internal
         PropertyImpl& output = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
         PropertyImpl& input = *m_nodeB.getInputs()->getChild("input1")->m_impl;
 
-        EXPECT_TRUE(m_dependencies.link(output, input, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(output, input, false, m_errorReporting));
         EXPECT_TRUE(m_dependencies.unlink(output, input, m_errorReporting));
 
         // both nodes still there, but no ordering guarantees without the link
@@ -119,7 +146,7 @@ namespace rlogic::internal
         m_dependencies.addNode(m_nodeB);
 
         PropertyImpl& input = *m_nodeB.getInputs()->getChild("input1")->m_impl;
-        EXPECT_TRUE(m_dependencies.link(*nodeToDelete->getOutputs()->getChild("output1")->m_impl, input, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*nodeToDelete->getOutputs()->getChild("output1")->m_impl, input, false, m_errorReporting));
 
         m_dependencies.removeNode(*nodeToDelete);
         nodeToDelete = nullptr;
@@ -136,7 +163,7 @@ namespace rlogic::internal
         m_dependencies.addNode(*nodeToDelete);
 
         PropertyImpl& output = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
-        EXPECT_TRUE(m_dependencies.link(output, *nodeToDelete->getInputs()->getChild("input1")->m_impl, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(output, *nodeToDelete->getInputs()->getChild("input1")->m_impl, false, m_errorReporting));
 
         m_dependencies.removeNode(*nodeToDelete);
         nodeToDelete = nullptr;
@@ -164,9 +191,9 @@ namespace rlogic::internal
         // A   ->    M    ->   B
         //   \               /
         //      ---->-------
-        EXPECT_TRUE(m_dependencies.link(output1A, input1M, m_errorReporting));
-        EXPECT_TRUE(m_dependencies.link(output1M, input1B, m_errorReporting));
-        EXPECT_TRUE(m_dependencies.link(output2A, input2B, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(output1A, input1M, false, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(output1M, input1B, false, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(output2A, input2B, false, m_errorReporting));
 
         expectSortedNodeOrder({ &m_nodeA, nodeToDelete.get(), &m_nodeB });
 
@@ -177,7 +204,7 @@ namespace rlogic::internal
         expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
 
         // Only link A->B remains
-        expectLink(output2A, { &input2B });
+        expectLink(output2A, { { &input2B, false } });
 
         // Other links are gone
         expectNoLinks(output1A);
@@ -193,7 +220,7 @@ namespace rlogic::internal
         PropertyImpl& inputB = *m_nodeB.getInputs()->getChild("input1")->m_impl;
         PropertyImpl& outputA = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
 
-        EXPECT_TRUE(m_dependencies.link(outputA, inputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(outputA, inputB, false, m_errorReporting));
         expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
 
         // Reverse dependency
@@ -202,16 +229,68 @@ namespace rlogic::internal
         PropertyImpl& inputA = *m_nodeA.getInputs()->getChild("input1")->m_impl;
         PropertyImpl& outputB = *m_nodeB.getOutputs()->getChild("output1")->m_impl;
 
-        EXPECT_TRUE(m_dependencies.link(outputB, inputA, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(outputB, inputA, false, m_errorReporting));
 
         // Still no disconnected nodes, but now topological order is B -> A
         expectSortedNodeOrder({ &m_nodeB, &m_nodeA });
 
         // Has exactly one link
-        expectLink(outputB, { &inputA });
+        expectLink(outputB, { { &inputA, false } });
         // Other links are gone
         expectNoLinks(inputB);
         expectNoLinks(outputA);
+    }
+
+    TEST_F(ALogicNodeDependencies, ReversingDependencyOfTwoNodes_UsingBackLink_DoesNotAffectTopologicalOrder)
+    {
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(m_nodeB);
+
+        // Node A -> Node B  (output of node A linked to input of node B)
+        PropertyImpl& inputB = *m_nodeB.getInputs()->getChild("input1")->m_impl;
+        PropertyImpl& outputA = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
+
+        EXPECT_TRUE(m_dependencies.link(outputA, inputB, false, m_errorReporting));
+        expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
+
+        // Reverse dependency but only using back link
+        // Node B -> Node A  (output of node B linked to input of node A)
+        EXPECT_TRUE(m_dependencies.unlink(outputA, inputB, m_errorReporting));
+        PropertyImpl& inputA = *m_nodeA.getInputs()->getChild("input1")->m_impl;
+        PropertyImpl& outputB = *m_nodeB.getOutputs()->getChild("output1")->m_impl;
+
+        EXPECT_TRUE(m_dependencies.link(outputB, inputA, true, m_errorReporting));
+
+        // Nodes are linked only using back link, this has no effect on topological order
+        expectUnsortedNodeOrder({ &m_nodeB, &m_nodeA });
+
+        // Has exactly one link
+        expectLink(outputB, { { &inputA, true } });
+        // Other links are gone
+        expectNoLinks(inputB);
+        expectNoLinks(outputA);
+    }
+
+    TEST_F(ALogicNodeDependencies, NodesConnectedInBothDirectionsFormingCycleWithBackLink)
+    {
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(m_nodeB);
+
+        PropertyImpl& inputA = *m_nodeA.getInputs()->getChild("input1")->m_impl;
+        PropertyImpl& outputA = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
+        PropertyImpl& inputB = *m_nodeB.getInputs()->getChild("input1")->m_impl;
+        PropertyImpl& outputB = *m_nodeB.getOutputs()->getChild("output1")->m_impl;
+
+        // Node A -> Node B  (output of node A linked to input of node B)
+        EXPECT_TRUE(m_dependencies.link(outputA, inputB, false, m_errorReporting));
+        expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
+
+        // connect in reverse direction using back link
+        EXPECT_TRUE(m_dependencies.link(outputB, inputA, true, m_errorReporting));
+        expectSortedNodeOrder({ &m_nodeA, &m_nodeB });
+
+        expectLink(outputA, { { &inputB, false } });
+        expectLink(outputB, { { &inputA, true } });
     }
 
     class ALogicNodeDependencies_NestedLinks : public ALogicNodeDependencies
@@ -254,7 +333,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeDependencies_NestedLinks, ReportsErrorWhenUnlinkingStructs_WithLinkedChildren)
     {
-        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, false, m_errorReporting));
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
 
         // Still can't unlink complex type
@@ -266,18 +345,18 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeDependencies_NestedLinks, ConnectingTwoNodes_CreatesALink)
     {
-        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, false, m_errorReporting));
 
         // Sorted topologically
         expectSortedNodeOrder({m_nodeANested.get(), m_nodeBNested.get()});
 
         // Has exactly one link
-        expectLink(*m_nestedOutputA, { m_nestedInputB });
+        expectLink(*m_nestedOutputA, { { m_nestedInputB, false } });
     }
 
     TEST_F(ALogicNodeDependencies_NestedLinks, DisconnectingTwoNodes_RemovesLinks)
     {
-        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, false, m_errorReporting));
         EXPECT_TRUE(m_dependencies.unlink(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
 
         // both nodes still there, but no ordering guarantees without the link
@@ -289,7 +368,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeDependencies_NestedLinks, RemovingSourceNode_RemovesLinks)
     {
-        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, false, m_errorReporting));
 
         m_dependencies.removeNode(*m_nodeANested);
         m_nodeANested = nullptr;
@@ -301,7 +380,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeDependencies_NestedLinks, RemovingTargetNode_RemovesLinks)
     {
-        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, false, m_errorReporting));
 
         m_dependencies.removeNode(*m_nodeBNested);
         m_nodeBNested = nullptr;
@@ -315,7 +394,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeDependencies_NestedLinks, ReversingDependencyOfTwoNodes_InvertsTopologicalOrder)
     {
-        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(*m_nestedOutputA, *m_nestedInputB, false, m_errorReporting));
         expectSortedNodeOrder({ m_nodeANested.get(), m_nodeBNested.get() });
 
         // Reverse dependency
@@ -324,13 +403,13 @@ namespace rlogic::internal
         PropertyImpl& nestedInputA = *m_nodeANested->getInputs()->getChild("inputStruct")->getChild("nested")->m_impl;
         PropertyImpl& nestedOutputB = *m_nodeBNested->getOutputs()->getChild("outputStruct")->getChild("nested")->m_impl;
 
-        EXPECT_TRUE(m_dependencies.link(nestedOutputB, nestedInputA, m_errorReporting));
+        EXPECT_TRUE(m_dependencies.link(nestedOutputB, nestedInputA, false, m_errorReporting));
 
         // Still no disconnected nodes, but now topological order is B -> A
         expectSortedNodeOrder({ m_nodeBNested.get(), m_nodeANested.get() });
 
         // Has exactly one link
-        expectLink(nestedOutputB, { &nestedInputA });
+        expectLink(nestedOutputB, { { &nestedInputA, false } });
         expectNoLinks(*m_nestedOutputA);
         expectNoLinks(*m_nestedInputB);
     }

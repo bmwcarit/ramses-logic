@@ -28,7 +28,7 @@
 
 namespace rlogic
 {
-    class ALogicEngine : public ::testing::Test
+    class ALogicEngineBase
     {
     public:
         static LuaConfig CreateDeps(const std::vector<std::pair<std::string_view, const LuaModule*>>& dependencies)
@@ -96,5 +96,9 @@ namespace rlogic
                 m_appearance = &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene);
             }
         }
+    };
+
+    class ALogicEngine : public ALogicEngineBase, public ::testing::Test
+    {
     };
 }

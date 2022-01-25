@@ -19,7 +19,7 @@
 
 namespace rlogic::internal
 {
-    class ALogicEngine_Dirtiness: public ALogicEngine
+    class ALogicEngine_DirtinessBase : public ALogicEngineBase
     {
     protected:
         ApiObjects& m_apiObjects = { m_logicEngine.m_impl->getApiObjects() };
@@ -47,6 +47,10 @@ namespace rlogic::internal
                 OUT.data.nested = IN.data.nested
             end
         )";
+    };
+
+    class ALogicEngine_Dirtiness : public ALogicEngine_DirtinessBase, public ::testing::Test
+    {
     };
 
     TEST_F(ALogicEngine_Dirtiness, NotDirtyAfterConstruction)
@@ -142,23 +146,46 @@ namespace rlogic::internal
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
-    TEST_F(ALogicEngine_Dirtiness, Dirty_WhenAddingLink)
+    class ALogicEngine_DirtinessViaLink : public ALogicEngine_DirtinessBase, public ::testing::TestWithParam<bool>
+    {
+    protected:
+        void link(const Property& src, const Property& dst)
+        {
+            if (GetParam())
+            {
+                EXPECT_TRUE(m_logicEngine.linkWeak(src, dst));
+            }
+            else
+            {
+                EXPECT_TRUE(m_logicEngine.link(src, dst));
+            }
+        }
+    };
+
+    INSTANTIATE_TEST_SUITE_P(
+        ALogicEngine_DirtinessViaLink_TestInstances,
+        ALogicEngine_DirtinessViaLink,
+        ::testing::Values(false, true));
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, Dirty_WhenAddingLink)
     {
         LuaScript* script1 = m_logicEngine.createLuaScript(m_minimal_script);
         LuaScript* script2 = m_logicEngine.createLuaScript(m_minimal_script);
         m_logicEngine.update();
 
-        m_logicEngine.link(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
+        link(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
         EXPECT_TRUE(m_apiObjects.isDirty());
         m_logicEngine.update();
         EXPECT_FALSE(m_apiObjects.isDirty());
     }
 
-    TEST_F(ALogicEngine_Dirtiness, NotDirty_WhenRemovingLink)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, NotDirty_WhenRemovingLink)
     {
         LuaScript* script1 = m_logicEngine.createLuaScript(m_minimal_script);
         LuaScript* script2 = m_logicEngine.createLuaScript(m_minimal_script);
-        m_logicEngine.link(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
+        link(*script1->getOutputs()->getChild("data"), *script2->getInputs()->getChild("data"));
         m_logicEngine.update();
 
         EXPECT_FALSE(m_apiObjects.isDirty());
@@ -169,11 +196,12 @@ namespace rlogic::internal
         EXPECT_FALSE(m_apiObjects.isDirty());
     }
 
-    TEST_F(ALogicEngine_Dirtiness, NotDirty_WhenRemovingNestedLink)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, NotDirty_WhenRemovingNestedLink)
     {
         LuaScript* script1 = m_logicEngine.createLuaScript(m_nested_properties_script);
         LuaScript* script2 = m_logicEngine.createLuaScript(m_nested_properties_script);
-        m_logicEngine.link(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
+        link(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
         m_logicEngine.update();
 
         EXPECT_FALSE(m_apiObjects.isDirty());
@@ -185,13 +213,14 @@ namespace rlogic::internal
     }
 
     // Removing link does not mark things dirty, but setting value does
-    TEST_F(ALogicEngine_Dirtiness, Dirty_WhenRemovingLink_AndSettingValueByCallingSetAfterwards)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, Dirty_WhenRemovingLink_AndSettingValueByCallingSetAfterwards)
     {
         LuaScript* script1 = m_logicEngine.createLuaScript(m_nested_properties_script);
         LuaScript* script2 = m_logicEngine.createLuaScript(m_nested_properties_script);
         m_logicEngine.update();
 
-        m_logicEngine.link(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
+        link(*script1->getOutputs()->getChild("data")->getChild("nested"), *script2->getInputs()->getChild("data")->getChild("nested"));
         m_logicEngine.update();
         ASSERT_FALSE(m_apiObjects.isDirty());
 

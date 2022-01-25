@@ -184,6 +184,11 @@ namespace rlogic
         return m_impl->link(sourceProperty, targetProperty);
     }
 
+    bool LogicEngine::linkWeak(const Property& sourceProperty, const Property& targetProperty)
+    {
+        return m_impl->linkWeak(sourceProperty, targetProperty);
+    }
+
     bool LogicEngine::unlink(const Property& sourceProperty, const Property& targetProperty)
     {
         return m_impl->unlink(sourceProperty, targetProperty);

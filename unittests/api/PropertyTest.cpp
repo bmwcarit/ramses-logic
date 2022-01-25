@@ -85,16 +85,42 @@ namespace rlogic::internal
 
     TEST_F(AProperty, CanBeLinkedAndUnlinked)
     {
-        Property property1(CreateInputProperty(EPropertyType::Float));
+        Property property1(CreateOutputProperty(EPropertyType::Float));
         Property property2(CreateInputProperty(EPropertyType::Float));
-        property2.m_impl->setLinkedOutput(*property1.m_impl);
+        property2.m_impl->setIncomingLink(*property1.m_impl, false);
         EXPECT_TRUE(property1.isLinked());
         EXPECT_TRUE(property2.isLinked());
-        EXPECT_EQ(property2.m_impl->getLinkedIncomingProperty(), property1.m_impl.get());
-        property2.m_impl->unsetLinkedOutput();
+        EXPECT_EQ(property2.m_impl->getIncomingLink().property, property1.m_impl.get());
+        EXPECT_FALSE(property2.m_impl->getIncomingLink().isWeakLink);
+        ASSERT_EQ(1u, property1.m_impl->getOutgoingLinks().size());
+        EXPECT_EQ(property2.m_impl.get(), property1.m_impl->getOutgoingLinks()[0].property);
+        EXPECT_FALSE(property1.m_impl->getOutgoingLinks()[0].isWeakLink);
+
+        property2.m_impl->resetIncomingLink();
         EXPECT_FALSE(property1.isLinked());
         EXPECT_FALSE(property2.isLinked());
-        EXPECT_EQ(property2.m_impl->getLinkedIncomingProperty(), nullptr);
+        EXPECT_EQ(property2.m_impl->getIncomingLink().property, nullptr);
+        EXPECT_TRUE(property1.m_impl->getOutgoingLinks().empty());
+    }
+
+    TEST_F(AProperty, CanBeLinkedAndUnlinked_backLink)
+    {
+        Property property1(CreateOutputProperty(EPropertyType::Float));
+        Property property2(CreateInputProperty(EPropertyType::Float));
+        property2.m_impl->setIncomingLink(*property1.m_impl, true);
+        EXPECT_TRUE(property1.isLinked());
+        EXPECT_TRUE(property2.isLinked());
+        EXPECT_EQ(property2.m_impl->getIncomingLink().property, property1.m_impl.get());
+        EXPECT_TRUE(property2.m_impl->getIncomingLink().isWeakLink);
+        ASSERT_EQ(1u, property1.m_impl->getOutgoingLinks().size());
+        EXPECT_EQ(property2.m_impl.get(), property1.m_impl->getOutgoingLinks()[0].property);
+        EXPECT_TRUE(property1.m_impl->getOutgoingLinks()[0].isWeakLink);
+
+        property2.m_impl->resetIncomingLink();
+        EXPECT_FALSE(property1.isLinked());
+        EXPECT_FALSE(property2.isLinked());
+        EXPECT_EQ(property2.m_impl->getIncomingLink().property, nullptr);
+        EXPECT_TRUE(property1.m_impl->getOutgoingLinks().empty());
     }
 
     TEST_F(AProperty, CanBeInitializedWithAValue)

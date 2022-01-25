@@ -18,7 +18,8 @@ struct Link FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_SOURCEPROPERTY = 4,
-    VT_TARGETPROPERTY = 6
+    VT_TARGETPROPERTY = 6,
+    VT_ISWEAK = 8
   };
   const rlogic_serialization::Property *sourceProperty() const {
     return GetPointer<const rlogic_serialization::Property *>(VT_SOURCEPROPERTY);
@@ -26,12 +27,16 @@ struct Link FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::Property *targetProperty() const {
     return GetPointer<const rlogic_serialization::Property *>(VT_TARGETPROPERTY);
   }
+  bool isWeak() const {
+    return GetField<uint8_t>(VT_ISWEAK, 0) != 0;
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_SOURCEPROPERTY) &&
            verifier.VerifyTable(sourceProperty()) &&
            VerifyOffset(verifier, VT_TARGETPROPERTY) &&
            verifier.VerifyTable(targetProperty()) &&
+           VerifyField<uint8_t>(verifier, VT_ISWEAK) &&
            verifier.EndTable();
   }
 };
@@ -45,6 +50,9 @@ struct LinkBuilder {
   }
   void add_targetProperty(flatbuffers::Offset<rlogic_serialization::Property> targetProperty) {
     fbb_.AddOffset(Link::VT_TARGETPROPERTY, targetProperty);
+  }
+  void add_isWeak(bool isWeak) {
+    fbb_.AddElement<uint8_t>(Link::VT_ISWEAK, static_cast<uint8_t>(isWeak), 0);
   }
   explicit LinkBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -61,10 +69,12 @@ struct LinkBuilder {
 inline flatbuffers::Offset<Link> CreateLink(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<rlogic_serialization::Property> sourceProperty = 0,
-    flatbuffers::Offset<rlogic_serialization::Property> targetProperty = 0) {
+    flatbuffers::Offset<rlogic_serialization::Property> targetProperty = 0,
+    bool isWeak = false) {
   LinkBuilder builder_(_fbb);
   builder_.add_targetProperty(targetProperty);
   builder_.add_sourceProperty(sourceProperty);
+  builder_.add_isWeak(isWeak);
   return builder_.Finish();
 }
 

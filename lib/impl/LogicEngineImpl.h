@@ -95,6 +95,7 @@ namespace rlogic::internal
         bool saveToFile(std::string_view filename);
 
         bool link(const Property& sourceProperty, const Property& targetProperty);
+        bool linkWeak(const Property& sourceProperty, const Property& targetProperty);
         bool unlink(const Property& sourceProperty, const Property& targetProperty);
 
         [[nodiscard]] bool isLinked(const LogicNode& logicNode) const;

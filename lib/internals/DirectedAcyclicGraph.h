@@ -23,7 +23,7 @@ namespace rlogic::internal
     using NodeVector = std::vector<LogicNodeImpl*>;
 
     // For short: DAG
-    // This DAG is used to represent the "property links" in LogicNode's, but abstracts the individual links and only
+    // This DAG is used to represent the "property links" in LogicNodes, but abstracts the individual links and only
     // counts the number of links between two nodes, not the actual properties which are linked (this info is stored in PropertyImpl).
     // Edge direction is equivalent to direction of data flow
     // inside the logic engine (outputs -> inputs). Node outgoing degree represent the
@@ -43,7 +43,7 @@ namespace rlogic::internal
         [[nodiscard]] bool containsNode(Node& node) const;
 
         bool addEdge(Node& source, Node& target);
-        void removeEdge(Node& source, const Node& target);
+        void removeEdge(Node& source, Node& target);
 
         [[nodiscard]] std::optional<NodeVector> getTopologicallySortedNodes() const;
 
@@ -67,6 +67,10 @@ namespace rlogic::internal
         // Stores both nodes and their edges in one hashmap
         // If a node has no outgoing links, the 'EdgeList' is empty
         // Each entry in 'EdgeList' represents an edge to another node
+
+        // Edges from source node to target nodes (edge can have more than 1 instance represented by multiplicity)
         std::unordered_map<Node*, EdgeList> m_nodeOutgoingEdges;
+        // Reverse relation from target node to all its source nodes (here without keeping edge multiplicity count)
+        std::unordered_map<Node*, NodeVector> m_nodeIncomingEdges;
     };
 }

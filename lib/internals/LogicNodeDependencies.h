@@ -33,12 +33,12 @@ namespace rlogic::internal
         void removeNode(LogicNodeImpl& node);
 
         // Link management
-        bool link(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting);
+        bool link(PropertyImpl& output, PropertyImpl& input, bool isWeakLink, ErrorReporting& errorReporting);
         bool unlink(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting);
         [[nodiscard]] bool isLinked(const LogicNodeImpl& node) const;
 
     private:
-        DirectedAcyclicGraph                m_logicNodeDAG;
+        DirectedAcyclicGraph m_logicNodeDAG;
 
         [[nodiscard]] bool isLinked(PropertyImpl& input) const;
 

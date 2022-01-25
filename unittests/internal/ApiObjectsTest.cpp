@@ -793,6 +793,7 @@ namespace rlogic::internal
             ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
                 *script->getOutputs()->getChild("nested")->getChild("rotation")->m_impl,
                 *nodeBinding->getInputs()->getChild("rotation")->m_impl,
+                false,
                 m_errorReporting));
             ApiObjects::Serialize(toSerialize, builder);
         }
@@ -881,6 +882,7 @@ namespace rlogic::internal
             ASSERT_TRUE(toSerialize.getLogicNodeDependencies().link(
                 *script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl,
                 *script2->getInputs()->getChild("integer")->m_impl,
+                false,
                 m_errorReporting));
 
             ApiObjects::Serialize(toSerialize, builder);
@@ -905,10 +907,12 @@ namespace rlogic::internal
 
         const PropertyImpl* script1Output = script1->getOutputs()->getChild("nested")->getChild("integer")->m_impl.get();
         const PropertyImpl* script2Input = script2->getInputs()->getChild("integer")->m_impl.get();
-        EXPECT_EQ(script1Output, script2Input->getLinkedIncomingProperty());
+        EXPECT_EQ(script1Output, script2Input->getIncomingLink().property);
+        EXPECT_FALSE(script2Input->getIncomingLink().isWeakLink);
 
-        ASSERT_EQ(1u, script1Output->getLinkedOutgoingProperties().size());
-        EXPECT_EQ(script1Output->getLinkedOutgoingProperties()[0], script2Input);
+        ASSERT_EQ(1u, script1Output->getOutgoingLinks().size());
+        EXPECT_EQ(script1Output->getOutgoingLinks()[0].property, script2Input);
+        EXPECT_FALSE(script1Output->getOutgoingLinks()[0].isWeakLink);
     }
 
     TEST_F(AnApiObjects_Serialization, ErrorWhenLuaModulesContainerMissing)

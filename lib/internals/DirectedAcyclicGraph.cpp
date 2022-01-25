@@ -18,28 +18,37 @@ namespace rlogic::internal
 {
     void DirectedAcyclicGraph::addNode(Node& node)
     {
-        assert(!containsNode(node));
+        assert(m_nodeOutgoingEdges.count(&node) == 0);
+        assert(m_nodeIncomingEdges.count(&node) == 0);
         m_nodeOutgoingEdges.insert({ &node, {} });
+        m_nodeIncomingEdges.insert({ &node, {} });
     }
 
     void DirectedAcyclicGraph::removeNode(Node& nodeToRemove)
     {
-        // First, remove all 'incoming edges' of the node by going through all outgoing edges
-        // and filtering those out which have targetNode == nodeToRemove
-        for (auto& nodeEntry : m_nodeOutgoingEdges)
+        assert(m_nodeOutgoingEdges.count(&nodeToRemove) != 0);
+        assert(m_nodeIncomingEdges.count(&nodeToRemove) != 0);
+
+        // remove node from all edge lists pointing to it from source nodes
+        const auto srcNodesIt = m_nodeIncomingEdges.find(&nodeToRemove);
+        for (const auto srcNode : srcNodesIt->second)
         {
-            // skip nodeToRemove, it can not have edges to itself
-            if (nodeEntry.first != &nodeToRemove)
-            {
-                EdgeList& otherNodeOutgoingEdges = nodeEntry.second;
-                const auto it = std::remove_if(otherNodeOutgoingEdges.begin(), otherNodeOutgoingEdges.end(),
-                    [&nodeToRemove](const auto& e) { return e.target == &nodeToRemove; });
-                otherNodeOutgoingEdges.erase(it, otherNodeOutgoingEdges.end());
-            }
+            EdgeList& srcNodeOutgoingEdges = m_nodeOutgoingEdges.find(srcNode)->second;
+            const auto it = std::remove_if(srcNodeOutgoingEdges.begin(), srcNodeOutgoingEdges.end(),
+                [&nodeToRemove](const auto& e) { return e.target == &nodeToRemove; });
+            srcNodeOutgoingEdges.erase(it, srcNodeOutgoingEdges.end());
         }
 
-        // Remove outgoing edges by simply removing the node from m_nodeOutgoingEdges
-        assert(containsNode(nodeToRemove));
+        // remove node from all edge lists pointing to it from its target nodes
+        const auto tgtNodesIt = m_nodeOutgoingEdges.find(&nodeToRemove);
+        for (const auto& tgtNode : tgtNodesIt->second)
+        {
+            auto& tgtNodeEdges = m_nodeIncomingEdges.find(tgtNode.target)->second;
+            tgtNodeEdges.erase(std::find(tgtNodeEdges.begin(), tgtNodeEdges.end(), &nodeToRemove));
+        }
+
+        // remove node from both maps
+        m_nodeIncomingEdges.erase(srcNodesIt);
         m_nodeOutgoingEdges.erase(&nodeToRemove);
     }
 
@@ -124,29 +133,28 @@ namespace rlogic::internal
             }
         }
 
-        NodeVector topologicallySortedNodes;
-        topologicallySortedNodes.reserve(totalNodeCount);
-        for (auto sortedNode : sparseNodeQueue)
-        {
-            // Some nodes are nullptr because of the special 'bubble sort' sorting method
-            if (sortedNode != nullptr)
-            {
-                topologicallySortedNodes.emplace_back(sortedNode);
-            }
-        }
+        // Some nodes are nullptr because of the special 'bubble sort' sorting method
+        sparseNodeQueue.erase(std::remove(sparseNodeQueue.begin(), sparseNodeQueue.end(), nullptr), sparseNodeQueue.end());
 
-        return topologicallySortedNodes;
+        return sparseNodeQueue;
     }
 
     bool DirectedAcyclicGraph::addEdge(Node& source, Node& target)
     {
-        auto nodeEdges = m_nodeOutgoingEdges.find(&source);
-        assert(nodeEdges != m_nodeOutgoingEdges.end());
-        auto edgeBetweenNodes = FindEdgeToNode(nodeEdges->second, target);
-        const bool isNewConnection = (edgeBetweenNodes == nodeEdges->second.end());
+        assert(m_nodeOutgoingEdges.count(&source) != 0);
+        assert(m_nodeOutgoingEdges.count(&target) != 0);
+        assert(m_nodeIncomingEdges.count(&source) != 0);
+        assert(m_nodeIncomingEdges.count(&target) != 0);
+
+        auto& nodeEdges = m_nodeOutgoingEdges.find(&source)->second;
+        auto edgeBetweenNodes = FindEdgeToNode(nodeEdges, target);
+        const bool isNewConnection = (edgeBetweenNodes == nodeEdges.end());
         if (isNewConnection)
         {
-            nodeEdges->second.push_back({ &target, 1u });
+            nodeEdges.push_back({ &target, 1u });
+            auto& tgtToSourcesList = m_nodeIncomingEdges.find(&target)->second;
+            assert(std::find(tgtToSourcesList.cbegin(), tgtToSourcesList.cend(), &source) == tgtToSourcesList.cend());
+            tgtToSourcesList.push_back(&source);
         }
         else
         {
@@ -156,28 +164,43 @@ namespace rlogic::internal
         return isNewConnection;
     }
 
-    void DirectedAcyclicGraph::removeEdge(Node& source, const Node& target)
+    void DirectedAcyclicGraph::removeEdge(Node& source, Node& target)
     {
-        const auto srcNodeEdges = m_nodeOutgoingEdges.find(&source);
-        assert(srcNodeEdges != m_nodeOutgoingEdges.end());
-        auto outgoingEdge = FindEdgeToNode(srcNodeEdges->second, target);
-        assert(outgoingEdge != srcNodeEdges->second.end());
+        assert(m_nodeOutgoingEdges.count(&source) != 0);
+        assert(m_nodeOutgoingEdges.count(&target) != 0);
+        assert(m_nodeIncomingEdges.count(&source) != 0);
+        assert(m_nodeIncomingEdges.count(&target) != 0);
+
+        auto& srcNodeEdges = m_nodeOutgoingEdges.find(&source)->second;
+        auto outgoingEdge = FindEdgeToNode(srcNodeEdges, target);
+        assert(outgoingEdge != srcNodeEdges.end());
         assert(outgoingEdge->multiplicity > 0u);
         --outgoingEdge->multiplicity;
         if (outgoingEdge->multiplicity == 0)
-            srcNodeEdges->second.erase(outgoingEdge);
+        {
+            srcNodeEdges.erase(outgoingEdge);
+            auto& tgtToSourcesList = m_nodeIncomingEdges.find(&target)->second;
+            assert(std::find(tgtToSourcesList.cbegin(), tgtToSourcesList.cend(), &source) != tgtToSourcesList.cend());
+            tgtToSourcesList.erase(std::find(tgtToSourcesList.begin(), tgtToSourcesList.end(), &source));
+        }
     }
 
     size_t DirectedAcyclicGraph::getInDegree(Node& node) const
     {
-        assert(containsNode(node));
-        // count in-going edges of node
-        return std::accumulate(m_nodeOutgoingEdges.cbegin(), m_nodeOutgoingEdges.cend(), size_t(0u), [&node](size_t sum, const auto& edgeIt) {
-            const auto it = FindEdgeToNode(edgeIt.second, node);
-            if (it != edgeIt.second.cend())
-                sum += it->multiplicity;
-            return sum;
-        });
+        assert(m_nodeOutgoingEdges.count(&node) != 0);
+        assert(m_nodeIncomingEdges.count(&node) != 0);
+
+        size_t edgeCount = 0u;
+        const auto srcNodesList = m_nodeIncomingEdges.find(&node)->second;
+        for (const auto srcNode : srcNodesList)
+        {
+            const EdgeList& srcNodeOutgoingEdges = m_nodeOutgoingEdges.find(srcNode)->second;
+            const auto edgeIt = FindEdgeToNode(srcNodeOutgoingEdges, node);
+            assert(edgeIt != srcNodeOutgoingEdges.cend());
+            edgeCount += edgeIt->multiplicity;
+        }
+
+        return edgeCount;
     }
 
     size_t DirectedAcyclicGraph::getOutDegree(Node& node) const
@@ -191,30 +214,14 @@ namespace rlogic::internal
 
     NodeVector DirectedAcyclicGraph::collectRootNodes() const
     {
-        // Outgoing edges has size == number of nodes in the graph
-        const size_t nodeCount = m_nodeOutgoingEdges.size();
-
         NodeVector rootNodes;
-        rootNodes.reserve(nodeCount);
+        // reserve to all nodes count because it will be used to store all sorted nodes later
+        rootNodes.reserve(m_nodeIncomingEdges.size());
 
-        std::unordered_set<Node*> nodesWithIncomingEdges;
-        nodesWithIncomingEdges.reserve(nodeCount);
-
-        for (auto& outgoingEdgesOfNode : m_nodeOutgoingEdges)
+        for (const auto& nodeIngoingEdges : m_nodeIncomingEdges)
         {
-            for (auto& outgoineEdge : outgoingEdgesOfNode.second)
-            {
-                nodesWithIncomingEdges.insert(outgoineEdge.target);
-            }
-        }
-
-        for (auto& nodeEntry : m_nodeOutgoingEdges)
-        {
-            Node* node = nodeEntry.first;
-            if (nodesWithIncomingEdges.end() == nodesWithIncomingEdges.find(node))
-            {
-                rootNodes.emplace_back(node);
-            }
+            if (nodeIngoingEdges.second.empty())
+                rootNodes.push_back(nodeIngoingEdges.first);
         }
 
         return rootNodes;

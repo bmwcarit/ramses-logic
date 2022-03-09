@@ -12,6 +12,7 @@
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/Property.h"
 #include "impl/AnimationNodeImpl.h"
 #include "impl/DataArrayImpl.h"
@@ -27,7 +28,7 @@
 
 namespace rlogic::internal
 {
-    class AnAnimationNode : public ::testing::Test
+    class AnAnimationNode : public ::testing::TestWithParam<bool>
     {
     public:
         void SetUp() override
@@ -39,6 +40,20 @@ namespace rlogic::internal
         }
 
     protected:
+        AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name = "")
+        {
+            AnimationNodeConfig config;
+            for (const auto& ch : channels)
+            {
+                EXPECT_TRUE(config.addChannel(ch));
+            }
+
+            if (!config.setExposingOfChannelDataAsProperties(GetParam()))
+                return nullptr;
+
+            return m_logicEngine.createAnimationNode(config, name);
+        }
+
         template <typename T>
         void advanceAnimationAndExpectValues(AnimationNode& animNode, float timeDelta, const T& expectedValue)
         {
@@ -90,11 +105,20 @@ namespace rlogic::internal
         DataArray* m_dataVec4 = nullptr;
     };
 
-    TEST_F(AnAnimationNode, IsCreated)
+    INSTANTIATE_TEST_SUITE_P(
+        AnAnimationNode_TestInstances,
+        AnAnimationNode,
+        ::testing::Values(
+            false, // without animation data exposed as properties
+            true)  // with animation data exposed as properties
+    );
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, IsCreated)
     {
         const AnimationChannel channel{ "channel", m_dataFloat, m_dataVec2 };
         const AnimationChannels channels{ channel, channel };
-        const auto animNode = m_logicEngine.createAnimationNode(channels, "animNode");
+        const auto animNode = createAnimationNode(channels, "animNode");
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
         ASSERT_NE(nullptr, animNode);
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("animNode"));
@@ -104,17 +128,19 @@ namespace rlogic::internal
         EXPECT_EQ(channels, animNode->getChannels());
     }
 
-    TEST_F(AnAnimationNode, IsDestroyed)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, IsDestroyed)
     {
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
+        const auto animNode = createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
         EXPECT_TRUE(m_logicEngine.destroy(*animNode));
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("animNode"));
     }
 
-    TEST_F(AnAnimationNode, FailsToBeDestroyedIfFromOtherLogicInstance)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, FailsToBeDestroyedIfFromOtherLogicInstance)
     {
-        auto animNode = m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
+        auto animNode = createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
 
         LogicEngine otherEngine;
         EXPECT_FALSE(otherEngine.destroy(*animNode));
@@ -122,9 +148,10 @@ namespace rlogic::internal
         EXPECT_EQ("Can't find AnimationNode in logic engine!", otherEngine.getErrors().front().message);
     }
 
-    TEST_F(AnAnimationNode, ChangesName)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, ChangesName)
     {
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
+        const auto animNode = createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
 
         animNode->setName("an");
         EXPECT_EQ("an", animNode->getName());
@@ -132,7 +159,8 @@ namespace rlogic::internal
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
-    TEST_F(AnAnimationNode, CanContainVariousAnimationChannels)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanContainVariousAnimationChannels)
     {
         const auto timeStamps1 = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f });
         const auto timeStamps2 = m_logicEngine.createDataArray(std::vector<float>{ 3.f, 4.f, 5.f });
@@ -145,7 +173,7 @@ namespace rlogic::internal
         const AnimationChannel channel4{ "channel4", timeStamps1, data1, EInterpolationType::Cubic, data1, data1 };
         const AnimationChannels channels{ channel1, channel2, channel3, channel4 };
 
-        const auto animNode = m_logicEngine.createAnimationNode(channels, "animNode");
+        const auto animNode = createAnimationNode(channels, "animNode");
 
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
         ASSERT_NE(nullptr, animNode);
@@ -156,15 +184,16 @@ namespace rlogic::internal
         EXPECT_EQ(channels, animNode->getChannels());
     }
 
-    TEST_F(AnAnimationNode, HasPropertiesMatchingChannels)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, HasPropertiesMatchingChannels)
     {
         const AnimationChannel channel1{ "channel1", m_dataFloat, m_dataFloat };
         const AnimationChannel channel2{ "channel2", m_dataFloat, m_dataVec4, EInterpolationType::Linear_Quaternions };
-        const auto animNode = m_logicEngine.createAnimationNode({ channel1, channel2 }, "animNode");
+        const auto animNode = createAnimationNode({ channel1, channel2 }, "animNode");
 
         const auto rootIn = animNode->getInputs();
         EXPECT_EQ("IN", rootIn->getName());
-        ASSERT_EQ(5u, rootIn->getChildCount());
+        ASSERT_EQ(rootIn->getChildCount(), GetParam() ? 6u : 5u); // with/out animation data properties
         EXPECT_EQ("timeDelta", rootIn->getChild(0u)->getName());
         EXPECT_EQ("play", rootIn->getChild(1u)->getName());
         EXPECT_EQ("loop", rootIn->getChild(2u)->getName());
@@ -187,118 +216,43 @@ namespace rlogic::internal
         EXPECT_EQ(EPropertyType::Vec4f, rootOut->getChild(2u)->getType());
     }
 
-    TEST_F(AnAnimationNode, DeterminesDurationFromHighestTimestamp)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, DeterminesDurationFromHighestTimestamp)
     {
         const auto timeStamps1 = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f });
         const auto timeStamps2 = m_logicEngine.createDataArray(std::vector<float>{ 4.f, 5.f, 6.f });
 
-        const auto animNode1 = m_logicEngine.createAnimationNode({ { "channel", timeStamps1, m_dataVec2 } }, "animNode1");
+        const auto animNode1 = createAnimationNode({ { "channel", timeStamps1, m_dataVec2 } }, "animNode1");
         EXPECT_FLOAT_EQ(3.f, animNode1->getDuration());
-        const auto animNode2 = m_logicEngine.createAnimationNode({ { "channel1", timeStamps1, m_dataVec2 }, { "channel2", timeStamps2, m_dataVec2 } }, "animNode2");
+        const auto animNode2 = createAnimationNode({ { "channel1", timeStamps1, m_dataVec2 }, { "channel2", timeStamps2, m_dataVec2 } }, "animNode2");
         EXPECT_FLOAT_EQ(6.f, animNode2->getDuration());
     }
 
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfMissingTimestampsOrKeyframes)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, FailsToBeCreatedWithNoChannels)
     {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({}, "animNode"));
+        EXPECT_EQ(nullptr, createAnimationNode({}, "animNode"));
         EXPECT_EQ("Failed to create AnimationNode 'animNode': must provide at least one channel.", m_logicEngine.getErrors().front().message);
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", nullptr, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': every channel must provide timestamps and keyframes data.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, nullptr }, validChannel }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': every channel must provide timestamps and keyframes data.", m_logicEngine.getErrors().front().message);
     }
 
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfTimestampsOrKeyframesTypeInvalid)
-    {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
-        const auto dataVec2OtherSize = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 2.f } }); // single element only
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataVec2, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': all channel timestamps must be float type.", m_logicEngine.getErrors().front().message);
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, dataVec2OtherSize } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': number of keyframes must be same as number of timestamps.", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfTimestampsNotStrictlyAscending)
-    {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
-
-        const auto timeStampsDescending = m_logicEngine.createDataArray(std::vector<float>{ { 1.f, 3.f, 2.f } });
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", timeStampsDescending, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': timestamps have to be strictly in ascending order.", m_logicEngine.getErrors().front().message);
-
-        const auto timeStampsNotStrictAscend = m_logicEngine.createDataArray(std::vector<float>{ { 1.f, 2.f, 2.f } });
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", timeStampsNotStrictAscend, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': timestamps have to be strictly in ascending order.", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfTangentsProvidedForNonCubicInterpolation)
-    {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Linear, m_dataVec2, nullptr } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents were provided for other than cubic interpolation type.", m_logicEngine.getErrors().front().message);
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Linear, nullptr, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents were provided for other than cubic interpolation type.", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfQuaternionInterpolationWithNonVec4fKeyframes)
-    {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Linear_Quaternions } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': quaternion animation requires the channel keyframes to be of type vec4f.", m_logicEngine.getErrors().front().message);
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic_Quaternions, m_dataVec2, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': quaternion animation requires the channel keyframes to be of type vec4f.", m_logicEngine.getErrors().front().message);
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic_Quaternions, m_dataVec2, m_dataVec2 }, validChannel }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': quaternion animation requires the channel keyframes to be of type vec4f.", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfInputRequirementsNotMet_specificToCubicInerpolation)
-    {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, m_dataVec2, m_dataVec2 };
-        EXPECT_NE(nullptr, m_logicEngine.createAnimationNode({ validChannel }, "animNode"));
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, m_dataVec2, nullptr } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': cubic interpolation requires tangents to be provided.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, nullptr, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': cubic interpolation requires tangents to be provided.", m_logicEngine.getErrors().front().message);
-
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, m_dataVec2, m_dataFloat } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents must be of same data type as keyframes.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, m_dataFloat, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents must be of same data type as keyframes.", m_logicEngine.getErrors().front().message);
-
-        const auto dataVec2OtherSize = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 2.f } }); // single element only
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, m_dataVec2, dataVec2OtherSize } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': number of tangents in/out must be same as number of keyframes.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, dataVec2OtherSize, m_dataVec2 } }, "animNode"));
-        EXPECT_EQ("Failed to create AnimationNode 'animNode': number of tangents in/out must be same as number of keyframes.", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(AnAnimationNode, FailsToBeCreatedIfDataArrayFromOtherLogicInstance)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, FailsToBeCreatedIfDataArrayFromOtherLogicInstance)
     {
         LogicEngine otherInstance;
         auto otherInstanceData = otherInstance.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f });
 
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ { "channel", otherInstanceData, m_dataFloat } }, "animNode"));
+        EXPECT_EQ(nullptr, createAnimationNode({ { "channel", otherInstanceData, m_dataFloat } }, "animNode"));
         EXPECT_EQ("Failed to create AnimationNode 'animNode': timestamps or keyframes were not found in this logic instance.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, otherInstanceData } }, "animNode"));
+        EXPECT_EQ(nullptr, createAnimationNode({ { "channel", m_dataFloat, otherInstanceData } }, "animNode"));
         EXPECT_EQ("Failed to create AnimationNode 'animNode': timestamps or keyframes were not found in this logic instance.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, m_dataFloat, EInterpolationType::Cubic, otherInstanceData, m_dataFloat } }, "animNode"));
+        EXPECT_EQ(nullptr, createAnimationNode({ { "channel", m_dataFloat, m_dataFloat, EInterpolationType::Cubic, otherInstanceData, m_dataFloat } }, "animNode"));
         EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents were not found in this logic instance.", m_logicEngine.getErrors().front().message);
-        EXPECT_EQ(nullptr, m_logicEngine.createAnimationNode({ { "channel", m_dataFloat, m_dataFloat, EInterpolationType::Cubic, m_dataFloat, otherInstanceData } }, "animNode"));
+        EXPECT_EQ(nullptr, createAnimationNode({ { "channel", m_dataFloat, m_dataFloat, EInterpolationType::Cubic, m_dataFloat, otherInstanceData } }, "animNode"));
         EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents were not found in this logic instance.", m_logicEngine.getErrors().front().message);
     }
 
-    TEST_F(AnAnimationNode, CanBeSerializedAndDeserialized)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanBeSerializedAndDeserialized)
     {
         WithTempDirectory tempDir;
 
@@ -315,8 +269,22 @@ namespace rlogic::internal
             const AnimationChannel channel3{ "channel3", timeStamps2, data2, EInterpolationType::Linear };
             const AnimationChannel channel4{ "channel4", timeStamps1, data1, EInterpolationType::Cubic, data1, data1 };
 
-            otherEngine.createAnimationNode({ channel1, channel2, channel3, channel4 }, "animNode1");
-            otherEngine.createAnimationNode({ channel4, channel3, channel2, channel1 }, "animNode2");
+            AnimationNodeConfig config1;
+            EXPECT_TRUE(config1.addChannel(channel1));
+            EXPECT_TRUE(config1.addChannel(channel2));
+            EXPECT_TRUE(config1.addChannel(channel3));
+            EXPECT_TRUE(config1.addChannel(channel4));
+            EXPECT_TRUE(config1.setExposingOfChannelDataAsProperties(GetParam()));
+
+            AnimationNodeConfig config2;
+            EXPECT_TRUE(config2.addChannel(channel4));
+            EXPECT_TRUE(config2.addChannel(channel3));
+            EXPECT_TRUE(config2.addChannel(channel2));
+            EXPECT_TRUE(config2.addChannel(channel1));
+            EXPECT_TRUE(config2.setExposingOfChannelDataAsProperties(GetParam()));
+
+            otherEngine.createAnimationNode(config1, "animNode1");
+            otherEngine.createAnimationNode(config2, "animNode2");
 
             ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin"));
         }
@@ -355,7 +323,7 @@ namespace rlogic::internal
         {
             const auto rootIn = animNode->getInputs();
             EXPECT_EQ("IN", rootIn->getName());
-            ASSERT_EQ(5u, rootIn->getChildCount());
+            ASSERT_EQ(rootIn->getChildCount(), GetParam() ? 6u : 5u); // with/out animation data properties
             EXPECT_EQ("timeDelta", rootIn->getChild(0u)->getName());
             EXPECT_EQ("play", rootIn->getChild(1u)->getName());
             EXPECT_EQ("loop", rootIn->getChild(2u)->getName());
@@ -390,7 +358,8 @@ namespace rlogic::internal
         EXPECT_EQ("channel1", rootOut2->getChild(4u)->getName());
     }
 
-    TEST_F(AnAnimationNode, WillSerializeAnimationInputStatesButNotProgress)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillSerializeAnimationInputStatesButNotProgress)
     {
         WithTempDirectory tempDir;
 
@@ -401,7 +370,10 @@ namespace rlogic::internal
             const auto timeStamps = otherEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "ts");
             const auto data = otherEngine.createDataArray(std::vector<int32_t>{ 10, 20 }, "data");
             const AnimationChannel channel{ "channel", timeStamps, data, EInterpolationType::Linear };
-            const auto animNode = otherEngine.createAnimationNode({ channel }, "animNode");
+            AnimationNodeConfig config;
+            config.addChannel(channel);
+            config.setExposingOfChannelDataAsProperties(GetParam());
+            const auto animNode = otherEngine.createAnimationNode(config, "animNode");
 
             EXPECT_TRUE(animNode->getInputs()->getChild("play")->set(true));
             EXPECT_TRUE(animNode->getInputs()->getChild("loop")->set(true));
@@ -435,11 +407,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<int32_t>(*animNode, 1.5f, 15);
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_step_vec2f)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_step_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -449,11 +422,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 1.f, 20.f }); // no change pass end of animation
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_step_vec2i)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_step_vec2i)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2i>{ { 0, 10 }, { 1, 20 } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -463,11 +437,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // no change pass end of animation
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2f)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -479,11 +454,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2i)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2i)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2i>{ { 0, 10 }, { 1, 20 } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -495,10 +471,11 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_linear_quaternions)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_quaternions)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, m_dataVec4, EInterpolationType::Linear_Quaternions } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, m_dataVec4, EInterpolationType::Linear_Quaternions } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -509,7 +486,8 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_cubic_vec2f)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
@@ -517,7 +495,7 @@ namespace rlogic::internal
         const auto tangentsIn = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 0.f }, { -1.f, -2.f } });
         const auto tangentsOut = m_logicEngine.createDataArray(std::vector<vec2f>{ { 2.f, 5.f }, { 0.f, 0.f } });
         // animation with one channel using zero tangents and another channel with non-zero tangents
-        const auto animNode = m_logicEngine.createAnimationNode({
+        const auto animNode = createAnimationNode({
             { "channel1", timeStamps, data, EInterpolationType::Cubic, tangentsZero, tangentsZero },
             { "channel2", timeStamps, data, EInterpolationType::Cubic, tangentsIn, tangentsOut },
             });
@@ -532,11 +510,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues_twoChannels(*animNode, 100.f, { 1.f, 20.f }, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
         const auto tangentsZero = m_logicEngine.createDataArray(std::vector<vec4f>{ { 0.f, 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({{ "channel", timeStamps, m_dataVec4, EInterpolationType::Cubic_Quaternions, tangentsZero, tangentsZero }});
+        const auto animNode = createAnimationNode({{ "channel", timeStamps, m_dataVec4, EInterpolationType::Cubic_Quaternions, tangentsZero, tangentsZero }});
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -549,12 +528,13 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions_withTangents)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions_withTangents)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
         const auto tangentsIn = m_logicEngine.createDataArray(std::vector<vec4f>{ { 0.f, 0.f, 0.f, 0.f }, { 1.f, 1.f, 0.f, 0.f }, { 1.f, 1.f, 0.f, 0.f } });
         const auto tangentsOut = m_logicEngine.createDataArray(std::vector<vec4f>{ { 1.f, 1.f, 0.f, 0.f}, {  1.f, 1.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, m_dataVec4, EInterpolationType::Cubic_Quaternions, tangentsIn, tangentsOut } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, m_dataVec4, EInterpolationType::Cubic_Quaternions, tangentsIn, tangentsOut } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -567,13 +547,14 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatesKeyframeValues_cubic_vec2i)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_vec2i)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2i>{ { 0, 10 }, { 1, 20 } });
         const auto tangentsIn = m_logicEngine.createDataArray(std::vector<vec2i>{ { 0, 0 }, { -1, -2 } });
         const auto tangentsOut = m_logicEngine.createDataArray(std::vector<vec2i>{ { 2, 5 }, { 0, 0 } });
-        const auto animNode = m_logicEngine.createAnimationNode({
+        const auto animNode = createAnimationNode({
             { "channel", timeStamps, data, EInterpolationType::Cubic, tangentsIn, tangentsOut },
             });
 
@@ -587,11 +568,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, InterpolatedValueBeforeFirstTimestampIsFirstKeyframe)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, InterpolatedValueBeforeFirstTimestampIsFirstKeyframe)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 20.f }, { 2.f, 30.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -602,11 +584,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 2.f, 30.f }); // stays at last keyframe after animation end
     }
 
-    TEST_F(AnAnimationNode, CanPauseAndResumePlayViaProperty)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanPauseAndResumePlayViaProperty)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.f, { 0.f, 10.f });
@@ -627,11 +610,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.2f, { 1.f, 20.f }); // anim time 1.0
     }
 
-    TEST_F(AnAnimationNode, WillNotUpdateIfTimeDeltaNegative)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillNotUpdateIfTimeDeltaNegative)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -646,11 +630,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
     }
 
-    TEST_F(AnAnimationNode, CanPlayLoopingAnimation)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanPlayLoopingAnimation)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("loop")->set(true);
@@ -667,11 +652,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 100.f, 20.f); // crossed end and stays at last keyframe
     }
 
-    TEST_F(AnAnimationNode, CanStartLoopingEvenAfterAnimationFinished)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanStartLoopingEvenAfterAnimationFinished)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -685,11 +671,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 0.4f, 16.f);
     }
 
-    TEST_F(AnAnimationNode, WillRewindAnimationOnStop)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillRewindAnimationOnStop)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("rewindOnStop")->set(true);
@@ -716,11 +703,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
     }
 
-    TEST_F(AnAnimationNode, WillRewindAnimationWhenRewindEnabledEvenAfterAnimationFinishedAndStopped)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillRewindAnimationWhenRewindEnabledEvenAfterAnimationFinishedAndStopped)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         advanceAnimationAndExpectValues(*animNode, 100.f, 20.f);
@@ -736,11 +724,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
     }
 
-    TEST_F(AnAnimationNode, WillPlayAnimationWithinGivenTimeRange)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillPlayAnimationWithinGivenTimeRange)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
@@ -750,22 +739,24 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 5.f, 30.f); // stays at time range end
     }
 
-    TEST_F(AnAnimationNode, WillStopAtTimeRangeEnd)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillStopAtTimeRangeEnd)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
         advanceAnimationAndExpectValues(*animNode, 100.f, 30.f); // stays at time range end
     }
 
-    TEST_F(AnAnimationNode, WillRewindToBeginningOfTimeRange)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillRewindToBeginningOfTimeRange)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
@@ -780,11 +771,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 100.f, 30.f); // stays at time range end
     }
 
-    TEST_F(AnAnimationNode, WillLoopWithinTimeRange)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillLoopWithinTimeRange)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("loop")->set(true);
@@ -796,11 +788,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 101.f, 22.f); // next several loops
     }
 
-    TEST_F(AnAnimationNode, WillUseOriginalDurationAsTimeRangeEndIfTimeRangeEndNotSpecified)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillUseOriginalDurationAsTimeRangeEndIfTimeRangeEndNotSpecified)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 0.f }); // unspecified time range end
@@ -808,11 +801,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 100.f, 40.f); // stays at animation end
     }
 
-    TEST_F(AnAnimationNode, CanChangeTimeRangeWhilePlayingAndAlwaysStaysWithinGivenTimeRange)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanChangeTimeRangeWhilePlayingAndAlwaysStaysWithinGivenTimeRange)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode->getInputs()->getChild("play")->set(true);
         animNode->getInputs()->getChild("loop")->set(true);
@@ -836,11 +830,12 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 2.f, 11.f); // loops within this range
     }
 
-    TEST_F(AnAnimationNode, WillFailUpdateIfTimeRangeInvalid)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, WillFailUpdateIfTimeRangeInvalid)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } }, "anim");
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } }, "anim");
 
         animNode->getInputs()->getChild("play")->set(true);
 
@@ -860,12 +855,13 @@ namespace rlogic::internal
         EXPECT_EQ("AnimationNode 'anim' failed to update - time range begin must be smaller than end and not negative (given time range [1, 1])", m_logicEngine.getErrors().front().message);
     }
 
-    TEST_F(AnAnimationNode, GivesStableResultsWithExtremelySmallTimeDelta)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, GivesStableResultsWithExtremelySmallTimeDelta)
     {
         constexpr float Eps = std::numeric_limits<float>::epsilon();
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ Eps * 100, Eps * 200 });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 1.f,  2.f } });
-        auto& animNode = *m_logicEngine.createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+        auto& animNode = *createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
         animNode.getInputs()->getChild("play")->set(true);
         // initialize output value by updating with zero timedelta and expect first keyframe value
@@ -885,6 +881,20 @@ namespace rlogic::internal
         }
         // expect last keyframe value
         EXPECT_FLOAT_EQ(2.f, lastValue);
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanBeCreatedWithMoreThanMaximumArraySizeKeyframesIfNotExposedViaProperties)
+    {
+        std::vector<float> vecDataExceeding;
+        vecDataExceeding.resize(MaxArrayPropertySize + 1u);
+        std::iota(vecDataExceeding.begin(), vecDataExceeding.end(), 1.f);
+        const auto dataExceeding = m_logicEngine.createDataArray(vecDataExceeding);
+
+        const AnimationChannel channelExceeding{ "channel2", dataExceeding, dataExceeding };
+        AnimationNodeConfig config;
+        config.addChannel(channelExceeding);
+        EXPECT_NE(nullptr, m_logicEngine.createAnimationNode(config, "animNode"));
     }
 
     class AnAnimationNode_SerializationLifecycle : public AnAnimationNode
@@ -907,7 +917,8 @@ namespace rlogic::internal
             PropertyInMissing,
             PropertyOutMissing,
             PropertyInWrongName,
-            PropertyOutWrongName
+            PropertyOutWrongName,
+            PropertyChannelsDataInvalid
         };
 
         std::unique_ptr<AnimationNodeImpl> deserializeSerializedDataWithIssue(ESerializationIssue issue)
@@ -933,6 +944,9 @@ namespace rlogic::internal
                 inputs.children.push_back(MakeType("loop", EPropertyType::Bool));
                 inputs.children.push_back(MakeType("rewindOnStop", EPropertyType::Bool));
                 inputs.children.push_back(MakeType("timeRange", EPropertyType::Vec2f));
+                if (issue == ESerializationIssue::PropertyChannelsDataInvalid)
+                    inputs.children.push_back(MakeType("invalidChannelsData", EPropertyType::Array));
+
                 auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::AnimationInput);
 
                 HierarchicalTypeData outputs = MakeStruct("OUT", {});
@@ -969,6 +983,7 @@ namespace rlogic::internal
                     issue == ESerializationIssue::NameMissing ? 0 : flatBufferBuilder.CreateString("animNode"),
                     issue == ESerializationIssue::IdMissing ? 0 : 1u,
                     issue == ESerializationIssue::ChannelsMissing ? 0 : flatBufferBuilder.CreateVector(channelsFB),
+                    issue == ESerializationIssue::PropertyChannelsDataInvalid,
                     issue == ESerializationIssue::RootInMissing ? 0 : PropertyImpl::Serialize(*inputsImpl, flatBufferBuilder, serializationMap),
                     issue == ESerializationIssue::RootOutMissing ? 0 : PropertyImpl::Serialize(*outputsImpl, flatBufferBuilder, serializationMap)
                 );
@@ -983,7 +998,13 @@ namespace rlogic::internal
         ErrorReporting m_errorReporting;
     };
 
-    TEST_F(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfEssentialDataMissing)
+    INSTANTIATE_TEST_SUITE_P(
+        AnAnimationNode_SerializationLifecycle_TestInstances,
+        AnAnimationNode_SerializationLifecycle,
+        ::testing::Values(false, true));
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfEssentialDataMissing)
     {
         EXPECT_TRUE(deserializeSerializedDataWithIssue(AnAnimationNode_SerializationLifecycle::ESerializationIssue::AllValid));
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
@@ -997,7 +1018,8 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfChannelDataMissing)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfChannelDataMissing)
     {
         for (const auto issue : { ESerializationIssue::ChannelTimestampsMissing, ESerializationIssue::ChannelKeyframesMissing })
         {
@@ -1008,7 +1030,8 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfTangentsMissing)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfTangentsMissing)
     {
         for (const auto issue : { ESerializationIssue::ChannelTangentsInMissing, ESerializationIssue::ChannelTangentsOutMissing })
         {
@@ -1019,7 +1042,8 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidInterpolationType)
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidInterpolationType)
     {
         EXPECT_FALSE(deserializeSerializedDataWithIssue(ESerializationIssue::InvalidInterpolationType));
         ASSERT_FALSE(m_errorReporting.getErrors().empty());
@@ -1033,5 +1057,13 @@ namespace rlogic::internal
             EXPECT_EQ("Fatal error during loading of AnimationNode 'animNode': missing or invalid properties!", m_errorReporting.getErrors().front().message);
             m_errorReporting.clear();
         }
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidChannelsData)
+    {
+        EXPECT_FALSE(deserializeSerializedDataWithIssue(ESerializationIssue::PropertyChannelsDataInvalid));
+        ASSERT_FALSE(m_errorReporting.getErrors().empty());
+        EXPECT_EQ("Fatal error during loading of AnimationNode 'animNode': missing or invalid channels data property!", m_errorReporting.getErrors().front().message);
     }
 }

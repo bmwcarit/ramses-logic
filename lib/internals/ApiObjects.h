@@ -59,6 +59,7 @@ namespace rlogic::internal
 {
     class SolState;
     class IRamsesObjectResolver;
+    class AnimationNodeConfigImpl;
 
     template <typename T>
     using ApiObjectContainer = std::vector<T*>;
@@ -103,7 +104,7 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
-        AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name);
+        AnimationNode* createAnimationNode(const AnimationNodeConfigImpl& config, std::string_view name);
         TimerNode* createTimerNode(std::string_view name);
         bool destroy(LogicObject& object, ErrorReporting& errorReporting);
 
@@ -129,6 +130,8 @@ namespace rlogic::internal
 
         // Strictly for testing purposes (inverse mappings require extra attention and test coverage)
         [[nodiscard]] const std::unordered_map<LogicNodeImpl*, LogicNode*>& getReverseImplMapping() const;
+
+        [[nodiscard]] int getNumElementsInLuaStack() const;
 
     private:
         // Handle internal data structures and mappings

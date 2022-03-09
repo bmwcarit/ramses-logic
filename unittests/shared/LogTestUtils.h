@@ -50,4 +50,27 @@ namespace rlogic
         ELogMessageType m_savedLogVerbosityLimit;
         bool m_unsetCustomHandler = false;
     };
+
+    struct TestLog
+    {
+        ELogMessageType type;
+        std::string message;
+    };
+
+    class TestLogCollector
+    {
+    public:
+        explicit TestLogCollector(ELogMessageType verbosityLimit)
+            : m_logCollector(verbosityLimit, [this](ELogMessageType type, std::string_view message)
+                {
+                    logs.emplace_back(TestLog{type, std::string{message}});
+                })
+        {
+        }
+
+        std::vector<TestLog> logs;
+
+    private:
+        ScopedLogContextLevel m_logCollector;
+    };
 }

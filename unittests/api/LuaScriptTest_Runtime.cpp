@@ -34,7 +34,7 @@ namespace rlogic
     protected:
     };
 
-    // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
+    // TODO Violin this can be fixed. Fix it!
     TEST_F(ALuaScript_Runtime, DISABLED_GeneratesErrorWhenOverwritingInputsInRunFunction)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
@@ -1665,32 +1665,26 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesNoErrorIfOutputIsSetInFunction)
     {
         auto script = m_logicEngine.createLuaScript(R"(
+            function init()
+                GLOBAL.setPrimitive = function (output)
+                    output.param = 42
+                end
+                GLOBAL.setSubStruct = function (output)
+                    output.struct = {
+                        param = 43
+                    }
+                end
+            end
+
             function interface()
                 OUT.param = INT
-                OUT.struct1 = {
+                OUT.struct = {
                     param = INT
-                }
-                OUT.struct2 = {
-                    param = INT
-                }
-            end
-            function setPrimitive(output)
-                output.param = 42
-            end
-            function setSubStruct(output)
-                output.struct1 = {
-                    param = 43
-                }
-            end
-            function setSubStruct2(output)
-                output = {
-                    param = 44
                 }
             end
             function run()
-                setPrimitive(OUT)
-                setSubStruct(OUT)
-                -- setSubStruct2(OUT.struct2) does not work right now
+                GLOBAL.setPrimitive(OUT)
+                GLOBAL.setSubStruct(OUT)
             end
         )");
 
@@ -1699,39 +1693,14 @@ namespace rlogic
         const auto outputs = script->getOutputs();
         ASSERT_NE(nullptr, outputs);
 
-        ASSERT_EQ(3u, outputs->getChildCount());
+        ASSERT_EQ(2u, outputs->getChildCount());
         const auto param = outputs->getChild(0);
         const auto struct1 = outputs->getChild(1);
-        //const auto struct2 = outputs->getChild(2);
 
         EXPECT_EQ(42, param->get<int32_t>());
 
         ASSERT_EQ(1u, struct1->getChildCount());
         EXPECT_EQ(43, struct1->getChild(0)->get<int32_t>());
-
-        // TODO Make this variant possible
-        //ASSERT_EQ(1u, struct2->getChildCount());
-        //EXPECT_EQ(44, struct2->getChild(0)->get<int32_t>());
-    }
-
-    TEST_F(ALuaScript_Runtime, DoesNotSetOutputIfOutputParamIsPassedToFunction)
-    {
-        auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.param = INT
-            end
-            function foo(output)
-                param = 42
-            end
-            function run()
-                foo(OUT.param)
-            end
-        )");
-
-        ASSERT_NE(nullptr, script);
-        EXPECT_TRUE(m_logicEngine.update());
-        const auto outputs = script->getOutputs();
-        EXPECT_EQ(0, outputs->getChild(0)->get<int32_t>());
     }
 
     TEST_F(ALuaScript_Runtime, HasNoInfluenceOnBindingsIfTheyAreNotLinked)
@@ -1871,8 +1840,10 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, IncludesStandardLibraries_WhenConfiguredWithThem)
     {
         const std::string_view scriptSrc = R"(
-            function debug_func(arg)
-                print(arg)
+            function init()
+                GLOBAL.debug_func = function (arg)
+                    print(arg)
+                end
             end
 
             function interface()
@@ -1889,7 +1860,7 @@ namespace rlogic
                 -- test table lib
                 OUT.table_maxn = table.maxn ({11, 12, 13})
                 -- test debug lib
-                local debuginfo = debug.getinfo (debug_func)
+                local debuginfo = debug.getinfo (GLOBAL.debug_func)
                 OUT.language_of_debug_func = debuginfo.what
             end
         )";
@@ -1998,18 +1969,18 @@ namespace rlogic
 
                 for unused, container in pairs(objectsToCheck) do
                     ---- no index specified is the same as providing nil (see below)
-                    k, v = rl_next(container)
+                    local k, v = rl_next(container)
                     assert(k == 'a')
                     assert(v == 11)
                     -- index=nil -> yields first element of container and its index
-                    k, v = rl_next(container, nil)
+                    local k, v = rl_next(container, nil)
                     assert(k == 'a')
                     assert(v == 11)
                     -- index==N -> yields element N+1 and its index
-                    k, v = rl_next(container, 'a')
+                    local k, v = rl_next(container, 'a')
                     assert(k == 'b')
                     assert(v == 12)
-                    k, v = rl_next(container, 'b')
+                    local k, v = rl_next(container, 'b')
                     assert(k == nil)
                     assert(v == nil)
                 end
@@ -2047,18 +2018,18 @@ namespace rlogic
 
                 for k, container in pairs(objectsToCheck) do
                     -- no index specified is the same as providing nil (see below)
-                    a, b = rl_next(container)
+                    local a, b = rl_next(container)
                     assert(a == 1)
                     assert(b == 11)
                     -- index=nil -> yields first element of container and its index
-                    a, b = rl_next(container, nil)
+                    local a, b = rl_next(container, nil)
                     assert(a == 1)
                     assert(b == 11)
                     -- index==N -> yields element N+1 and its index
-                    a, b = rl_next(container, 1)
+                    local a, b = rl_next(container, 1)
                     assert(a == 2)
                     assert(b == 12)
-                    a, b = rl_next(container, 2)
+                    local a, b = rl_next(container, 2)
                     assert(a == nil)
                     assert(b == nil)
                 end
@@ -2100,6 +2071,7 @@ namespace rlogic
                 for k, container in pairs(objectsToCheck) do
                     -- iterate manually over reference table...
                     local refKey = 1
+                    local refValue = nil
                     for key, value in rl_ipairs(container) do
                         if type(key) ~= 'number' then
                             error('Key should be of type number!')
@@ -2109,7 +2081,7 @@ namespace rlogic
                             error("Expected key==refKey, but found " .. tostring(key) .. " != " .. tostring(refKey))
                         end
 
-                        local refValue = refTable[refKey]
+                        refValue = refTable[refKey]
                         if value ~= refValue then
                             error("Expected value==refValue, but found " .. tostring(value) .. " != " .. tostring(refValue))
                         end
@@ -2119,7 +2091,7 @@ namespace rlogic
 
                     -- make sure there were exactly as many elements in refTable by checking no element is left to iterate
                     assert(refKey == 3)
-                    assert(refValue == nil)
+                    assert(refValue == 12)
                 end
 
             end
@@ -2261,5 +2233,104 @@ namespace rlogic
         script->getInputs()->getChild("nested")->getChild("int")->set<int32_t>(42);
         script->getInputs()->getChild("nested")->getChild("bool")->set<bool>(false);
         EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    class ALuaScript_Runtime_Sandboxing : public ALuaScript_Runtime
+    {
+    };
+
+    TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenTryingToReadUnknownGlobals)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+
+            function run()
+                local t = someGlobalVariable
+            end)");
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr(
+                "Unexpected global access to key 'someGlobalVariable' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+    }
+
+    TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenSettingGlobals)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+
+            function run()
+                thisCausesError = 'bad'
+            end)");
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr("Unexpected global variable definition 'thisCausesError' in run()! Use the init() function to declare global data and functions, or use modules!"));
+    }
+
+    TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenTryingToOverrideGlobals)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function init()
+            end
+
+            function interface()
+            end
+
+            function run()
+                GLOBAL = {}
+            end)");
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_FALSE(m_logicEngine.update());
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr(" Trying to override the GLOBAL table in run()! You can only read data, but not overwrite the table!"));
+    }
+
+    TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenTryingToDeclareRunFunctionTwice)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+
+            function run()
+            end
+
+            function run()
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr("Function 'run' can only be declared once!"));
+    }
+
+    TEST_F(ALuaScript_Runtime_Sandboxing, ForbidsCallingSpecialFunctions)
+    {
+        for (const auto& specialFunction  : std::vector<std::string>{ "init", "run", "interface" })
+        {
+            LuaScript* script = m_logicEngine.createLuaScript(fmt::format(R"(
+                function init()
+                end
+                function interface()
+                end
+
+                function run()
+                    {}()
+                end
+            )", specialFunction));
+
+            ASSERT_NE(nullptr, script);
+
+            EXPECT_FALSE(m_logicEngine.update());
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+                ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'", specialFunction)));
+
+            ASSERT_TRUE(m_logicEngine.destroy(*script));
+        }
     }
 }

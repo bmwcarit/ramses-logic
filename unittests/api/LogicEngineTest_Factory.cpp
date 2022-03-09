@@ -12,6 +12,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/LuaModule.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 
 #include "impl/LogicNodeImpl.h"
 
@@ -244,7 +245,9 @@ namespace rlogic
         LogicObject* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         LogicObject* cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         LogicObject* dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        LogicObject* animNode          = m_logicEngine.createAnimationNode({{"channel", dataArray->as<DataArray>(), dataArray->as<DataArray>()}}, "animNode");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray->as<DataArray>(), dataArray->as<DataArray>(), EInterpolationType::Linear });
+        LogicObject* animNode          = m_logicEngine.createAnimationNode(config, "animNode");
 
         EXPECT_TRUE(luaModule->as<LuaModule>());
         EXPECT_TRUE(luaScript->as<LuaScript>());
@@ -293,8 +296,10 @@ namespace rlogic
         m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
-        const LogicObject* dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        m_logicEngine.createAnimationNode({{"channel", dataArray->as<DataArray>(), dataArray->as<DataArray>()}}, "animNode");
+        const LogicObject* dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray->as<DataArray>(), dataArray->as<DataArray>(), EInterpolationType::Linear });
+        m_logicEngine.createAnimationNode(config, "animNode");
 
         const auto& immutableLogicEngine = m_logicEngine;
         const auto* luaModuleConst         = immutableLogicEngine.findByName<LogicObject>("luaModule");
@@ -355,6 +360,7 @@ namespace rlogic
             }
 
             std::optional<internal::LogicNodeRuntimeError> update() override { return std::nullopt; }
+            void createRootProperties() final {}
         };
 
         struct UnknownObject : LogicNode

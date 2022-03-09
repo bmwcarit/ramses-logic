@@ -33,6 +33,7 @@ Class Index
     RamsesBinding
     RamsesCameraBinding
     RamsesNodeBinding
+    SaveFileConfig
     TimerNode
 
 

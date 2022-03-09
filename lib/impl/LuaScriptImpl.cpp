@@ -17,6 +17,8 @@
 #include "internals/SolHelper.h"
 #include "internals/ErrorReporting.h"
 #include "internals/FileFormatVersions.h"
+#include "internals/PropertyTypeExtractor.h"
+#include "internals/EnvironmentProtection.h"
 
 #include "generated/LuaScriptGen.h"
 
@@ -29,16 +31,22 @@ namespace rlogic::internal
         , m_source(std::move(compiledScript.source.sourceCode))
         , m_wrappedRootInput(*compiledScript.rootInput->m_impl)
         , m_wrappedRootOutput(*compiledScript.rootOutput->m_impl)
-        , m_solFunction(std::move(compiledScript.mainFunction))
+        , m_runFunction(std::move(compiledScript.runFunction))
         , m_modules(std::move(compiledScript.source.userModules))
         , m_stdModules(std::move(compiledScript.source.stdModules))
     {
         setRootProperties(std::move(compiledScript.rootInput), std::move(compiledScript.rootOutput));
 
-        sol::environment env = sol::get_environment(m_solFunction);
+        sol::environment env = sol::get_environment(m_runFunction);
+        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
 
-        env["IN"] = std::ref(m_wrappedRootInput);
-        env["OUT"] = std::ref(m_wrappedRootOutput);
+        internalEnv["IN"] = std::ref(m_wrappedRootInput);
+        internalEnv["OUT"] = std::ref(m_wrappedRootOutput);
+    }
+
+    void LuaScriptImpl::createRootProperties()
+    {
+        // unlike other logic objects, luascript properties created outside of it (from script or deserialized)
     }
 
     flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap)
@@ -180,10 +188,16 @@ namespace rlogic::internal
 
         sol::protected_function mainFunction = load_result;
         sol::environment env = solState.createEnvironment(stdModules, userModules);
+        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
 
         env.set_on(mainFunction);
 
-        sol::protected_function_result main_result = mainFunction();
+        sol::protected_function_result main_result {};
+        {
+            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
+            main_result = mainFunction();
+        }
+
         if (!main_result.valid())
         {
             sol::error error = main_result;
@@ -192,11 +206,18 @@ namespace rlogic::internal
         }
 
         env["GLOBAL"] = solState.createTable();
-        sol::protected_function init = env["init"];
+        sol::protected_function init = internalEnv["init"];
 
         if (init.valid())
         {
-            sol::protected_function_result initResult = init();
+            // in order to support interface definitions in globals we need to register the symbols for init section
+            PropertyTypeExtractor::RegisterTypes(env);
+            sol::protected_function_result initResult {};
+            {
+                ScopedEnvironmentProtection p(env, EEnvProtectionFlag::InitFunction);
+                initResult = init();
+            }
+            PropertyTypeExtractor::UnregisterTypes(env);
 
             if (!initResult.valid())
             {
@@ -206,8 +227,18 @@ namespace rlogic::internal
             }
         }
 
+        sol::protected_function run = internalEnv["run"];
+
+        if (!run.valid())
+        {
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: scripts contains no run() function!", name), nullptr);
+            return nullptr;
+        }
+
         auto inputs = std::make_unique<Property>(std::move(rootInput));
         auto outputs = std::make_unique<Property>(std::move(rootOutput));
+
+        EnvironmentProtection::SetEnvironmentProtectionLevel(env, EEnvProtectionFlag::RunFunction);
 
         return std::make_unique<LuaScriptImpl>(
             LuaCompiledScript{
@@ -217,7 +248,7 @@ namespace rlogic::internal
                     std::move(stdModules),
                     std::move(userModules)
                 },
-                sol::protected_function(std::move(load_result)),
+                std::move(run),
                 std::move(inputs),
                 std::move(outputs)
             },
@@ -226,9 +257,7 @@ namespace rlogic::internal
 
     std::optional<LogicNodeRuntimeError> LuaScriptImpl::update()
     {
-        sol::environment        env  = sol::get_environment(m_solFunction);
-        sol::protected_function runFunction = env["run"];
-        sol::protected_function_result result = runFunction();
+        sol::protected_function_result result = m_runFunction();
 
         if (!result.valid())
         {

@@ -62,8 +62,9 @@ namespace rlogic::internal
 
         std::optional<LogicNodeRuntimeError> update() override;
 
-    private:
+        void createRootProperties() final;
 
+    private:
         std::reference_wrapper<ramses::Appearance> m_ramsesAppearance;
         std::vector<uint32_t> m_uniformIndices;
 

@@ -12,11 +12,13 @@
 #include "ramses-logic/LogicNode.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/TimerNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
 #include "impl/LuaModuleImpl.h"
 #include "impl/LuaConfigImpl.h"
+#include "impl/SaveFileConfigImpl.h"
 #include "impl/LogicEngineReportImpl.h"
 
 #include "internals/FileUtils.h"
@@ -100,7 +102,7 @@ namespace rlogic::internal
         return m_apiObjects->createDataArray(data, name);
     }
 
-    rlogic::AnimationNode* LogicEngineImpl::createAnimationNode(const AnimationChannels& channels, std::string_view name)
+    rlogic::AnimationNode* LogicEngineImpl::createAnimationNode(const AnimationNodeConfig& config, std::string_view name)
     {
         m_errors.clear();
 
@@ -111,37 +113,14 @@ namespace rlogic::internal
             return it != dataArrays.cend();
         };
 
-        if (channels.empty())
+        if (config.getChannels().empty())
         {
             m_errors.add(fmt::format("Failed to create AnimationNode '{}': must provide at least one channel.", name), nullptr);
             return nullptr;
         }
-        for (const auto& channel : channels)
-        {
-            if (!channel.timeStamps || !channel.keyframes)
-            {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': every channel must provide timestamps and keyframes data.", name), nullptr);
-                return nullptr;
-            }
-            // Checked at channel creation type, can't fail here
-            assert(CanPropertyTypeBeAnimated(channel.keyframes->getDataType()));
-            if (channel.timeStamps->getDataType() != EPropertyType::Float)
-            {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': all channel timestamps must be float type.", name), nullptr);
-                return nullptr;
-            }
-            if (channel.timeStamps->getNumElements() != channel.keyframes->getNumElements())
-            {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': number of keyframes must be same as number of timestamps.", name), nullptr);
-                return nullptr;
-            }
-            const auto& timestamps = *channel.timeStamps->getData<float>();
-            if (std::adjacent_find(timestamps.cbegin(), timestamps.cend(), std::greater_equal<float>()) != timestamps.cend())
-            {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': timestamps have to be strictly in ascending order.", name), nullptr);
-                return nullptr;
-            }
 
+        for (const auto& channel : config.getChannels())
+        {
             if (!containsDataArray(channel.timeStamps) ||
                 !containsDataArray(channel.keyframes))
             {
@@ -149,47 +128,15 @@ namespace rlogic::internal
                 return nullptr;
             }
 
-            if ((channel.interpolationType == EInterpolationType::Linear_Quaternions || channel.interpolationType == EInterpolationType::Cubic_Quaternions) &&
-                channel.keyframes->getDataType() != EPropertyType::Vec4f)
+            if ((channel.tangentsIn && !containsDataArray(channel.tangentsIn)) ||
+                (channel.tangentsOut && !containsDataArray(channel.tangentsOut)))
             {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': quaternion animation requires the channel keyframes to be of type vec4f.", name), nullptr);
-                return nullptr;
-            }
-
-            if (channel.interpolationType == EInterpolationType::Cubic || channel.interpolationType == EInterpolationType::Cubic_Quaternions)
-            {
-                if (!channel.tangentsIn || !channel.tangentsOut)
-                {
-                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': cubic interpolation requires tangents to be provided.", name), nullptr);
-                    return nullptr;
-                }
-                if (channel.tangentsIn->getDataType() != channel.keyframes->getDataType() ||
-                    channel.tangentsOut->getDataType() != channel.keyframes->getDataType())
-                {
-                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents must be of same data type as keyframes.", name), nullptr);
-                    return nullptr;
-                }
-                if (channel.tangentsIn->getNumElements() != channel.keyframes->getNumElements() ||
-                    channel.tangentsOut->getNumElements() != channel.keyframes->getNumElements())
-                {
-                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': number of tangents in/out must be same as number of keyframes.", name), nullptr);
-                    return nullptr;
-                }
-                if (!containsDataArray(channel.tangentsIn) ||
-                    !containsDataArray(channel.tangentsOut))
-                {
-                    m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were not found in this logic instance.", name), nullptr);
-                    return nullptr;
-                }
-            }
-            else if (channel.tangentsIn || channel.tangentsOut)
-            {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were provided for other than cubic interpolation type.", name), nullptr);
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were not found in this logic instance.", name), nullptr);
                 return nullptr;
             }
         }
 
-        return m_apiObjects->createAnimationNode(channels, name);
+        return m_apiObjects->createAnimationNode(*config.m_impl, name);
     }
 
     TimerNode* LogicEngineImpl::createTimerNode(std::string_view name)
@@ -265,9 +212,8 @@ namespace rlogic::internal
         if (m_updateReportEnabled)
             m_updateReport.sectionFinished(UpdateReport::ETimingSection::TopologySort);
 
-        // force dirty all timer nodes so they update their tickers
-        for (TimerNode* timerNode : m_apiObjects->getApiObjectContainer<TimerNode>())
-            timerNode->m_impl.setDirty(true);
+        // force dirty all timer nodes and their dependents so they update their tickers
+        setTimerNodesAndDependentsDirty();
 
         const bool success = updateNodes(*sortedNodes);
 
@@ -325,6 +271,22 @@ namespace rlogic::internal
         }
 
         return true;
+    }
+
+    void LogicEngineImpl::setTimerNodesAndDependentsDirty()
+    {
+        for (TimerNode* timerNode : m_apiObjects->getApiObjectContainer<TimerNode>())
+        {
+            // force set timer node itself dirty so it can update its ticker
+            timerNode->m_impl.setDirty(true);
+
+            // force set all nodes linked to timeDelta dirty (timeDelta is often constant but that does not mean update is not needed)
+            auto timeDeltaOutput = timerNode->getOutputs()->getChild(0u);
+            assert(timeDeltaOutput && timeDeltaOutput->getName() == "timeDelta");
+            const auto& outgoingLinks = timeDeltaOutput->m_impl->getOutgoingLinks();
+            for (const auto& outLink : outgoingLinks)
+                outLink.property->getLogicNode().setDirty(true);
+        }
     }
 
     const std::vector<ErrorData>& LogicEngineImpl::getErrors() const
@@ -408,7 +370,7 @@ namespace rlogic::internal
         const auto& ramsesVersion = *logicEngine->ramsesVersion();
         const auto& rlogicVersion = *logicEngine->rlogicVersion();
 
-        LOG_INFO("Loading logic engine contents from '{}' which was exported with Ramses {} and Logic Engine {}", dataSourceDescription, ramsesVersion.v_string()->string_view(), rlogicVersion.v_string()->string_view());
+        LOG_INFO("Loading logic engine content from '{}' which was exported with Ramses {} and Logic Engine {}", dataSourceDescription, ramsesVersion.v_string()->string_view(), rlogicVersion.v_string()->string_view());
 
         if (!CheckRamsesVersionFromFile(ramsesVersion))
         {
@@ -427,6 +389,11 @@ namespace rlogic::internal
             return false;
         }
 
+        if (logicEngine->assetMetedata())
+        {
+            LogAssetMetadata(*logicEngine->assetMetedata());
+        }
+
         RamsesObjectResolver ramsesResolver(m_errors, scene);
 
         std::unique_ptr<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
@@ -442,7 +409,7 @@ namespace rlogic::internal
         return true;
     }
 
-    bool LogicEngineImpl::saveToFile(std::string_view filename)
+    bool LogicEngineImpl::saveToFile(std::string_view filename, const SaveFileConfigImpl& config)
     {
         m_errors.clear();
 
@@ -482,10 +449,24 @@ namespace rlogic::internal
             g_FileFormatVersion);
         builder.Finish(ramsesLogicVersionOffset);
 
+        const auto exporterVersionOffset = rlogic_serialization::CreateVersion(builder,
+            config.getExporterMajorVersion(),
+            config.getExporterMinorVersion(),
+            config.getExporterPatchVersion(),
+            builder.CreateString(""),
+            config.getExporterFileFormatVersion());
+        builder.Finish(exporterVersionOffset);
+
+        const auto assetMetadataOffset = rlogic_serialization::CreateMetadata(builder,
+            builder.CreateString(config.getMetadataString()),
+            exporterVersionOffset);
+        builder.Finish(assetMetadataOffset);
+
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
             ramsesVersionOffset,
             ramsesLogicVersionOffset,
-            ApiObjects::Serialize(*m_apiObjects, builder));
+            ApiObjects::Serialize(*m_apiObjects, builder),
+            assetMetadataOffset);
         builder.Finish(logicEngine);
 
         if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
@@ -497,6 +478,19 @@ namespace rlogic::internal
         LOG_INFO("Saved logic engine to file: '{}'.", filename);
 
         return true;
+    }
+
+    void LogicEngineImpl::LogAssetMetadata(const rlogic_serialization::Metadata& assetMetadata)
+    {
+        const std::string_view metadataString = assetMetadata.metadataString() ? assetMetadata.metadataString()->string_view() : "none";
+        LOG_INFO("Logic Engine content metadata: '{}'", metadataString);
+        const std::string exporterVersion = assetMetadata.exporterVersion() ?
+            fmt::format("{}.{}.{} (file format version {})",
+                assetMetadata.exporterVersion()->v_major(),
+                assetMetadata.exporterVersion()->v_minor(),
+                assetMetadata.exporterVersion()->v_patch(),
+                assetMetadata.exporterVersion()->v_fileFormatVersion()) : "undefined";
+        LOG_INFO("Exporter version: {}", exporterVersion);
     }
 
     bool LogicEngineImpl::link(const Property& sourceProperty, const Property& targetProperty)

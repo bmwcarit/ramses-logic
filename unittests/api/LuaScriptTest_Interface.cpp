@@ -11,6 +11,7 @@
 #include "ramses-logic/Property.h"
 #include "impl/PropertyImpl.h"
 #include "LogTestUtils.h"
+#include "fmt/format.h"
 
 
 namespace rlogic
@@ -22,7 +23,7 @@ namespace rlogic
         ScopedLogContextLevel m_silenceLogs{ ELogMessageType::Off };
     };
 
-    // Not testable, because assignment to userdata can't be catched. It's just a replacement of the current value
+    // TODO Violin this can be fixed; fix it!
     TEST_F(ALuaScript_Interface, DISABLED_GeneratesErrorWhenOverwritingInputsInInterfaceFunction)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
@@ -38,26 +39,6 @@ namespace rlogic
 
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in interface() function!!");
-    }
-
-    TEST_F(ALuaScript_Interface, GlobalSymbolsNotAvailable)
-    {
-        auto script = m_logicEngine.createLuaScript(R"(
-            globalVar = "not visible"
-
-            function interface()
-                if globalVar == nil then
-                    error("globalVar is not available!")
-                end
-            end
-
-            function run()
-            end
-        )", WithStdModules({EStandardModule::Base}));
-
-        ASSERT_EQ(nullptr, script);
-        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("globalVar is not available!"));
     }
 
     TEST_F(ALuaScript_Interface, ProducesErrorsIfARuntimeErrorOccursInInterface)
@@ -460,5 +441,111 @@ namespace rlogic
         EXPECT_EQ(6, *script->getOutputs()->getChild("sizes")->getChild("outputSizeNested")->get<int32_t>());
         EXPECT_EQ(5, *script->getOutputs()->getChild("sizes")->getChild("outputSizeArray")->get<int32_t>());
         EXPECT_EQ(2, *script->getOutputs()->getChild("sizes")->getChild("outputSizeArrayElem")->get<int32_t>());
+    }
+
+    class ALuaScript_Interface_Sandboxing : public ALuaScript_Interface
+    {
+    };
+
+    TEST_F(ALuaScript_Interface_Sandboxing, DeclaringGlobalSymbolsCausesCompilationErrors)
+    {
+        auto script = m_logicEngine.createLuaScript(R"(
+            globalVar = "this will cause error"
+        )", WithStdModules({ EStandardModule::Base }));
+
+        ASSERT_EQ(nullptr, script);
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+            ::testing::HasSubstr("Declaring global variables is forbidden (exceptions: the functions 'init', 'interface' and 'run')! (found value of type 'string')"));
+    }
+
+    TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenTryingToReadUnknownGlobals)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+                local t = someGlobalVariable
+            end
+
+            function run()
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr(
+                "Unexpected global access to key 'someGlobalVariable' in interface()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+    }
+
+    TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenSettingGlobals)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+                thisCausesError = 'bad'
+            end
+
+            function run()
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr(
+                "Unexpected global variable definition 'thisCausesError' in interface()! "
+                "Use the GLOBAL table inside the init() function to declare global data and functions, or use modules!"));
+    }
+
+    TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenTryingToOverrideGlobals)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function init()
+            end
+
+            function interface()
+                GLOBAL = {}
+            end
+
+            function run()
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr("Trying to override the GLOBAL table in interface()! You can only read data, but not overwrite the GLOBAL table!"));
+    }
+
+    TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenTryingToDeclareInterfaceFunctionTwice)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+
+            function interface()
+            end
+
+            function run()
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr("Function 'interface' can only be declared once!"));
+    }
+
+    TEST_F(ALuaScript_Interface_Sandboxing, ForbidsCallingSpecialFunctionsFromInsideInterface)
+    {
+        for (const auto& specialFunction  : std::vector<std::string>{ "init", "run", "interface" })
+        {
+            LuaScript* script = m_logicEngine.createLuaScript(fmt::format(R"(
+                function init()
+                end
+                function run()
+                end
+
+                function interface()
+                    {}()
+                end
+            )", specialFunction));
+
+            ASSERT_EQ(nullptr, script);
+
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+                ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in interface()! Allowed keys: 'GLOBAL', 'IN', 'OUT'", specialFunction)));
+        }
     }
 }

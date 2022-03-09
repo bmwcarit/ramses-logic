@@ -17,6 +17,7 @@
 #include "internals/ErrorReporting.h"
 #include "internals/PropertyTypeExtractor.h"
 #include "internals/EPropertySemantics.h"
+#include "internals/EnvironmentProtection.h"
 #include "fmt/format.h"
 #include "SolHelper.h"
 
@@ -43,16 +44,20 @@ namespace rlogic::internal
         if (!CrossCheckDeclaredAndProvidedModules(source, userModules, chunkname, errorReporting))
             return std::nullopt;
 
-        // TODO Violin use separate environment for script loading, don't reuse it as a runtime environment
         sol::environment env = solState.createEnvironment(stdModules, userModules);
+        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
 
-        env["GLOBAL"] = solState.createTable();
+        internalEnv["GLOBAL"] = solState.createTable();
 
-        // TODO Violin check that result here is not something else
         sol::protected_function mainFunction = load_result;
         env.set_on(mainFunction);
 
-        sol::protected_function_result main_result = mainFunction();
+        sol::protected_function_result main_result {};
+        {
+            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
+            main_result = mainFunction();
+        }
+
         if (!main_result.valid())
         {
             sol::error error = main_result;
@@ -60,19 +65,31 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
-        sol::protected_function intf = env["interface"];
+        if (main_result.get_type() != sol::type::none)
+        {
+            errorReporting.add(fmt::format("[{}] Expected no return value in script source, but a value of type '{}' was returned!",
+                chunkname, sol_helper::GetSolTypeName(main_result.get_type())), nullptr);
+            return std::nullopt;
+        }
 
+        sol::protected_function intf = internalEnv["interface"];
         if (!intf.valid())
         {
             errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname), nullptr);
             return std::nullopt;
         }
 
-        sol::protected_function init = env["init"];
-
+        sol::protected_function init = internalEnv["init"];
         if (init.valid())
         {
-            sol::protected_function_result initResult = init();
+            // in order to support interface definitions in globals we need to register the symbols for init section
+            sol::protected_function_result initResult {};
+            {
+                PropertyTypeExtractor::RegisterTypes(env);
+                ScopedEnvironmentProtection p(env, EEnvProtectionFlag::InitFunction);
+                initResult = init();
+                PropertyTypeExtractor::UnregisterTypes(env);
+            }
 
             if (!initResult.valid())
             {
@@ -82,7 +99,7 @@ namespace rlogic::internal
             }
         }
 
-        sol::protected_function run = env["run"];
+        sol::protected_function run = internalEnv["run"];
 
         if (!run.valid())
         {
@@ -94,18 +111,24 @@ namespace rlogic::internal
         PropertyTypeExtractor outputsExtractor("OUT", EPropertyType::Struct);
 
         sol::environment interfaceEnvironment = solState.createEnvironment(stdModules, userModules);
-
+        PropertyTypeExtractor::RegisterTypes(interfaceEnvironment);
         interfaceEnvironment["IN"] = std::ref(inputsExtractor);
         interfaceEnvironment["OUT"] = std::ref(outputsExtractor);
-        interfaceEnvironment["GLOBAL"] = env["GLOBAL"];
+        // Expose globals to interface function
+        EnvironmentProtection::GetProtectedEnvironmentTable(interfaceEnvironment)["GLOBAL"] = internalEnv["GLOBAL"];
 
         interfaceEnvironment.set_on(intf);
-        sol::protected_function_result intfResult = intf();
+        sol::protected_function_result intfResult {};
+        {
+            ScopedEnvironmentProtection p(interfaceEnvironment, EEnvProtectionFlag::InterfaceFunction);
+            intfResult = intf();
+        }
 
         interfaceEnvironment["IN"] = sol::lua_nil;
         interfaceEnvironment["OUT"] = sol::lua_nil;
         for (const auto& module : userModules)
             interfaceEnvironment[module.first] = sol::lua_nil;
+        PropertyTypeExtractor::UnregisterTypes(interfaceEnvironment);
 
         if (!intfResult.valid())
         {
@@ -117,6 +140,8 @@ namespace rlogic::internal
         auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptInput));
         auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(outputsExtractor.getExtractedTypeData(), EPropertySemantics::ScriptOutput));
 
+        EnvironmentProtection::SetEnvironmentProtectionLevel(env, EEnvProtectionFlag::RunFunction);
+
         return LuaCompiledScript{
             LuaSource{
                 std::move(source),
@@ -124,7 +149,7 @@ namespace rlogic::internal
                 stdModules,
                 userModules
             },
-            std::move(load_result),
+            std::move(run),
             std::move(inputs),
             std::move(outputs)
         };
@@ -152,6 +177,9 @@ namespace rlogic::internal
             return std::nullopt;
 
         sol::environment env = solState.createEnvironment(stdModules, userModules);
+        // interface definitions can be provided within module, in order to be able to extract them
+        // when used in LuaScript interface the necessary user types need to be provided
+        PropertyTypeExtractor::RegisterTypes(env);
 
         sol::protected_function mainFunction = load_result;
         env.set_on(mainFunction);
@@ -163,6 +191,10 @@ namespace rlogic::internal
             errorReporting.add(error.what(), nullptr);
             return std::nullopt;
         }
+
+        // user types for interface extraction are no longer needed
+        // but type constants are still needed otherwise extraction in script using the module is not correct (not clear why)
+        PropertyTypeExtractor::UnregisterTypes(env, true);
 
         sol::object resultObj = main_result;
         // TODO Violin check and test for abuse: yield, more than one result

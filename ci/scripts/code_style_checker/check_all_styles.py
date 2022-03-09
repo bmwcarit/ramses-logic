@@ -61,7 +61,6 @@ def main():
         # Flatbuffer generated files
         r'_generated.h',
         # Should not be checked for anything, contains plain hashsum
-        r'DOCKER_TAG',
         r'(^|/)build[^/]*/',
     }
 

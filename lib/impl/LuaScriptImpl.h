@@ -68,11 +68,13 @@ namespace rlogic::internal
 
         [[nodiscard]] const ModuleMapping& getModules() const;
 
+        void createRootProperties() final;
+
     private:
         std::string             m_source;
         WrappedLuaProperty      m_wrappedRootInput;
         WrappedLuaProperty      m_wrappedRootOutput;
-        sol::protected_function m_solFunction;
+        sol::protected_function m_runFunction;
         ModuleMapping           m_modules;
         StandardModules         m_stdModules;
     };

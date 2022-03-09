@@ -19,6 +19,10 @@ namespace rlogic::internal
     TimerNodeImpl::TimerNodeImpl(std::string_view name, uint64_t id) noexcept
         : LogicNodeImpl(name, id)
     {
+    }
+
+    void TimerNodeImpl::createRootProperties()
+    {
         HierarchicalTypeData inputs = MakeStruct("IN", {
             {"ticker_us", EPropertyType::Int64}
             });

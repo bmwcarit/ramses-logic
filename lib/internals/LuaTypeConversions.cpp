@@ -17,22 +17,32 @@ namespace rlogic::internal
     std::optional<sol::lua_table> LuaTypeConversions::ExtractLuaTable(const sol::object& object)
     {
         auto potentialTable = object.as<std::optional<sol::lua_table>>();
+
+        // The missing else() statements below mean that if any of the conditions fail, the
+        // result of the function will be the first cast (potentialTable)
         if (potentialTable)
         {
-            sol::lua_table table = *potentialTable;
-            sol::object metaContent = table[sol::metatable_key];
-
             // Identify read-only data (e.g. logic engine read-only module tables)
             // This is basically a reverse-test for this: https://www.lua.org/pil/13.4.4.html
             // See also LuaCompilationUtils::MakeTableReadOnly for the counterpart
-            auto potentialMetatable = metaContent.as<std::optional<sol::lua_table>>();
-            if (potentialMetatable)
+            sol::lua_table table = *potentialTable;
+            sol::object metaContent = table[sol::metatable_key];
+
+            if (metaContent.valid())
             {
-                sol::object metaIndex = (*potentialMetatable)[sol::meta_function::index];
-                auto potentialModuleTable = metaIndex.as<std::optional<sol::lua_table>>();
-                if (potentialModuleTable)
+                auto potentialMetatable = metaContent.as<std::optional<sol::lua_table>>();
+                if (potentialMetatable)
                 {
-                    potentialTable = potentialModuleTable;
+                    sol::object metaIndex = (*potentialMetatable)[sol::meta_function::index];
+
+                    if (metaIndex.valid())
+                    {
+                        auto potentialModuleTable = metaIndex.as<std::optional<sol::lua_table>>();
+                        if (potentialModuleTable)
+                        {
+                            potentialTable = potentialModuleTable;
+                        }
+                    }
                 }
             }
         }

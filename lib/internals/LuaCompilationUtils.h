@@ -39,8 +39,8 @@ namespace rlogic::internal
     {
         LuaSource source;
 
-        // The main function (holding interface() and run() functions)
-        sol::protected_function mainFunction;
+        // The run() function
+        sol::protected_function runFunction;
 
         // Parsed interface properties
         std::unique_ptr<Property> rootInput;

@@ -293,6 +293,38 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: missing name!");
     }
 
+    TEST_F(ALuaScript_Serialization, ProducesErrorWhenScriptDeclaresGlobalVariables)
+    {
+        {
+            const std::string_view src = R"(
+            global="this will cause error"
+            function interface()
+            end
+
+            function run()
+            end
+            )";
+            auto script = rlogic_serialization::CreateLuaScript(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateString("name"),
+                1u,
+                m_flatBufferBuilder.CreateString(src),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
+                m_testUtils.serializeTestProperty("IN"),
+                m_testUtils.serializeTestProperty("OUT")
+            );
+            m_flatBufferBuilder.Finish(script);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaScriptImpl> deserialized = LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_THAT(m_errorReporting.getErrors()[0].message, ::testing::HasSubstr("Declaring global variables is forbidden (exceptions: the functions 'init', 'interface' and 'run')!"));
+    }
+
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenLuaScriptSourceHasSyntaxErrors)
     {
         {

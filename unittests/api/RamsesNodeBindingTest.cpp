@@ -558,6 +558,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "name", 1u);
+            binding.createRootProperties();
             (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -594,6 +595,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node", 1u);
+            binding.createRootProperties();
             (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -618,6 +620,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node", 1u);
+            binding.createRootProperties();
             // Set non-standard values. These will not be used after deserialization, instead the binding
             // will re-load the values from ramses
             binding.getInputs()->getChild("rotation")->set<vec3f>({100, 200, 300});

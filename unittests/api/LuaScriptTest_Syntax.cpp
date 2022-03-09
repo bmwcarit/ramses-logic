@@ -52,6 +52,21 @@ namespace rlogic
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"badSyntaxScript\"]:1: '<name>' expected near 'not'"));
     }
 
+    TEST_F(ALuaScript_Syntax, ProducesErrorIfScriptReturnsValue)
+    {
+        LuaScript* scriptNoRun = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+            function run()
+            end
+            return "a string"
+        )");
+
+        ASSERT_EQ(nullptr, scriptNoRun);
+        EXPECT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Expected no return value in script source, but a value of type 'string' was returned!"));
+    }
+
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_FromGlobalScope)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
@@ -190,6 +205,64 @@ namespace rlogic
                 }
             }
         }
+    }
+
+    TEST_F(ALuaScript_Syntax, ForbidsCallingInterfaceFunctionDirectly)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+
+            function run()
+            end
+
+            interface()
+        )");
+
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+            ::testing::HasSubstr("Trying to read global variable 'interface' outside the scope of init(), interface() and run() functions! "
+                "This can cause undefined behavior and is forbidden!"));
+    }
+
+    TEST_F(ALuaScript_Syntax, ForbidsCallingRunFunctionDirectly)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function interface()
+            end
+
+            function run()
+            end
+
+            run()
+        )");
+
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+            ::testing::HasSubstr("Trying to read global variable 'run' outside the scope of init(), interface() and run() functions! "
+                "This can cause undefined behavior and is forbidden!"));
+    }
+
+    TEST_F(ALuaScript_Syntax, ForbidsCallingInitFunctionDirectly)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function init()
+            end
+            function interface()
+            end
+            function run()
+            end
+
+            init()
+        )");
+
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message,
+            ::testing::HasSubstr("Trying to read global variable 'init' outside the scope of init(), interface() and run() functions! "
+                "This can cause undefined behavior and is forbidden!"));
     }
 
     TEST_F(ALuaScript_Syntax, CanUseLuaSyntaxForComputingArraySize)

@@ -11,6 +11,7 @@
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/RamsesNodeBinding.h"
@@ -29,9 +30,12 @@ namespace rlogic::internal
         {
             const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f }, "dataarray");
             const AnimationChannel channel{ "channel", dataArray, dataArray, rlogic::EInterpolationType::Linear };
-            m_animation1 = m_logicEngine.createAnimationNode({ channel }, "animNode1");
-            m_animation2 = m_logicEngine.createAnimationNode({ channel }, "animNode2");
-            m_animation3 = m_logicEngine.createAnimationNode({ channel }, "animNode3");
+            AnimationNodeConfig config;
+            config.addChannel(channel);
+
+            m_animation1 = m_logicEngine.createAnimationNode(config, "animNode1");
+            m_animation2 = m_logicEngine.createAnimationNode(config, "animNode2");
+            m_animation3 = m_logicEngine.createAnimationNode(config, "animNode3");
             m_timer = m_logicEngine.createTimerNode();
         }
 

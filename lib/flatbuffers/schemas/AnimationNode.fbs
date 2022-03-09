@@ -35,6 +35,7 @@ table AnimationNode
     name:string;
     id:uint64;
     channels:[Channel];
+    channelsAsProperties:bool;
     rootInput:Property;
     rootOutput:Property;
 }

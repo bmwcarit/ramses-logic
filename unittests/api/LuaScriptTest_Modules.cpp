@@ -44,11 +44,19 @@ namespace rlogic::internal
                     green = INT
                 }
             end
+            function myothermath.structWithArray()
+                return {
+                    value = INT,
+                    array = ARRAY(2, INT)
+                }
+            end
+
             myothermath.color = {
                 red = 255,
                 green = 128,
                 blue = 72
             }
+
             return myothermath
         )";
 
@@ -254,6 +262,126 @@ namespace rlogic::internal
         EXPECT_EQ(72, *colorOutput->getChild("blue")->get<int32_t>());
     }
 
+    TEST_F(ALuaScriptWithModule, CanUseTableDataAndItsTypeDefinitionFromModule_WhenDefinitionIsATableField)
+    {
+        const auto modSrc = R"(
+            local mod = {}
+            mod.structType = {
+                a = STRING,
+                b = INT32
+            }
+            return mod
+        )";
+
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mod")
+
+            function interface()
+                IN.struct = mod.structType
+            end
+
+            function run()
+            end
+        )", createDeps({{"mod", modSrc}}));
+        ASSERT_NE(nullptr, script);
+
+        const Property& structInput = *script->getInputs()->getChild("struct");
+        EXPECT_EQ(EPropertyType::String, structInput.getChild("a")->getType());
+        EXPECT_EQ(EPropertyType::Int32, structInput.getChild("b")->getType());
+    }
+
+    // This is based on our user docs example - it used to be broken, so added as a test here to make sure it works
+    TEST_F(ALuaScriptWithModule, CanUseTableDataAndItsArrayTypeDefinitionFromModule)
+    {
+        const auto modSrc = R"(
+            local coalaModule = {}
+
+            coalaModule.coalaChief = "Alfred"
+
+            coalaModule.coalaStruct = {
+                preferredFood = STRING,
+                weight = INT
+            }
+
+            function coalaModule.bark()
+                print("Coalas don't bark...")
+            end
+
+            return coalaModule
+        )";
+
+        LuaConfig moduleConfig;
+        moduleConfig.addStandardModuleDependency(EStandardModule::Base);
+        LuaModule* mod = m_logicEngine.createLuaModule(modSrc, moduleConfig);
+
+        LuaConfig scriptConfig;
+        scriptConfig.addDependency("coalas", *mod);
+        scriptConfig.addStandardModuleDependency(EStandardModule::Base);
+
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("coalas")
+
+            function interface()
+                OUT.coalas = ARRAY(2, coalas.coalaStruct)
+            end
+
+            function run()
+                OUT.coalas = {
+                    {
+                        preferredFood = "bamboo",
+                        weight = 5
+                    },
+                    {
+                        preferredFood = "donuts",
+                        weight = 12
+                    }
+                }
+
+                print(coalas.coalaChief .. " says:")
+                coalas.bark()
+            end
+        )", scriptConfig);
+        ASSERT_NE(nullptr, script);
+
+        m_logicEngine.update();
+        const Property& coala1 = *script->getOutputs()->getChild("coalas")->getChild(0);
+        const Property& coala2 = *script->getOutputs()->getChild("coalas")->getChild(1);
+        EXPECT_EQ("bamboo", *coala1.getChild("preferredFood")->get<std::string>());
+        EXPECT_EQ(5, *coala1.getChild("weight")->get<int32_t>());
+        EXPECT_EQ("donuts", *coala2.getChild("preferredFood")->get<std::string>());
+        EXPECT_EQ(12, *coala2.getChild("weight")->get<int32_t>());
+    }
+
+    TEST_F(ALuaScriptWithModule, CanUseTableDataAndItsTypeDefinitionFromModule_WithArray)
+    {
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("mymath")
+            function interface()
+                IN.struct = mymath.structWithArray()
+                OUT.struct = mymath.structWithArray()
+            end
+            function run()
+                OUT.struct = IN.struct
+                OUT.struct.array[2] = 42
+            end
+        )", createDeps({ { "mymath", m_moduleSourceCode2 } }));
+        ASSERT_TRUE(script);
+
+        m_logicEngine.update();
+
+        const Property* input = script->getInputs()->getChild("struct");
+        ASSERT_TRUE(input);
+        ASSERT_TRUE(input->getChild("value") && input->getChild("value")->getType() == EPropertyType::Int32);
+        ASSERT_TRUE(input->getChild("array") && input->getChild("array")->getType() == EPropertyType::Array);
+
+        const Property* output = script->getOutputs()->getChild("struct");
+        ASSERT_TRUE(output);
+        ASSERT_TRUE(output->getChild("value") && output->getChild("value")->getType() == EPropertyType::Int32);
+        ASSERT_TRUE(output->getChild("array") && output->getChild("array")->getType() == EPropertyType::Array);
+        ASSERT_EQ(2u, output->getChild("array")->getChildCount());
+        EXPECT_EQ(42, *output->getChild("array")->getChild(1u)->get<int32_t>());
+    }
+
     TEST_F(ALuaScriptWithModule, CanGetTableSizeWithCustomMethod)
     {
         const std::string_view modSrc = R"(
@@ -417,30 +545,25 @@ namespace rlogic::internal
             return wrapped
         )";
 
-        const auto wrapped = m_logicEngine.createLuaModule(wrappedModuleSrc, createDeps({{"mymath", m_moduleSourceCode}}));
+        const auto wrapped = m_logicEngine.createLuaModule(wrappedModuleSrc, createDeps({ {"mymath", m_moduleSourceCode} }));
 
         LuaConfig config;
         config.addDependency("wrapped", *wrapped);
 
-        const auto script = m_logicEngine.createLuaScript(R"(
+        m_logicEngine.createLuaScript(R"(
             modules("wrapped")
             function interface()
                 OUT.add = INT
                 OUT.PI = FLOAT
             end
             function run()
-                -- This tests that the indirect dependency is correctly hidden
-                if mymath ~= nil then
-                    error("If this error happens, mymath module is not properly wrapped!")
-                end
-                OUT.add = wrapped.add(10, 20)
-                OUT.PI = wrapped.PI
+                -- This should generate 'global access error' if indirect dependency is not correctly hidden
+                mymath.add(10, 20)
             end
         )", config);
 
-        EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(130, *script->getOutputs()->getChild("add")->get<int32_t>());
-        EXPECT_FLOAT_EQ(42.f, *script->getOutputs()->getChild("PI")->get<float>());
+        EXPECT_FALSE(m_logicEngine.update());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Unexpected global access to key 'mymath' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
     }
 
     TEST_F(ALuaScriptWithModule, ReloadsModuleUsingTheSameNameCausesItToBeRecompiled)
@@ -662,6 +785,87 @@ namespace rlogic::internal
             }
         }
         EXPECT_TRUE(m_logicEngine.update());
+    }
+
+    TEST_F(ALuaScriptWithModule, SerializesAndDeserializesScriptWithStructPropertyInInterfaceDefinedInModule)
+    {
+        WithTempDirectory tempDirectory;
+        {
+            constexpr std::string_view moduleDefiningInterfaceType = R"(
+                local mytypes = {}
+                function mytypes.mystruct()
+                    return {
+                        name = STRING,
+                        address =
+                        {
+                            street = STRING,
+                            number = INT
+                        }
+                    }
+                end
+                return mytypes)";
+
+            constexpr std::string_view scriptSrc = R"(
+                modules("mytypes")
+                function interface()
+                    IN.array_of_structs = ARRAY(2, mytypes.mystruct())
+                    OUT.array_of_structs = ARRAY(2, mytypes.mystruct())
+                end
+
+                function run()
+                    OUT.array_of_structs = IN.array_of_structs
+                    OUT.array_of_structs[2].address.number = 42
+                end)";
+
+            LogicEngine otherLogicEngine;
+
+            LuaModule* module = otherLogicEngine.createLuaModule(moduleDefiningInterfaceType);
+            ASSERT_NE(nullptr, module);
+
+            LuaConfig config;
+            config.addDependency("mytypes", *module);
+            LuaScript* script = otherLogicEngine.createLuaScript(scriptSrc, config, "script");
+            ASSERT_NE(nullptr, script);
+
+            EXPECT_TRUE(otherLogicEngine.update());
+            ASSERT_TRUE(otherLogicEngine.saveToFile("moduleWithInterface.bin"));
+        }
+
+        m_logicEngine.loadFromFile("moduleWithInterface.bin");
+        const LuaScript* script = m_logicEngine.findByName<LuaScript>("script");
+
+        for (auto rootProp : std::initializer_list<const Property*>{ script->getInputs(), script->getOutputs() })
+        {
+            ASSERT_EQ(1u, rootProp->getChildCount());
+            const auto arrayOfStructs = rootProp->getChild(0);
+
+            EXPECT_EQ("array_of_structs", arrayOfStructs->getName());
+            EXPECT_EQ(EPropertyType::Array, arrayOfStructs->getType());
+            ASSERT_EQ(2u, arrayOfStructs->getChildCount());
+
+            for (size_t i = 0; i < 2; ++i)
+            {
+                const auto structChild = arrayOfStructs->getChild(i);
+                EXPECT_EQ(EPropertyType::Struct, structChild->getType());
+                EXPECT_EQ("", structChild->getName());
+                ASSERT_EQ(2u, structChild->getChildCount());
+                const auto name = structChild->getChild("name");
+                ASSERT_NE(nullptr, name);
+                EXPECT_EQ(EPropertyType::String, name->getType());
+                const auto address = structChild->getChild("address");
+                ASSERT_NE(nullptr, address);
+                ASSERT_EQ(2u, address->getChildCount());
+                EXPECT_EQ(EPropertyType::Struct, address->getType());
+                const auto addressStr = address->getChild("street");
+                const auto addressNr = address->getChild("number");
+                ASSERT_NE(nullptr, addressStr);
+                ASSERT_NE(nullptr, addressNr);
+                EXPECT_EQ(EPropertyType::String, addressStr->getType());
+                EXPECT_EQ(EPropertyType::Int32, addressNr->getType());
+            }
+        }
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ(42, *script->getOutputs()->getChild(0u)->getChild(1u)->getChild("address")->getChild("number")->get<int32_t>());
     }
 
     TEST_F(ALuaScriptWithModule, ScriptOverwritingBaseLibraryWontAffectOtherScriptUsingIt)

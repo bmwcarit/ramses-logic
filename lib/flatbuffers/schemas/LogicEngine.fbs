@@ -20,6 +20,12 @@ table Version
     v_fileFormatVersion:uint32 = 0; // default=0 means version was not being exported yet
 }
 
+table Metadata
+{
+    metadataString:string;
+    exporterVersion: Version;
+}
+
 table LogicEngine
 {
     // Meta info
@@ -27,6 +33,7 @@ table LogicEngine
     rlogicVersion:Version (required);
     // Data objects
     apiObjects:ApiObjects;
+    assetMetedata: Metadata;
 }
 
 root_type LogicEngine;

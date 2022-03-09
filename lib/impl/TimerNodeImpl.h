@@ -37,6 +37,8 @@ namespace rlogic::internal
 
         std::optional<LogicNodeRuntimeError> update() override;
 
+        void createRootProperties() final;
+
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::TimerNode> Serialize(
             const TimerNodeImpl& timerNode,
             flatbuffers::FlatBufferBuilder& builder,

@@ -12,6 +12,7 @@
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/Property.h"
+#include "ramses-logic/LuaScript.h"
 #include "impl/TimerNodeImpl.h"
 #include "impl/PropertyImpl.h"
 #include "internals/ErrorReporting.h"
@@ -176,6 +177,45 @@ namespace rlogic::internal
 
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
         EXPECT_EQ("TimerNode 'timerNode' failed to update - ticker must be monotonically increasing (lastTick=110 newTick=109)", m_logicEngine.getErrors().front().message);
+    }
+
+    TEST_F(ATimerNode, WillTriggerUpdateOfLinkedScriptIfTimeDeltaConstant)
+    {
+        constexpr std::string_view scriptSrc = R"(
+            function interface()
+                IN.timeDelta = FLOAT
+            end
+            function run()
+            end
+        )";
+
+        const auto timerNode = m_logicEngine.createTimerNode("timerNode");
+        const auto script = m_logicEngine.createLuaScript(scriptSrc);
+        ASSERT_TRUE(timerNode && script);
+        const auto timeDeltaOut = timerNode->getOutputs()->getChild("timeDelta");
+        const auto timeDeltaIn = script->getInputs()->getChild("timeDelta");
+        ASSERT_TRUE(timeDeltaOut && timeDeltaIn);
+        assert(timeDeltaOut && timeDeltaIn); // clang complaining for no reason
+        ASSERT_TRUE(m_logicEngine.link(*timeDeltaOut, *timeDeltaIn));
+        m_logicEngine.enableUpdateReport(true);
+
+        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(1000000u));
+        EXPECT_TRUE(m_logicEngine.update());
+        auto executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+        ASSERT_EQ(2u, executedNodes.size());
+        EXPECT_EQ(script, executedNodes[1].first);
+
+        for (int64_t ticker = 2u; ticker < 10u; ++ticker)
+        {
+            EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(ticker * 1000000u)); // timeDelta is in seconds vs ticker in milliseconds
+            EXPECT_TRUE(m_logicEngine.update());
+            // constant timeDelta
+            EXPECT_FLOAT_EQ(1.f, *timerNode->getOutputs()->getChild(0u)->get<float>());
+
+            executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
+            ASSERT_EQ(2u, executedNodes.size());
+            EXPECT_EQ(script, executedNodes[1].first);
+        }
     }
 
     TEST_F(ATimerNode, CanBeSerializedAndDeserialized)

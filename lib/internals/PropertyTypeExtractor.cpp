@@ -96,7 +96,9 @@ namespace rlogic::internal
         else if (solType == sol::type::table)
         {
             PropertyTypeExtractor structProperty(idxAsStr, EPropertyType::Struct);
-            structProperty.extractPropertiesFromTable(value.as<sol::table>());
+            auto extractedTable = LuaTypeConversions::ExtractLuaTable(value);
+            assert(extractedTable && "Has to be of type table, since we checked the type above");
+            structProperty.extractPropertiesFromTable(*extractedTable);
             m_children.emplace_back(std::move(structProperty));
         }
         else if (solType == sol::type::userdata)
@@ -127,7 +129,9 @@ namespace rlogic::internal
                 else if (solArrayType == sol::type::table)
                 {
                     PropertyTypeExtractor structInArray("", EPropertyType::Struct);
-                    structInArray.extractPropertiesFromTable(arrayType.as<sol::table>());
+                    auto extractedTable = LuaTypeConversions::ExtractLuaTable(arrayType);
+                    assert(extractedTable && "Has to be of type table, since we checked the type above");
+                    structInArray.extractPropertiesFromTable(*extractedTable);
                     arrayProperty.m_children.resize(arrayTypeInfo.arraySize, structInArray);
                 }
                 // TODO Violin consider whether we should add support for nested arrays. Should be easy to implement, and would be more consistent for users
@@ -154,7 +158,7 @@ namespace rlogic::internal
         return std::find_if(m_children.begin(), m_children.end(), [&name](const PropertyTypeExtractor& child) {return child.m_typeData.name == name; });
     }
 
-    void PropertyTypeExtractor::extractPropertiesFromTable(const sol::table& table)
+    void PropertyTypeExtractor::extractPropertiesFromTable(const sol::lua_table& table)
     {
         for (auto& tableEntry : table)
         {
@@ -172,10 +176,9 @@ namespace rlogic::internal
         // TODO Violin/Sven/Tobias discuss max array size
         // Putting a "sane" number here, but maybe worth discussing again
         const size_t arraySize = potentialUInt.getData();
-        constexpr size_t MaxArraySize = 255;
-        if (arraySize == 0u || arraySize > MaxArraySize)
+        if (arraySize == 0u || arraySize > MaxArrayPropertySize)
         {
-            sol_helper::throwSolException("ARRAY(N, T) invoked with invalid size parameter N={} (must be in the range [1, {}])!", arraySize, MaxArraySize);
+            sol_helper::throwSolException("ARRAY(N, T) invoked with invalid size parameter N={} (must be in the range [1, {}])!", arraySize, MaxArrayPropertySize);
         }
         if (!arrayType)
         {
@@ -186,10 +189,6 @@ namespace rlogic::internal
 
     void PropertyTypeExtractor::RegisterTypes(sol::environment& environment)
     {
-        environment.new_usertype<ArrayTypeInfo>("ArrayTypeInfo");
-        environment.new_usertype<PropertyTypeExtractor>("LuaScriptPropertyExtractor",
-            sol::meta_method::new_index, &PropertyTypeExtractor::newIndex,
-            sol::meta_method::index, &PropertyTypeExtractor::index);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Float)] = static_cast<int>(EPropertyType::Float);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2f)] = static_cast<int>(EPropertyType::Vec2f);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3f)] = static_cast<int>(EPropertyType::Vec3f);
@@ -203,7 +202,41 @@ namespace rlogic::internal
         environment[GetLuaPrimitiveTypeName(EPropertyType::String)] = static_cast<int>(EPropertyType::String);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Bool)] = static_cast<int>(EPropertyType::Bool);
         environment[GetLuaPrimitiveTypeName(EPropertyType::Struct)] = static_cast<int>(EPropertyType::Struct);
+
+        environment.new_usertype<PropertyTypeExtractor>("LuaScriptPropertyExtractor",
+            sol::meta_method::new_index, &PropertyTypeExtractor::newIndex,
+            sol::meta_method::index, &PropertyTypeExtractor::index);
+        environment.new_usertype<ArrayTypeInfo>("ArrayTypeInfo");
         environment.set_function(GetLuaPrimitiveTypeName(EPropertyType::Array), &PropertyTypeExtractor::CreateArray);
+    }
+
+    void PropertyTypeExtractor::UnregisterTypes(sol::environment& environment, bool keepTypeConstants)
+    {
+        if (!keepTypeConstants)
+        {
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Float)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2f)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3f)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4f)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Int32)] = sol::lua_nil;
+            environment["INT"] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Int64)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2i)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3i)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4i)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::String)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Bool)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Struct)] = sol::lua_nil;
+            environment[GetLuaPrimitiveTypeName(EPropertyType::Array)] = sol::lua_nil;
+        }
+
+        auto propertyExtractorUserType = environment.get<sol::metatable>("LuaScriptPropertyExtractor");
+        assert(propertyExtractorUserType.valid());
+        propertyExtractorUserType.unregister();
+
+        auto arrayUserType = environment.get<sol::metatable>("ArrayTypeInfo");
+        assert(arrayUserType.valid());
+        arrayUserType.unregister();
     }
 
     HierarchicalTypeData PropertyTypeExtractor::getExtractedTypeData() const
@@ -242,5 +275,4 @@ namespace rlogic::internal
     {
         return m_children;
     }
-
 }

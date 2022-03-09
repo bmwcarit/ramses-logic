@@ -75,6 +75,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
+            binding.createRootProperties();
             (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -108,6 +109,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
+            binding.createRootProperties();
             (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -299,6 +301,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
+            binding.createRootProperties();
             (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 

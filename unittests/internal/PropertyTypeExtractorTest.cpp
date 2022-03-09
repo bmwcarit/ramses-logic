@@ -32,6 +32,30 @@ namespace rlogic::internal
         EXPECT_FALSE(sol["ARRAY"].valid());
     }
 
+    TEST(ThePropertyTypeExtractorGlobalSymbols, UnregisteringSymbolsWillNotKeepAnythingInLuaStack)
+    {
+        sol::state sol;
+        sol::environment env(sol, sol::create, sol.globals());
+
+        PropertyTypeExtractor::RegisterTypes(env);
+        EXPECT_TRUE(lua_gettop(sol.lua_state()) >= 0);
+
+        PropertyTypeExtractor::UnregisterTypes(env);
+        EXPECT_TRUE(lua_gettop(sol.lua_state()) == 0);
+    }
+
+    TEST(ThePropertyTypeExtractorGlobalSymbols, UnregisteringSymbolsWillNotKeepAnythingInLuaStack_KeepingConstants)
+    {
+        sol::state sol;
+        sol::environment env(sol, sol::create, sol.globals());
+
+        PropertyTypeExtractor::RegisterTypes(env);
+        EXPECT_TRUE(lua_gettop(sol.lua_state()) >= 0);
+
+        PropertyTypeExtractor::UnregisterTypes(env, true);
+        EXPECT_TRUE(lua_gettop(sol.lua_state()) == 0);
+    }
+
     class APropertyTypeExtractor : public ::testing::Test
     {
     protected:

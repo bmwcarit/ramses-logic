@@ -34,6 +34,7 @@ Prefer to learn by example? Have a look at our [self-contained example snippets]
 
 |Logic    | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
 |---------|-------------------------------|------------------------------------|------------------------------|
+|0.15.0   | 27.0.116                      | 27.0.102                           | >= 0.15.0                    |
 |0.14.2   | 27.0.115                      | 27.0.102                           | >= 0.13.0                    |
 |0.14.1   | 27.0.114                      | 27.0.102                           | >= 0.13.0                    |
 |0.13.0   | 27.0.114                      | 27.0.102                           | >= 0.13.0                    |

@@ -18,6 +18,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/Logger.h"
 #include "ramses-logic/RamsesLogicVersion.h"
 
@@ -48,7 +49,7 @@ namespace rlogic::internal
     class ALogicEngine_Serialization : public ALogicEngine
     {
     protected:
-        static std::vector<char> CreateTestBuffer()
+        static std::vector<char> CreateTestBuffer(const SaveFileConfig& config = {})
         {
             LogicEngine logicEngineForSaving;
             logicEngineForSaving.createLuaScript(R"(
@@ -59,7 +60,7 @@ namespace rlogic::internal
                 end
             )", {}, "luascript");
 
-            logicEngineForSaving.saveToFile("tempfile.bin");
+            logicEngineForSaving.saveToFile("tempfile.bin", config);
 
             return *FileUtils::LoadBinary("tempfile.bin");
         }
@@ -164,6 +165,76 @@ namespace rlogic::internal
             std::vector<char> corruptedMemory = *FileUtils::LoadBinary("LogicEngine.bin");
             EXPECT_FALSE(m_logicEngine.loadFromBuffer(corruptedMemory.data(), corruptedMemory.size()));
             EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("contains corrupted data!"));
+        }
+    }
+
+    TEST_F(ALogicEngine_Serialization, PrintsMetadataInfoOnLoad)
+    {
+        SaveFileConfig config;
+        config.setMetadataString("This is a scene exported for tests");
+        config.setExporterVersion(3, 1, 2, 42);
+
+        // Test different constructor variations
+        SaveFileConfig config2(config);
+        config2 = config;
+        config2 = std::move(config);
+
+        SaveBufferToFile(CreateTestBuffer(config2), "LogicEngine.bin");
+
+        TestLogCollector logCollector(ELogMessageType::Info);
+
+        // Test with file API
+        {
+            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+
+            ASSERT_EQ(logCollector.logs.size(), 3);
+            EXPECT_THAT(logCollector.logs[0].message, ::testing::HasSubstr("Loading logic engine content from 'file 'LogicEngine.bin'"));
+            EXPECT_THAT(logCollector.logs[1].message, ::testing::HasSubstr("Logic Engine content metadata: 'This is a scene exported for tests'"));
+            EXPECT_THAT(logCollector.logs[2].message, ::testing::HasSubstr("Exporter version: 3.1.2 (file format version 42)"));
+        }
+
+        logCollector.logs.clear();
+
+        // Test with buffer API
+        {
+            const std::vector<char> byteBuffer = *FileUtils::LoadBinary("LogicEngine.bin");
+            EXPECT_TRUE(m_logicEngine.loadFromBuffer(byteBuffer.data(), byteBuffer.size()));
+
+            ASSERT_EQ(logCollector.logs.size(), 3);
+            EXPECT_THAT(logCollector.logs[0].message, ::testing::HasSubstr("Loading logic engine content from 'data buffer"));
+            EXPECT_THAT(logCollector.logs[1].message, ::testing::HasSubstr("Logic Engine content metadata: 'This is a scene exported for tests'"));
+            EXPECT_THAT(logCollector.logs[2].message, ::testing::HasSubstr("Exporter version: 3.1.2 (file format version 42)"));
+        }
+    }
+
+    TEST_F(ALogicEngine_Serialization, PrintsMetadataInfoOnLoad_NoVersionInfoProvided)
+    {
+        SaveFileConfig config;
+        SaveBufferToFile(CreateTestBuffer(config), "LogicEngine.bin");
+
+        TestLogCollector logCollector(ELogMessageType::Info);
+
+        // Test with file API
+        {
+            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+
+            ASSERT_EQ(logCollector.logs.size(), 3);
+            EXPECT_THAT(logCollector.logs[0].message, ::testing::HasSubstr("Loading logic engine content from 'file 'LogicEngine.bin'"));
+            EXPECT_THAT(logCollector.logs[1].message, ::testing::HasSubstr("Logic Engine content metadata: ''"));
+            EXPECT_THAT(logCollector.logs[2].message, ::testing::HasSubstr("Exporter version: 0.0.0 (file format version 0)"));
+        }
+
+        logCollector.logs.clear();
+
+        // Test with buffer API
+        {
+            const std::vector<char> byteBuffer = *FileUtils::LoadBinary("LogicEngine.bin");
+            EXPECT_TRUE(m_logicEngine.loadFromBuffer(byteBuffer.data(), byteBuffer.size()));
+
+            ASSERT_EQ(logCollector.logs.size(), 3);
+            EXPECT_THAT(logCollector.logs[0].message, ::testing::HasSubstr("Loading logic engine content from 'data buffer"));
+            EXPECT_THAT(logCollector.logs[1].message, ::testing::HasSubstr("Logic Engine content metadata: ''"));
+            EXPECT_THAT(logCollector.logs[2].message, ::testing::HasSubstr("Exporter version: 0.0.0 (file format version 0)"));
         }
     }
 
@@ -384,7 +455,9 @@ namespace rlogic::internal
             logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
             logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
             const auto data = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
-            logicEngine.createAnimationNode({ { "channel", data, data } }, "animNode");
+            AnimationNodeConfig config;
+            config.addChannel({ "channel", data, data });
+            logicEngine.createAnimationNode(config, "animNode");
 
             logicEngine.saveToFile("LogicEngine.bin");
         }
@@ -795,7 +868,10 @@ namespace rlogic::internal
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("height"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("floatUniform"));
             ASSERT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNode"));
+            EXPECT_EQ(5u, logicEngine.findByName<AnimationNode>("animNode")->getInputs()->getChildCount());
             EXPECT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNode")->getOutputs()->getChild("channel"));
+            ASSERT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties"));
+            EXPECT_EQ(6u, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties")->getInputs()->getChildCount());
             EXPECT_NE(nullptr, logicEngine.findByName<TimerNode>("timerNode"));
 
             EXPECT_NE(nullptr, logicEngine.findByName<RamsesNodeBinding>("nodebinding"));

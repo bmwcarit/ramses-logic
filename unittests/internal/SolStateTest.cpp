@@ -55,19 +55,16 @@ namespace rlogic::internal
         EXPECT_TRUE(env.valid());
     }
 
-    // TODO Violin currently exposed so that init() can access them. Try if we can isolate even more
-    // to have nothing in the global environment
-    TEST_F(ASolState, NewEnvironment_ExposesTypeSymbols)
+    TEST_F(ASolState, NewEnvironment_DoesNotExposeTypeSymbols)
     {
         sol::environment env = m_solState.createEnvironment({}, {});
         ASSERT_TRUE(env.valid());
 
-        EXPECT_TRUE(env["INT"].valid());
-        EXPECT_TRUE(env["FLOAT"].valid());
-        EXPECT_TRUE(env["STRING"].valid());
-        EXPECT_TRUE(env["BOOL"].valid());
-        EXPECT_TRUE(env["ARRAY"].valid());
-
+        EXPECT_FALSE(env["INT"].valid());
+        EXPECT_FALSE(env["FLOAT"].valid());
+        EXPECT_FALSE(env["STRING"].valid());
+        EXPECT_FALSE(env["BOOL"].valid());
+        EXPECT_FALSE(env["ARRAY"].valid());
         EXPECT_FALSE(env["IN"].valid());
         EXPECT_FALSE(env["OUT"].valid());
     }
@@ -81,30 +78,30 @@ namespace rlogic::internal
         EXPECT_TRUE(env["rl_len"].valid());
     }
 
+    class ASolState_Environment : public ASolState
+    {
+    protected:
+        sol::environment m_env {m_solState.createEnvironment({}, {})};
+    };
+
     // Those are created on-demand in the interface() function and during runtime
-    TEST_F(ASolState, NewEnvironment_HasNo_IN_OUT_globals)
+    TEST_F(ASolState_Environment, HasNo_IN_OUT_globals)
     {
-        sol::environment env = m_solState.createEnvironment({}, {});
-        ASSERT_TRUE(env.valid());
-
-        EXPECT_FALSE(env["IN"].valid());
-        EXPECT_FALSE(env["OUT"].valid());
+        EXPECT_FALSE(m_env["IN"].valid());
+        EXPECT_FALSE(m_env["OUT"].valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_HidesGlobalStandardModulesByDefault)
+    TEST_F(ASolState_Environment, HidesGlobalStandardModulesByDefault)
     {
-        sol::environment env = m_solState.createEnvironment({}, {});
-        ASSERT_TRUE(env.valid());
-
-        EXPECT_FALSE(env["print"].valid());
-        EXPECT_FALSE(env["debug"].valid());
-        EXPECT_FALSE(env["string"].valid());
-        EXPECT_FALSE(env["table"].valid());
-        EXPECT_FALSE(env["error"].valid());
-        EXPECT_FALSE(env["math"].valid());
+        EXPECT_FALSE(m_env["print"].valid());
+        EXPECT_FALSE(m_env["debug"].valid());
+        EXPECT_FALSE(m_env["string"].valid());
+        EXPECT_FALSE(m_env["table"].valid());
+        EXPECT_FALSE(m_env["error"].valid());
+        EXPECT_FALSE(m_env["math"].valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_ExposesOnlyRequestedGlobalStandardModules)
+    TEST_F(ASolState_Environment, ExposesOnlyRequestedGlobalStandardModules)
     {
         sol::environment env = m_solState.createEnvironment({EStandardModule::Math}, {});
         ASSERT_TRUE(env.valid());
@@ -118,7 +115,7 @@ namespace rlogic::internal
         EXPECT_FALSE(env["error"].valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_ExposesRequestedGlobalStandardModules_TwoModules)
+    TEST_F(ASolState_Environment, ExposesRequestedGlobalStandardModules_TwoModules)
     {
         sol::environment env = m_solState.createEnvironment({ EStandardModule::String, EStandardModule::Table }, {});
         ASSERT_TRUE(env.valid());
@@ -132,7 +129,7 @@ namespace rlogic::internal
         EXPECT_FALSE(env["error"].valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_ExposesRequestedGlobalStandardModules_BaseLib)
+    TEST_F(ASolState_Environment, ExposesRequestedGlobalStandardModules_BaseLib)
     {
         sol::environment env = m_solState.createEnvironment({ EStandardModule::Base }, {});
         ASSERT_TRUE(env.valid());
@@ -147,33 +144,28 @@ namespace rlogic::internal
         EXPECT_FALSE(env["string"].valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_HasNoFunctionsExpectedByUserScript)
+    TEST_F(ASolState_Environment, HasNoFunctionsExpectedByUserScript)
     {
-        sol::environment env = m_solState.createEnvironment({}, {});
-        ASSERT_TRUE(env.valid());
-
-        EXPECT_FALSE(env["interface"].valid());
-        EXPECT_FALSE(env["run"].valid());
+        EXPECT_FALSE(m_env["interface"].valid());
+        EXPECT_FALSE(m_env["run"].valid());
     }
 
-    TEST_F(ASolState, NewEnvironment_TwoEnvironmentsShareNoData)
+    TEST_F(ASolState_Environment, NewEnvironment_TwoEnvironmentsShareNoData)
     {
-        sol::environment env1 = m_solState.createEnvironment({}, {});
         sol::environment env2 = m_solState.createEnvironment({}, {});
-        ASSERT_TRUE(env1.valid());
         ASSERT_TRUE(env2.valid());
 
-        env1["thisBelongsTo"] = "env1";
+        m_env["thisBelongsTo"] = "m_env";
         env2["thisBelongsTo"] = "env2";
 
-        const std::string data1 = env1["thisBelongsTo"];
+        const std::string data1 = m_env["thisBelongsTo"];
         const std::string data2 = env2["thisBelongsTo"];
 
-        EXPECT_EQ(data1, "env1");
+        EXPECT_EQ(data1, "m_env");
         EXPECT_EQ(data2, "env2");
     }
 
-    TEST_F(ASolState, NewlyCreatedEnvironment_HasNoAccessToPreviouslyDeclaredGlobalSymbols)
+    TEST_F(ASolState_Environment, HasNoAccessToPreviouslyDeclaredGlobalSymbols)
     {
         const std::string_view script = R"(
             global= "this is global"
@@ -188,9 +180,9 @@ namespace rlogic::internal
         sol::function func = loadedScript();
 
         // Apply fresh environment to func
-        sol::environment env = m_solState.createEnvironment({}, {});
-        ASSERT_TRUE(env.valid());
-        env.set_on(func);
+        sol::environment newEnv = m_solState.createEnvironment({}, {});
+        ASSERT_TRUE(newEnv.valid());
+        newEnv.set_on(func);
 
         // Func has no access to 'global' because it was defined _before_ applying the new environment
         sol::object result = func();
@@ -199,7 +191,7 @@ namespace rlogic::internal
 
     // Similar to NewlyCreatedEnvironment_HasNoAccessToPreviouslyDeclaredGlobalSymbols
     // But here the environment is applied before global symbols are declared -> access to those is available
-    TEST_F(ASolState, NewlyCreatedEnvironment_HasAccessToGlobalSymbols_DeclaredAfterApplyingTheEnvironment)
+    TEST_F(ASolState_Environment, HasAccessToGlobalSymbols_DeclaredAfterApplyingTheEnvironment)
     {
         const std::string_view script = R"(
             global = "this is global"
@@ -212,8 +204,7 @@ namespace rlogic::internal
         sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
 
         // Apply a fresh environments to loaded script _before_ executing it
-        sol::environment env = m_solState.createEnvironment({}, {});
-        env.set_on(loadedScript);
+        m_env.set_on(loadedScript);
         sol::function func = loadedScript();
 
         // Can access global symbol, because it lives in the new environment
@@ -221,7 +212,7 @@ namespace rlogic::internal
         EXPECT_EQ(result, "this is global");
     }
 
-    TEST_F(ASolState, NewEnvironment_OverridesEnvironmentOfScript_AfterAppliedOnIt)
+    TEST_F(ASolState_Environment, OverridesEnvironmentOfScript_AfterAppliedOnIt)
     {
         const std::string_view reportData = R"(
                 if data ~= nil then
@@ -236,11 +227,9 @@ namespace rlogic::internal
         std::string dataStatus = script();
         EXPECT_EQ(dataStatus, "no data");
 
-        sol::environment env = m_solState.createEnvironment({}, {});
-        ASSERT_TRUE(env.valid());
-        env["data"] = "a lot of data!";
+        m_env["data"] = "a lot of data!";
 
-        env.set_on(script);
+        m_env.set_on(script);
 
         dataStatus = script();
         EXPECT_EQ(dataStatus, "data: a lot of data!");

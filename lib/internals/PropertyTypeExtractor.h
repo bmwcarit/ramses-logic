@@ -14,6 +14,8 @@
 
 namespace rlogic::internal
 {
+    struct ArrayTypeInfo;
+
     class PropertyTypeExtractor
     {
     public:
@@ -35,6 +37,7 @@ namespace rlogic::internal
 
         // Register symbols for type extraction to sol environment
         static void RegisterTypes(sol::environment& environment);
+        static void UnregisterTypes(sol::environment& environment, bool keepTypeConstants = false);
 
     private:
         TypeData m_typeData;
@@ -44,6 +47,6 @@ namespace rlogic::internal
         ChildProperties m_children;
 
         ChildProperties::iterator findChild(const std::string_view name);
-        void extractPropertiesFromTable(const sol::table& table);
+        void extractPropertiesFromTable(const sol::lua_table& table);
     };
 }

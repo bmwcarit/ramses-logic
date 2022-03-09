@@ -28,10 +28,15 @@ namespace rlogic::internal
         , m_ramsesNode(ramsesNode)
         , m_rotationType(rotationType)
     {
+    }
+
+
+    void RamsesNodeBindingImpl::createRootProperties()
+    {
         // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
         auto inputsType = MakeStruct("IN", {
                 TypeData{"visibility", EPropertyType::Bool},
-                TypeData{"rotation", rotationType == ERotationType::Quaternion ? EPropertyType::Vec4f : EPropertyType::Vec3f},
+                TypeData{"rotation", m_rotationType == ERotationType::Quaternion ? EPropertyType::Vec4f : EPropertyType::Vec3f},
                 TypeData{"translation", EPropertyType::Vec3f},
                 TypeData{"scaling", EPropertyType::Vec3f},
             });
@@ -39,7 +44,7 @@ namespace rlogic::internal
 
         setRootProperties(std::move(inputs), {});
 
-        ApplyRamsesValuesToInputProperties(*this, ramsesNode);
+        ApplyRamsesValuesToInputProperties(*this, m_ramsesNode);
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::Serialize(

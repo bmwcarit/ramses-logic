@@ -7,11 +7,19 @@
 //  -------------------------------------------------------------------------
 
 #include "LogicEngineTest_Base.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 
 namespace rlogic
 {
     class ALogicEngine_Lookup : public ALogicEngine
     {
+    protected:
+        AnimationNode* createAnimationNode(const DataArray* dataArray)
+        {
+            AnimationNodeConfig config;
+            config.addChannel({ "channel", dataArray, dataArray });
+            return m_logicEngine.createAnimationNode(config, "animNode");
+        }
     };
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName)
@@ -22,7 +30,7 @@ namespace rlogic
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", dataArray, dataArray } }, "animNode");
+        const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
 
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LuaModule>("luaModule"));
@@ -62,7 +70,7 @@ namespace rlogic
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
-        const auto animNode = m_logicEngine.createAnimationNode({ { "channel", dataArray, dataArray } }, "animNode");
+        const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
 
         const LogicEngine& immutableLogicEngine = m_logicEngine;
@@ -93,7 +101,7 @@ namespace rlogic
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        m_logicEngine.createAnimationNode({{"channel", dataArray, dataArray}}, "animNode");
+        createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
 
         const auto* luaModuleFound         = m_logicEngine.findByName<LogicObject>("luaModule")->as<LuaModule>();
@@ -132,7 +140,7 @@ namespace rlogic
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        m_logicEngine.createAnimationNode({{"channel", dataArray, dataArray}}, "animNode");
+        createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
 
         const LogicEngine& immutableLogicEngine   = m_logicEngine;
@@ -172,7 +180,7 @@ namespace rlogic
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding*     cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto               dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        const auto               animNode          = m_logicEngine.createAnimationNode({{"channel", dataArray, dataArray}}, "animNode");
+        const auto               animNode          = createAnimationNode(dataArray);
         const auto               timerNode         = m_logicEngine.createTimerNode("timerNode");
 
         EXPECT_EQ(luaModule, m_logicEngine.findLogicObjectById(1u));
@@ -193,7 +201,7 @@ namespace rlogic
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding*     cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto               dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        const auto               animNode          = m_logicEngine.createAnimationNode({{"channel", dataArray, dataArray}}, "animNode");
+        const auto               animNode          = createAnimationNode(dataArray);
         const auto               timerNode         = m_logicEngine.createTimerNode("timerNode");
 
         const LogicEngine& immutableLogicEngine = m_logicEngine;
@@ -215,7 +223,7 @@ namespace rlogic
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        m_logicEngine.createAnimationNode({{"channel", dataArray, dataArray}}, "animNode");
+        createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
 
         const auto* luaModuleFound         = m_logicEngine.findLogicObjectById(1u)->as<LuaModule>();
@@ -254,7 +262,7 @@ namespace rlogic
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        m_logicEngine.createAnimationNode({{"channel", dataArray, dataArray}}, "animNode");
+        createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
 
         const LogicEngine& immutableLogicEngine   = m_logicEngine;
@@ -300,7 +308,7 @@ namespace rlogic
         RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
-        auto animNode = m_logicEngine.createAnimationNode({ { "channel", dataArray, dataArray } }, "animNode");
+        auto animNode = createAnimationNode(dataArray);
         auto timerNode = m_logicEngine.createTimerNode("timerNode");
 
         // Rename
@@ -342,7 +350,7 @@ namespace rlogic
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
-        m_logicEngine.createAnimationNode({ { "channel", dataArray, dataArray } }, "animNode");
+        createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
 
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("dataarray"));

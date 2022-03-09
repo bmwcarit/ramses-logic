@@ -1,5 +1,43 @@
 # master
 
+# v0.15.0
+
+Summary:
+* Multiple features, bugfixes and more strict sandboxing
+* New Ramses (27.0.116)
+* Not backwards compatible
+    * binary files need re-export
+
+**Features**
+
+* Added possibility to modify AnimationNode timestamps and keyframes on the fly
+    * See AnimationNodeConfig::setExposingOfChannelDataAsProperties which exposes the channel data as node properties
+      which can be set or linked as any other logic node properties.
+* Can optionally supply asset metadata when saving content
+    * see [SaveFileConfig](https://ramses-logic.readthedocs.io/en/latest/classes/SaveFileConfig.html)
+    * see [LogicEngine::saveToFile](https://ramses-logic.readthedocs.io/en/latest/classes/LogicEngine.html#_CPPv4N6rlogic11LogicEngine10saveToFileENSt11string_viewERK14SaveFileConfig)
+    * Versions are logged in the INFO channel every time LogicEngine::loadFromFile/Buffer is called
+
+**Bugfixes**
+
+* Type definitions declared in modules also work when the data is not wrapped in a function (example from docs works now)
+    * Fixes https://github.com/COVESA/ramses-logic/issues/39
+* Catches error correctly when returning any value from the main Lua script source code
+* Fixed memory leak when re-creating LuaScripts (previously, creating above 1000 scripts caused Lua stack overflow)
+* Correctly catches writing of global variables everywhere except when using the dedicated GLOBAL table
+    * This may break existing Lua code which relied on the lack of checks!
+    * Global variable access will be also caught and causes errors - use this to fix such assets
+* Correctly catches error when declaring any function other than the predefined ones (init, interface, run)
+    * Use syntax like 'GLOBAL.myFunc = function () ... end' inside the init() function to declare global functions
+    * Declaring functions twice will result in error
+* Improves quality of error messages related to sandbox violations
+* Nodes linked to TimerNode's timeDelta will now be always updated (also when timeDelta stays constant)
+
+**API Changes**
+
+* Added AnimationNodeConfig which has to be used when creating AnimationNode (LogicEngine::createAnimationNode)
+    * Animation channels are now provided to the config first, where also their validity is checked
+
 # v0.14.2
 
 Fully compatible to Logic Engine 0.14.0.

@@ -37,34 +37,26 @@ namespace rlogic::internal
         EXPECT_EQ("script name", script->getName());
     }
 
-    TEST_F(ALuaScript_Lifecycle, KeepsGlobalScopeSymbolsDuringRunMethod)
+    //This is actually bad (because it can cause undefined behavior), but we still have a test to show/test how it works
+    TEST_F(ALuaScript_Lifecycle, KeepsLocalScopeSymbolsDuringRunMethod)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            -- 'Local' symbols in the global space are global too
-            local global1 = "global1"
-            global2 = "global2"
-
-            function getGlobalString()
-                return global1 .. global2
-            end
+            -- 'Local' symbols in the global space are inherited by functions
+            local localSymbol = "localSymbol"
 
             function interface()
                 OUT.result = STRING
             end
 
             function run()
-                -- global symbols are available here
-                if global1 == "global1" and global2 == "global2" then
-                    OUT.result = getGlobalString()
-                else
-                    error("Expected global symbols were not found!")
-                end
+                -- local symbols from global scope are available here
+                OUT.result = localSymbol
             end
         )");
 
         ASSERT_NE(nullptr, script);
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(script->getOutputs()->getChild("result")->get<std::string>(), "global1global2");
+        EXPECT_EQ(script->getOutputs()->getChild("result")->get<std::string>(), "localSymbol");
     }
 
     class ALuaScript_LifecycleWithFiles : public ALuaScript_Lifecycle

@@ -39,6 +39,7 @@ namespace rlogic
     class RamsesCameraBinding;
     class DataArray;
     class AnimationNode;
+    class AnimationNodeConfig;
     class TimerNode;
     class LuaScript;
     class LuaModule;
@@ -50,11 +51,13 @@ namespace rlogic
 namespace rlogic_serialization
 {
     struct Version;
+    struct Metadata;
 }
 
 namespace rlogic::internal
 {
     class LuaConfigImpl;
+    class SaveFileConfigImpl;
     class LogicNodeImpl;
     class RamsesBindingImpl;
     class ApiObjects;
@@ -82,7 +85,7 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
-        AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name);
+        AnimationNode* createAnimationNode(const AnimationNodeConfig& config, std::string_view name);
         TimerNode* createTimerNode(std::string_view name);
 
         bool destroy(LogicObject& object);
@@ -92,7 +95,7 @@ namespace rlogic::internal
 
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
-        bool saveToFile(std::string_view filename);
+        bool saveToFile(std::string_view filename, const SaveFileConfigImpl& config);
 
         bool link(const Property& sourceProperty, const Property& targetProperty);
         bool linkWeak(const Property& sourceProperty, const Property& targetProperty);
@@ -113,9 +116,12 @@ namespace rlogic::internal
 
     private:
         size_t activateLinksRecursive(PropertyImpl& output);
+        void setTimerNodesAndDependentsDirty();
 
         bool checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
+
+        static void LogAssetMetadata(const rlogic_serialization::Metadata& assetMetadata);
 
         [[nodiscard]] bool updateNodes(const NodeVector& nodes);
 

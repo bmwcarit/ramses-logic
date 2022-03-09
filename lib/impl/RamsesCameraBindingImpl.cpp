@@ -30,6 +30,10 @@ namespace rlogic::internal
         : RamsesBindingImpl(name, id)
         , m_ramsesCamera(ramsesCamera)
     {
+    }
+
+    void RamsesCameraBindingImpl::createRootProperties()
+    {
         std::vector<TypeData> frustumPlanes = {
             TypeData{ "nearPlane", EPropertyType::Float },
             TypeData{ "farPlane", EPropertyType::Float },
@@ -74,7 +78,7 @@ namespace rlogic::internal
             {} // No outputs
         );
 
-        ApplyRamsesValuesToInputProperties(*this, ramsesCamera);
+        ApplyRamsesValuesToInputProperties(*this, m_ramsesCamera);
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> RamsesCameraBindingImpl::Serialize(
@@ -314,5 +318,4 @@ namespace rlogic::internal
             break;
         }
     }
-
 }

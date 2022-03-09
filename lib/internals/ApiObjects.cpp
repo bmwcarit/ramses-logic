@@ -31,6 +31,7 @@
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/DataArrayImpl.h"
 #include "impl/AnimationNodeImpl.h"
+#include "impl/AnimationNodeConfigImpl.h"
 #include "impl/TimerNodeImpl.h"
 
 #include "ramses-client-api/Node.h"
@@ -91,10 +92,12 @@ namespace rlogic::internal
         if (!compiledScript)
             return nullptr;
 
-        std::unique_ptr<LuaScript> up     = std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(*compiledScript), scriptName, getNextLogicObjectId()));
-        LuaScript*                 script = up.get();
+        std::unique_ptr<LuaScript> up = std::make_unique<LuaScript>(std::make_unique<LuaScriptImpl>(std::move(*compiledScript), scriptName, getNextLogicObjectId()));
+        LuaScript* script = up.get();
         m_scripts.push_back(script);
         registerLogicObject(std::move(up));
+        script->m_impl.createRootProperties();
+
         return script;
     }
 
@@ -119,37 +122,44 @@ namespace rlogic::internal
         if (!compiledModule)
             return nullptr;
 
-        std::unique_ptr<LuaModule> up        = std::make_unique<LuaModule>(std::make_unique<LuaModuleImpl>(std::move(*compiledModule), moduleName, getNextLogicObjectId()));
-        LuaModule*                 luaModule = up.get();
+        std::unique_ptr<LuaModule> up = std::make_unique<LuaModule>(std::make_unique<LuaModuleImpl>(std::move(*compiledModule), moduleName, getNextLogicObjectId()));
+        LuaModule* luaModule = up.get();
         m_luaModules.push_back(luaModule);
         registerLogicObject(std::move(up));
+
         return luaModule;
     }
 
     RamsesNodeBinding* ApiObjects::createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name)
     {
         std::unique_ptr<RamsesNodeBinding> up = std::make_unique<RamsesNodeBinding>(std::make_unique<RamsesNodeBindingImpl>(ramsesNode, rotationType, name, getNextLogicObjectId()));
-        RamsesNodeBinding*                 binding = up.get();
+        RamsesNodeBinding* binding = up.get();
         m_ramsesNodeBindings.push_back(binding);
         registerLogicObject(std::move(up));
+        binding->m_impl.createRootProperties();
+
         return binding;
     }
 
     RamsesAppearanceBinding* ApiObjects::createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name)
     {
-        std::unique_ptr<RamsesAppearanceBinding> up      = std::make_unique<RamsesAppearanceBinding>(std::make_unique<RamsesAppearanceBindingImpl>(ramsesAppearance, name, getNextLogicObjectId()));
-        RamsesAppearanceBinding*                 binding = up.get();
+        std::unique_ptr<RamsesAppearanceBinding> up = std::make_unique<RamsesAppearanceBinding>(std::make_unique<RamsesAppearanceBindingImpl>(ramsesAppearance, name, getNextLogicObjectId()));
+        RamsesAppearanceBinding* binding = up.get();
         m_ramsesAppearanceBindings.push_back(binding);
         registerLogicObject(std::move(up));
+        binding->m_impl.createRootProperties();
+
         return binding;
     }
 
     RamsesCameraBinding* ApiObjects::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
-        std::unique_ptr<RamsesCameraBinding> up      = std::make_unique<RamsesCameraBinding>(std::make_unique<RamsesCameraBindingImpl>(ramsesCamera, name, getNextLogicObjectId()));
-        RamsesCameraBinding*                 binding = up.get();
+        std::unique_ptr<RamsesCameraBinding> up = std::make_unique<RamsesCameraBinding>(std::make_unique<RamsesCameraBindingImpl>(ramsesCamera, name, getNextLogicObjectId()));
+        RamsesCameraBinding* binding = up.get();
         m_ramsesCameraBindings.push_back(binding);
         registerLogicObject(std::move(up));
+        binding->m_impl.createRootProperties();
+
         return binding;
     }
 
@@ -159,20 +169,23 @@ namespace rlogic::internal
         static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
         // make copy of users data and move into data array
         std::vector<T> dataCopy = data;
-        auto                       impl      = std::make_unique<DataArrayImpl>(std::move(dataCopy), name, getNextLogicObjectId());
-        std::unique_ptr<DataArray> up        = std::make_unique<DataArray>(std::move(impl));
-        DataArray*                 dataArray = up.get();
+        auto impl = std::make_unique<DataArrayImpl>(std::move(dataCopy), name, getNextLogicObjectId());
+        std::unique_ptr<DataArray> up = std::make_unique<DataArray>(std::move(impl));
+        DataArray* dataArray = up.get();
         m_dataArrays.push_back(dataArray);
         registerLogicObject(std::move(up));
         return dataArray;
     }
 
-    AnimationNode* ApiObjects::createAnimationNode(const AnimationChannels& channels, std::string_view name)
+    AnimationNode* ApiObjects::createAnimationNode(const AnimationNodeConfigImpl& config, std::string_view name)
     {
-        std::unique_ptr<AnimationNode> up        = std::make_unique<AnimationNode>(std::make_unique<AnimationNodeImpl>(channels, name, getNextLogicObjectId()));
-        AnimationNode*                 animation = up.get();
+        std::unique_ptr<AnimationNode> up = std::make_unique<AnimationNode>(
+            std::make_unique<AnimationNodeImpl>(config.getChannels(), config.getExposingOfChannelDataAsProperties(), name, getNextLogicObjectId()));
+        AnimationNode* animation = up.get();
         m_animationNodes.push_back(animation);
         registerLogicObject(std::move(up));
+        animation->m_impl.createRootProperties();
+
         return animation;
     }
 
@@ -182,6 +195,8 @@ namespace rlogic::internal
         TimerNode* timer = up.get();
         m_timerNodes.push_back(timer);
         registerLogicObject(std::move(up));
+        timer->m_impl.createRootProperties();
+
         return timer;
     }
 
@@ -980,6 +995,11 @@ namespace rlogic::internal
     uint64_t ApiObjects::getNextLogicObjectId()
     {
         return ++m_lastObjectId;
+    }
+
+    int ApiObjects::getNumElementsInLuaStack() const
+    {
+        return m_solState->getNumElementsInLuaStack();
     }
 
     template DataArray* ApiObjects::createDataArray<float>(const std::vector<float>&, std::string_view);

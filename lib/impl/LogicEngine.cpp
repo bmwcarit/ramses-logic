@@ -124,9 +124,9 @@ namespace rlogic
         return m_impl->createDataArray(data, name);
     }
 
-    AnimationNode* LogicEngine::createAnimationNode(const AnimationChannels& channels, std::string_view name)
+    AnimationNode* LogicEngine::createAnimationNode(const AnimationNodeConfig& config, std::string_view name)
     {
-        return m_impl->createAnimationNode(channels, name);
+        return m_impl->createAnimationNode(config, name);
     }
 
     TimerNode* LogicEngine::createTimerNode(std::string_view name)
@@ -174,9 +174,9 @@ namespace rlogic
         return m_impl->loadFromBuffer(rawBuffer, bufferSize, ramsesScene, enableMemoryVerification);
     }
 
-    bool LogicEngine::saveToFile(std::string_view filename)
+    bool LogicEngine::saveToFile(std::string_view filename, const SaveFileConfig& config)
     {
-        return m_impl->saveToFile(filename);
+        return m_impl->saveToFile(filename, *config.m_impl);
     }
 
     bool LogicEngine::link(const Property& sourceProperty, const Property& targetProperty)

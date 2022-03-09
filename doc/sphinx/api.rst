@@ -358,7 +358,13 @@ a file with running animations and want to re-apply their current value without 
     when it comes to animations. It is fully up to the application to define the time units passed to animations to match those in the animation timestamps.
     The type of ``timeDelta`` is ``float`` in order to match default glTF semantics (time is represented in seconds with float precision for sub-second fractions).
 
-If you have a trivial time logic which applies a fixed time delta each frame, you can simply traverse all animations and apply a fixed value:
+``Ramses logic`` provides a tool that helps with dealing with time in your application, a :class`rlogic::TimerNode` can be linked to all animation nodes
+and generate ``timeDelta`` for you either using internal clock or a time ticker provided by application. This gives a single point where time can be set
+as clock ticker and it will auto-distribute it to all linked animation nodes in form of ``timeDelta``. There can be multiple timer nodes so different time
+contexts can be specified if needed.
+
+If however you prefer a full control of timing each animation node explicitly you can always do so, here is an example of how application time would be applied
+to all animation nodes:
 
 .. code-block::
     :linenos:
@@ -381,9 +387,24 @@ If you have a trivial time logic which applies a fixed time delta each frame, yo
         logicEngine.update();
     }
 
-This may seem like an overkill for simply progressing the time of all animations, but it allows for flexible time control
-and gives full power to the application code as to how and when to update animations at the cost of few lines of boilerplate
-code.
+---------------------------------
+Static vs. dynamic animation data
+---------------------------------
+
+:class:`rlogic::AnimationNode` can be used in two different modes, with static data or dynamic data. By default animation node's animation data
+(timestamps, keyframes) cannot be modified after the data is provided when creating an instance of :class:`rlogic::AnimationNode`, it is static.
+There is however a way to create :class:`rlogic::AnimationNode` which allows modifying the animation data at any point in time, even during animating
+- enable :func:`rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties` when creating the :class:`rlogic::AnimationNode`.
+Animation node created this way will have exact same functionality as the static version but in addition exposes some animation data in form
+of node properties, namely timestamps and keyframes from all its channels. The animation data properties can be used as any other logic node properties,
+they can be set directly or linked to another node.
+
+.. warning::
+
+    Animation node with exposed data as properties is limited to a fixed maximum number of keyframes
+    (see :func:`rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties` for details) and suffers from a relatively high performance hit
+    when animating compared to the default 'static' animation node. The performance hit scales with the number of keyframes,
+    keep them as low as possible when using it!
 
 =========================
 Error handling

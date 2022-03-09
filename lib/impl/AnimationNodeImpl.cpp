@@ -21,9 +21,32 @@
 
 namespace rlogic::internal
 {
-    AnimationNodeImpl::AnimationNodeImpl(AnimationChannels channels, std::string_view name, uint64_t id) noexcept
+    AnimationNodeImpl::AnimationNodeImpl(AnimationChannels channels, bool exposeDataAsProperties, std::string_view name, uint64_t id) noexcept
         : LogicNodeImpl(name, id)
         , m_channels{ std::move(channels) }
+        , m_hasChannelDataExposedViaProperties{ exposeDataAsProperties }
+    {
+        m_channelsWorkData.resize(m_channels.size());
+        for (size_t i = 0u; i < m_channels.size(); ++i)
+        {
+            const auto& channel = m_channels[i];
+            assert(channel.timeStamps && channel.keyframes);
+            assert(channel.timeStamps->getNumElements() == channel.keyframes->getNumElements());
+            assert(!channel.tangentsIn || channel.timeStamps->getNumElements() == channel.tangentsIn->getNumElements());
+            assert(!channel.tangentsOut || channel.timeStamps->getNumElements() == channel.tangentsOut->getNumElements());
+
+            // extract basic channel data to work containers, update logic operates with these containers instead of original channel data
+            // (for timestamps and keyframes at least), it also makes it possible to modify this data in runtime while keeping original data constant
+            assert(m_channels[i].timeStamps->getDataType() == EPropertyType::Float && m_channels[i].timeStamps->getNumElements() > 0);
+            m_channelsWorkData[i].timestamps = *m_channels[i].timeStamps->getData<float>();
+            m_channelsWorkData[i].keyframes = m_channels[i].keyframes->m_impl.getDataVariant();
+
+            // overall duration equals longest channel in animation
+            m_maxChannelDuration = std::max(m_maxChannelDuration, channel.timeStamps->getData<float>()->back());
+        }
+    }
+
+    void AnimationNodeImpl::createRootProperties()
     {
         HierarchicalTypeData inputs = MakeStruct("IN", {
             {"timeDelta", EPropertyType::Float},   // EInputIdx_TimeDelta
@@ -32,24 +55,37 @@ namespace rlogic::internal
             {"rewindOnStop", EPropertyType::Bool}, // EInputIdx_RewindOnStop
             {"timeRange", EPropertyType::Vec2f}    // EInputIdx_TimeRange
             });
+        if (m_hasChannelDataExposedViaProperties)
+        {
+            std::vector<HierarchicalTypeData> channelsData;
+            for (const auto& channel : m_channels)
+            {
+                assert(channel.timeStamps && channel.keyframes);
+                assert(channel.timeStamps->getNumElements() == channel.keyframes->getNumElements());
+                assert(channel.timeStamps->getNumElements() <= MaxArrayPropertySize);
+                const std::initializer_list<HierarchicalTypeData> channelDataArrays =
+                {
+                    MakeArray("timestamps", channel.timeStamps->getNumElements(), EPropertyType::Float),
+                    MakeArray("keyframes", channel.keyframes->getNumElements(), channel.keyframes->getDataType())
+                };
+
+                channelsData.push_back(HierarchicalTypeData({ std::string{ channel.name }, EPropertyType::Struct }, channelDataArrays));
+            }
+            inputs.children.push_back(HierarchicalTypeData({ "channelsData", EPropertyType::Struct }, channelsData)); // EInputIdx_ChannelsData
+        }
         auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::AnimationInput);
 
         HierarchicalTypeData outputs = MakeStruct("OUT", {
             {"progress", EPropertyType::Float},    // EPropertyOutputIndex::Progress
             });
         for (const auto& channel : m_channels)
-        {
-            assert(channel.timeStamps && channel.keyframes);
-            assert(channel.timeStamps->getNumElements() == channel.keyframes->getNumElements());
-            assert(!channel.tangentsIn || channel.timeStamps->getNumElements() == channel.tangentsIn->getNumElements());
-            assert(!channel.tangentsOut || channel.timeStamps->getNumElements() == channel.tangentsOut->getNumElements());
             outputs.children.push_back(MakeType(std::string{ channel.name }, channel.keyframes->getDataType()));
-            // overall duration equals longest channel in animation
-            m_maxChannelDuration = std::max(m_maxChannelDuration, channel.timeStamps->getData<float>()->back());
-        }
         auto outputsImpl = std::make_unique<PropertyImpl>(std::move(outputs), EPropertySemantics::AnimationOutput);
 
         setRootProperties(std::make_unique<Property>(std::move(inputsImpl)), std::make_unique<Property>(std::move(outputsImpl)));
+
+        if (m_hasChannelDataExposedViaProperties)
+            initAnimationDataPropertyValues();
     }
 
     float AnimationNodeImpl::getMaximumChannelDuration() const
@@ -82,6 +118,10 @@ namespace rlogic::internal
                 return std::nullopt;
             }
         }
+
+        // propagate data from properties if this animation node has channel data properties
+        if (m_hasChannelDataExposedViaProperties)
+            updateAnimationDataFromProperties();
 
         // determine duration from time range input property
         const vec2f userProvidedTimeRange = *getInputs()->getChild(EInputIdx_TimeRange)->get<vec2f>();
@@ -124,9 +164,9 @@ namespace rlogic::internal
 
     void AnimationNodeImpl::updateChannel(size_t channelIdx, float beginOffset)
     {
+        const auto& channelWorkData = m_channelsWorkData[channelIdx];
         const auto& channel = m_channels[channelIdx];
-        assert(channel.timeStamps->getDataType() == EPropertyType::Float && channel.timeStamps->getNumElements() > 0);
-        const auto& timeStamps = *channel.timeStamps->getData<float>();
+        const auto& timeStamps = channelWorkData.timestamps;
         const float elapsedChannelPlayTime = m_elapsedPlayTime + beginOffset;
 
         // find upper/lower timestamp neighbor of elapsed timestamp
@@ -169,7 +209,7 @@ namespace rlogic::internal
                 break;
             }
             }
-        }, channel.keyframes->m_impl.getDataVariant());
+        }, channelWorkData.keyframes);
 
         if (channel.interpolationType == EInterpolationType::Linear_Quaternions || channel.interpolationType == EInterpolationType::Cubic_Quaternions)
         {
@@ -311,6 +351,7 @@ namespace rlogic::internal
             builder.CreateString(animNode.getName()),
             animNode.getId(),
             builder.CreateVector(channelsFB),
+            animNode.m_hasChannelDataExposedViaProperties,
             PropertyImpl::Serialize(*animNode.getInputs()->m_impl, builder, serializationMap),
             PropertyImpl::Serialize(*animNode.getOutputs()->m_impl, builder, serializationMap)
         );
@@ -384,11 +425,14 @@ namespace rlogic::internal
             channels.push_back(std::move(channel));
         }
 
-        auto deserialized = std::make_unique<AnimationNodeImpl>(std::move(channels), name, animNodeFB.id());
+        const bool hasChannelDataProperties = animNodeFB.channelsAsProperties();
 
         // deserialize and overwrite constructor generated properties
         auto rootInProperty = PropertyImpl::Deserialize(*animNodeFB.rootInput(), EPropertySemantics::AnimationInput, errorReporting, deserializationMap);
         auto rootOutProperty = PropertyImpl::Deserialize(*animNodeFB.rootOutput(), EPropertySemantics::AnimationOutput, errorReporting, deserializationMap);
+
+        auto deserialized = std::make_unique<AnimationNodeImpl>(std::move(channels), hasChannelDataProperties, name, animNodeFB.id());
+
         if (!rootInProperty->getChild(EInputIdx_TimeDelta) || rootInProperty->getChild(EInputIdx_TimeDelta)->getName() != "timeDelta" ||
             !rootInProperty->getChild(EInputIdx_Play) || rootInProperty->getChild(EInputIdx_Play)->getName() != "play" ||
             !rootInProperty->getChild(EInputIdx_Loop) || rootInProperty->getChild(EInputIdx_Loop)->getName() != "loop" ||
@@ -400,8 +444,70 @@ namespace rlogic::internal
             errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}': missing or invalid properties!", name), nullptr);
             return nullptr;
         }
+
+        if (hasChannelDataProperties && (!rootInProperty->getChild(EInputIdx_ChannelsData) || rootInProperty->getChild(EInputIdx_ChannelsData)->getName() != "channelsData"))
+        {
+            errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}': missing or invalid channels data property!", name), nullptr);
+            return nullptr;
+        }
+
         deserialized->setRootProperties(std::make_unique<Property>(std::move(rootInProperty)), std::make_unique<Property>(std::move(rootOutProperty)));
 
+        // reset property values of all channel data to original channel data provided at creation time
+        if (hasChannelDataProperties)
+            deserialized->initAnimationDataPropertyValues();
+
         return deserialized;
+    }
+
+    void AnimationNodeImpl::initAnimationDataPropertyValues()
+    {
+        Property* channelsData = getInputs()->getChild("channelsData");
+        assert(channelsData && channelsData->getChildCount() == m_channelsWorkData.size());
+        for (size_t channelIdx = 0u; channelIdx < channelsData->getChildCount(); ++channelIdx)
+        {
+            Property* channelDataProp = channelsData->getChild(channelIdx);
+            Property* timestampsProp = channelDataProp->getChild("timestamps");
+            Property* keyframesProp = channelDataProp->getChild("keyframes");
+            assert(timestampsProp && keyframesProp);
+            const auto& channelData = m_channelsWorkData[channelIdx];
+            assert(timestampsProp->getChildCount() == channelData.timestamps.size());
+            assert(keyframesProp->getChildCount() == timestampsProp->getChildCount());
+
+            const auto& timestamps = channelData.timestamps;
+            for (size_t i = 0u; i < timestamps.size(); ++i)
+                timestampsProp->getChild(i)->m_impl->setValue(timestamps[i]);
+
+            std::visit([&](const auto& keyframes) {
+                for (size_t i = 0u; i < keyframes.size(); ++i)
+                    keyframesProp->getChild(i)->m_impl->setValue(keyframes[i]);
+            }, channelData.keyframes);
+        }
+    }
+
+    void AnimationNodeImpl::updateAnimationDataFromProperties()
+    {
+        const auto channelsDataProp = getInputs()->getChild(EInputIdx_ChannelsData);
+        for (size_t ch = 0u; ch < channelsDataProp->getChildCount(); ++ch)
+        {
+            const auto channelDataProp = channelsDataProp->getChild(ch);
+
+            const auto timestampsProp = channelDataProp->getChild(0u);
+            auto& timestamps = m_channelsWorkData[ch].timestamps;
+            assert(timestamps.size() == timestampsProp->getChildCount());
+            for (size_t i = 0u; i < timestamps.size(); ++i)
+            {
+                timestamps[i] = *timestampsProp->getChild(i)->get<float>();
+                m_maxChannelDuration = std::max(m_maxChannelDuration, timestamps[i]);
+            }
+
+            const auto keyframesProp = channelDataProp->getChild(1u);
+            auto& keyframesVariant = m_channelsWorkData[ch].keyframes;
+            std::visit([&](auto& keyframes) {
+                using ValueType = std::remove_const_t<std::remove_reference_t<decltype(keyframes.front())>>;
+                for (size_t i = 0u; i < keyframes.size(); ++i)
+                    keyframes[i] = *keyframesProp->getChild(i)->get<ValueType>();
+            }, keyframesVariant);
+        }
     }
 }

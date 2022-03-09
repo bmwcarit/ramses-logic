@@ -27,6 +27,7 @@ namespace rlogic::internal
         using LogicNodeImpl::setRootProperties;
 
         MOCK_METHOD(std::optional<LogicNodeRuntimeError>, update, (), (override, final));
+        MOCK_METHOD(void, createRootProperties, (), (override, final));
     };
 
     class ALogicNodeImpl : public ::testing::Test

@@ -32,6 +32,8 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
+        void createRootProperties() final {}
+
     private:
         static HierarchicalTypeData CreateTestInputsType(bool createNestedProperties)
         {

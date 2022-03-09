@@ -15,6 +15,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/EStandardModule.h"
 
 #include "ramses-client.h"
@@ -155,8 +156,13 @@ int main(int argc, char* argv[])
     rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*node, rlogic::ERotationType::Euler_XYZ, "nodebinding");
     rlogic::RamsesCameraBinding* camBinding = logicEngine.createRamsesCameraBinding(*camera, "camerabinding");
     rlogic::RamsesAppearanceBinding* appBinding = logicEngine.createRamsesAppearanceBinding(*appearance, "appearancebinding");
+
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
-    const auto animNode = logicEngine.createAnimationNode({ { "channel", dataArray, dataArray, rlogic::EInterpolationType::Linear } }, "animNode");
+    rlogic::AnimationNodeConfig animConfig;
+    animConfig.addChannel({ "channel", dataArray, dataArray, rlogic::EInterpolationType::Linear });
+    const auto animNode = logicEngine.createAnimationNode(animConfig, "animNode");
+    animConfig.setExposingOfChannelDataAsProperties(true);
+    logicEngine.createAnimationNode(animConfig, "animNodeWithDataProperties");
     logicEngine.createTimerNode("timerNode");
 
     logicEngine.link(*script1->getOutputs()->getChild("floatOutput"), *script2->getInputs()->getChild("floatInput"));

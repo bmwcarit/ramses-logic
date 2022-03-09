@@ -12,9 +12,10 @@
 #include "impl/LuaModuleImpl.h"
 
 #include "internals/LuaCustomizations.h"
-#include "internals/PropertyTypeExtractor.h"
 #include "internals/WrappedLuaProperty.h"
-
+#include "internals/SolHelper.h"
+#include "internals/LuaTypeConversions.h"
+#include "internals/EnvironmentProtection.h"
 
 #include <iostream>
 
@@ -77,29 +78,28 @@ namespace rlogic::internal
 
     sol::environment SolState::createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules)
     {
-        sol::environment newEnv(m_solState, sol::create);
+        sol::environment protectedEnv(m_solState, sol::create);
 
-        // Set itself as a global variable registry
-        newEnv["_G"] = newEnv;
+        protectedEnv["_G"] = protectedEnv;
 
-        mapStandardModules(stdModules, newEnv);
+        mapStandardModules(stdModules, protectedEnv);
 
         for (const auto& module : userModules)
         {
             assert(!SolState::IsReservedModuleName(module.first));
-            newEnv[module.first] = module.second->m_impl.getModule();
+            protectedEnv[module.first] = module.second->m_impl.getModule();
         }
 
-        // Allow access to interface types in all environments
-        PropertyTypeExtractor::RegisterTypes(newEnv);
-
+        // TODO Violin take a closer look at this, should not be needed
         // if using 'modules' call to declare dependencies - resolve it to noop
         auto dummyFunc = [](const std::string& /*unused*/) {};
-        newEnv["modules"] = dummyFunc;
+        protectedEnv["modules"] = dummyFunc;
 
-        LuaCustomizations::MapToEnvironment(m_solState, newEnv);
+        LuaCustomizations::MapToEnvironment(m_solState, protectedEnv);
 
-        return newEnv;
+        EnvironmentProtection::AddProtectedEnvironmentTable(protectedEnv, m_solState);
+
+        return protectedEnv;
     }
 
     void SolState::mapStandardModules(const StandardModules& stdModules, sol::environment& env)
@@ -177,4 +177,8 @@ namespace rlogic::internal
         return m_solState.create_table();
     }
 
+    int SolState::getNumElementsInLuaStack() const
+    {
+        return lua_gettop(m_solState.lua_state());
+    }
 }

@@ -89,7 +89,7 @@ The ``interface()`` function can declare inputs and outputs by adding properties
 if they were standard ``Lua`` tables, with two restrictions:
 
 * the key has to be a string (and not a number or anything else) so that it can be shown as a human-readable property in the Ramses Composer
-* the value has to be one of the types supported by the ``Logic Engine`` (INT, FLOAT, etc. - full list further down) or a table which obeys the same rules
+* the value has to be one of the types supported by the ``Logic Engine`` (INT32, FLOAT, etc. - full list further down) or a table which obeys the same rules
 
 Here is an example:
 
@@ -103,14 +103,15 @@ Here is an example:
             name = STRING,
             coalafications = {
                 bear = BOOL,
-                bamboo_eaten = INT
+                bamboo_eaten = INT32
             }
         }
     end
 
 Following types are supported for individual properties:
 
-* INT
+* INT32
+* INT64
 * FLOAT
 * BOOL
 * STRING
@@ -131,6 +132,11 @@ nested under ``coala``. Here is another example, this time with arrays:
             not_eaten_yet = BOOL
         })
     end
+
+.. note::
+
+    ARRAY(n, T) is defined such as ``n`` is a number between 1 and 255, and ``T`` is a type for the array elements. ``T`` can be anything except an array itself
+    (multi-dimensional arrays are currently not supported by the ``Logic Engine``)
 
 In the example above, ``IN.bamboo_coordinates`` is an input array of 10 elements, each of type ``VEC3F``. ``OUT.located_bamboo`` is an output
 array with a `struct` type - each of the 10 elements has a ``position`` and a ``not_eaten_yet`` property.
@@ -153,7 +159,7 @@ but the properties have a value which can be read and written. Like in this exam
             name = STRING,
             coalafications = {
                 bear = BOOL,
-                bamboo_eaten = INT
+                bamboo_eaten = INT32
             }
         }
     end
@@ -186,16 +192,15 @@ function is executed every time one or more of the values in ``IN`` changes, eit
 or when any of the inputs is linked to another script's output whose value changed.
 
 The examples above demonstrate how structs can be nested in other structs or in arrays. The ``Logic Engine`` supports arbitrary nesting for structs. Arrays can
-have a primitive type (e.g. ``INT``) or a complex type (a struct) which can have arbitrary properties, also nested ones. It is not possible to have arrays of arrays
+have a primitive type (e.g. ``INT32``) or a complex type (a struct, an array etc.) which can have arbitrary properties, also nested ones. It is not possible to have arrays of arrays
 (multidimensional arrays). Also, array size is limited to 255 elements currently.
 
 ==============================================
 Global variables and the init() function
 ==============================================
 
-Global symbols (symbols declared outside of the scope of functions) are **not** visible in the ``interface()`` or the ``run()`` functions
-(see :ref:`Environments and isolation`).
-This restriction makes sure that scripts are stateless and not execution-dependent and that they behave the same after loading from a file as when they
+The ``Logic Engine`` prohibits reading and writing global variables, with a few exceptions (see :ref:`Environments and isolation`).
+These restrictions make sure that scripts are stateless and not execution-dependent and that they behave the same after loading from a file as when they
 were created.
 
 In order to declare global variables, use the ``init()`` function in conjunction with the ``GLOBAL`` special table for holding global symbols.
@@ -273,6 +278,22 @@ The following set of rules describes which part of the ``Lua`` script is assigne
 * The ``interface()`` function is executed in a temporary environment which is destroyed afterwards (alongside all its data!)
 * The ``interface()`` function has access to modules and the ``GLOBAL`` table, but nothing else
 
+.. warning::
+    Variables declared as 'local' but are declared in the global space (outside any function) can not be reliably isolated
+    because of the way Lua works (they bypass environment boundaries). It is strongly discouraged to declare local variables
+    in the global scope to avoid having undefined behavior!
+
+
+Furthermore, the ``Logic Engine`` enforces strict rules on reading and writing global variables. These are as follows:
+
+* No global variables may be declared in the runtime environment, other than the special functions ``init``, ``interface`` and ``run``
+* Special functions can be declared at most once (e.g. it's not possible to declare the ``interface`` function twice)
+* No global variables may be accessed, except:
+    * Modules (they are mapped as global variables)
+    * The ``GLOBAL`` table in the functions where that's allowed
+    * The ``IN`` and ``OUT`` special tables
+* In particular, you can't call any of the special global functions (they are called by the runtime). Doing that will result in errors!
+
 ==================================================
 Indexing inside Lua
 ==================================================
@@ -287,7 +308,7 @@ lists for arrays, without having to provide indices. Take a look at the followin
     :emphasize-lines: 7,9-12,14-17
 
     function interface()
-        OUT.array = ARRAY(2, INT)
+        OUT.array = ARRAY(2, INT32)
     end
 
     function run()
@@ -373,7 +394,7 @@ script):
 
     coalaModule.coalaStruct = {
         preferredFood = STRING,
-        weight = INT
+        weight = INT32
     }
 
     function coalaModule.bark()
@@ -467,7 +488,7 @@ Using other Lua operations (e.g. pairs/ipairs) will result in errors.
 Vec2/3/4 types
 -----------------------------------------------------
 
-While the property types which reflect Lua built-in types (BOOL, INT, FLOAT, STRING) inherit the standard
+While the property types which reflect Lua built-in types (BOOL, INT32, FLOAT, STRING) inherit the standard
 Lua value semantics, the more complex types (VEC2/3/4/I/F) have no representation in Lua, and are wrapped as
 ``Lua`` tables. They have the additional constraint that all values must be set simultaneously. It's not possible
 for example to set just one component of a VEC3F - all three must be set at once. The reason for this design decision
@@ -577,9 +598,9 @@ But be aware that not all constellations are working. Here are some examples to 
     :emphasize-lines: 13,18-20
 
     function interface()
-        OUT.param1 = INT
+        OUT.param1 = INT32
         OUT.struct1 = {
-            param2 = INT
+            param2 = INT32
         }
     end
 

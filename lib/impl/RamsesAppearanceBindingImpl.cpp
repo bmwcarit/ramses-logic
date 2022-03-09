@@ -35,9 +35,7 @@ namespace rlogic::internal
         const uint32_t uniformCount = effect.getUniformInputCount();
         m_uniformIndices.reserve(uniformCount);
 
-        std::vector<HierarchicalTypeData> bindingInputs;
-        bindingInputs.reserve(uniformCount);
-
+        // create mapping from property children indices to uniform inputs, this must match properties (either created or deserialized)
         for (uint32_t i = 0; i < uniformCount; ++i)
         {
             ramses::UniformInput uniformInput;
@@ -46,6 +44,23 @@ namespace rlogic::internal
             assert(uniformInput.isValid());
             (void)result;
 
+            if (GetPropertyTypeForUniform(uniformInput))
+                m_uniformIndices.push_back(i);
+        }
+    }
+
+    void RamsesAppearanceBindingImpl::createRootProperties()
+    {
+        const auto& effect = m_ramsesAppearance.get().getEffect();
+        const uint32_t uniformCount = effect.getUniformInputCount();
+
+        std::vector<HierarchicalTypeData> bindingInputs;
+        bindingInputs.reserve(uniformCount);
+
+        for (uint32_t i = 0; i < uniformCount; ++i)
+        {
+            ramses::UniformInput uniformInput;
+            effect.getUniformInput(i, uniformInput);
             const std::optional<EPropertyType> convertedType = GetPropertyTypeForUniform(uniformInput);
 
             // TODO Violin handle all types eventually (need some more breaking ramses features for that)
@@ -61,12 +76,10 @@ namespace rlogic::internal
                 {
                     bindingInputs.emplace_back(MakeArray(uniformInput.getName(), uniformInput.getElementCount(), *convertedType));
                 }
-
-                m_uniformIndices.push_back(i);
             }
         }
 
-        HierarchicalTypeData bindingInputsType (TypeData{"IN", EPropertyType::Struct}, bindingInputs);
+        HierarchicalTypeData bindingInputsType(TypeData{ "IN", EPropertyType::Struct }, bindingInputs);
 
         setRootProperties(
             std::make_unique<Property>(std::make_unique<PropertyImpl>(bindingInputsType, EPropertySemantics::BindingInput)),
@@ -173,23 +186,6 @@ namespace rlogic::internal
 
         auto binding = std::make_unique<RamsesAppearanceBindingImpl>(*resolvedAppearance, name, appearanceBinding.base()->id());
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
-
-        const uint32_t uniformCount = effect.getUniformInputCount();
-        binding->m_uniformIndices.reserve(binding->getInputs()->getChildCount());
-
-        // Re-populate property mapping
-        for (uint32_t i = 0; i < uniformCount; ++i)
-        {
-            ramses::UniformInput uniformInput;
-            ramses::status_t success = effect.getUniformInput(i, uniformInput);
-            assert(success == ramses::StatusOK);
-            assert(uniformInput.isValid());
-            (void)success;
-            if (GetPropertyTypeForUniform(uniformInput))
-            {
-                binding->m_uniformIndices.push_back(i);
-            }
-        }
 
         return binding;
     }
@@ -346,5 +342,4 @@ namespace rlogic::internal
 
         return ConvertRamsesUniformTypeToPropertyType(uniform.getDataType());
     }
-
 }

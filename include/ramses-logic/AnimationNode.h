@@ -49,6 +49,13 @@ namespace rlogic
     *                    Channel value output is a result of keyframes interpolation based on applied time deltas,
     *                    it can be linked to another logic node input to process the animation result.
     *
+    * - Channel data outputs (only if created with #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties enabled):
+    *     - channelsData (struct) - contains all channels and their data in a hierarchy. For each channel:
+    *         - [channelName] (struct)
+    *             - timestamps (array of float) - each element represents a timestamp value
+    *             - keyframes (array of T) - each element represents a keyframe value
+    *                                      - type T is data type matching this channel original keyframes
+    *
     * On #rlogic::LogicEngine::update all animation nodes will be updated if and only if there was any of the inputs set
     * (regardless if value changed or not), for this reason it is important that application (directly to node input
     * or indirectly via logic network) sets timeDelta regularly (typically every loop/frame).
@@ -89,12 +96,20 @@ namespace rlogic
         * The duration is determined by the highest timestamp value in timestamps data of all channels
         * (#rlogic::AnimationChannel::timeStamps) and is not affected by 'timeRange' property input.
         *
+        * The value retrieved is affected by modifications to timestamp data via properties
+        * (see #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties) and therefore reflects
+        * the actual value used during animation.
+        *
         * @return maximum duration of this animation.
         */
         [[nodiscard]] RLOGIC_API float getDuration() const;
 
         /**
         * Returns channel data used in this animation (as provided at creation time #rlogic::LogicEngine::createAnimationNode).
+        *
+        * Note that the retrieved data is not affected by any modifications via channel data input properties
+        * (see #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties). If modifications were made, only corresponding
+        * properties hold the actual values used during animation.
         *
         * @return animation channels used in this animation.
         */

@@ -12,6 +12,7 @@
 #include "ramses-logic/Collection.h"
 #include "ramses-logic/ErrorData.h"
 #include "ramses-logic/LuaConfig.h"
+#include "ramses-logic/SaveFileConfig.h"
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/ERotationType.h"
@@ -44,6 +45,7 @@ namespace rlogic
     class RamsesCameraBinding;
     class DataArray;
     class AnimationNode;
+    class AnimationNodeConfig;
     class TimerNode;
     enum class ELogMessageType;
 
@@ -249,17 +251,17 @@ namespace rlogic
         /**
         * Creates a new #rlogic::AnimationNode for animating properties.
         * Refer to #rlogic::AnimationNode for more information about its use.
-        * There must be at least one channel provided, please see #rlogic::AnimationChannel
-        * requirements for all the data.
+        * There must be at least one channel provided in the #rlogic::AnimationNodeConfig,
+        * please see #rlogic::AnimationChannel requirements for all the data.
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
-        * @param channels list of animation channels to be animated with this animation node.
+        * @param config list of animation channels to be animated with this animation node and other configuration flags.
         * @param name a name for the the new #rlogic::AnimationNode.
         * @return a pointer to the created object or nullptr if
         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
         */
-        RLOGIC_API AnimationNode* createAnimationNode(const AnimationChannels& channels, std::string_view name = "");
+        RLOGIC_API AnimationNode* createAnimationNode(const AnimationNodeConfig& config, std::string_view name = "");
 
         /**
         * Creates a new #rlogic::TimerNode for generate and/or propagate timing information.
@@ -482,10 +484,11 @@ namespace rlogic
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
          * @param filename path to file to save the data (relative or absolute). The file will be created or overwritten if it exists!
+         * @param config optional configuration object with exporter and asset metadata info, see #rlogic::SaveFileConfig for details
          * @return true if saving was successful, false otherwise. To get more detailed
          * error information use #getErrors()
          */
-        RLOGIC_API bool saveToFile(std::string_view filename);
+        RLOGIC_API bool saveToFile(std::string_view filename, const SaveFileConfig& config = {});
 
         /**
          * Loads the whole LogicEngine data from the given file. See also #saveToFile().

@@ -29,6 +29,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-client-api/PerspectiveCamera.h"
 #include "ramses-client-api/Appearance.h"
@@ -274,9 +275,10 @@ namespace rlogic::internal
         auto dataArray3 = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data3");
         auto dataArray4 = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data4");
 
-        auto animNode = m_apiObjects.createAnimationNode({
-            AnimationChannel{ "channel1", dataArray1, dataArray2 },
-            AnimationChannel{ "channel2", dataArray1, dataArray2, EInterpolationType::Cubic, dataArray3, dataArray4 } }, "animNode");
+        AnimationNodeConfig config;
+        EXPECT_TRUE(config.addChannel({ "channel1", dataArray1, dataArray2 }));
+        EXPECT_TRUE(config.addChannel({ "channel2", dataArray1, dataArray2, EInterpolationType::Cubic, dataArray3, dataArray4 }));
+        auto animNode = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
 
         EXPECT_FALSE(m_apiObjects.destroy(*dataArray1, m_errorReporting));
         EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
@@ -334,7 +336,9 @@ namespace rlogic::internal
     {
         auto dataArray = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
         ASSERT_NE(nullptr, dataArray);
-        auto animNode = m_apiObjects.createAnimationNode({ AnimationChannel{ "channel", dataArray, dataArray, EInterpolationType::Linear } }, "animNode");
+        AnimationNodeConfig config;
+        EXPECT_TRUE(config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear }));
+        auto animNode = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
         EXPECT_EQ(animNode, m_apiObjects.getApiObjectOwningContainer().back().get());
         EXPECT_EQ(animNode, m_apiObjects.getApiObjectContainer<LogicObject>().back());
@@ -348,7 +352,9 @@ namespace rlogic::internal
     {
         auto dataArray = m_apiObjects.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
         ASSERT_NE(nullptr, dataArray);
-        auto animNode = m_apiObjects.createAnimationNode({ AnimationChannel{ "channel", dataArray, dataArray, EInterpolationType::Linear } }, "animNode");
+        AnimationNodeConfig config;
+        EXPECT_TRUE(config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear }));
+        auto animNode = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         EXPECT_TRUE(m_apiObjects.destroy(*animNode, m_errorReporting));
         EXPECT_TRUE(m_errorReporting.getErrors().empty());
         EXPECT_TRUE(m_apiObjects.getApiObjectContainer<AnimationNode>().empty());
@@ -363,7 +369,9 @@ namespace rlogic::internal
         ApiObjects otherInstance;
         auto dataArray = otherInstance.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "data");
         ASSERT_NE(nullptr, dataArray);
-        auto animNode = otherInstance.createAnimationNode({ AnimationChannel{ "channel", dataArray, dataArray, EInterpolationType::Linear } }, "animNode");
+        AnimationNodeConfig config;
+        EXPECT_TRUE(config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear }));
+        auto animNode = otherInstance.createAnimationNode(*config.m_impl, "animNode");
         EXPECT_EQ(animNode, otherInstance.getApiObjectOwningContainer().back().get());
         EXPECT_EQ(animNode, otherInstance.getApiObjectContainer<LogicObject>().back());
         EXPECT_FALSE(m_apiObjects.destroy(*animNode, m_errorReporting));
@@ -506,7 +514,9 @@ namespace rlogic::internal
         const auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "");
         const auto* cameraBinding     = m_apiObjects.createRamsesCameraBinding(*m_camera, "");
         const auto* dataArray         = m_apiObjects.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "data");
-        const auto* animationNode     = m_apiObjects.createAnimationNode({AnimationChannel{"channel", dataArray, dataArray, EInterpolationType::Linear}}, "animNode");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+        const auto* animationNode     = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         const auto* timerNode         = m_apiObjects.createTimerNode("timerNode");
 
         std::vector<LogicObject*> ownedLogicObjectsRawPointers;
@@ -527,7 +537,9 @@ namespace rlogic::internal
         const auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "");
         const auto* cameraBinding     = m_apiObjects.createRamsesCameraBinding(*m_camera, "");
         const auto* dataArray         = m_apiObjects.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "data");
-        const auto* animationNode     = m_apiObjects.createAnimationNode({AnimationChannel{"channel", dataArray, dataArray, EInterpolationType::Linear}}, "animNode");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+        const auto* animationNode     = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         const auto* timerNode         = m_apiObjects.createTimerNode("timerNode");
 
         std::unordered_set<uint64_t> logicObjectIds =
@@ -553,7 +565,9 @@ namespace rlogic::internal
         const auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "");
         const auto* cameraBinding     = m_apiObjects.createRamsesCameraBinding(*m_camera, "");
         const auto* dataArray         = m_apiObjects.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "data");
-        const auto* animationNode     = m_apiObjects.createAnimationNode({AnimationChannel{"channel", dataArray, dataArray, EInterpolationType::Linear}}, "animNode");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+        const auto* animationNode     = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         const auto* timerNode         = m_apiObjects.createTimerNode("timerNode");
 
         EXPECT_EQ(luaModule->getId(), 1u);
@@ -583,7 +597,9 @@ namespace rlogic::internal
         auto* appearanceBinding       = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "");
         const auto* cameraBinding     = m_apiObjects.createRamsesCameraBinding(*m_camera, "");
         const auto* dataArray         = m_apiObjects.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "data");
-        auto* animationNode           = m_apiObjects.createAnimationNode({AnimationChannel{"channel", dataArray, dataArray, EInterpolationType::Linear}}, "animNode");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+        auto* animationNode           = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         const auto* timerNode         = m_apiObjects.createTimerNode("timerNode");
 
         EXPECT_EQ(m_apiObjects.getApiObjectById(1u), luaModule);
@@ -1213,7 +1229,9 @@ namespace rlogic::internal
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
             toSerialize.createRamsesCameraBinding(*m_camera, "camera");
             auto dataArray = toSerialize.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "data");
-            toSerialize.createAnimationNode({AnimationChannel{"channel", dataArray, dataArray, EInterpolationType::Linear}}, "animNode");
+            AnimationNodeConfig config;
+            config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+            toSerialize.createAnimationNode(*config.m_impl, "animNode");
             toSerialize.createTimerNode("timerNode");
 
             ApiObjects::Serialize(toSerialize, builder);

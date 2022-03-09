@@ -11,6 +11,7 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/DataArray.h"
@@ -92,10 +93,15 @@ int main(int argc, char* argv[])
     const rlogic::AnimationChannel stepAnimChannel { "rotationZstep", animTimestamps, animKeyframes, rlogic::EInterpolationType::Step };
 
     /**
-     * Finally, create the animation nodes by passing in the channel data
+     * Finally, create the animation nodes by passing in the channel data via config
      */
-    rlogic::AnimationNode* cubicAnimNode = logicEngine.createAnimationNode({ cubicAnimChannel });
-    rlogic::AnimationNode* stepAnimNode = logicEngine.createAnimationNode({ stepAnimChannel });
+    rlogic::AnimationNodeConfig animConfigCubic;
+    animConfigCubic.addChannel(cubicAnimChannel);
+    rlogic::AnimationNode* cubicAnimNode = logicEngine.createAnimationNode(animConfigCubic);
+
+    rlogic::AnimationNodeConfig animConfigStep;
+    animConfigStep.addChannel(stepAnimChannel);
+    rlogic::AnimationNode* stepAnimNode = logicEngine.createAnimationNode(animConfigStep);
 
     /**
     * Connect the animation channel 'rotationZ' output with the rotation property of the RamsesNodeBinding object.

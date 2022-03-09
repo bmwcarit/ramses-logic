@@ -25,6 +25,9 @@ namespace rlogic_serialization {
 struct Version;
 struct VersionBuilder;
 
+struct Metadata;
+struct MetadataBuilder;
+
 struct LogicEngine;
 struct LogicEngineBuilder;
 
@@ -134,13 +137,85 @@ inline flatbuffers::Offset<Version> CreateVersionDirect(
       v_fileFormatVersion);
 }
 
+struct Metadata FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef MetadataBuilder Builder;
+  struct Traits;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_METADATASTRING = 4,
+    VT_EXPORTERVERSION = 6
+  };
+  const flatbuffers::String *metadataString() const {
+    return GetPointer<const flatbuffers::String *>(VT_METADATASTRING);
+  }
+  const rlogic_serialization::Version *exporterVersion() const {
+    return GetPointer<const rlogic_serialization::Version *>(VT_EXPORTERVERSION);
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_METADATASTRING) &&
+           verifier.VerifyString(metadataString()) &&
+           VerifyOffset(verifier, VT_EXPORTERVERSION) &&
+           verifier.VerifyTable(exporterVersion()) &&
+           verifier.EndTable();
+  }
+};
+
+struct MetadataBuilder {
+  typedef Metadata Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_metadataString(flatbuffers::Offset<flatbuffers::String> metadataString) {
+    fbb_.AddOffset(Metadata::VT_METADATASTRING, metadataString);
+  }
+  void add_exporterVersion(flatbuffers::Offset<rlogic_serialization::Version> exporterVersion) {
+    fbb_.AddOffset(Metadata::VT_EXPORTERVERSION, exporterVersion);
+  }
+  explicit MetadataBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  MetadataBuilder &operator=(const MetadataBuilder &);
+  flatbuffers::Offset<Metadata> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<Metadata>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<Metadata> CreateMetadata(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<flatbuffers::String> metadataString = 0,
+    flatbuffers::Offset<rlogic_serialization::Version> exporterVersion = 0) {
+  MetadataBuilder builder_(_fbb);
+  builder_.add_exporterVersion(exporterVersion);
+  builder_.add_metadataString(metadataString);
+  return builder_.Finish();
+}
+
+struct Metadata::Traits {
+  using type = Metadata;
+  static auto constexpr Create = CreateMetadata;
+};
+
+inline flatbuffers::Offset<Metadata> CreateMetadataDirect(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    const char *metadataString = nullptr,
+    flatbuffers::Offset<rlogic_serialization::Version> exporterVersion = 0) {
+  auto metadataString__ = metadataString ? _fbb.CreateString(metadataString) : 0;
+  return rlogic_serialization::CreateMetadata(
+      _fbb,
+      metadataString__,
+      exporterVersion);
+}
+
 struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LogicEngineBuilder Builder;
   struct Traits;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_RAMSESVERSION = 4,
     VT_RLOGICVERSION = 6,
-    VT_APIOBJECTS = 8
+    VT_APIOBJECTS = 8,
+    VT_ASSETMETEDATA = 10
   };
   const rlogic_serialization::Version *ramsesVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RAMSESVERSION);
@@ -151,6 +226,9 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::ApiObjects *apiObjects() const {
     return GetPointer<const rlogic_serialization::ApiObjects *>(VT_APIOBJECTS);
   }
+  const rlogic_serialization::Metadata *assetMetedata() const {
+    return GetPointer<const rlogic_serialization::Metadata *>(VT_ASSETMETEDATA);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_RAMSESVERSION) &&
@@ -159,6 +237,8 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyTable(rlogicVersion()) &&
            VerifyOffset(verifier, VT_APIOBJECTS) &&
            verifier.VerifyTable(apiObjects()) &&
+           VerifyOffset(verifier, VT_ASSETMETEDATA) &&
+           verifier.VerifyTable(assetMetedata()) &&
            verifier.EndTable();
   }
 };
@@ -175,6 +255,9 @@ struct LogicEngineBuilder {
   }
   void add_apiObjects(flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects) {
     fbb_.AddOffset(LogicEngine::VT_APIOBJECTS, apiObjects);
+  }
+  void add_assetMetedata(flatbuffers::Offset<rlogic_serialization::Metadata> assetMetedata) {
+    fbb_.AddOffset(LogicEngine::VT_ASSETMETEDATA, assetMetedata);
   }
   explicit LogicEngineBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -194,8 +277,10 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
     flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
-    flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects = 0) {
+    flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects = 0,
+    flatbuffers::Offset<rlogic_serialization::Metadata> assetMetedata = 0) {
   LogicEngineBuilder builder_(_fbb);
+  builder_.add_assetMetedata(assetMetedata);
   builder_.add_apiObjects(apiObjects);
   builder_.add_rlogicVersion(rlogicVersion);
   builder_.add_ramsesVersion(ramsesVersion);

@@ -166,7 +166,7 @@ namespace rlogic
             function interface()
             end
             function run()
-                str="a"
+                local str="a"
                 for i=0,1000 do
                     str = str .. "a"
                 end

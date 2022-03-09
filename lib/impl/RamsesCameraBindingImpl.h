@@ -92,6 +92,8 @@ namespace rlogic::internal
         // TODO Violin make nodiscard
         std::optional<LogicNodeRuntimeError> update() override;
 
+        void createRootProperties() final;
+
     private:
         std::reference_wrapper<ramses::Camera> m_ramsesCamera;
 

@@ -12,6 +12,7 @@
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/AnimationNode.h"
+#include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "fmt/format.h"
 
@@ -112,8 +113,11 @@ namespace rlogic
         const auto* animKeyframes = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, {0.f, 0.f, 360.f} });
         const rlogic::AnimationChannel channelLinear { "rotationZ", animTimestamps, animKeyframes, rlogic::EInterpolationType::Linear };
 
-        AnimationChannels channels(state.range(0), channelLinear);
-        auto* node = logicEngine.createAnimationNode(channels);
+        AnimationNodeConfig config;
+        for (int64_t i = 0; i < state.range(0); ++i)
+            config.addChannel(channelLinear);
+        auto* node = logicEngine.createAnimationNode(config);
+
         node->getInputs()->getChild("play")->set(true);
         node->getInputs()->getChild("loop")->set(true);
         auto* timeProp = node->getInputs()->getChild("timeDelta");
@@ -128,8 +132,11 @@ namespace rlogic
         const auto* animKeyframes = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, {0.f, 0.f, 180.f}, {0.f, 0.f, 100.f}, {0.f, 0.f, 360.f} });
         const rlogic::AnimationChannel channelLinear { "rotationZ", animTimestamps, animKeyframes, rlogic::EInterpolationType::Linear };
 
-        AnimationChannels channels(state.range(0), channelLinear);
-        auto* node = logicEngine.createAnimationNode(channels);
+        AnimationNodeConfig config;
+        for (int64_t i = 0; i < state.range(0); ++i)
+            config.addChannel(channelLinear);
+        auto* node = logicEngine.createAnimationNode(config);
+
         node->getInputs()->getChild("play")->set(true);
         node->getInputs()->getChild("loop")->set(true);
         auto* timeProp = node->getInputs()->getChild("timeDelta");
@@ -146,8 +153,11 @@ namespace rlogic
         const auto* cubicAnimTangentsOut = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, { 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f } });
         const rlogic::AnimationChannel channelCubic { "rotationZcubic", animTimestamps, animKeyframes, rlogic::EInterpolationType::Cubic, cubicAnimTangentsIn, cubicAnimTangentsOut };
 
-        AnimationChannels channels(state.range(0), channelCubic);
-        auto* node = logicEngine.createAnimationNode(channels);
+        AnimationNodeConfig config;
+        for (int64_t i = 0; i < state.range(0); ++i)
+            config.addChannel(channelCubic);
+        auto* node = logicEngine.createAnimationNode(config);
+
         node->getInputs()->getChild("play")->set(true);
         node->getInputs()->getChild("loop")->set(true);
         auto* timeProp = node->getInputs()->getChild("timeDelta");

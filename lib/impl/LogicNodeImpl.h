@@ -40,6 +40,7 @@ namespace rlogic::internal
         [[nodiscard]] Property* getOutputs();
         [[nodiscard]] const Property* getOutputs() const;
 
+        virtual void createRootProperties() = 0;
         virtual std::optional<LogicNodeRuntimeError> update() = 0;
 
         void setDirty(bool dirty);

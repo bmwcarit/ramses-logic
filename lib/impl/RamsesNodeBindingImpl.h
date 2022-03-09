@@ -73,6 +73,8 @@ namespace rlogic::internal
 
         std::optional<LogicNodeRuntimeError> update() override;
 
+        void createRootProperties() final;
+
     private:
         static void ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode);
 

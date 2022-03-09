@@ -752,6 +752,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesCameraBindingImpl binding(*m_camera, "name", 1u);
+            binding.createRootProperties();
             (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 
@@ -788,6 +789,7 @@ namespace rlogic::internal
         // Serialize
         {
             RamsesCameraBindingImpl binding(*m_camera, "name", 1u);
+            binding.createRootProperties();
             (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
         }
 

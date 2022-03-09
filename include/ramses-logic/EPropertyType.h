@@ -304,4 +304,6 @@ namespace rlogic
         }
         return "STRUCT";
     }
+
+    constexpr size_t MaxArrayPropertySize = 255u;
 }

@@ -54,7 +54,10 @@ namespace rlogic::internal
         void copyTableIntoEnvironment(const sol::table& table, std::string_view name, sol::environment& env);
         sol::table createTable();
 
+        [[nodiscard]] int getNumElementsInLuaStack() const;
+
         [[nodiscard]] static bool IsReservedModuleName(std::string_view name);
+
     private:
         sol::state m_solState;
         // Cached to avoid unnecessary heap allocations

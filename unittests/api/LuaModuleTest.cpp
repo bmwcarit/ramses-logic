@@ -131,7 +131,9 @@ namespace rlogic::internal
         {
             auto module = rlogic_serialization::CreateLuaModule(
                 m_flatBufferBuilder,
-                0 // no name
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    0, // no name
+                    0)
             );
             m_flatBufferBuilder.Finish(module);
         }
@@ -140,8 +142,9 @@ namespace rlogic::internal
         std::unique_ptr<LuaModuleImpl> deserialized = LuaModuleImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing name!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing name!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of LuaModule from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ALuaModule_SerializationLifecycle, ProducesErrorWhenIdMissing)
@@ -149,8 +152,9 @@ namespace rlogic::internal
         {
             auto module = rlogic_serialization::CreateLuaModule(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                0 // no id
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    0) // no id
             );
             m_flatBufferBuilder.Finish(module);
         }
@@ -159,8 +163,9 @@ namespace rlogic::internal
         std::unique_ptr<LuaModuleImpl> deserialized = LuaModuleImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing id!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing or invalid ID!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of LuaModule from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ALuaModule_SerializationLifecycle, ProducesErrorWhenLuaSourceCodeMissing)
@@ -168,8 +173,9 @@ namespace rlogic::internal
         {
             auto module = rlogic_serialization::CreateLuaModule(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0 // no source code
             );
             m_flatBufferBuilder.Finish(module);
@@ -188,8 +194,9 @@ namespace rlogic::internal
         {
             auto module = rlogic_serialization::CreateLuaModule(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_moduleSourceCode),
                 0 // no source code
             );
@@ -257,12 +264,12 @@ namespace rlogic::internal
         config.addDependency("_math", *mathCombined);
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("_math")
-            function interface()
-                OUT.added = INT
-                OUT.subbed = INT
+            function interface(IN,OUT)
+                OUT.added = Type:Int32()
+                OUT.subbed = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.added = _math.add(1,2)
                 OUT.subbed = _math.sub(15,5)
             end
@@ -290,11 +297,11 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mathAll")
 
-            function interface()
-                OUT.result = INT
+            function interface(IN,OUT)
+                OUT.result = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.result = mathAll.add1(1,2) + mathAll.add2(100,10)
             end
         )", config);
@@ -331,12 +338,12 @@ namespace rlogic::internal
         scriptConfig.addDependency("math2", *mathUser2);
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("math1", "math2")
-            function interface()
-                OUT.result1 = INT
-                OUT.result2 = INT
+            function interface(IN,OUT)
+                OUT.result1 = Type:Int32()
+                OUT.result2 = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.result1 = math1.add(1,2)
                 OUT.result2 = math2.add(1,2)
             end

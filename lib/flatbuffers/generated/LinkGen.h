@@ -13,9 +13,14 @@ namespace rlogic_serialization {
 struct Link;
 struct LinkBuilder;
 
+inline const flatbuffers::TypeTable *LinkTypeTable();
+
 struct Link FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LinkBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return LinkTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_SOURCEPROPERTY = 4,
     VT_TARGETPROPERTY = 6,
@@ -82,6 +87,26 @@ struct Link::Traits {
   using type = Link;
   static auto constexpr Create = CreateLink;
 };
+
+inline const flatbuffers::TypeTable *LinkTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_BOOL, 0, -1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::PropertyTypeTable
+  };
+  static const char * const names[] = {
+    "sourceProperty",
+    "targetProperty",
+    "isWeak"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
 
 }  // namespace rlogic_serialization
 

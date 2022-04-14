@@ -38,10 +38,10 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, DISABLED_GeneratesErrorWhenOverwritingInputsInRunFunction)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
                 IN = {}
             end
         )");
@@ -49,17 +49,17 @@ namespace rlogic
         ASSERT_EQ(nullptr, script);
 
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Special global symbol 'IN' should not be overwritten with other types in run() function!!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Special global symbol 'IN' should not be overwritten with other types in run(IN,OUT) function!!"));
     }
 
     TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningVectorComponentsIndividually)
     {
         m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.vec3f = VEC3F
+            function interface(IN,OUT)
+                OUT.vec3f = Type:Vec3f()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.vec3f[1] = 1.0
             end
         )");
@@ -73,9 +73,9 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedInputIsUsedInRun)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 local undefined = IN.undefined
             end
         )");
@@ -89,9 +89,9 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorIfUndefinedOutputIsUsedInRun)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 OUT.undefined = 5
             end
         )");
@@ -105,9 +105,9 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ReportsSourceNodeOnRuntimeError)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 error("this causes an error")
             end
         )", WithStdModules({ EStandardModule::Base }));
@@ -122,11 +122,11 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenTryingToWriteInputValues)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.value = FLOAT
+            function interface(IN,OUT)
+                IN.value = Type:Float()
             end
 
-            function run()
+            function run(IN,OUT)
                 IN.value = 5
             end
         )");
@@ -144,16 +144,16 @@ namespace rlogic
         std::vector<LuaTestError> allErrorCases;
         for (const auto& errorType : wrongIndexTypes)
         {
-            allErrorCases.emplace_back(LuaTestError{"IN" + errorType + " = 5", "lua: error: Bad access to property 'IN'! Expected a string but got object of type"});
-            allErrorCases.emplace_back(LuaTestError{"OUT" + errorType + " = 5", "lua: error: Bad access to property 'OUT'! Expected a string but got object of type"});
+            allErrorCases.emplace_back(LuaTestError{"inputs" + errorType + " = 5", "lua: error: Bad access to property ''! Expected a string but got object of type"});
+            allErrorCases.emplace_back(LuaTestError{"outputs" + errorType + " = 5", "lua: error: Bad access to property ''! Expected a string but got object of type"});
         }
 
         for (const auto& singleCase : allErrorCases)
         {
             auto script = m_logicEngine.createLuaScript(
-                "function interface()\n"
+                "function interface(inputs,outputs)\n"
                 "end\n"
-                "function run()\n" +
+                "function run(inputs,outputs)\n" +
                 singleCase.errorCode +
                 "\n"
                 "end\n");
@@ -216,13 +216,13 @@ namespace rlogic
     {
         auto* script = m_logicEngine.createLuaScript(R"(
 
-            function interface()
-                IN.a = INT
-                IN.b = INT
-                OUT.result = INT
+            function interface(IN,OUT)
+                IN.a = Type:Int32()
+                IN.b = Type:Int32()
+                OUT.result = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.result = IN.a + IN.b
             end
         )");
@@ -245,18 +245,18 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ReadsDataFromVec234Inputs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.vec2f = VEC2F
-                IN.vec3f = VEC3F
-                IN.vec4f = VEC4F
-                IN.vec2i = VEC2I
-                IN.vec3i = VEC3I
-                IN.vec4i = VEC4I
-                OUT.sumOfAllFloats = FLOAT
-                OUT.sumOfAllInts = INT
+            function interface(IN,OUT)
+                IN.vec2f = Type:Vec2f()
+                IN.vec3f = Type:Vec3f()
+                IN.vec4f = Type:Vec4f()
+                IN.vec2i = Type:Vec2i()
+                IN.vec3i = Type:Vec3i()
+                IN.vec4i = Type:Vec4i()
+                OUT.sumOfAllFloats = Type:Float()
+                OUT.sumOfAllInts = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.sumOfAllFloats =
                     IN.vec2f[1] + IN.vec2f[2] +
                     IN.vec3f[1] + IN.vec3f[2] + IN.vec3f[3] +
@@ -286,20 +286,20 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, WritesValuesToVectorTypeOutputs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.vec2f = VEC2F
-                OUT.vec3f = VEC3F
-                OUT.vec4f = VEC4F
-                OUT.vec2i = VEC2I
-                OUT.vec3i = VEC3I
-                OUT.vec4i = VEC4I
+            function interface(IN,OUT)
+                OUT.vec2f = Type:Vec2f()
+                OUT.vec3f = Type:Vec3f()
+                OUT.vec4f = Type:Vec4f()
+                OUT.vec2i = Type:Vec2i()
+                OUT.vec3i = Type:Vec3i()
+                OUT.vec4i = Type:Vec4i()
                 OUT.nested = {
-                    vec = VEC3I,
-                    float = FLOAT
+                    vec = Type:Vec3i(),
+                    float = Type:Float()
                 }
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.vec2f = {0.1, 0.2}
                 OUT.vec3f = {1.1, 1.2, 1.3}
                 OUT.vec4f = {2.1, 2.2, 2.3, 2.4}
@@ -349,16 +349,16 @@ namespace rlogic
         for (const auto& aCase : allCases)
         {
             auto scriptSource = std::string(R"(
-            function interface()
-                OUT.vec2f = VEC2F
-                OUT.vec3f = VEC3F
-                OUT.vec4f = VEC4F
-                OUT.vec2i = VEC2I
-                OUT.vec3i = VEC3I
-                OUT.vec4i = VEC4I
+            function interface(IN,OUT)
+                OUT.vec2f = Type:Vec2f()
+                OUT.vec3f = Type:Vec3f()
+                OUT.vec4f = Type:Vec4f()
+                OUT.vec2i = Type:Vec2i()
+                OUT.vec3i = Type:Vec3i()
+                OUT.vec4i = Type:Vec4i()
             end
 
-            function run()
+            function run(IN,OUT)
             )");
             scriptSource += aCase;
             scriptSource += "\nend\n";
@@ -376,12 +376,12 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, PermitsAssigningOfVector_FromTable_WithKeyValuePairs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.vec2f = VEC2F
-                OUT.vec3i = VEC3I
+            function interface(IN,OUT)
+                OUT.vec2f = Type:Vec2f()
+                OUT.vec3i = Type:Vec3i()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.vec2f = {[1] = 0.1, [2] = 0.2}
                 OUT.vec3i = {[3] = 13, [2] = 12, [1] = 11} -- shuffled
             end
@@ -400,14 +400,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, UsesNestedInputsToProduceResult)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.data = {
-                    a = INT,
-                    b = INT
+                    a = Type:Int32(),
+                    b = Type:Int32()
                 }
-                OUT.result = INT
+                OUT.result = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.result = IN.data.a + IN.data.b
             end
         )");
@@ -432,14 +432,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, StoresDataToNestedOutputs_AsWholeStruct)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.data = INT
+            function interface(IN,OUT)
+                IN.data = Type:Int32()
                 OUT.struct = {
-                    field1 = INT,
-                    field2 = INT
+                    field1 = Type:Int32(),
+                    field2 = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.struct = {
                     field1 = IN.data + IN.data,
                     field2 = IN.data * IN.data
@@ -465,14 +465,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, StoresDataToNestedOutputs_Individually)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.data = INT
+            function interface(IN,OUT)
+                IN.data = Type:Int32()
                 OUT.data = {
-                    field1 = INT,
-                    field2 = INT
+                    field1 = Type:Int32(),
+                    field2 = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data.field1 = IN.data + IN.data
                 OUT.data.field2 = IN.data * IN.data
             end
@@ -496,13 +496,13 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_Underspecified)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.data = {
-                    field1 = INT,
-                    field2 = INT
+                    field1 = Type:Int32(),
+                    field2 = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = {
                     field1 = 5
                 }
@@ -524,13 +524,13 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_Overspecified)
     {
         m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.data = {
-                    field1 = INT,
-                    field2 = INT
+                    field1 = Type:Int32(),
+                    field2 = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = {
                     field1 = 5,
                     field2 = 5,
@@ -547,14 +547,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenFieldHasWrongType)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.data = {
-                    field1 = INT32,
-                    field2 = INT32
+                    field1 = Type:Int32(),
+                    field2 = Type:Int32()
                 }
-                OUT.field2 = INT32
+                OUT.field2 = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.field2 = "this is no integer"
                 OUT.data = {
                     field1 = 5,
@@ -569,7 +569,7 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning string to 'INT32' output 'field2'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning string to 'Int32' output 'field2'!"));
 
         EXPECT_EQ(0, *field1->get<int32_t>());
         EXPECT_EQ(0, *field2->get<int32_t>());
@@ -578,16 +578,16 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenNestedSubStructDoesNotMatch)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.data = {
-                    field1 = INT,
-                    field2 = INT,
+                    field1 = Type:Int32(),
+                    field2 = Type:Int32(),
                     nested = {
-                        field = INT
+                        field = Type:Int32()
                     }
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = {
                     field1 = 5,
                     field2 = 5,
@@ -614,16 +614,16 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignsValuesToArrays)
     {
         std::string_view scriptWithArrays = R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
-                IN.array_int64 = ARRAY(2, INT64)
-                IN.array_float = ARRAY(3, FLOAT)
-                OUT.array_int = ARRAY(2, INT)
-                OUT.array_int64 = ARRAY(2, INT64)
-                OUT.array_float = ARRAY(3, FLOAT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
+                IN.array_int64 = Type:Array(2, Type:Int64())
+                IN.array_float = Type:Array(3, Type:Float())
+                OUT.array_int = Type:Array(2, Type:Int32())
+                OUT.array_int64 = Type:Array(2, Type:Int64())
+                OUT.array_float = Type:Array(3, Type:Float())
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.array_int = IN.array_int
                 OUT.array_int[2] = 5
                 OUT.array_int64 = IN.array_int64
@@ -669,11 +669,11 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAccessingArrayWithNonIntegerIndex)
     {
         const std::string_view scriptTemplate = (R"(
-            function interface()
-                IN.array = ARRAY(2, INT)
-                OUT.array = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array = Type:Array(2, Type:Int32())
+                OUT.array = Type:Array(2, Type:Int32())
             end
-            function run()
+            function run(IN,OUT)
                 {}
             end
         )");
@@ -708,11 +708,11 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAccessingArrayOutOfRange)
     {
         const std::string_view scriptTemplate = (R"(
-            function interface()
-                IN.array = ARRAY(2, INT)
-                OUT.array = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array = Type:Array(2, Type:Int32())
+                OUT.array = Type:Array(2, Type:Int32())
             end
-            function run()
+            function run(IN,OUT)
                 {}
             end
         )");
@@ -750,14 +750,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignArrayValuesFromLuaTable)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.int_array = ARRAY(2, INT)
-                OUT.int64_array = ARRAY(2, INT64)
-                OUT.float_array = ARRAY(2, FLOAT)
-                OUT.vec2i_array = ARRAY(2, VEC2I)
-                OUT.vec3f_array = ARRAY(2, VEC3F)
+            function interface(IN,OUT)
+                OUT.int_array = Type:Array(2, Type:Int32())
+                OUT.int64_array = Type:Array(2, Type:Int64())
+                OUT.float_array = Type:Array(2, Type:Float())
+                OUT.vec2i_array = Type:Array(2, Type:Vec2i())
+                OUT.vec3f_array = Type:Array(2, Type:Vec3f())
             end
-            function run()
+            function run(IN,OUT)
                 OUT.int_array = {1, 2}
                 OUT.int64_array = {3, 4}
                 OUT.float_array = {0.1, 0.2}
@@ -791,10 +791,10 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignArrayValuesFromLuaTable_WithExplicitKeys)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.int_array = ARRAY(3, INT)
+            function interface(IN,OUT)
+                OUT.int_array = Type:Array(3, Type:Int32())
             end
-            function run()
+            function run(IN,OUT)
                 OUT.int_array = {[1] = 11, [2] = 12, [3] = 13}
             end
         )");
@@ -813,10 +813,10 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayWithFewerElementsThanRequired_UsingExplicitIndices)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.int_array = ARRAY(3, INT)
+            function interface(IN,OUT)
+                OUT.int_array = Type:Array(3, Type:Int32())
             end
-            function run()
+            function run(IN,OUT)
                 OUT.int_array = {[1] = 11, [2] = 12}
             end
         )");
@@ -832,10 +832,10 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArrayFromLuaTableWithCorrectSizeButWrongIndices)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.int_array = ARRAY(3, INT)
+            function interface(IN,OUT)
+                OUT.int_array = Type:Array(3, Type:Int32())
             end
-            function run()
+            function run(IN,OUT)
                 -- 3 values, but use [1, 3, 4] instead of [1, 2, 3]
                 OUT.int_array = {[1] = 11, [3] = 13, [4] = 14}
             end
@@ -849,16 +849,43 @@ namespace rlogic
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Error during assignment of array property 'int_array'! Expected a value at index 2"));
     }
 
+    TEST_F(ALuaScript_Runtime, AssignsMultidimensionalArrays)
+    {
+        const std::string_view scriptSrc = (R"(
+            function interface(IN,OUT)
+                OUT.array2d_int = Type:Array(2, Type:Array(2, Type:Int32()))
+                OUT.array3d_float = Type:Array(1, Type:Array(1, Type:Array(1, Type:Float())))
+            end
+            function run(IN,OUT)
+                OUT.array2d_int = {{1, 2}, {3, 4}}
+                OUT.array3d_float = {{{1.4}}}
+            end
+        )");
+
+        auto script = m_logicEngine.createLuaScript(scriptSrc);
+
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(m_logicEngine.update());
+
+        auto outArray2d = script->getOutputs()->getChild("array2d_int");
+        EXPECT_EQ(1, *outArray2d->getChild(0)->getChild(0)->get<int32_t>());
+        EXPECT_EQ(2, *outArray2d->getChild(0)->getChild(1)->get<int32_t>());
+        EXPECT_EQ(3, *outArray2d->getChild(1)->getChild(0)->get<int32_t>());
+        EXPECT_EQ(4, *outArray2d->getChild(1)->getChild(1)->get<int32_t>());
+        auto outArray3d = script->getOutputs()->getChild("array3d_float");
+        EXPECT_FLOAT_EQ(1.4f, *outArray3d->getChild(0)->getChild(0)->getChild(0)->get<float>());
+    }
+
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningArraysWrongValues)
     {
         const std::string_view scriptTemplate = (R"(
-            function interface()
-                OUT.array_int = ARRAY(2, INT32)
-                OUT.array_int64 = ARRAY(2, INT64)
-                OUT.array_string = ARRAY(2, STRING)
-                OUT.array_vec2f = ARRAY(2, VEC2F)
+            function interface(IN,OUT)
+                OUT.array_int = Type:Array(2, Type:Int32())
+                OUT.array_int64 = Type:Array(2, Type:Int64())
+                OUT.array_string = Type:Array(2, Type:String())
+                OUT.array_vec2f = Type:Array(2, Type:Vec2f())
             end
-            function run()
+            function run(IN,OUT)
                 {}
             end
         )");
@@ -869,25 +896,25 @@ namespace rlogic
             {"OUT.array_int = {1}", "Error during assignment of array property 'array_int'! Expected a value at index 2"},
             {"OUT.array_int = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int'! Expected array size: 2"},
             {"OUT.array_int = {1, 2.2}", "Error while extracting integer: implicit rounding (fractional part '0.20000000000000018' is not negligible)"},
-            {"OUT.array_int = {1, true}", "Assigning bool to 'INT32' output ''"},
+            {"OUT.array_int = {1, true}", "Assigning bool to 'Int32' output ''"},
             {"OUT.array_int = {nil, 1, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 1"},
             {"OUT.array_int = {1, nil, 3}", "Error during assignment of array property 'array_int'! Expected a value at index 2"},
             {"OUT.array_int64 = {}", "Error during assignment of array property 'array_int64'! Expected a value at index 1"},
             {"OUT.array_int64 = {1}", "Error during assignment of array property 'array_int64'! Expected a value at index 2"},
             {"OUT.array_int64 = {1, 2, 3}", "Element size mismatch when assigning array property 'array_int64'! Expected array size: 2"},
             {"OUT.array_int64 = {1, 2.2}", "Error while extracting integer: implicit rounding (fractional part '0.20000000000000018' is not negligible)"},
-            {"OUT.array_int64 = {1, true}", "Assigning bool to 'INT64' output ''"},
+            {"OUT.array_int64 = {1, true}", "Assigning bool to 'Int64' output ''"},
             {"OUT.array_int64 = {nil, 1, 3}", "Error during assignment of array property 'array_int64'! Expected a value at index 1"},
             {"OUT.array_int64 = {1, nil, 3}", "Error during assignment of array property 'array_int64'! Expected a value at index 2"},
             // TODO Violin the messages below are a bit misleading now ... They could contain info which array field failed to be assigned. Need to refactor the code and fix them
-            {"OUT.array_string = {'somestring', 2}", "Assigning number to 'STRING' output ''"},
-            {"OUT.array_string = {'somestring', {}}", "Assigning table to 'STRING' output ''"},
-            {"OUT.array_string = {'somestring', OUT.array_int}", "Can't assign property 'array_int' (type ARRAY) to property '' (type STRING)"},
-            {"OUT.array_vec2f = {1, 2}", "Error while assigning output VEC2 property ''. Expected a Lua table with 2 entries but got object of type number instead!"},
-            {"OUT.array_vec2f = {{1, 2}, {5}}", "Error while assigning output VEC2 property ''. Error while extracting array: expected 2 array components in table but got 1 instead!"},
-            {"OUT.array_vec2f = {{1, 2}, {}}", "Error while assigning output VEC2 property ''. Error while extracting array: expected 2 array components in table but got 0 instead!"},
-            {"OUT.array_int = OUT", "Can't assign property 'OUT' (type STRUCT) to property 'array_int' (type ARRAY)"},
-            {"OUT.array_int = IN", "Can't assign property 'IN' (type STRUCT) to property 'array_int' (type ARRAY)"},
+            {"OUT.array_string = {'somestring', 2}", "Assigning number to 'String' output ''"},
+            {"OUT.array_string = {'somestring', {}}", "Assigning table to 'String' output ''"},
+            {"OUT.array_string = {'somestring', OUT.array_int}", "Can't assign property 'array_int' (type Array) to property '' (type String)"},
+            {"OUT.array_vec2f = {1, 2}", "Error while assigning output Vec2 property ''. Expected a Lua table with 2 entries but got object of type number instead!"},
+            {"OUT.array_vec2f = {{1, 2}, {5}}", "Error while assigning output Vec2 property ''. Error while extracting array: expected 2 array components in table but got 1 instead!"},
+            {"OUT.array_vec2f = {{1, 2}, {}}", "Error while assigning output Vec2 property ''. Error while extracting array: expected 2 array components in table but got 0 instead!"},
+            {"OUT.array_int = OUT", "Can't assign property '' (type Struct) to property 'array_int' (type Array)"},
+            {"OUT.array_int = IN", "Can't assign property '' (type Struct) to property 'array_int' (type Array)"},
         };
 
         for (const auto& singleCase : allErrorCases)
@@ -906,11 +933,11 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignsValuesArraysInVariousLuaSyntaxStyles)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.array = ARRAY(3, VEC2I)
-                OUT.array = ARRAY(3, VEC2I)
+            function interface(IN,OUT)
+                IN.array = Type:Array(3, Type:Vec2i())
+                OUT.array = Type:Array(3, Type:Vec2i())
             end
-            function run()
+            function run(IN,OUT)
                 -- assign from "everything" towards "just one value" to cover as many cases as possible
                 OUT.array = IN.array
                 OUT.array[2] = IN.array[2]
@@ -931,17 +958,17 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignsValuesArraysInVariousLuaSyntaxStyles_InNestedStruct)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = {
-                    array1  = ARRAY(1, VEC2F),
-                    array2  = ARRAY(2, VEC3F)
+                    array1  = Type:Array(1, Type:Vec2f()),
+                    array2  = Type:Array(2, Type:Vec3f())
                 }
                 OUT.struct = {
-                    array1  = ARRAY(1, VEC2F),
-                    array2  = ARRAY(2, VEC3F)
+                    array1  = Type:Array(1, Type:Vec2f()),
+                    array2  = Type:Array(2, Type:Vec3f())
                 }
             end
-            function run()
+            function run(IN,OUT)
                 -- assign from "everything" towards "just one value" to cover as many cases as possible
                 OUT.struct = IN.struct
                 OUT.struct.array1    = IN.struct.array1
@@ -963,14 +990,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AllowsAssigningArraysFromTableWithNilAtTheEnd)
     {
         const std::string_view scriptTemplate = (R"(
-            function interface()
-                OUT.array_2ints = ARRAY(2, INT)
-                OUT.array_3ints = ARRAY(3, INT)
-                OUT.array_4ints = ARRAY(4, INT)
-                OUT.array_vec2i = ARRAY(1, VEC2I)
+            function interface(IN,OUT)
+                OUT.array_2ints = Type:Array(2, Type:Int32())
+                OUT.array_3ints = Type:Array(3, Type:Int32())
+                OUT.array_4ints = Type:Array(4, Type:Int32())
+                OUT.array_vec2i = Type:Array(1, Type:Vec2i())
             end
 
-            function run()
+            function run(IN,OUT)
                 {}
             end
         )");
@@ -1001,14 +1028,14 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningArraysWithMismatchedSizes)
     {
         const std::string_view scriptTemplate = (R"(
-            function interface()
-                IN.array_float2 = ARRAY(2, FLOAT)
-                IN.array_float4 = ARRAY(4, FLOAT)
-                IN.array_vec3f = ARRAY(1, VEC3F)
-                OUT.array_float3 = ARRAY(3, FLOAT)
+            function interface(IN,OUT)
+                IN.array_float2 = Type:Array(2, Type:Float())
+                IN.array_float4 = Type:Array(4, Type:Float())
+                IN.array_vec3f = Type:Array(1, Type:Vec3f())
+                OUT.array_float3 = Type:Array(3, Type:Float())
             end
 
-            function run()
+            function run(IN,OUT)
                 {}
             end
         )");
@@ -1039,27 +1066,27 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningUserdataArraysWithMismatchedTypes)
     {
         const std::string_view scriptTemplate = (R"(
-            function interface()
-                IN.array_float = ARRAY(2, FLOAT)
-                IN.array_vec2f = ARRAY(2, VEC2F)
-                IN.array_vec2i = ARRAY(2, VEC2I)
-                OUT.array_int = ARRAY(2, INT32)
-                OUT.array_int64 = ARRAY(2, INT64)
+            function interface(IN,OUT)
+                IN.array_float = Type:Array(2, Type:Float())
+                IN.array_vec2f = Type:Array(2, Type:Vec2f())
+                IN.array_vec2i = Type:Array(2, Type:Vec2i())
+                OUT.array_int = Type:Array(2, Type:Int32())
+                OUT.array_int64 = Type:Array(2, Type:Int64())
             end
 
-            function run()
+            function run(IN,OUT)
                 {}
             end
         )");
 
         const std::vector<LuaTestError> allCases =
         {
-            {"OUT.array_int = IN.array_float", "Can't assign property '' (type FLOAT) to property '' (type INT32)!"},
-            {"OUT.array_int = IN.array_vec2f", "Can't assign property '' (type VEC2F) to property '' (type INT32)!"},
-            {"OUT.array_int = IN.array_vec2i", "Can't assign property '' (type VEC2I) to property '' (type INT32)!"},
-            {"OUT.array_int64 = IN.array_float", "Can't assign property '' (type FLOAT) to property '' (type INT64)!"},
-            {"OUT.array_int64 = IN.array_vec2f", "Can't assign property '' (type VEC2F) to property '' (type INT64)!"},
-            {"OUT.array_int64 = IN.array_vec2i", "Can't assign property '' (type VEC2I) to property '' (type INT64)!"},
+            {"OUT.array_int = IN.array_float", "Can't assign property '' (type Float) to property '' (type Int32)!"},
+            {"OUT.array_int = IN.array_vec2f", "Can't assign property '' (type Vec2f) to property '' (type Int32)!"},
+            {"OUT.array_int = IN.array_vec2i", "Can't assign property '' (type Vec2i) to property '' (type Int32)!"},
+            {"OUT.array_int64 = IN.array_float", "Can't assign property '' (type Float) to property '' (type Int64)!"},
+            {"OUT.array_int64 = IN.array_vec2f", "Can't assign property '' (type Vec2f) to property '' (type Int64)!"},
+            {"OUT.array_int64 = IN.array_vec2i", "Can't assign property '' (type Vec2i) to property '' (type Int64)!"},
         };
 
         for (const auto& aCase : allCases)
@@ -1078,13 +1105,13 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenImplicitlyRoundingNumbers)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.float1 = FLOAT
-                IN.float2 = FLOAT
-                OUT.int = INT
-                OUT.int64 = INT64
+            function interface(IN,OUT)
+                IN.float1 = Type:Float()
+                IN.float2 = Type:Float()
+                OUT.int = Type:Int32()
+                OUT.int64 = Type:Int64()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.int = IN.float1
                 OUT.int64 = IN.float2
             end
@@ -1127,44 +1154,44 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNilToIntOutputs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.int = INT32
+            function interface(IN,OUT)
+                OUT.int = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.int = nil
             end
         )");
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to 'INT32' output 'int'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning nil to 'Int32' output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningBoolToIntOutputs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.int = INT32
+            function interface(IN,OUT)
+                OUT.int = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.int = true
             end
         )");
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'INT32' output 'int'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'Int32' output 'int'!"));
         EXPECT_EQ(0, *script->getOutputs()->getChild("int")->get<int32_t>());
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningBoolToStringOutputs)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.str = STRING
+            function interface(IN,OUT)
+                OUT.str = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.str = "this is quite ok"
                 OUT.str = true   -- this is not ok
             end
@@ -1172,42 +1199,42 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'STRING' output 'str'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning bool to 'String' output 'str'!"));
         EXPECT_EQ("this is quite ok", *script->getOutputs()->getChild("str")->get<std::string>());
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNumberToStringOutputs)
     {
         m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.str = STRING
+            function interface(IN,OUT)
+                OUT.str = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.str = 42   -- this is not ok
             end
         )");
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning number to 'STRING' output 'str'!"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Assigning number to 'String' output 'str'!"));
     }
 
     TEST_F(ALuaScript_Runtime, SupportsMultipleLevelsOfNestedInputs_confidenceTest)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.rabbit = {
                     color = {
-                        r = FLOAT,
-                        g = FLOAT,
-                        b = FLOAT
+                        r = Type:Float(),
+                        g = Type:Float(),
+                        b = Type:Float()
                     },
-                    speed = INT
+                    speed = Type:Int32()
                 }
-                OUT.result = FLOAT
+                OUT.result = Type:Float()
 
             end
-            function run()
+            function run(IN,OUT)
                 OUT.result = (IN.rabbit.color.r + IN.rabbit.color.b + IN.rabbit.color.g) * IN.rabbit.speed
             end
         )");
@@ -1234,25 +1261,25 @@ namespace rlogic
     {
         const std::vector<LuaTestError> allCases = {
             {"local var = IN[0]",
-            "Bad access to property 'IN'! Expected a string but got object of type number instead!"},
+            "Bad access to property ''! Expected a string but got object of type number instead!"},
             {"var = IN[true]",
-            "Bad access to property 'IN'! Expected a string but got object of type bool instead!"},
+            "Bad access to property ''! Expected a string but got object of type bool instead!"},
             {"var = IN[{x = 5}]",
-            "Bad access to property 'IN'! Expected a string but got object of type table instead!"},
+            "Bad access to property ''! Expected a string but got object of type table instead!"},
             {"OUT[0] = 5",
-            "Bad access to property 'OUT'! Expected a string but got object of type number instead!"},
+            "Bad access to property ''! Expected a string but got object of type number instead!"},
             {"OUT[true] = 5",
-            "Bad access to property 'OUT'! Expected a string but got object of type bool instead!"},
+            "Bad access to property ''! Expected a string but got object of type bool instead!"},
             {"OUT[{x = 5}] = 5",
-            "Bad access to property 'OUT'! Expected a string but got object of type table instead!"},
+            "Bad access to property ''! Expected a string but got object of type table instead!"},
         };
 
         for (const auto& singleCase : allCases)
         {
             auto script = m_logicEngine.createLuaScript(
-                "function interface()\n"
+                "function interface(IN,OUT)\n"
                 "end\n"
-                "function run()\n" +
+                "function run(IN,OUT)\n" +
                 singleCase.errorCode + "\n"
                 "end\n"
             );
@@ -1278,9 +1305,9 @@ namespace rlogic
         for (const auto& singleCase : allCases)
         {
             auto script = m_logicEngine.createLuaScript(
-                "function interface()\n"
+                "function interface(IN,OUT)\n"
                 "end\n"
-                "function run()\n" +
+                "function run(IN,OUT)\n" +
                 singleCase.errorCode + "\n"
                 "end\n"
             );
@@ -1296,12 +1323,12 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignsValuesToArraysWithStructs)
     {
         std::string_view scriptWithArrays = R"(
-            function interface()
-                IN.array_structs = ARRAY(2, {name = STRING, age = INT})
-                OUT.array_structs = ARRAY(2, {name = STRING, age = INT})
+            function interface(IN,OUT)
+                IN.array_structs = Type:Array(2, {name = Type:String(), age = Type:Int32()})
+                OUT.array_structs = Type:Array(2, {name = Type:String(), age = Type:Int32()})
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.array_structs = IN.array_structs
                 OUT.array_structs[2] = {name = "joe", age = 99}
                 OUT.array_structs[2].age = 78
@@ -1324,45 +1351,33 @@ namespace rlogic
         EXPECT_EQ(78, *OUT_array->getChild(1)->getChild("age")->get<int32_t>());
     }
 
-    // This is truly evil, too! Perhaps more so than the previous test
-    // I think this is not catchable, because it's just a normal function call
-    TEST_F(ALuaScript_Runtime, DISABLED_ForbidsCallingInterfaceFunctionInsideTheRunFunction)
+    // The below test is a truly evil attempt to violate the sandbox/environment protection
+    // The test makes sure we catch it and report an error accordingly
+    TEST_F(ALuaScript_Runtime, ForbidsCallingInterfaceFunctionInsideTheRunFunction)
     {
-        auto* script = m_logicEngine.createLuaScript(R"(
-            do_the_shuffle = false
-
-            function interface()
-                if do_the_shuffle then
-                    OUT.str = "... go left! A Kansas city shuffle, lol!"
-                else
-                    OUT.str = STRING
-                end
+        m_logicEngine.createLuaScript(R"(
+            function interface(IN,OUT)
             end
-            function run()
-                OUT.str = "They look right... ...and you..."
 
-                do_the_shuffle = true
-                interface()
+            function run(IN,OUT)
+                interface(IN,OUT)
             end
         )");
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Not allowed to call interface() function inside run() function!");
-        EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
-        EXPECT_FALSE(m_logicEngine.update());
-        EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message, ::testing::HasSubstr("Unexpected global access to key 'interface' in run()!"));
     }
 
 
     TEST_F(ALuaScript_Runtime, AbortsAfterFirstRuntimeError)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.float = FLOAT
-                OUT.float = FLOAT
+            function interface(IN,OUT)
+                IN.float = Type:Float()
+                OUT.float = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 error("next line will not be executed")
                 OUT.float = IN.float
             end
@@ -1377,50 +1392,50 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, AssignOutputsFromInputsInDifferentWays_ConfidenceTest)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.assignmentType = STRING
+            function interface(IN,OUT)
+                IN.assignmentType = Type:String()
 
-                IN.float = FLOAT
-                IN.int   = INT
+                IN.float = Type:Float()
+                IN.int   = Type:Int32()
                 IN.struct = {
-                    float = FLOAT,
-                    int   = INT,
+                    float = Type:Float(),
+                    int   = Type:Int32(),
                     struct = {
-                        float   = FLOAT,
-                        int     = INT,
-                        bool    = BOOL,
-                        string  = STRING,
-                        vec2f  = VEC2F,
-                        vec3f  = VEC3F,
-                        vec4f  = VEC4F,
-                        vec2i  = VEC2I,
-                        vec3i  = VEC3I,
-                        vec4i  = VEC4I,
-                        array  = ARRAY(2, VEC2I)
+                        float   = Type:Float(),
+                        int     = Type:Int32(),
+                        bool    = Type:Bool(),
+                        string  = Type:String(),
+                        vec2f  = Type:Vec2f(),
+                        vec3f  = Type:Vec3f(),
+                        vec4f  = Type:Vec4f(),
+                        vec2i  = Type:Vec2i(),
+                        vec3i  = Type:Vec3i(),
+                        vec4i  = Type:Vec4i(),
+                        array  = Type:Array(2, Type:Vec2i())
                     }
                 }
 
-                OUT.float = FLOAT
-                OUT.int   = INT
+                OUT.float = Type:Float()
+                OUT.int   = Type:Int32()
                 OUT.struct = {
-                    float = FLOAT,
-                    int   = INT,
+                    float = Type:Float(),
+                    int   = Type:Int32(),
                     struct = {
-                        float   = FLOAT,
-                        int     = INT,
-                        bool    = BOOL,
-                        string  = STRING,
-                        vec2f  = VEC2F,
-                        vec3f  = VEC3F,
-                        vec4f  = VEC4F,
-                        vec2i  = VEC2I,
-                        vec3i  = VEC3I,
-                        vec4i  = VEC4I,
-                        array  = ARRAY(2, VEC2I)
+                        float   = Type:Float(),
+                        int     = Type:Int32(),
+                        bool    = Type:Bool(),
+                        string  = Type:String(),
+                        vec2f  = Type:Vec2f(),
+                        vec3f  = Type:Vec3f(),
+                        vec4f  = Type:Vec4f(),
+                        vec2i  = Type:Vec2i(),
+                        vec3i  = Type:Vec3i(),
+                        vec4i  = Type:Vec4i(),
+                        array  = Type:Array(2, Type:Vec2i())
                     }
                 }
             end
-            function run()
+            function run(IN,OUT)
                 if IN.assignmentType == "nullify" then
                     OUT.float = 0
                     OUT.int   = 0
@@ -1541,18 +1556,12 @@ namespace rlogic
         }
     }
 
-    // This is truly evil! But Lua is a script language, so... Lots of possibilities! :D
-    // I think this is not catchable, becuse "run" is a function and not a userdata
-    // Therefore it is not catchable in c++
-    TEST_F(ALuaScript_Runtime, DISABLED_ForbidsOverwritingRunFunctionInsideTheRunFunction)
+    TEST_F(ALuaScript_Runtime, ForbidsOverwritingRunFunctionInsideTheRunFunction)
     {
-        auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.str = STRING
+        m_logicEngine.createLuaScript(R"(
+            function interface(IN,OUT)
             end
-            function run()
-                OUT.str = "They look right... ...and you..."
-
+            function run(IN,OUT)
                 run = function()
                     OUT.str = "... go left! A Kansas city shuffle, lol!"
                 end
@@ -1561,18 +1570,17 @@ namespace rlogic
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Not allowed to overwrite run() function inside of itself!");
-        EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
-        EXPECT_FALSE(m_logicEngine.update());
-        EXPECT_EQ("They look right... ...and you...", *script->getOutputs()->getChild("str")->get<std::string>());
+        EXPECT_THAT(m_logicEngine.getErrors().back().message,
+            ::testing::HasSubstr("Unexpected global variable definition 'run' in run()! "
+                "Use the init() function to declare global data and functions, or use modules!"));
     }
 
     TEST_F(ALuaScript_Runtime, ProducesErrorIfInvalidOutPropertyIsAccessed)
     {
         auto scriptWithInvalidOutParam = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 OUT.param = 47.11
             end
         )");
@@ -1585,9 +1593,9 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorIfInvalidNestedOutPropertyIsAccessed)
     {
         auto scriptWithInvalidStructAccess = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 OUT.struct.param = 47.11
             end
         )");
@@ -1600,12 +1608,12 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, ProducesErrorIfValidestedButInvalidOutPropertyIsAccessed)
     {
         auto scriptWithValidStructButInvalidField = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.struct = {
-                    param = INT
+                    param = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.struct.invalid = 47.11
             end
         )");
@@ -1618,23 +1626,23 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, CanAssignInputDirectlyToOutput)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.param_struct = {
-                    param1 = FLOAT,
+                    param1 = Type:Float(),
                     param2_struct = {
-                        a = INT,
-                        b = INT
+                        a = Type:Int32(),
+                        b = Type:Int32()
                     }
                 }
                 OUT.param_struct = {
-                    param1 = FLOAT,
+                    param1 = Type:Float(),
                     param2_struct = {
-                        a = INT,
-                        b = INT
+                        a = Type:Int32(),
+                        b = Type:Int32()
                     }
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.param_struct = IN.param_struct
             end
         )");
@@ -1676,13 +1684,13 @@ namespace rlogic
                 end
             end
 
-            function interface()
-                OUT.param = INT
+            function interface(IN,OUT)
+                OUT.param = Type:Int32()
                 OUT.struct = {
-                    param = INT
+                    param = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 GLOBAL.setPrimitive(OUT)
                 GLOBAL.setSubStruct(OUT)
             end
@@ -1706,13 +1714,13 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime, HasNoInfluenceOnBindingsIfTheyAreNotLinked)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.inFloat = FLOAT
-                IN.inVec3  = VEC3F
-                OUT.outFloat = FLOAT
-                OUT.outVec3  = VEC3F
+            function interface(IN,OUT)
+                IN.inFloat = Type:Float()
+                IN.inVec3  = Type:Vec3f()
+                OUT.outFloat = Type:Float()
+                OUT.outVec3  = Type:Vec3f()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outFloat = IN.inFloat
                 OUT.outVec3 = IN.inVec3
             end
@@ -1846,13 +1854,13 @@ namespace rlogic
                 end
             end
 
-            function interface()
-                OUT.floored_float = INT
-                OUT.string_gsub = STRING
-                OUT.table_maxn = INT
-                OUT.language_of_debug_func = STRING
+            function interface(IN,OUT)
+                OUT.floored_float = Type:Int32()
+                OUT.string_gsub = Type:String()
+                OUT.table_maxn = Type:Int32()
+                OUT.language_of_debug_func = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 -- test math lib
                 OUT.floored_float = math.floor(42.7)
                 -- test string lib
@@ -1883,13 +1891,13 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, ComputesSizeOfCustomPropertiesUsingCustomLengthFunction)
     {
         std::string_view scriptSrc = R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
-                OUT.struct = {a=INT, b={c = INT}}
-                OUT.array_struct = ARRAY(3, {a=INT, b=FLOAT})
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
+                OUT.struct = {a=Type:Int32(), b={c = Type:Int32()}}
+                OUT.array_struct = Type:Array(3, {a=Type:Int32(), b=Type:Float()})
             end
 
-            function run()
+            function run(IN,OUT)
                 if rl_len(IN) ~= 1 then
                     error("Wrong IN size!")
                 end
@@ -1927,10 +1935,10 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, CallingCustomLengthFunctionOnNormalLuaTables_YieldsSameResultAsBuiltInSizeOperator)
     {
         std::string_view scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
                 local emptyTable = {}
                 assert(rl_len(emptyTable) == #emptyTable)
                 local numericTable = {1, 2, 3}
@@ -1949,18 +1957,18 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, CustomRlNextFunctionWorksLikeItsBuiltInCounterpart_Structs)
     {
         std::string_view scriptSrc = R"(
-            function interface()
-                IN.struct = {a = INT, b = INT}
+            function interface(IN,OUT)
+                IN.struct = {a = Type:Int32(), b = Type:Int32()}
                 IN.nested = {
-                    struct = {a = INT, b = INT}
+                    struct = {a = Type:Int32(), b = Type:Int32()}
                 }
-                OUT.struct = {a = INT, b = INT}
+                OUT.struct = {a = Type:Int32(), b = Type:Int32()}
                 OUT.nested = {
-                    struct = {a = INT, b = INT}
+                    struct = {a = Type:Int32(), b = Type:Int32()}
                 }
             end
 
-            function run()
+            function run(IN,OUT)
                 -- propagate data to OUT so that we can test both further down
                 OUT.struct = IN.struct
                 OUT.nested = IN.nested
@@ -1998,18 +2006,18 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, CustomRlNextFunctionWorksLikeItsBuiltInCounterpart_Arrays)
     {
         std::string_view scriptSrc = R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
                 IN.nested = {
-                    array_int = ARRAY(2, INT)
+                    array_int = Type:Array(2, Type:Int32())
                 }
-                OUT.array_int = ARRAY(2, INT)
+                OUT.array_int = Type:Array(2, Type:Int32())
                 OUT.nested = {
-                    array_int = ARRAY(2, INT)
+                    array_int = Type:Array(2, Type:Int32())
                 }
             end
 
-            function run()
+            function run(IN,OUT)
                 -- propagate data to OUT so that we can test both further down
                 OUT.array_int = IN.array_int
                 OUT.nested = IN.nested
@@ -2047,18 +2055,18 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, Custom_IPairs_BehavesTheSameAsStandard_IPairs_Function_ForArrays)
     {
         std::string_view scriptSrc = R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
                 IN.nested = {
-                    array_int = ARRAY(2, INT)
+                    array_int = Type:Array(2, Type:Int32())
                 }
-                OUT.array_int = ARRAY(2, INT)
+                OUT.array_int = Type:Array(2, Type:Int32())
                 OUT.nested = {
-                    array_int = ARRAY(2, INT)
+                    array_int = Type:Array(2, Type:Int32())
                 }
             end
 
-            function run()
+            function run(IN,OUT)
                 -- propagate data to OUT so that we can test both further down
                 OUT.array_int = IN.array_int
                 OUT.nested = IN.nested
@@ -2108,18 +2116,18 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, Custom_Pairs_BehavesTheSameAsStandard_Pairs_Function_ForArrays)
     {
         std::string_view scriptSrc = R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
                 IN.nested = {
-                    array_int = ARRAY(2, INT)
+                    array_int = Type:Array(2, Type:Int32())
                 }
-                OUT.array_int = ARRAY(2, INT)
+                OUT.array_int = Type:Array(2, Type:Int32())
                 OUT.nested = {
-                    array_int = ARRAY(2, INT)
+                    array_int = Type:Array(2, Type:Int32())
                 }
             end
 
-            function run()
+            function run(IN,OUT)
                 -- propagate data to OUT so that we can test both further down
                 OUT.array_int = IN.array_int
                 OUT.nested = IN.nested
@@ -2167,28 +2175,28 @@ namespace rlogic
     TEST_F(ALuaScript_RuntimeIterators, Custom_Pairs_BehavesTheSameAsStandard_Pairs_Function_ForStructs)
     {
         std::string_view scriptSrc = R"(
-            function interface()
-                IN.int = INT
-                IN.bool = BOOL
+            function interface(IN,OUT)
+                IN.int = Type:Int32()
+                IN.bool = Type:Bool()
                 IN.nested = {
-                    int = INT,
-                    bool = BOOL,
+                    int = Type:Int32(),
+                    bool = Type:Bool(),
                     nested = {
-                        notUsed = FLOAT
+                        notUsed = Type:Float()
                     }
                 }
-                OUT.int = INT
-                OUT.bool = BOOL
+                OUT.int = Type:Int32()
+                OUT.bool = Type:Bool()
                 OUT.nested = {
-                    int = INT,
-                    bool = BOOL,
+                    int = Type:Int32(),
+                    bool = Type:Bool(),
                     nested = {
-                        notUsed = FLOAT
+                        notUsed = Type:Float()
                     }
                 }
             end
 
-            function run()
+            function run(IN,OUT)
                 -- propagate data to OUT so that we can test both further down
                 OUT.int = IN.int
                 OUT.bool = IN.bool
@@ -2242,10 +2250,10 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenTryingToReadUnknownGlobals)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
                 local t = someGlobalVariable
             end)");
         ASSERT_NE(nullptr, script);
@@ -2254,16 +2262,16 @@ namespace rlogic
 
         EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
             ::testing::HasSubstr(
-                "Unexpected global access to key 'someGlobalVariable' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+                "Unexpected global access to key 'someGlobalVariable' in run()! Only 'GLOBAL' is allowed as a key"));
     }
 
     TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenSettingGlobals)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
                 thisCausesError = 'bad'
             end)");
         ASSERT_NE(nullptr, script);
@@ -2279,10 +2287,10 @@ namespace rlogic
             function init()
             end
 
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
                 GLOBAL = {}
             end)");
         ASSERT_NE(nullptr, script);
@@ -2295,13 +2303,13 @@ namespace rlogic
     TEST_F(ALuaScript_Runtime_Sandboxing, ReportsErrorWhenTryingToDeclareRunFunctionTwice)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -2316,10 +2324,10 @@ namespace rlogic
             LuaScript* script = m_logicEngine.createLuaScript(fmt::format(R"(
                 function init()
                 end
-                function interface()
+                function interface(IN,OUT)
                 end
 
-                function run()
+                function run(IN,OUT)
                     {}()
                 end
             )", specialFunction));
@@ -2328,7 +2336,7 @@ namespace rlogic
 
             EXPECT_FALSE(m_logicEngine.update());
             EXPECT_THAT(m_logicEngine.getErrors()[0].message,
-                ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'", specialFunction)));
+                ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in run()! Only 'GLOBAL' is allowed as a key", specialFunction)));
 
             ASSERT_TRUE(m_logicEngine.destroy(*script));
         }

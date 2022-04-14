@@ -9,6 +9,7 @@
 #include <gmock/gmock.h>
 
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Property.h"
 
 #include "LogicEngineTest_Base.h"
@@ -25,26 +26,37 @@ namespace rlogic::internal
         ApiObjects& m_apiObjects = { m_logicEngine.m_impl->getApiObjects() };
 
         const std::string_view m_minimal_script = R"(
-            function interface()
-                IN.data = INT
-                OUT.data = INT
+            function interface(IN,OUT)
+                IN.data = Type:Int32()
+                OUT.data = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = IN.data
             end
         )";
 
         const std::string_view m_nested_properties_script = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.data = {
-                    nested = INT
+                    nested = Type:Int32()
                 }
                 OUT.data = {
-                    nested = INT
+                    nested = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data.nested = IN.data.nested
+            end
+        )";
+
+        const std::string_view m_valid_empty_interface = R"(
+            function interface(IN,OUT)
+            end
+        )";
+
+        const std::string_view m_minimal_interface = R"(
+            function interface(IN)
+                IN.data = Type:Int32()
             end
         )";
     };
@@ -64,27 +76,55 @@ namespace rlogic::internal
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
-    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingNodeBinding)
+    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingInterface)
+    {
+        m_logicEngine.createLuaInterface(m_valid_empty_interface, "iface name");
+        EXPECT_TRUE(m_apiObjects.isDirty());
+    }
+
+    TEST_F(ALogicEngine_Dirtiness, NotDirtyAfterCreatingNodeBinding)
     {
         m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
-        EXPECT_TRUE(m_apiObjects.isDirty());
+        EXPECT_FALSE(m_apiObjects.isDirty());
     }
 
-    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingAppearanceBinding)
+    TEST_F(ALogicEngine_Dirtiness, NotDirtyAfterCreatingAppearanceBinding)
     {
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
+        EXPECT_FALSE(m_apiObjects.isDirty());
+    }
+
+    TEST_F(ALogicEngine_Dirtiness, NotDirtyAfterCreatingCameraBinding)
+    {
+        m_logicEngine.createRamsesCameraBinding(*m_camera, "");
+        EXPECT_FALSE(m_apiObjects.isDirty());
+    }
+
+    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingNodeBinding_AndChangingInput)
+    {
+        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
+        nodeBinding->getInputs()->getChild("scaling")->set(vec3f{1.5f, 1.f, 1.f});
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
-    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingCameraBinding)
+    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingAppearanceBinding_AndChangingInput)
     {
-        m_logicEngine.createRamsesCameraBinding(*m_camera, "");
+        RamsesAppearanceBinding* appBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
+        appBinding->getInputs()->getChild("floatUniform")->set(15.f);
+        EXPECT_TRUE(m_apiObjects.isDirty());
+    }
+
+    TEST_F(ALogicEngine_Dirtiness, DirtyAfterCreatingCameraBinding_AndChangingInput)
+    {
+        RamsesCameraBinding* camBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "");
+        camBinding->getInputs()->getChild("viewport")->getChild("width")->set<int32_t>(15);
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
     TEST_F(ALogicEngine_Dirtiness, NotDirty_AfterCreatingObjectsAndCallingUpdate)
     {
         m_logicEngine.createLuaScript(m_valid_empty_script);
+        m_logicEngine.createLuaInterface(m_valid_empty_interface, "iface name");
         m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
         m_logicEngine.createRamsesCameraBinding(*m_camera, "");
@@ -110,6 +150,18 @@ namespace rlogic::internal
         m_logicEngine.update();
 
         script->getInputs()->getChild("data")->getChild("nested")->set<int32_t>(5);
+
+        EXPECT_TRUE(m_apiObjects.isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_apiObjects.isDirty());
+    }
+
+    TEST_F(ALogicEngine_Dirtiness, Dirty_AfterSettingInterfaceInput)
+    {
+        LuaInterface* intf = m_logicEngine.createLuaInterface(m_minimal_interface, "iface name");
+        m_logicEngine.update();
+
+        intf->getInputs()->getChild("data")->set<int32_t>(5);
 
         EXPECT_TRUE(m_apiObjects.isDirty());
         m_logicEngine.update();
@@ -229,12 +281,54 @@ namespace rlogic::internal
         EXPECT_TRUE(m_apiObjects.isDirty());
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, Dirty_WhenAddingLinkToInterfaceInput)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(m_minimal_script);
+        LuaInterface* intf = m_logicEngine.createLuaInterface(m_minimal_interface, "iface name");
+        m_logicEngine.update();
+
+        link(*script->getOutputs()->getChild("data"), *intf->getInputs()->getChild("data"));
+        EXPECT_TRUE(m_apiObjects.isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_apiObjects.isDirty());
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, Dirty_WhenAddingLinkToInterfaceOutput)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(m_minimal_script);
+        LuaInterface* intf = m_logicEngine.createLuaInterface(m_minimal_interface, "iface name");
+        m_logicEngine.update();
+
+        link(*intf->getOutputs()->getChild("data"), *script->getInputs()->getChild("data"));
+        EXPECT_TRUE(m_apiObjects.isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_apiObjects.isDirty());
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(ALogicEngine_DirtinessViaLink, NotDirty_WhenRemovingLinkToInterface)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(m_minimal_script);
+        LuaInterface* intf = m_logicEngine.createLuaInterface(m_minimal_interface, "iface name");
+        link(*script->getOutputs()->getChild("data"), *intf->getInputs()->getChild("data"));
+        m_logicEngine.update();
+
+        EXPECT_FALSE(m_apiObjects.isDirty());
+        m_logicEngine.unlink(*script->getOutputs()->getChild("data"), *intf->getInputs()->getChild("data"));
+
+        EXPECT_FALSE(m_apiObjects.isDirty());
+        m_logicEngine.update();
+        EXPECT_FALSE(m_apiObjects.isDirty());
+    }
+
     TEST_F(ALogicEngine_Dirtiness, Dirty_WhenScriptHadRuntimeError)
     {
         const std::string_view scriptWithError = R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 error("Snag!")
             end
         )";
@@ -250,12 +344,12 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_Dirtiness, KeepsDirtynessStateOfDependentScript_UntilErrorInSourceScriptIsFixed)
     {
         const std::string_view scriptWithFixableError = R"(
-            function interface()
-                IN.triggerError = BOOL
-                IN.data = INT
-                OUT.data = INT
+            function interface(IN,OUT)
+                IN.triggerError = Type:Bool()
+                IN.data = Type:Int32()
+                OUT.data = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = IN.data
                 if IN.triggerError then
                     error("Snag!")
@@ -290,10 +384,10 @@ namespace rlogic::internal
     {
     protected:
         const std::string_view m_bindningDataScript = R"(
-            function interface()
-                OUT.vec3f = VEC3F
+            function interface(IN,OUT)
+                OUT.vec3f = Type:Vec3f()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.vec3f = {1, 2, 3}
             end
         )";
@@ -311,16 +405,22 @@ namespace rlogic::internal
         EXPECT_FALSE(m_apiObjects.bindingsDirty());
     }
 
-    TEST_F(ALogicEngine_BindingDirtiness, DirtyAfterCreatingNodeBinding)
+    TEST_F(ALogicEngine_BindingDirtiness, NotDirtyAfterCreatingNodeBinding)
     {
         m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
-        EXPECT_TRUE(m_apiObjects.bindingsDirty());
+        EXPECT_FALSE(m_apiObjects.bindingsDirty());
     }
 
-    TEST_F(ALogicEngine_BindingDirtiness, DirtyAfterCreatingAppearanceBinding)
+    TEST_F(ALogicEngine_BindingDirtiness, NotDirtyAfterCreatingAppearanceBinding)
     {
         m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
-        EXPECT_TRUE(m_apiObjects.bindingsDirty());
+        EXPECT_FALSE(m_apiObjects.bindingsDirty());
+    }
+
+    TEST_F(ALogicEngine_BindingDirtiness, NotDirtyAfterCreatingCameraBinding)
+    {
+        m_logicEngine.createRamsesCameraBinding(*m_camera, "");
+        EXPECT_FALSE(m_apiObjects.bindingsDirty());
     }
 
     TEST_F(ALogicEngine_BindingDirtiness, NotDirty_AfterCreatingBindingsAndCallingUpdate)

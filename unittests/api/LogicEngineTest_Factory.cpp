@@ -123,9 +123,9 @@ namespace rlogic
 
         constexpr std::string_view valid_empty_script = R"(
             modules("mymodule")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
         EXPECT_TRUE(m_logicEngine.createLuaScript(valid_empty_script, CreateDeps({ { "mymodule", module } }), "script"));
@@ -142,9 +142,9 @@ namespace rlogic
 
         constexpr std::string_view valid_empty_script = R"(
             modules("mymodule")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
         auto script = m_logicEngine.createLuaScript(valid_empty_script, CreateDeps({ { "mymodule", module } }));

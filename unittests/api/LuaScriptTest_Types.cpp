@@ -48,11 +48,11 @@ namespace rlogic
     TEST_F(ALuaScript_Types, FailsToSetArrayDirectly)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
         auto  array_int = script->getInputs()->getChild("array_int");
@@ -87,24 +87,24 @@ namespace rlogic
         EXPECT_EQ("speed", speed_byName->getName());
     }
 
-    TEST_F(ALuaScript_Types, AssignsNameAndTypeToGlobalInputsStruct)
+    TEST_F(ALuaScript_Types, AssignsTypeToGlobalInputsStruct)
     {
         auto* script = m_logicEngine.createLuaScript(m_minimalScript);
 
         auto inputs = script->getInputs();
 
         ASSERT_EQ(0u, inputs->getChildCount());
-        EXPECT_EQ("IN", inputs->getName());
+        EXPECT_EQ("", inputs->getName());
         EXPECT_EQ(EPropertyType::Struct, inputs->getType());
     }
 
-    TEST_F(ALuaScript_Types, AssignsNameAndTypeToGlobalOutputsStruct)
+    TEST_F(ALuaScript_Types, AssignsTypeToGlobalOutputsStruct)
     {
         auto* script  = m_logicEngine.createLuaScript(m_minimalScript);
         auto  outputs = script->getOutputs();
 
         ASSERT_EQ(0u, outputs->getChildCount());
-        EXPECT_EQ("OUT", outputs->getName());
+        EXPECT_EQ("", outputs->getName());
         EXPECT_EQ(EPropertyType::Struct, outputs->getType());
     }
 
@@ -144,14 +144,14 @@ namespace rlogic
     TEST_F(ALuaScript_Types, ProvidesFullTypeInformationOnArrayProperties)
     {
         std::string_view scriptWithArrays = R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
-                IN.array_float = ARRAY(3, FLOAT)
-                OUT.array_int = ARRAY(2, INT)
-                OUT.array_float = ARRAY(3, FLOAT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
+                IN.array_float = Type:Array(3, Type:Float())
+                OUT.array_int = Type:Array(2, Type:Int32())
+                OUT.array_float = Type:Array(3, Type:Float())
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -196,20 +196,20 @@ namespace rlogic
     TEST_F(ALuaScript_Types, ProvidesFullTypeInformationOnArrayOfStructProperties)
     {
         std::string_view scriptWithArrays = R"(
-            function interface()
+            function interface(IN,OUT)
                 local struct_decl = {
-                    name = STRING,
+                    name = Type:String(),
                     address =
                     {
-                        street = STRING,
-                        number = INT
+                        street = Type:String(),
+                        number = Type:Int32()
                     }
                 }
-                IN.array_of_structs = ARRAY(2, struct_decl)
-                OUT.array_of_structs = ARRAY(2, struct_decl)
+                IN.array_of_structs = Type:Array(2, struct_decl)
+                OUT.array_of_structs = Type:Array(2, struct_decl)
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 

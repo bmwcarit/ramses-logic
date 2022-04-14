@@ -83,9 +83,10 @@ namespace rlogic::internal
         const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesAppearanceBinding>(m_flatBufferBuilder.GetBufferPointer());
 
         ASSERT_TRUE(serializedBinding.base());
-        ASSERT_TRUE(serializedBinding.base()->name());
-        EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
-        EXPECT_EQ(serializedBinding.base()->id(), 1u);
+        ASSERT_TRUE(serializedBinding.base()->base());
+        ASSERT_TRUE(serializedBinding.base()->base()->name());
+        EXPECT_EQ(serializedBinding.base()->base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedBinding.base()->base()->id(), 1u);
 
         ASSERT_TRUE(serializedBinding.base()->rootInput());
         EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -159,8 +160,9 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0, // no name!
-                1u
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    0, // no name!
+                    1u)
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(
                 m_flatBufferBuilder,
@@ -173,15 +175,18 @@ namespace rlogic::internal
         std::unique_ptr<RamsesAppearanceBindingImpl> deserialized = RamsesAppearanceBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing name!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, ErrorWhenNoBindingId)
     {
         {
             auto base = rlogic_serialization::CreateRamsesBinding(m_flatBufferBuilder,
-                0 // no id (id gets checked before name)!
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    0) // no id
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(m_flatBufferBuilder, base);
             m_flatBufferBuilder.Finish(binding);
@@ -191,8 +196,9 @@ namespace rlogic::internal
         std::unique_ptr<RamsesAppearanceBindingImpl> deserialized = RamsesAppearanceBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesAppearanceBinding from serialized data: missing id!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing or invalid ID!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ARamsesAppearanceBinding_SerializationLifecycle, ErrorWhenNoRootInput)
@@ -200,8 +206,9 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0 // no root input
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(
@@ -229,10 +236,11 @@ namespace rlogic::internal
             );
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 ramsesRef,
-                m_testUtils.serializeTestProperty("IN")
+                m_testUtils.serializeTestProperty("")
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(
                 m_flatBufferBuilder,
@@ -254,10 +262,11 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0,
-                m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
+                m_testUtils.serializeTestProperty("", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
             );
             auto binding = rlogic_serialization::CreateRamsesAppearanceBinding(
                 m_flatBufferBuilder,
@@ -673,10 +682,10 @@ namespace rlogic::internal
 
         // Link binding input to a script (binding is not set directly, but is linked)
         const std::string_view scriptSrc = R"(
-                function interface()
-                    OUT.float = FLOAT
+                function interface(IN,OUT)
+                    OUT.float = Type:Float()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.float = 42.42
                 end
             )";
@@ -740,6 +749,7 @@ namespace rlogic::internal
             inputs->getChild("ivec2Array")->getChild(1)->set<vec2i>({ 13, 14 });
             inputs->getChild("vec2Array")->getChild(0)->set<vec2f>({ .11f, .12f });
             inputs->getChild("vec2Array")->getChild(1)->set<vec2f>({ .13f, .14f });
+            m_logicEngine.update();
             ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
         }
 
@@ -801,6 +811,7 @@ namespace rlogic::internal
         {
             auto& rAppearanceBinding = *m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
             rAppearanceBinding.getInputs()->getChild("floatUniform")->set(42.42f);
+            m_logicEngine.update();
             ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
         }
 
@@ -859,6 +870,7 @@ namespace rlogic::internal
 
             // Set a different input over the binding object
             inputs->getChild("floatUniform")->set<float>(42.42f);
+            m_logicEngine.update();
             ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesSet.bin"));
         }
 
@@ -891,11 +903,11 @@ namespace rlogic::internal
 
         {
             const std::string_view scriptSrc = R"(
-                function interface()
-                    IN.float = FLOAT
-                    OUT.float = FLOAT
+                function interface(IN,OUT)
+                    IN.float = Type:Float()
+                    OUT.float = Type:Float()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.float = IN.float
                 end
             )";
@@ -905,6 +917,7 @@ namespace rlogic::internal
 
             script->getInputs()->getChild("float")->set<float>(42.42f);
             ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("float"), *appearanceBinding.getInputs()->getChild("floatUniform1")));
+            ASSERT_TRUE(m_logicEngine.update());
             ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesLinked.bin"));
         }
 

@@ -30,12 +30,12 @@ namespace rlogic
         const int64_t scriptSize = state.range(0);
 
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
             end
-            function run()
+            function run(IN,OUT)
             end
         )", scriptSize);
 

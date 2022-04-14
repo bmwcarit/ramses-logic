@@ -37,8 +37,11 @@ namespace rlogic
          * Returns a property of type Struct which holds the inputs of the #LogicNode.
          *
          * Returns the root Property of the LogicNode which contains potentially
-         * nested list of properties. The properties are different for the classes which derive from
-         * #LogicNode. Look at the documentation of each derived class for more information on the properties.             *
+         * nested list of properties. Calling #rlogic#Property#getName() on the returned object will always return ""
+         * regardless of the name used in the scripts. This applies only to the root input node, rest of the nodes
+         * in the tree structure follow standard behavior.
+         * The properties are different for the classes which derive from #LogicNode. Look at the documentation
+         * of each derived class for more information on the properties.
          * @return a tree like structure with the inputs of the #LogicNode
          */
         [[nodiscard]] RLOGIC_API Property* getInputs();
@@ -52,8 +55,11 @@ namespace rlogic
          * Returns a property of type Struct which holds the outputs of the #LogicNode
          *
          * Returns the root Property of the LogicNode which contains potentially
-         * nested list of properties. The properties are different for the classes which derive from
-         * #LogicNode. Look at the documentation of each derived class for more information on the properties.             *
+         * nested list of properties. Calling #rlogic#Property#getName() on the returned object will always return ""
+         * regardless of the name used in the scripts. This applies only to the root output node, rest of the nodes
+         * in the tree structure follow standard behavior.
+         * The properties are different for the classes which derive from #LogicNode. Look at the documentation
+         * of each derived class for more information on the properties.
          * @return a tree like structure with the outputs of the LogicNode
          */
         [[nodiscard]] RLOGIC_API const Property* getOutputs() const;

@@ -6,6 +6,8 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "LogicObject.fbs";
+
 namespace rlogic_serialization;
 
 enum EDataArrayType:uint8
@@ -31,8 +33,7 @@ union ArrayUnion
 
 table DataArray
 {
-    name:string;
-    id:uint64;
+    base:LogicObject;
     type:EDataArrayType;
     data:ArrayUnion;
 }

@@ -6,6 +6,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LogicObjectGen.h"
 #include "PropertyGen.h"
 #include "RamsesReferenceGen.h"
 
@@ -14,20 +15,21 @@ namespace rlogic_serialization {
 struct RamsesBinding;
 struct RamsesBindingBuilder;
 
+inline const flatbuffers::TypeTable *RamsesBindingTypeTable();
+
 struct RamsesBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef RamsesBindingBuilder Builder;
   struct Traits;
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_NAME = 4,
-    VT_ID = 6,
-    VT_BOUNDRAMSESOBJECT = 8,
-    VT_ROOTINPUT = 10
-  };
-  const flatbuffers::String *name() const {
-    return GetPointer<const flatbuffers::String *>(VT_NAME);
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RamsesBindingTypeTable();
   }
-  uint64_t id() const {
-    return GetField<uint64_t>(VT_ID, 0);
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_BASE = 4,
+    VT_BOUNDRAMSESOBJECT = 6,
+    VT_ROOTINPUT = 8
+  };
+  const rlogic_serialization::LogicObject *base() const {
+    return GetPointer<const rlogic_serialization::LogicObject *>(VT_BASE);
   }
   const rlogic_serialization::RamsesReference *boundRamsesObject() const {
     return GetPointer<const rlogic_serialization::RamsesReference *>(VT_BOUNDRAMSESOBJECT);
@@ -37,9 +39,8 @@ struct RamsesBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_NAME) &&
-           verifier.VerifyString(name()) &&
-           VerifyField<uint64_t>(verifier, VT_ID) &&
+           VerifyOffset(verifier, VT_BASE) &&
+           verifier.VerifyTable(base()) &&
            VerifyOffset(verifier, VT_BOUNDRAMSESOBJECT) &&
            verifier.VerifyTable(boundRamsesObject()) &&
            VerifyOffset(verifier, VT_ROOTINPUT) &&
@@ -52,11 +53,8 @@ struct RamsesBindingBuilder {
   typedef RamsesBinding Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
-  void add_name(flatbuffers::Offset<flatbuffers::String> name) {
-    fbb_.AddOffset(RamsesBinding::VT_NAME, name);
-  }
-  void add_id(uint64_t id) {
-    fbb_.AddElement<uint64_t>(RamsesBinding::VT_ID, id, 0);
+  void add_base(flatbuffers::Offset<rlogic_serialization::LogicObject> base) {
+    fbb_.AddOffset(RamsesBinding::VT_BASE, base);
   }
   void add_boundRamsesObject(flatbuffers::Offset<rlogic_serialization::RamsesReference> boundRamsesObject) {
     fbb_.AddOffset(RamsesBinding::VT_BOUNDRAMSESOBJECT, boundRamsesObject);
@@ -78,15 +76,13 @@ struct RamsesBindingBuilder {
 
 inline flatbuffers::Offset<RamsesBinding> CreateRamsesBinding(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<flatbuffers::String> name = 0,
-    uint64_t id = 0,
+    flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     flatbuffers::Offset<rlogic_serialization::RamsesReference> boundRamsesObject = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0) {
   RamsesBindingBuilder builder_(_fbb);
-  builder_.add_id(id);
   builder_.add_rootInput(rootInput);
   builder_.add_boundRamsesObject(boundRamsesObject);
-  builder_.add_name(name);
+  builder_.add_base(base);
   return builder_.Finish();
 }
 
@@ -95,19 +91,26 @@ struct RamsesBinding::Traits {
   static auto constexpr Create = CreateRamsesBinding;
 };
 
-inline flatbuffers::Offset<RamsesBinding> CreateRamsesBindingDirect(
-    flatbuffers::FlatBufferBuilder &_fbb,
-    const char *name = nullptr,
-    uint64_t id = 0,
-    flatbuffers::Offset<rlogic_serialization::RamsesReference> boundRamsesObject = 0,
-    flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0) {
-  auto name__ = name ? _fbb.CreateString(name) : 0;
-  return rlogic_serialization::CreateRamsesBinding(
-      _fbb,
-      name__,
-      id,
-      boundRamsesObject,
-      rootInput);
+inline const flatbuffers::TypeTable *RamsesBindingTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::LogicObjectTypeTable,
+    rlogic_serialization::RamsesReferenceTypeTable,
+    rlogic_serialization::PropertyTypeTable
+  };
+  static const char * const names[] = {
+    "base",
+    "boundRamsesObject",
+    "rootInput"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
 }
 
 }  // namespace rlogic_serialization

@@ -509,7 +509,7 @@ namespace rlogic::internal
 
         EXPECT_THAT(err.what(),
             ::testing::HasSubstr(
-                "lua: error: Error while assigning output VEC2 property 'Vec2f'. "
+                "lua: error: Error while assigning output Vec2 property 'Vec2f'. "
                 "Error while extracting array: unexpected value (type: 'number') at array element # 1! "
                 "Reason: Error while extracting floating point number: value would cause overflow in float"));
     }

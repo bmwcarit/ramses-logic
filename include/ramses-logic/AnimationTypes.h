@@ -34,7 +34,7 @@ namespace rlogic
     * tangents #tangentsIn, #tangentsOut are mandatory only for #rlogic::EInterpolationType::Cubic
     * interpolation, ignored for other interpolation types.
     * See GLTF 2.0 specification appendix C for details on tangents
-    * (https://github.com/KhronosGroup/glTF/tree/master/specification/2.0?ts=4#appendix-c-spline-interpolation)
+    * (https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#interpolation-cubic)
     */
     struct AnimationChannel
     {

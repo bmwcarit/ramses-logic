@@ -21,17 +21,17 @@ namespace rlogic
     {
     protected:
         std::string_view m_scriptWithInterfaceError = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.prop = nil
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
         std::string_view m_scriptWithRuntimeError = R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 IN.prop = nil
             end
         )";
@@ -48,7 +48,7 @@ namespace rlogic
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message,
                   "[errorscript] Error while loading script. Lua stack trace:\n"
-                  "lua: error: Field 'prop' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!\n"
+                  "lua: error: Invalid type of field 'prop'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'nil' instead\n"
                   "stack traceback:\n"
                   "\t[C]: in ?\n"
                   "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");
@@ -81,7 +81,7 @@ namespace rlogic
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message,
             "[errorscript] Error while loading script. Lua stack trace:\n"
-            "lua: error: Field 'prop' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!\n"
+            "lua: error: Invalid type of field 'prop'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'nil' instead\n"
             "stack traceback:\n"
             "\t[C]: in ?\n"
             "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");

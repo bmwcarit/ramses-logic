@@ -6,4 +6,5 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
+add_subdirectory(ramses-logic-utils)
 add_subdirectory(ramses-logic-viewer)

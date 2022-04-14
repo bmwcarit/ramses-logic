@@ -46,6 +46,7 @@ namespace rlogic
     class LogicObject;
     class LogicNode;
     class LuaScript;
+    class LuaInterface;
     class LuaModule;
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
@@ -60,6 +61,7 @@ namespace rlogic::internal
     class SolState;
     class IRamsesObjectResolver;
     class AnimationNodeConfigImpl;
+    class ValidationResults;
 
     template <typename T>
     using ApiObjectContainer = std::vector<T*>;
@@ -94,6 +96,10 @@ namespace rlogic::internal
             const LuaConfigImpl& config,
             std::string_view scriptName,
             ErrorReporting& errorReporting);
+        LuaInterface* createLuaInterface(
+            std::string_view source,
+            std::string_view interfaceName,
+            ErrorReporting& errorReporting);
         LuaModule* createLuaModule(
             std::string_view source,
             const LuaConfigImpl& config,
@@ -110,6 +116,7 @@ namespace rlogic::internal
 
         // Invariance checks
         [[nodiscard]] bool checkBindingsReferToSameRamsesScene(ErrorReporting& errorReporting) const;
+        void checkAllInterfaceOutputsLinked(ValidationResults& validationResults) const;
 
         // Getters
         template <typename T>
@@ -147,6 +154,7 @@ namespace rlogic::internal
         // Type-specific destruction logic
         [[nodiscard]] bool destroyInternal(RamsesNodeBinding& ramsesNodeBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(LuaScript& luaScript, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(LuaInterface& luaInterface, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(LuaModule& luaModule, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
@@ -157,6 +165,7 @@ namespace rlogic::internal
         std::unique_ptr<SolState> m_solState {std::make_unique<SolState>()};
 
         ApiObjectContainer<LuaScript>               m_scripts;
+        ApiObjectContainer<LuaInterface>            m_interfaces;
         ApiObjectContainer<LuaModule>               m_luaModules;
         ApiObjectContainer<RamsesNodeBinding>       m_ramsesNodeBindings;
         ApiObjectContainer<RamsesAppearanceBinding> m_ramsesAppearanceBindings;

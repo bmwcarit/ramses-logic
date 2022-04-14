@@ -76,49 +76,43 @@ namespace rlogic::internal
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
 
         const auto rootIn = timerNode->getInputs();
-        EXPECT_EQ("IN", rootIn->getName());
+        EXPECT_EQ("", rootIn->getName());
         ASSERT_EQ(1u, rootIn->getChildCount());
         EXPECT_EQ("ticker_us", rootIn->getChild(0u)->getName());
         EXPECT_EQ(EPropertyType::Int64, rootIn->getChild(0u)->getType());
 
         const auto rootOut = timerNode->getOutputs();
-        EXPECT_EQ("OUT", rootOut->getName());
-        ASSERT_EQ(2u, rootOut->getChildCount());
-        EXPECT_EQ("timeDelta", rootOut->getChild(0u)->getName());
-        EXPECT_EQ("ticker_us", rootOut->getChild(1u)->getName());
-        EXPECT_EQ(EPropertyType::Float, rootOut->getChild(0u)->getType());
-        EXPECT_EQ(EPropertyType::Int64, rootOut->getChild(1u)->getType());
+        EXPECT_EQ("", rootOut->getName());
+        ASSERT_EQ(1u, rootOut->getChildCount());
+        EXPECT_EQ("ticker_us", rootOut->getChild(0u)->getName());
+        EXPECT_EQ(EPropertyType::Int64, rootOut->getChild(0u)->getType());
     }
 
-    TEST_F(ATimerNode, OutputsTimeDeltaAndTicker_userTicker)
+    TEST_F(ATimerNode, OutputsTicker_userTicker)
     {
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
 
         EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(1000000));
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_FLOAT_EQ(0.f, *timerNode->getOutputs()->getChild(0u)->get<float>()); // no time delta on 1st update
-        EXPECT_EQ(1000000, *timerNode->getOutputs()->getChild(1u)->get<int64_t>());
+        EXPECT_EQ(1000000, *timerNode->getOutputs()->getChild(0u)->get<int64_t>());
 
         // +0.5 second
         EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(1500000));
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_FLOAT_EQ(0.5f, *timerNode->getOutputs()->getChild(0u)->get<float>());
-        EXPECT_EQ(1500000, *timerNode->getOutputs()->getChild(1u)->get<int64_t>());
+        EXPECT_EQ(1500000, *timerNode->getOutputs()->getChild(0u)->get<int64_t>());
 
         // no change
         EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(1500000));
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_FLOAT_EQ(0.f, *timerNode->getOutputs()->getChild(0u)->get<float>());
-        EXPECT_EQ(1500000, *timerNode->getOutputs()->getChild(1u)->get<int64_t>());
+        EXPECT_EQ(1500000, *timerNode->getOutputs()->getChild(0u)->get<int64_t>());
 
         // +10 second
         EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(11500000));
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_FLOAT_EQ(10.f, *timerNode->getOutputs()->getChild(0u)->get<float>());
-        EXPECT_EQ(11500000, *timerNode->getOutputs()->getChild(1u)->get<int64_t>());
+        EXPECT_EQ(11500000, *timerNode->getOutputs()->getChild(0u)->get<int64_t>());
     }
 
-    TEST_F(ATimerNode, OutputsTimeDeltaAndTicker_autoTicker)
+    TEST_F(ATimerNode, OutputsTicker_autoTicker)
     {
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
 
@@ -126,19 +120,14 @@ namespace rlogic::internal
         EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(0));
 
         EXPECT_TRUE(m_logicEngine.update());
-        EXPECT_FLOAT_EQ(0.f, *timerNode->getOutputs()->getChild(0u)->get<float>()); // no time delta on 1st update
-        const auto initialTicker = *timerNode->getOutputs()->getChild(1u)->get<int64_t>();
+        const auto initialTicker = *timerNode->getOutputs()->getChild(0u)->get<int64_t>();
         EXPECT_TRUE(initialTicker > 0);
 
         auto ticker = initialTicker;
-        float deltaSum = 0.f;
         for (int i = 0; i < 10; ++i)
         {
             EXPECT_TRUE(m_logicEngine.update());
-            const auto timeDelta = *timerNode->getOutputs()->getChild(0u)->get<float>();
-            EXPECT_TRUE(timeDelta >= 0.f);
-            deltaSum += timeDelta;
-            const auto nextTicker = *timerNode->getOutputs()->getChild(1u)->get<int64_t>();
+            const auto nextTicker = *timerNode->getOutputs()->getChild(0u)->get<int64_t>();
             EXPECT_TRUE(nextTicker >= ticker);
             ticker = nextTicker;
             std::this_thread::sleep_for(std::chrono::milliseconds{ 1 });
@@ -146,76 +135,6 @@ namespace rlogic::internal
 
         // check that auto ticker is actually progressing
         EXPECT_GT(ticker, initialTicker);
-        EXPECT_GT(deltaSum, 0.f);
-    }
-
-    TEST_F(ATimerNode, FailsUpdateIfNegativeTickerProvided)
-    {
-        const auto timerNode = m_logicEngine.createTimerNode("timerNode");
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(-100));
-        EXPECT_FALSE(m_logicEngine.update());
-
-        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-        EXPECT_EQ("TimerNode 'timerNode' failed to update - cannot use negative ticker (-100)", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(ATimerNode, FailsUpdateIfTickerProvidedNotMonotonicallyIncreasing)
-    {
-        const auto timerNode = m_logicEngine.createTimerNode("timerNode");
-
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(100));
-        EXPECT_TRUE(m_logicEngine.update());
-
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(110));
-        EXPECT_TRUE(m_logicEngine.update());
-
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(110));
-        EXPECT_TRUE(m_logicEngine.update());
-
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(109));
-        EXPECT_FALSE(m_logicEngine.update());
-
-        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-        EXPECT_EQ("TimerNode 'timerNode' failed to update - ticker must be monotonically increasing (lastTick=110 newTick=109)", m_logicEngine.getErrors().front().message);
-    }
-
-    TEST_F(ATimerNode, WillTriggerUpdateOfLinkedScriptIfTimeDeltaConstant)
-    {
-        constexpr std::string_view scriptSrc = R"(
-            function interface()
-                IN.timeDelta = FLOAT
-            end
-            function run()
-            end
-        )";
-
-        const auto timerNode = m_logicEngine.createTimerNode("timerNode");
-        const auto script = m_logicEngine.createLuaScript(scriptSrc);
-        ASSERT_TRUE(timerNode && script);
-        const auto timeDeltaOut = timerNode->getOutputs()->getChild("timeDelta");
-        const auto timeDeltaIn = script->getInputs()->getChild("timeDelta");
-        ASSERT_TRUE(timeDeltaOut && timeDeltaIn);
-        assert(timeDeltaOut && timeDeltaIn); // clang complaining for no reason
-        ASSERT_TRUE(m_logicEngine.link(*timeDeltaOut, *timeDeltaIn));
-        m_logicEngine.enableUpdateReport(true);
-
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(1000000u));
-        EXPECT_TRUE(m_logicEngine.update());
-        auto executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
-        ASSERT_EQ(2u, executedNodes.size());
-        EXPECT_EQ(script, executedNodes[1].first);
-
-        for (int64_t ticker = 2u; ticker < 10u; ++ticker)
-        {
-            EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(ticker * 1000000u)); // timeDelta is in seconds vs ticker in milliseconds
-            EXPECT_TRUE(m_logicEngine.update());
-            // constant timeDelta
-            EXPECT_FLOAT_EQ(1.f, *timerNode->getOutputs()->getChild(0u)->get<float>());
-
-            executedNodes = m_logicEngine.getLastUpdateReport().getNodesExecuted();
-            ASSERT_EQ(2u, executedNodes.size());
-            EXPECT_EQ(script, executedNodes[1].first);
-        }
     }
 
     TEST_F(ATimerNode, CanBeSerializedAndDeserialized)
@@ -236,43 +155,16 @@ namespace rlogic::internal
         EXPECT_EQ("timerNode", timerNode->getName());
 
         const auto rootIn = timerNode->getInputs();
-        EXPECT_EQ("IN", rootIn->getName());
+        EXPECT_EQ("", rootIn->getName());
         ASSERT_EQ(1u, rootIn->getChildCount());
         EXPECT_EQ("ticker_us", rootIn->getChild(0u)->getName());
         EXPECT_EQ(EPropertyType::Int64, rootIn->getChild(0u)->getType());
 
         const auto rootOut = timerNode->getOutputs();
-        EXPECT_EQ("OUT", rootOut->getName());
-        ASSERT_EQ(2u, rootOut->getChildCount());
-        EXPECT_EQ("timeDelta", rootOut->getChild(0u)->getName());
-        EXPECT_EQ("ticker_us", rootOut->getChild(1u)->getName());
-        EXPECT_EQ(EPropertyType::Float, rootOut->getChild(0u)->getType());
-        EXPECT_EQ(EPropertyType::Int64, rootOut->getChild(1u)->getType());
-    }
-
-    TEST_F(ATimerNode, WillNotSerializeInternalTimer)
-    {
-        WithTempDirectory tempDir;
-
-        {
-            LogicEngine otherEngine;
-            auto timerNode = otherEngine.createTimerNode("timerNode");
-
-            // set custom ticker to some value
-            EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(100));
-            EXPECT_TRUE(otherEngine.update());
-
-            ASSERT_TRUE(otherEngine.saveToFile("logic_timerNode.bin"));
-        }
-
-        ASSERT_TRUE(m_logicEngine.loadFromFile("logic_timerNode.bin"));
-        const auto timerNode = m_logicEngine.findByName<TimerNode>("timerNode");
-        ASSERT_TRUE(timerNode);
-
-        EXPECT_TRUE(timerNode->getInputs()->getChild(0u)->set<int64_t>(1));
-        // this would fail if internal timer would be serialized because ticker is lower
-        // than value before serialization - which violates monotonic ticker input
-        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ("", rootOut->getName());
+        ASSERT_EQ(1u, rootOut->getChildCount());
+        EXPECT_EQ("ticker_us", rootOut->getChild(0u)->getName());
+        EXPECT_EQ(EPropertyType::Int64, rootOut->getChild(0u)->getType());
     }
 
     class ATimerNode_SerializationLifecycle : public ATimerNode
@@ -298,7 +190,7 @@ namespace rlogic::internal
             DeserializationMap deserializationMap;
 
             {
-                HierarchicalTypeData inputs = MakeStruct("IN", {});
+                HierarchicalTypeData inputs = MakeStruct("", {});
                 if (issue == ESerializationIssue::PropertyInWrongName)
                 {
                     inputs.children.push_back(MakeType("wrongInput", EPropertyType::Int64));
@@ -309,23 +201,22 @@ namespace rlogic::internal
                 }
                 auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::ScriptInput);
 
-                HierarchicalTypeData outputs = MakeStruct("OUT", {});
+                HierarchicalTypeData outputs = MakeStruct("", {});
                 if (issue == ESerializationIssue::PropertyOutWrongName)
                 {
-                    outputs.children.push_back(MakeType("wrongOutput", EPropertyType::Float));
+                    outputs.children.push_back(MakeType("wrongOutput", EPropertyType::Int64));
                 }
-                else
+                else if (issue != ESerializationIssue::PropertyOutMissing)
                 {
-                    outputs.children.push_back(MakeType("timeDelta", EPropertyType::Float));
-                }
-                if (issue != ESerializationIssue::PropertyOutMissing)
                     outputs.children.push_back(MakeType("ticker_us", EPropertyType::Int64));
+                }
                 auto outputsImpl = std::make_unique<PropertyImpl>(std::move(outputs), EPropertySemantics::ScriptOutput);
 
                 const auto timerNodeFB = rlogic_serialization::CreateTimerNode(
                     flatBufferBuilder,
-                    issue == ESerializationIssue::NameMissing ? 0 : flatBufferBuilder.CreateString("timerNode"),
-                    issue == ESerializationIssue::IdMissing ? 0 : 1u,
+                    rlogic_serialization::CreateLogicObject(flatBufferBuilder,
+                        issue == ESerializationIssue::NameMissing ? 0 : flatBufferBuilder.CreateString("timerNode"),
+                        issue == ESerializationIssue::IdMissing ? 0 : 1u),
                     issue == ESerializationIssue::RootInMissing ? 0 : PropertyImpl::Serialize(*inputsImpl, flatBufferBuilder, serializationMap),
                     issue == ESerializationIssue::RootOutMissing ? 0 : PropertyImpl::Serialize(*outputsImpl, flatBufferBuilder, serializationMap)
                 );
@@ -349,12 +240,12 @@ namespace rlogic::internal
         {
             EXPECT_FALSE(deserializeSerializedDataWithIssue(issue));
             ASSERT_FALSE(m_errorReporting.getErrors().empty());
-            EXPECT_EQ("Fatal error during loading of TimerNode from serialized data: missing name, id or in/out property data!", m_errorReporting.getErrors().front().message);
+            EXPECT_EQ("Fatal error during loading of TimerNode from serialized data: missing name, id or in/out property data!", m_errorReporting.getErrors().back().message);
             m_errorReporting.clear();
         }
     }
 
-    TEST_F(ATimerNode_SerializationLifecycle, FailsDeserializationIfInvalidInterpolationType)
+    TEST_F(ATimerNode_SerializationLifecycle, FailsDeserializationIfInvalidOrMissingProperties)
     {
         for (const auto issue : { ESerializationIssue::PropertyInMissing, ESerializationIssue::PropertyOutMissing, ESerializationIssue::PropertyInWrongName, ESerializationIssue::PropertyOutWrongName })
         {

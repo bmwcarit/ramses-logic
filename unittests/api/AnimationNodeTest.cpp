@@ -55,9 +55,9 @@ namespace rlogic::internal
         }
 
         template <typename T>
-        void advanceAnimationAndExpectValues(AnimationNode& animNode, float timeDelta, const T& expectedValue)
+        void advanceAnimationAndExpectValues(AnimationNode& animNode, float progress, const T& expectedValue)
         {
-            EXPECT_TRUE(animNode.getInputs()->getChild("timeDelta")->set(timeDelta));
+            EXPECT_TRUE(animNode.getInputs()->getChild("progress")->set(progress));
             EXPECT_TRUE(m_logicEngine.update());
             const auto val = *animNode.getOutputs()->getChild("channel")->get<T>();
             if constexpr (std::is_same_v<T, vec2f>)
@@ -87,9 +87,9 @@ namespace rlogic::internal
             }
         }
 
-        void advanceAnimationAndExpectValues_twoChannels(AnimationNode& animNode, float timeDelta, const vec2f& expectedValue1, const vec2f& expectedValue2)
+        void advanceAnimationAndExpectValues_twoChannels(AnimationNode& animNode, float progress, const vec2f& expectedValue1, const vec2f& expectedValue2)
         {
-            animNode.getInputs()->getChild("timeDelta")->set(timeDelta);
+            animNode.getInputs()->getChild("progress")->set(progress);
             m_logicEngine.update();
             const auto val1 = *animNode.getOutputs()->getChild("channel1")->get<vec2f>();
             EXPECT_FLOAT_EQ(expectedValue1[0], val1[0]);
@@ -124,7 +124,6 @@ namespace rlogic::internal
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("animNode"));
 
         EXPECT_EQ("animNode", animNode->getName());
-        EXPECT_FLOAT_EQ(3.f, animNode->getDuration());
         EXPECT_EQ(channels, animNode->getChannels());
     }
 
@@ -180,8 +179,31 @@ namespace rlogic::internal
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("animNode"));
 
         EXPECT_EQ("animNode", animNode->getName());
-        EXPECT_FLOAT_EQ(5.f, animNode->getDuration());
+        EXPECT_FLOAT_EQ(5.f, *animNode->getOutputs()->getChild("duration")->get<float>());
         EXPECT_EQ(channels, animNode->getChannels());
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, HasFixedProperties)
+    {
+        const AnimationChannel channel{ "channel", m_dataFloat, m_dataVec2 };
+        const AnimationChannels channels{ channel, channel };
+        const auto animNode = createAnimationNode(channels, "animNode");
+        ASSERT_NE(nullptr, animNode);
+
+        const auto rootIn = animNode->getInputs();
+        ASSERT_TRUE(rootIn);
+        EXPECT_EQ("", rootIn->getName());
+        ASSERT_EQ(rootIn->getChildCount(), GetParam() ? 2u : 1u); // with/out animation data properties
+        ASSERT_TRUE(rootIn->getChild("progress"));
+        EXPECT_EQ(EPropertyType::Float, rootIn->getChild("progress")->getType());
+
+        const auto rootOut = animNode->getOutputs();
+        ASSERT_TRUE(rootOut);
+        EXPECT_EQ("", rootOut->getName());
+        ASSERT_EQ(3u, rootOut->getChildCount());
+        ASSERT_TRUE(rootOut && rootOut->getChild("duration"));
+        EXPECT_EQ(EPropertyType::Float, rootOut->getChild("duration")->getType());
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
@@ -191,27 +213,10 @@ namespace rlogic::internal
         const AnimationChannel channel2{ "channel2", m_dataFloat, m_dataVec4, EInterpolationType::Linear_Quaternions };
         const auto animNode = createAnimationNode({ channel1, channel2 }, "animNode");
 
-        const auto rootIn = animNode->getInputs();
-        EXPECT_EQ("IN", rootIn->getName());
-        ASSERT_EQ(rootIn->getChildCount(), GetParam() ? 6u : 5u); // with/out animation data properties
-        EXPECT_EQ("timeDelta", rootIn->getChild(0u)->getName());
-        EXPECT_EQ("play", rootIn->getChild(1u)->getName());
-        EXPECT_EQ("loop", rootIn->getChild(2u)->getName());
-        EXPECT_EQ("rewindOnStop", rootIn->getChild(3u)->getName());
-        EXPECT_EQ("timeRange", rootIn->getChild(4u)->getName());
-        EXPECT_EQ(EPropertyType::Float, rootIn->getChild(0u)->getType());
-        EXPECT_EQ(EPropertyType::Bool, rootIn->getChild(1u)->getType());
-        EXPECT_EQ(EPropertyType::Bool, rootIn->getChild(2u)->getType());
-        EXPECT_EQ(EPropertyType::Bool, rootIn->getChild(3u)->getType());
-        EXPECT_EQ(EPropertyType::Vec2f, rootIn->getChild(4u)->getType());
-
         const auto rootOut = animNode->getOutputs();
-        EXPECT_EQ("OUT", rootOut->getName());
         ASSERT_EQ(3u, rootOut->getChildCount());
-        EXPECT_EQ("progress", rootOut->getChild(0u)->getName());
         EXPECT_EQ("channel1", rootOut->getChild(1u)->getName());
         EXPECT_EQ("channel2", rootOut->getChild(2u)->getName());
-        EXPECT_EQ(EPropertyType::Float, rootOut->getChild(0u)->getType());
         EXPECT_EQ(EPropertyType::Float, rootOut->getChild(1u)->getType());
         EXPECT_EQ(EPropertyType::Vec4f, rootOut->getChild(2u)->getType());
     }
@@ -223,9 +228,9 @@ namespace rlogic::internal
         const auto timeStamps2 = m_logicEngine.createDataArray(std::vector<float>{ 4.f, 5.f, 6.f });
 
         const auto animNode1 = createAnimationNode({ { "channel", timeStamps1, m_dataVec2 } }, "animNode1");
-        EXPECT_FLOAT_EQ(3.f, animNode1->getDuration());
+        EXPECT_FLOAT_EQ(3.f, *animNode1->getOutputs()->getChild("duration")->get<float>());
         const auto animNode2 = createAnimationNode({ { "channel1", timeStamps1, m_dataVec2 }, { "channel2", timeStamps2, m_dataVec2 } }, "animNode2");
-        EXPECT_FLOAT_EQ(6.f, animNode2->getDuration());
+        EXPECT_FLOAT_EQ(6.f, *animNode2->getOutputs()->getChild("duration")->get<float>());
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
@@ -299,8 +304,8 @@ namespace rlogic::internal
 
         EXPECT_EQ("animNode1", animNode1->getName());
         EXPECT_EQ("animNode2", animNode2->getName());
-        EXPECT_FLOAT_EQ(5.f, animNode1->getDuration());
-        EXPECT_FLOAT_EQ(5.f, animNode2->getDuration());
+        EXPECT_FLOAT_EQ(5.f, *animNode1->getOutputs()->getChild("duration")->get<float>());
+        EXPECT_FLOAT_EQ(5.f, *animNode2->getOutputs()->getChild("duration")->get<float>());
 
         // ptrs are different after loading, find data arrays to verify the references in loaded anim nodes match
         const auto ts1 = m_logicEngine.findByName<DataArray>("ts1");
@@ -322,24 +327,18 @@ namespace rlogic::internal
         for (const auto animNode : { animNode1, animNode2 })
         {
             const auto rootIn = animNode->getInputs();
-            EXPECT_EQ("IN", rootIn->getName());
-            ASSERT_EQ(rootIn->getChildCount(), GetParam() ? 6u : 5u); // with/out animation data properties
-            EXPECT_EQ("timeDelta", rootIn->getChild(0u)->getName());
-            EXPECT_EQ("play", rootIn->getChild(1u)->getName());
-            EXPECT_EQ("loop", rootIn->getChild(2u)->getName());
-            EXPECT_EQ("rewindOnStop", rootIn->getChild(3u)->getName());
-            EXPECT_EQ("timeRange", rootIn->getChild(4u)->getName());
+            EXPECT_EQ("", rootIn->getName());
+            ASSERT_EQ(rootIn->getChildCount(), GetParam() ? 2u : 1u); // with/out animation data properties
+            EXPECT_EQ("progress", rootIn->getChild(0u)->getName());
             EXPECT_EQ(EPropertyType::Float, rootIn->getChild(0u)->getType());
-            EXPECT_EQ(EPropertyType::Bool, rootIn->getChild(1u)->getType());
-            EXPECT_EQ(EPropertyType::Bool, rootIn->getChild(2u)->getType());
-            EXPECT_EQ(EPropertyType::Bool, rootIn->getChild(3u)->getType());
-            EXPECT_EQ(EPropertyType::Vec2f, rootIn->getChild(4u)->getType());
 
             const auto rootOut = animNode->getOutputs();
-            EXPECT_EQ("OUT", rootOut->getName());
+            EXPECT_EQ("", rootOut->getName());
             ASSERT_EQ(5u, rootOut->getChildCount());
-            EXPECT_EQ("progress", rootOut->getChild(0u)->getName());
-            EXPECT_EQ(EPropertyType::Float, rootOut->getChild(0u)->getType());
+            ASSERT_EQ("duration", rootOut->getChild(0u)->getName());
+            ASSERT_EQ(EPropertyType::Float, rootOut->getChild(0u)->getType());
+            EXPECT_FLOAT_EQ(5.f, *animNode->getOutputs()->getChild("duration")->get<float>());
+
             EXPECT_EQ(EPropertyType::Vec2i, rootOut->getChild(1u)->getType());
             EXPECT_EQ(EPropertyType::Vec2i, rootOut->getChild(2u)->getType());
             EXPECT_EQ(EPropertyType::Vec2i, rootOut->getChild(3u)->getType());
@@ -359,11 +358,10 @@ namespace rlogic::internal
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillSerializeAnimationInputStatesButNotProgress)
+    TEST_P(AnAnimationNode, WillSerializeAnimationIncludingProgress)
     {
         WithTempDirectory tempDir;
 
-        const vec2f timeRange{ 1.f, 2.f };
         {
             LogicEngine otherEngine;
 
@@ -375,14 +373,9 @@ namespace rlogic::internal
             config.setExposingOfChannelDataAsProperties(GetParam());
             const auto animNode = otherEngine.createAnimationNode(config, "animNode");
 
-            EXPECT_TRUE(animNode->getInputs()->getChild("play")->set(true));
-            EXPECT_TRUE(animNode->getInputs()->getChild("loop")->set(true));
-            EXPECT_TRUE(animNode->getInputs()->getChild("rewindOnStop")->set(true));
-            EXPECT_TRUE(animNode->getInputs()->getChild("timeRange")->set(timeRange));
-            EXPECT_TRUE(animNode->getInputs()->getChild("timeDelta")->set(3.5f));
+            EXPECT_TRUE(animNode->getInputs()->getChild("progress")->set(0.75f));
             EXPECT_TRUE(otherEngine.update());
             EXPECT_EQ(15, *animNode->getOutputs()->getChild("channel")->get<int32_t>());
-            EXPECT_FLOAT_EQ(0.5f, *animNode->getOutputs()->getChild("progress")->get<float>());
 
             ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin"));
         }
@@ -391,20 +384,31 @@ namespace rlogic::internal
         const auto animNode = m_logicEngine.findByName<AnimationNode>("animNode");
         ASSERT_TRUE(animNode);
 
-        // update node with zero timeDelta to check its state
-        EXPECT_TRUE(animNode->getInputs()->getChild("timeDelta")->set(0.f));
+        // update node with no change to progress to check its state
         EXPECT_TRUE(m_logicEngine.update());
 
-        // kept input states but not progress
-        EXPECT_TRUE(*animNode->getInputs()->getChild("play")->get<bool>());
-        EXPECT_TRUE(*animNode->getInputs()->getChild("loop")->get<bool>());
-        EXPECT_TRUE(*animNode->getInputs()->getChild("rewindOnStop")->get<bool>());
-        EXPECT_EQ(timeRange, *animNode->getInputs()->getChild("timeRange")->get<vec2f>());
-        EXPECT_EQ(10, *animNode->getOutputs()->getChild("channel")->get<int32_t>());
-        EXPECT_FLOAT_EQ(0.f, *animNode->getOutputs()->getChild("progress")->get<float>());
+        // progress same as when saved
+        EXPECT_EQ(15, *animNode->getOutputs()->getChild("channel")->get<int32_t>());
 
         // can play again
-        advanceAnimationAndExpectValues<int32_t>(*animNode, 1.5f, 15);
+        advanceAnimationAndExpectValues<int32_t>(*animNode, 0.f,   10);
+        advanceAnimationAndExpectValues<int32_t>(*animNode, 0.5f,  10);
+        advanceAnimationAndExpectValues<int32_t>(*animNode, 0.75f, 15);
+        advanceAnimationAndExpectValues<int32_t>(*animNode, 1.f,   20);
+    }
+
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode, CanHandleProgressOutOfNormalizedRange)
+    {
+        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
+        const auto data = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+
+        advanceAnimationAndExpectValues<float>(*animNode, 0.0f, 10.f);
+        advanceAnimationAndExpectValues<float>(*animNode, 0.5f, 15.f);
+        advanceAnimationAndExpectValues<float>(*animNode, 1.0f, 20.f);
+        advanceAnimationAndExpectValues<float>(*animNode, -999.f, 10.f);
+        advanceAnimationAndExpectValues<float>(*animNode, 999.f, 20.f);
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
@@ -414,11 +418,9 @@ namespace rlogic::internal
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.f, { 0.f, 10.f });
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.99f, { 0.f, 10.f }); // still no change
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.0100001f, { 1.f, 20.f }); // step to next keyframe value at its timestamp
+        advanceAnimationAndExpectValues<vec2f>(*animNode, 1.000001f, { 1.f, 20.f }); // step to next keyframe value at its timestamp
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 1.f, 20.f }); // no change pass end of animation
     }
 
@@ -429,11 +431,9 @@ namespace rlogic::internal
         const auto data = m_logicEngine.createDataArray(std::vector<vec2i>{ { 0, 10 }, { 1, 20 } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.f, { 0, 10 });
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.99f, { 0, 10 }); // still no change
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.0100001f, { 1, 20 }); // step to next keyframe value at its timestamp
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 1.000001f, { 1, 20 }); // step to next keyframe value at its timestamp
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // no change pass end of animation
     }
 
@@ -444,13 +444,11 @@ namespace rlogic::internal
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.f, { 0.f, 10.f });
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.1f, { 0.1f, 11.f }); // time 0.1
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.4f, { 0.5f, 15.f }); // time 0.5
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.4f, { 0.9f, 19.f }); // time 0.9
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.1f, { 1.f, 20.f }); // time 1.0
+        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.5f, { 0.5f, 15.f }); // time 0.5
+        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.9f, { 0.9f, 19.f }); // time 0.9
+        advanceAnimationAndExpectValues<vec2f>(*animNode, 1.0f, { 1.f, 20.f }); // time 1.0
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
@@ -461,13 +459,11 @@ namespace rlogic::internal
         const auto data = m_logicEngine.createDataArray(std::vector<vec2i>{ { 0, 10 }, { 1, 20 } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.f, { 0, 10 });
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.1f, { 0, 11 }); // time 0.1
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.4f, { 1, 15 }); // time 0.5
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.4f, { 1, 19 }); // time 0.9
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.1f, { 1, 20 }); // time 1.0
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.5f, { 1, 15 }); // time 0.5
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.9f, { 1, 19 }); // time 0.9
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 1.0f, { 1, 20 }); // time 1.0
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
     }
 
@@ -477,12 +473,10 @@ namespace rlogic::internal
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, m_dataVec4, EInterpolationType::Linear_Quaternions } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec4f>(*animNode, 0.f, { 1, 0, 0, 0 });
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.5f, { .70710677f, .70710677f, 0, 0 }); // time 0.5
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { .70710677f, .70710677f, 0, 0 }); // time 0.5
         advanceAnimationAndExpectValues<vec4f>(*animNode, 0.5f, { 0, 1, 0, 0 }); // time 1.0
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.5f, { 0, .70710677f, .70710677f, 0 }); // time 1.5
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.75f, { 0, .70710677f, .70710677f, 0 }); // time 1.5
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
@@ -500,13 +494,11 @@ namespace rlogic::internal
             { "channel2", timeStamps, data, EInterpolationType::Cubic, tangentsIn, tangentsOut },
             });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues_twoChannels(*animNode, 0.f, { 0.f, 10.f }, { 0.f, 10.f });
         advanceAnimationAndExpectValues_twoChannels(*animNode, 0.1f, { 0.028f, 10.28f }, { 0.199f, 10.703f }); // time 0.1
-        advanceAnimationAndExpectValues_twoChannels(*animNode, 0.4f, { 0.5f, 15.f }, { 0.875f, 15.875f }); // time 0.5
-        advanceAnimationAndExpectValues_twoChannels(*animNode, 0.4f, { 0.972f, 19.72f }, { 1.071f, 19.927f }); // time 0.9
-        advanceAnimationAndExpectValues_twoChannels(*animNode, 0.1f, { 1.f, 20.f }, { 1.f, 20.f }); // time 1.0
+        advanceAnimationAndExpectValues_twoChannels(*animNode, 0.5f, { 0.5f, 15.f }, { 0.875f, 15.875f }); // time 0.5
+        advanceAnimationAndExpectValues_twoChannels(*animNode, 0.9f, { 0.972f, 19.72f }, { 1.071f, 19.927f }); // time 0.9
+        advanceAnimationAndExpectValues_twoChannels(*animNode, 1.0f, { 1.f, 20.f }, { 1.f, 20.f }); // time 1.0
         advanceAnimationAndExpectValues_twoChannels(*animNode, 100.f, { 1.f, 20.f }, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
@@ -517,14 +509,12 @@ namespace rlogic::internal
         const auto tangentsZero = m_logicEngine.createDataArray(std::vector<vec4f>{ { 0.f, 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f } });
         const auto animNode = createAnimationNode({{ "channel", timeStamps, m_dataVec4, EInterpolationType::Cubic_Quaternions, tangentsZero, tangentsZero }});
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec4f>(*animNode, 0.f, { 1, 0, 0, 0 });
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { .98328203f, .18208927f, 0, 0 }); // time 0.25
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.125f, { .98328203f, .18208927f, 0, 0 }); // time 0.25
         advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { .70710677f, .70710677f, 0, 0 }); // time 0.5
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { .18208927f, .98328203f, 0, 0 }); // time 0.75
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { 0, 1, 0, 0 }); // time 1.0
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.75f, { 0, .18208927f, .98328203f, 0 }); // time 1.75
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.375f, { .18208927f, .98328203f, 0, 0 }); // time 0.75
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.5f, { 0, 1, 0, 0 }); // time 1.0
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.875f, { 0, .18208927f, .98328203f, 0 }); // time 1.75
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
@@ -536,14 +526,12 @@ namespace rlogic::internal
         const auto tangentsOut = m_logicEngine.createDataArray(std::vector<vec4f>{ { 1.f, 1.f, 0.f, 0.f}, {  1.f, 1.f, 0.f, 0.f }, { 0.f, 0.f, 0.f, 0.f } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, m_dataVec4, EInterpolationType::Cubic_Quaternions, tangentsIn, tangentsOut } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec4f>(*animNode, 0.f, { 1, 0, 0, 0 });
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { 0.9749645f, 0.22236033f, 0, 0 }); // time 0.25
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.125f, { 0.9749645f, 0.22236033f, 0, 0 }); // time 0.25
         advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { .70710677f, .70710677f, 0, 0 }); // time 0.5
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { 0.13598002f, 0.99071163f, 0, 0 }); // time 0.75
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.25f, { 0, 1, 0, 0 }); // time 1.0
-        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.75f, { -0.055011157f, 0.12835936f, 0.99020082f, 0 }); // time 1.75
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.375f, { 0.13598002f, 0.99071163f, 0, 0 }); // time 0.75
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.5f, { 0, 1, 0, 0 }); // time 1.0
+        advanceAnimationAndExpectValues<vec4f>(*animNode, 0.875f, { -0.055011157f, 0.12835936f, 0.99020082f, 0 }); // time 1.75
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
@@ -558,13 +546,11 @@ namespace rlogic::internal
             { "channel", timeStamps, data, EInterpolationType::Cubic, tangentsIn, tangentsOut },
             });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.f, { 0, 10 });
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.1f, { 0, 11 }); // time 0.1
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.4f, { 1, 16 }); // time 0.5
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.4f, { 1, 20 }); // time 0.9
-        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.1f, { 1, 20 }); // time 1.0
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.5f, { 1, 16 }); // time 0.5
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 0.9f, { 1, 20 }); // time 0.9
+        advanceAnimationAndExpectValues<vec2i>(*animNode, 1.0f, { 1, 20 }); // time 1.0
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
     }
 
@@ -575,303 +561,46 @@ namespace rlogic::internal
         const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 20.f }, { 2.f, 30.f } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.f, { 1.f, 20.f });
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.5f, { 1.f, 20.f }); // time 0.5
+        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.25f, { 1.f, 20.f }); // time 0.5
         advanceAnimationAndExpectValues<vec2f>(*animNode, 0.5f, { 1.f, 20.f }); // time 1.0
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.5f, { 1.5f, 25.f }); // time 1.5
+        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.75f, { 1.5f, 25.f }); // time 1.5
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 2.f, 30.f }); // stays at last keyframe after animation end
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, CanPauseAndResumePlayViaProperty)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<vec2f>{ { 0.f, 10.f }, { 1.f, 20.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.f, { 0.f, 10.f });
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.2f, { 0.2f, 12.f }); // anim time 0.2
-
-        animNode->getInputs()->getChild("play")->set(false);
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 0.2f, 12.f }); // no change
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.2f, { 0.4f, 14.f }); // anim time 0.4
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.2f, { 0.6f, 16.f }); // anim time 0.6
-
-        animNode->getInputs()->getChild("play")->set(false);
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 0.6f, 16.f }); // no change
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.2f, { 0.8f, 18.f }); // anim time 0.8
-        advanceAnimationAndExpectValues<vec2f>(*animNode, 0.2f, { 1.f, 20.f }); // anim time 1.0
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillNotUpdateIfTimeDeltaNegative)
+    TEST_P(AnAnimationNode, CanJumpAnywhereInAnimation)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
         const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-
-        EXPECT_TRUE(animNode->getInputs()->getChild("timeDelta")->set(-0.4f));
-        EXPECT_FALSE(m_logicEngine.update());
-        // no change, invalid timeDelta was ignored
-        EXPECT_FLOAT_EQ(14.f, *animNode->getOutputs()->getChild("channel")->get<float>());
-
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
+        advanceAnimationAndExpectValues(*animNode, 1.f, 20.f);
+        advanceAnimationAndExpectValues(*animNode, -10.f, 10.f);
+        advanceAnimationAndExpectValues(*animNode, 10.f, 20.f);
+        advanceAnimationAndExpectValues(*animNode, 0.5f, 15.f);
+        advanceAnimationAndExpectValues(*animNode, 0.25f, 12.5f);
+        advanceAnimationAndExpectValues(*animNode, 0.75f, 17.5f);
     }
 
     // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, CanPlayLoopingAnimation)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("loop")->set(true);
-
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 12.f); // crossed end and restarted
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 16.f);
-        advanceAnimationAndExpectValues(*animNode, 0.39f, 19.9f);
-        advanceAnimationAndExpectValues(*animNode, 0.02f, 10.1f); // crossed end and restarted
-
-        animNode->getInputs()->getChild("loop")->set(false);
-        advanceAnimationAndExpectValues(*animNode, 100.f, 20.f); // crossed end and stays at last keyframe
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, CanStartLoopingEvenAfterAnimationFinished)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-
-        advanceAnimationAndExpectValues(*animNode, 100.f, 20.f); // crossed end and animation finished
-
-        animNode->getInputs()->getChild("loop")->set(true); // will restart animation
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 12.f); // crossed end and restarted
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 16.f);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillRewindAnimationOnStop)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("rewindOnStop")->set(true);
-
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-
-        animNode->getInputs()->getChild("play")->set(false); // will rewind
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.5f, 10.f);
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f); // started from beginning
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
-        advanceAnimationAndExpectValues(*animNode, 100.f, 20.f);
-
-        animNode->getInputs()->getChild("play")->set(false); // will rewind
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.5f, 10.f);
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f); // started from beginning
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillRewindAnimationWhenRewindEnabledEvenAfterAnimationFinishedAndStopped)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues(*animNode, 100.f, 20.f);
-        animNode->getInputs()->getChild("play")->set(false); // animation finished and stopped
-
-        animNode->getInputs()->getChild("rewindOnStop")->set(true); // will rewind
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f);
-        advanceAnimationAndExpectValues(*animNode, 0.5f, 10.f);
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues(*animNode, 0.f, 10.f); // started from beginning
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 14.f);
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 18.f);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillPlayAnimationWithinGivenTimeRange)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
-        advanceAnimationAndExpectValues(*animNode, 0.f, 20.f); // start at time range beginning
-        advanceAnimationAndExpectValues(*animNode, 5.f, 25.f);
-        advanceAnimationAndExpectValues(*animNode, 5.f, 30.f);
-        advanceAnimationAndExpectValues(*animNode, 5.f, 30.f); // stays at time range end
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillStopAtTimeRangeEnd)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
-        advanceAnimationAndExpectValues(*animNode, 100.f, 30.f); // stays at time range end
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillRewindToBeginningOfTimeRange)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
-        advanceAnimationAndExpectValues(*animNode, 100.f, 30.f); // stays at time range end
-        animNode->getInputs()->getChild("play")->set(false); // animation finished and stopped
-
-        animNode->getInputs()->getChild("rewindOnStop")->set(true); // will rewind
-        advanceAnimationAndExpectValues(*animNode, 0.f, 20.f); // rewinds to time range beginning
-
-        animNode->getInputs()->getChild("play")->set(true);
-        advanceAnimationAndExpectValues(*animNode, 5.f, 25.f);
-        advanceAnimationAndExpectValues(*animNode, 100.f, 30.f); // stays at time range end
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillLoopWithinTimeRange)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("loop")->set(true);
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
-        advanceAnimationAndExpectValues(*animNode, 0.f, 20.f);
-        advanceAnimationAndExpectValues(*animNode, 5.f, 25.f);
-        advanceAnimationAndExpectValues(*animNode, 6.f, 21.f); // next loop
-        advanceAnimationAndExpectValues(*animNode, 10.f, 21.f); // next loop
-        advanceAnimationAndExpectValues(*animNode, 101.f, 22.f); // next several loops
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillUseOriginalDurationAsTimeRangeEndIfTimeRangeEndNotSpecified)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 0.f }); // unspecified time range end
-        advanceAnimationAndExpectValues(*animNode, 0.f, 20.f); // start at time range beginning
-        advanceAnimationAndExpectValues(*animNode, 100.f, 40.f); // stays at animation end
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, CanChangeTimeRangeWhilePlayingAndAlwaysStaysWithinGivenTimeRange)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
-
-        animNode->getInputs()->getChild("play")->set(true);
-        animNode->getInputs()->getChild("loop")->set(true);
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 20.f, 30.f });
-        // loop within (20, 30) time range
-        advanceAnimationAndExpectValues(*animNode, 0.f, 20.f);
-        advanceAnimationAndExpectValues(*animNode, 5.f, 25.f);
-        advanceAnimationAndExpectValues(*animNode, 6.f, 21.f);
-        // jump to a (30, 40) time range
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 30.f, 40.f });
-        advanceAnimationAndExpectValues(*animNode, 0.f, 31.f); // starts off with same offset as in previous time range
-        advanceAnimationAndExpectValues(*animNode, 8.f, 39.f);
-        // jump to a (10, 20) time range
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 10.f, 20.f });
-        advanceAnimationAndExpectValues(*animNode, 0.f, 19.f); // again starts off with same offset as in previous time range
-        advanceAnimationAndExpectValues(*animNode, 2.f, 11.f); // loops within this range
-        // extend range to (10, 30)
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 10.f, 30.f });
-        advanceAnimationAndExpectValues(*animNode, 0.f, 11.f); // no change as time range beginning did not change
-        advanceAnimationAndExpectValues(*animNode, 18.f, 29.f); // plays in extended range
-        advanceAnimationAndExpectValues(*animNode, 2.f, 11.f); // loops within this range
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, WillFailUpdateIfTimeRangeInvalid)
-    {
-        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 10.f, 20.f, 30.f, 40.f });
-        const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 10.f, 20.f, 30.f, 40.f } });
-        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } }, "anim");
-
-        animNode->getInputs()->getChild("play")->set(true);
-
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 30.f, 20.f });
-        EXPECT_FALSE(m_logicEngine.update());
-        ASSERT_FALSE(m_logicEngine.getErrors().empty());
-        EXPECT_EQ("AnimationNode 'anim' failed to update - time range begin must be smaller than end and not negative (given time range [30, 20])", m_logicEngine.getErrors().front().message);
-
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ -1.f, 20.f });
-        EXPECT_FALSE(m_logicEngine.update());
-        ASSERT_FALSE(m_logicEngine.getErrors().empty());
-        EXPECT_EQ("AnimationNode 'anim' failed to update - time range begin must be smaller than end and not negative (given time range [-1, 20])", m_logicEngine.getErrors().front().message);
-
-        animNode->getInputs()->getChild("timeRange")->set(vec2f{ 1.f, 1.f });
-        EXPECT_FALSE(m_logicEngine.update());
-        ASSERT_FALSE(m_logicEngine.getErrors().empty());
-        EXPECT_EQ("AnimationNode 'anim' failed to update - time range begin must be smaller than end and not negative (given time range [1, 1])", m_logicEngine.getErrors().front().message);
-    }
-
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
-    TEST_P(AnAnimationNode, GivesStableResultsWithExtremelySmallTimeDelta)
+    TEST_P(AnAnimationNode, GivesStableResultsWithExtremelySmallTimestamps)
     {
         constexpr float Eps = std::numeric_limits<float>::epsilon();
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ Eps * 100, Eps * 200 });
         const auto data = m_logicEngine.createDataArray(std::vector<float>{ { 1.f,  2.f } });
         auto& animNode = *createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
 
-        animNode.getInputs()->getChild("play")->set(true);
-        // initialize output value by updating with zero timedelta and expect first keyframe value
+        // initialize output value by updating with zero progress and expect first keyframe value
         advanceAnimationAndExpectValues(animNode, 0.f, 1.f);
 
         float lastValue = 0.f;
-        for (int i = 0; i < 500; ++i)
+        for (int i = 0; i < 110; ++i)
         {
-            // advance with epsilon steps
-            animNode.getInputs()->getChild("timeDelta")->set(Eps);
+            const float progress = 0.01f * float(i);
+
+            animNode.getInputs()->getChild("progress")->set(progress);
             m_logicEngine.update();
             const auto val = *animNode.getOutputs()->getChild("channel")->get<float>();
 
@@ -930,33 +659,31 @@ namespace rlogic::internal
             {
                 const auto data = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
 
-                HierarchicalTypeData inputs = MakeStruct("IN", {});
-                if (issue == ESerializationIssue::PropertyInWrongName)
-                {
-                    inputs.children.push_back(MakeType("wrongInput", EPropertyType::Float));
-                }
-                else
-                {
-                    inputs.children.push_back(MakeType("timeDelta", EPropertyType::Float));
-                }
+                HierarchicalTypeData inputs = MakeStruct("", {});
                 if (issue != ESerializationIssue::PropertyInMissing)
-                    inputs.children.push_back(MakeType("play", EPropertyType::Bool));
-                inputs.children.push_back(MakeType("loop", EPropertyType::Bool));
-                inputs.children.push_back(MakeType("rewindOnStop", EPropertyType::Bool));
-                inputs.children.push_back(MakeType("timeRange", EPropertyType::Vec2f));
+                {
+                    if (issue == ESerializationIssue::PropertyInWrongName)
+                    {
+                        inputs.children.push_back(MakeType("wrongInput", EPropertyType::Float));
+                    }
+                    else
+                    {
+                        inputs.children.push_back(MakeType("progress", EPropertyType::Float));
+                    }
+                }
                 if (issue == ESerializationIssue::PropertyChannelsDataInvalid)
                     inputs.children.push_back(MakeType("invalidChannelsData", EPropertyType::Array));
 
                 auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::AnimationInput);
 
-                HierarchicalTypeData outputs = MakeStruct("OUT", {});
+                HierarchicalTypeData outputs = MakeStruct("", {});
                 if (issue == ESerializationIssue::PropertyOutWrongName)
                 {
                     outputs.children.push_back(MakeType("wrongOutput", EPropertyType::Float));
                 }
                 else
                 {
-                    outputs.children.push_back(MakeType("progress", EPropertyType::Float));
+                    outputs.children.push_back(MakeType("duration", EPropertyType::Float));
                 }
                 if (issue != ESerializationIssue::PropertyOutMissing)
                     outputs.children.push_back(MakeType("channel", EPropertyType::Float));
@@ -980,8 +707,9 @@ namespace rlogic::internal
 
                 const auto animNodeFB = rlogic_serialization::CreateAnimationNode(
                     flatBufferBuilder,
-                    issue == ESerializationIssue::NameMissing ? 0 : flatBufferBuilder.CreateString("animNode"),
-                    issue == ESerializationIssue::IdMissing ? 0 : 1u,
+                    rlogic_serialization::CreateLogicObject(flatBufferBuilder,
+                        issue == ESerializationIssue::NameMissing ? 0 : flatBufferBuilder.CreateString("animNode"),
+                        issue == ESerializationIssue::IdMissing ? 0 : 1u),
                     issue == ESerializationIssue::ChannelsMissing ? 0 : flatBufferBuilder.CreateVector(channelsFB),
                     issue == ESerializationIssue::PropertyChannelsDataInvalid,
                     issue == ESerializationIssue::RootInMissing ? 0 : PropertyImpl::Serialize(*inputsImpl, flatBufferBuilder, serializationMap),
@@ -1013,7 +741,7 @@ namespace rlogic::internal
         {
             EXPECT_FALSE(deserializeSerializedDataWithIssue(issue));
             ASSERT_FALSE(m_errorReporting.getErrors().empty());
-            EXPECT_EQ("Fatal error during loading of AnimationNode from serialized data: missing name, id, channels or in/out property data!", m_errorReporting.getErrors().front().message);
+            EXPECT_EQ("Fatal error during loading of AnimationNode from serialized data: missing name, id, channels or in/out property data!", m_errorReporting.getErrors().back().message);
             m_errorReporting.clear();
         }
     }
@@ -1049,7 +777,11 @@ namespace rlogic::internal
         ASSERT_FALSE(m_errorReporting.getErrors().empty());
         EXPECT_EQ("Fatal error during loading of AnimationNode 'animNode' channel 'channel' data: missing or invalid interpolation type!", m_errorReporting.getErrors().front().message);
         m_errorReporting.clear();
+    }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
+    TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidOrMissingProperties)
+    {
         for (const auto issue : { ESerializationIssue::PropertyInMissing, ESerializationIssue::PropertyOutMissing, ESerializationIssue::PropertyInWrongName, ESerializationIssue::PropertyOutWrongName })
         {
             EXPECT_FALSE(deserializeSerializedDataWithIssue(issue));

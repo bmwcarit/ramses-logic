@@ -47,6 +47,11 @@ namespace rlogic::internal
         std::unique_ptr<Property> rootOutput;
     };
 
+    struct LuaCompiledInterface
+    {
+        std::unique_ptr<Property> rootProperty;
+    };
+
     struct LuaCompiledModule
     {
         LuaSource source;
@@ -61,6 +66,12 @@ namespace rlogic::internal
             const ModuleMapping& userModules,
             const StandardModules& stdModules,
             std::string source,
+            std::string_view name,
+            ErrorReporting& errorReporting);
+
+        [[nodiscard]] static std::optional<LuaCompiledInterface> CompileInterface(
+            SolState& solState,
+            const std::string& source,
             std::string_view name,
             ErrorReporting& errorReporting);
 

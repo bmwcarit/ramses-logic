@@ -9,14 +9,15 @@
 #pragma once
 
 #include "ramses-logic/APIExport.h"
+#include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/Collection.h"
+#include "ramses-logic/EPropertyType.h"
+#include "ramses-logic/ERotationType.h"
 #include "ramses-logic/ErrorData.h"
+#include "ramses-logic/LogicEngineReport.h"
 #include "ramses-logic/LuaConfig.h"
 #include "ramses-logic/SaveFileConfig.h"
-#include "ramses-logic/EPropertyType.h"
-#include "ramses-logic/AnimationTypes.h"
-#include "ramses-logic/ERotationType.h"
-#include "ramses-logic/LogicEngineReport.h"
+#include "ramses-logic/WarningData.h"
 
 #include <vector>
 #include <string_view>
@@ -38,6 +39,7 @@ namespace rlogic
 {
     class LogicNode;
     class LuaScript;
+    class LuaInterface;
     class LuaModule;
     class Property;
     class RamsesNodeBinding;
@@ -132,6 +134,24 @@ namespace rlogic
             std::string_view scriptName = "");
 
         /**
+        * Creates a new Lua interface from a source string. Refer to the #rlogic::LuaInterface class
+        * for requirements which Lua interface must fulfill in order to be added to the #LogicEngine.
+        * Note: interfaces must have a non-empty name which is unique among other interfaces
+        * (there can't be two interface objects with the same name in the same #LogicEngine instance).
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param source the Lua source code
+        * @param interfaceName name to assign to the interface once it's created. This name must be unique!
+        * @return a pointer to the created object or nullptr if
+        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+        * The interface can be destroyed by calling the #destroy method
+        */
+        RLOGIC_API LuaInterface* createLuaInterface(
+            std::string_view source,
+            std::string_view interfaceName);
+
+        /**
          * Creates a new #rlogic::LuaModule from Lua source code.
          * LuaModules can be used to share code and data constants across scripts or
          * other modules. See also #createLuaScript and #rlogic::LuaConfig for details.
@@ -163,10 +183,10 @@ namespace rlogic
          * and pass list of module names it depends on, for example:
          *   \code{.lua}
          *       modules("foo", "bar")
-         *       function interface()
+         *       function interface(IN,OUT)
          *         OUT.x = foo.myType()
          *       end
-         *       function run()
+         *       function run(IN,OUT)
          *         OUT.x = bar.doSth()
          *       end
          *   \endcode
@@ -449,6 +469,14 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API const std::vector<ErrorData>& getErrors() const;
 
         /**
+        * Performs a (potentially slow!) validation of the LogicEngine content and reports a list of warnings
+        * for things which could be fixed/changed for better performance, consistency or resource usage.
+        *
+        * @return a list of warnings
+        */
+        [[nodiscard]] RLOGIC_API const std::vector<WarningData>& validate() const;
+
+        /**
         * Destroys an instance of an object created with #LogicEngine.
         * All objects created using #LogicEngine derive from a base class #rlogic::LogicObject
         * and can be destroyed using this method.
@@ -480,6 +508,9 @@ namespace rlogic
          *
          * Note: The method reports error and aborts if the #rlogic::RamsesBinding objects reference more than one
          * Ramses scene (this is acceptable during runtime, but not for saving to file).
+         *
+         * Note: This method fails and reports error if validation failed and was not disabled by
+         * calling #rlogic::SaveFileConfig::setValidationEnabled with false
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *

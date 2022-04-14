@@ -25,55 +25,41 @@ namespace rlogic
     * Animation node can be used to animate properties in logic network.
     * Animation node itself is a logic node and has a set of input and output properties:
     * - Fixed inputs:
-    *     - timeDelta (float)   - how much time to advance the animation if playing
-    *                             (units should match with #rlogic::AnimationChannel::timeStamps)
-    *                           - typical application running in a loop will provide timeDelta once per loop
-    *                             as duration elapsed between last and current loop
-    *     - play (bool)         - will advance in animation if true or no update if false
-    *     - loop (bool)         - if true, will loop animation when playing (i.e. start over whenever end is reached)
-    *     - rewindOnStop (bool) - if true, whenever animation is stopped (play=false) it will jump
-    *                             to the beginning (as if it never started)
-    *                           - animation will rewind also if not playing and this input is switched from false to true
-    *     - timeRange (vec2f)   - by default animation is played from time 0 to the last timestamp of its longest channel,
-    *                             this can be changed by using this input by providing vec2f{ timeRangeBegin, timeRangeEnd },
-    *                             animation will then play strictly within this time range (applies also to loop and rewindOnStop)
-    *                           - time range end is optional, if set to 0 or negative then the original maximum duration
-    *                             will be used (#getDuration)
-    *                           - if end is specified (positive value) it must always be larger than begin
-    *                             or else the node update will fail
+    *     - progress (float)  - point within [0;1] normalized range of where to jump to in the animation
+    *                         - in this range 0 marks the time 0 (regardless of timestamp of the first keyframe),
+    *                           and 1 marks the end of the animation determined by the duration of the animation
+    *                         - values outside of the [0;1] range are accepted and will be clamped
     * - Fixed outputs:
-    *     - progress (float)  - a [0;1] normalized progress of animation where 0 is beginning, 1 is end
+    *     - duration (float)  - total duration of the animation, determined by the highest timestamp from all its channels
+    *                         - is affected by modifications to timestamp data via properties
+    *                           (see #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties)
+    *
     * - Channel outputs: Each animation channel provided at creation time (#rlogic::LogicEngine::createAnimationNode)
     *                    will be represented as output property with name of the channel (#rlogic::AnimationChannel::name)
     *                    and a value of type matching element in #rlogic::AnimationChannel::keyframes.
-    *                    Channel value output is a result of keyframes interpolation based on applied time deltas,
-    *                    it can be linked to another logic node input to process the animation result.
+    *                    Channel value output is a result of keyframes interpolation based on the 'progress' input above,
+    *                    it can be linked to another logic node input to use the animation result.
     *
-    * - Channel data outputs (only if created with #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties enabled):
+    * - Channel data inputs (only if created with #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties enabled):
     *     - channelsData (struct) - contains all channels and their data in a hierarchy. For each channel:
     *         - [channelName] (struct)
     *             - timestamps (array of float) - each element represents a timestamp value
     *             - keyframes (array of T) - each element represents a keyframe value
     *                                      - type T is data type matching this channel original keyframes
     *
-    * On #rlogic::LogicEngine::update all animation nodes will be updated if and only if there was any of the inputs set
-    * (regardless if value changed or not), for this reason it is important that application (directly to node input
-    * or indirectly via logic network) sets timeDelta regularly (typically every loop/frame).
-    * Now when animation is playing (play input is true) and a non-negative timeDelta is set, the logic will
-    * advance the animation progress, i.e. it will:
-    *     - add timeDelta to already elapsed time of played animation (from previous updates)
-    *     - for each channel it will:
-    *         - lookup closest previous and next timestamp/keyframe pair according to the new total elapsed play time,
+    * During update when 'progress' input is set the following logic is executed:
+    *     - calculate local animation time based on progress
+    *     - for each channel:
+    *         - lookup closest previous and next timestamp/keyframe pair according to the local animation time,
     *         - interpolate between them according to the interpolation type of that channel,
     *         - and finally set this value to the channel's output property.
-    *     - update 'progress' output accordingly
     *
     * Note that all channel outputs will always have a value determined by corresponding keyframes, this includes
     * also when the time falls outside of the first/last animation timestamps:
     *     - channel output value equals first keyframe for any time at or before the first keyframe timestamp
     *     - channel output value equals last keyframe for any time at or after the last keyframe timestamp
     * This can be useful for example when needing to initialize the outputs before playing the animation yet,
-    * when updating the animation node with timeDelta 0, the logic will execute and update outputs to their
+    * when updating the animation node with progress 0, the logic will execute and update outputs to their
     * first keyframes.
     */
     class AnimationNode : public LogicNode
@@ -90,19 +76,6 @@ namespace rlogic
         * Destructor of AnimationNode.
         */
         ~AnimationNode() noexcept override;
-
-        /**
-        * Gets maximum duration of this animation's channel data.
-        * The duration is determined by the highest timestamp value in timestamps data of all channels
-        * (#rlogic::AnimationChannel::timeStamps) and is not affected by 'timeRange' property input.
-        *
-        * The value retrieved is affected by modifications to timestamp data via properties
-        * (see #rlogic::AnimationNodeConfig::setExposingOfChannelDataAsProperties) and therefore reflects
-        * the actual value used during animation.
-        *
-        * @return maximum duration of this animation.
-        */
-        [[nodiscard]] RLOGIC_API float getDuration() const;
 
         /**
         * Returns channel data used in this animation (as provided at creation time #rlogic::LogicEngine::createAnimationNode).

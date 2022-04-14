@@ -64,8 +64,8 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeImpl, TakesOwnershipOfGivenProperties)
     {
-        auto inputType = MakeStruct("IN", { TypeData{"subProperty", EPropertyType::Int32} });
-        auto outputType = MakeStruct("OUT", { TypeData{"subProperty", EPropertyType::Int32} });
+        auto inputType = MakeStruct("", { TypeData{"subProperty", EPropertyType::Int32} });
+        auto outputType = MakeStruct("", { TypeData{"subProperty", EPropertyType::Int32} });
         // These usually come from subclasses deserialization code
         auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputType, EPropertySemantics::ScriptInput));
         auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(outputType, EPropertySemantics::ScriptOutput));
@@ -73,12 +73,12 @@ namespace rlogic::internal
         LogicNodeImplMock logicNode("");
         logicNode.setRootProperties(std::move(inputs), std::move(outputs));
 
-        EXPECT_EQ(logicNode.getInputs()->getName(), "IN");
+        EXPECT_EQ(logicNode.getInputs()->getName(), "");
         EXPECT_EQ(&logicNode.getInputs()->m_impl->getLogicNode(), &logicNode);
         EXPECT_EQ(logicNode.getInputs()->getChild(0)->getName(), "subProperty");
         EXPECT_EQ(&logicNode.getInputs()->getChild(0)->m_impl->getLogicNode(), &logicNode);
 
-        EXPECT_EQ(logicNode.getOutputs()->getName(), "OUT");
+        EXPECT_EQ(logicNode.getOutputs()->getName(), "");
         EXPECT_EQ(&logicNode.getOutputs()->m_impl->getLogicNode(), &logicNode);
         EXPECT_EQ(logicNode.getOutputs()->getChild(0)->getName(), "subProperty");
         EXPECT_EQ(&logicNode.getOutputs()->getChild(0)->m_impl->getLogicNode(), &logicNode);

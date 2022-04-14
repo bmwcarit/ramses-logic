@@ -286,11 +286,11 @@ namespace rlogic::internal
     TEST_F(ARamsesNodeBinding, PropagatesItsInputsToRamsesNodeOnUpdate_WithLinksInsteadOfSetCall)
     {
         const std::string_view scriptSrc = R"(
-            function interface()
-                OUT.rotation = VEC3F
-                OUT.visibility = BOOL
+            function interface(IN,OUT)
+                OUT.rotation = Type:Vec3f()
+                OUT.visibility = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.rotation = {1, 2, 3}
                 OUT.visibility = false
             end
@@ -420,7 +420,7 @@ namespace rlogic::internal
             rlogic::RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, logicEnum, "NodeBinding");
 
             EXPECT_EQ(messageType, ELogMessageType::Warn);
-            EXPECT_EQ(warningMessage, "Initial rotation values for RamsesNodeBinding 'NodeBinding' will not be imported from bound Ramses node due to mismatching rotation type.");
+            EXPECT_EQ(warningMessage, fmt::format("Initial rotation values for RamsesNodeBinding '{}' will not be imported from bound Ramses node due to mismatching rotation type.", binding->m_impl.getIdentificationString()));
 
             EXPECT_THAT(*binding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
             EXPECT_EQ(binding->getRotationType(), logicEnum);
@@ -430,6 +430,21 @@ namespace rlogic::internal
             messageType = ELogMessageType::Off;
             warningMessage = "";
         }
+    }
+
+    TEST_F(ARamsesNodeBinding_RotationTypes, PrintsNoWarning_WhenConventionEnumsDontMatch_InSpecialCaseWhereRamsesRotationValuesAreZero)
+    {
+        ScopedLogContextLevel scopedLogs(ELogMessageType::Warn, [](ELogMessageType /*type*/, std::string_view /*msg*/) {
+            FAIL() << "Should not cause any warnings!";
+            });
+
+        m_node->setRotation(0.f, 0.f, 0.f, ramses::ERotationConvention::XYX);
+        rlogic::RamsesNodeBinding* binding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
+
+        EXPECT_THAT(*binding->getInputs()->getChild("rotation")->get<vec3f>(), ::testing::ElementsAre(0.f, 0.f, 0.f));
+        EXPECT_EQ(binding->getRotationType(), ERotationType::Euler_XYZ);
+
+        ASSERT_TRUE(m_logicEngine.destroy(*binding));
     }
 
     TEST_F(ARamsesNodeBinding_RotationTypes, InitializesQuaternionAsVec4f)
@@ -566,9 +581,10 @@ namespace rlogic::internal
         const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesNodeBinding>(m_flatBufferBuilder.GetBufferPointer());
 
         ASSERT_TRUE(serializedBinding.base());
-        ASSERT_TRUE(serializedBinding.base()->name());
-        EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
-        EXPECT_EQ(serializedBinding.base()->id(), 1u);
+        ASSERT_TRUE(serializedBinding.base()->base());
+        ASSERT_TRUE(serializedBinding.base()->base()->name());
+        EXPECT_EQ(serializedBinding.base()->base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedBinding.base()->base()->id(), 1u);
 
         ASSERT_TRUE(serializedBinding.base()->rootInput());
         EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -585,7 +601,7 @@ namespace rlogic::internal
             EXPECT_EQ(deserializedBinding->getId(), 1u);
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
             EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
+            EXPECT_EQ(deserializedBinding->getInputs()->getName(), "");
             EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 4u);
         }
     }
@@ -673,8 +689,9 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0, // no name!
-                1u
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    0, // no name!
+                    1u)
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
                 m_flatBufferBuilder,
@@ -687,8 +704,9 @@ namespace rlogic::internal
         std::unique_ptr<RamsesNodeBindingImpl> deserialized = RamsesNodeBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesNodeBinding from serialized data: missing name!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing name!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of RamsesNodeBinding from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ARamsesNodeBinding_SerializationLifecycle, ErrorWhenNoBindingId)
@@ -696,8 +714,9 @@ namespace rlogic::internal
         {
             auto base    = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0 // no id (id gets checked before name)!
-            );
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    0));
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(m_flatBufferBuilder, base);
             m_flatBufferBuilder.Finish(binding);
         }
@@ -706,8 +725,9 @@ namespace rlogic::internal
         std::unique_ptr<RamsesNodeBindingImpl> deserialized = RamsesNodeBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesNodeBinding from serialized data: missing id!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing or invalid ID!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of RamsesNodeBinding from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ARamsesNodeBinding_SerializationLifecycle, ErrorWhenNoRootInput)
@@ -715,8 +735,9 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0 // no root input
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
@@ -739,10 +760,11 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0,
-                m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
+                m_testUtils.serializeTestProperty("", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
                 m_flatBufferBuilder,
@@ -769,10 +791,11 @@ namespace rlogic::internal
             );
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 ramsesRef,
-                m_testUtils.serializeTestProperty("IN")
+                m_testUtils.serializeTestProperty("")
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
                 m_flatBufferBuilder,
@@ -804,10 +827,11 @@ namespace rlogic::internal
             );
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 ramsesRef,
-                m_testUtils.serializeTestProperty("IN")
+                m_testUtils.serializeTestProperty("")
             );
             auto binding = rlogic_serialization::CreateRamsesNodeBinding(
                 m_flatBufferBuilder,
@@ -969,6 +993,7 @@ namespace rlogic::internal
             nodeBinding.getInputs()->getChild("rotation")->set<vec3f>(vec3f{ 2.1f, 2.2f, 2.3f });
             nodeBinding.getInputs()->getChild("scaling")->set<vec3f>(vec3f{ 3.1f, 3.2f, 3.3f });
             nodeBinding.getInputs()->getChild("visibility")->set<bool>(true);
+            tempEngineForSaving.update();
             EXPECT_TRUE(tempEngineForSaving.saveToFile("AllValuesSet.bin"));
         }
 
@@ -1016,11 +1041,11 @@ namespace rlogic::internal
             LogicEngine tempEngineForSaving;
 
             const std::string_view scriptSrc = R"(
-                function interface()
-                    OUT.rotation = VEC3F
-                    OUT.visibility = BOOL
+                function interface(IN,OUT)
+                    OUT.rotation = Type:Vec3f()
+                    OUT.visibility = Type:Bool()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.rotation = {1, 2, 3}
                     OUT.visibility = false
                 end
@@ -1033,6 +1058,7 @@ namespace rlogic::internal
             ASSERT_TRUE(tempEngineForSaving.link(*script->getOutputs()->getChild("rotation"), *nodeBinding.getInputs()->getChild("rotation")));
             ASSERT_TRUE(tempEngineForSaving.link(*script->getOutputs()->getChild("visibility"), *nodeBinding.getInputs()->getChild("visibility")));
 
+            tempEngineForSaving.update();
             EXPECT_TRUE(tempEngineForSaving.saveToFile("SomeInputsLinked.bin"));
         }
 
@@ -1128,11 +1154,11 @@ namespace rlogic::internal
         m_node->setVisibility(ramses::EVisibilityMode::Off);
 
         const std::string_view scriptSrc = R"(
-            function interface()
-                IN.rotation = VEC3F
-                OUT.rotation = VEC3F
+            function interface(IN,OUT)
+                IN.rotation = Type:Vec3f()
+                OUT.rotation = Type:Vec3f()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.rotation = IN.rotation
             end
         )";

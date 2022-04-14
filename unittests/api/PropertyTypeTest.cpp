@@ -73,19 +73,19 @@ namespace rlogic
 
     TEST(GetLuaPrimitiveTypeNameFunction, ProvidesNameForSupportedTypeEnumValues)
     {
-        EXPECT_STREQ("FLOAT", GetLuaPrimitiveTypeName(EPropertyType::Float));
-        EXPECT_STREQ("VEC2F", GetLuaPrimitiveTypeName(EPropertyType::Vec2f));
-        EXPECT_STREQ("VEC3F", GetLuaPrimitiveTypeName(EPropertyType::Vec3f));
-        EXPECT_STREQ("VEC4F", GetLuaPrimitiveTypeName(EPropertyType::Vec4f));
-        EXPECT_STREQ("INT32", GetLuaPrimitiveTypeName(EPropertyType::Int32));
-        EXPECT_STREQ("INT64", GetLuaPrimitiveTypeName(EPropertyType::Int64));
-        EXPECT_STREQ("VEC2I", GetLuaPrimitiveTypeName(EPropertyType::Vec2i));
-        EXPECT_STREQ("VEC3I", GetLuaPrimitiveTypeName(EPropertyType::Vec3i));
-        EXPECT_STREQ("VEC4I", GetLuaPrimitiveTypeName(EPropertyType::Vec4i));
-        EXPECT_STREQ("BOOL", GetLuaPrimitiveTypeName(EPropertyType::Bool));
-        EXPECT_STREQ("STRING", GetLuaPrimitiveTypeName(EPropertyType::String));
-        EXPECT_STREQ("STRUCT", GetLuaPrimitiveTypeName(EPropertyType::Struct));
-        EXPECT_STREQ("ARRAY", GetLuaPrimitiveTypeName(EPropertyType::Array));
+        EXPECT_STREQ("Float", GetLuaPrimitiveTypeName(EPropertyType::Float));
+        EXPECT_STREQ("Vec2f", GetLuaPrimitiveTypeName(EPropertyType::Vec2f));
+        EXPECT_STREQ("Vec3f", GetLuaPrimitiveTypeName(EPropertyType::Vec3f));
+        EXPECT_STREQ("Vec4f", GetLuaPrimitiveTypeName(EPropertyType::Vec4f));
+        EXPECT_STREQ("Int32", GetLuaPrimitiveTypeName(EPropertyType::Int32));
+        EXPECT_STREQ("Int64", GetLuaPrimitiveTypeName(EPropertyType::Int64));
+        EXPECT_STREQ("Vec2i", GetLuaPrimitiveTypeName(EPropertyType::Vec2i));
+        EXPECT_STREQ("Vec3i", GetLuaPrimitiveTypeName(EPropertyType::Vec3i));
+        EXPECT_STREQ("Vec4i", GetLuaPrimitiveTypeName(EPropertyType::Vec4i));
+        EXPECT_STREQ("Bool", GetLuaPrimitiveTypeName(EPropertyType::Bool));
+        EXPECT_STREQ("String", GetLuaPrimitiveTypeName(EPropertyType::String));
+        EXPECT_STREQ("Struct", GetLuaPrimitiveTypeName(EPropertyType::Struct));
+        EXPECT_STREQ("Array", GetLuaPrimitiveTypeName(EPropertyType::Array));
     }
 
     TEST(PropertyTypeCheck, ChecksPropertyTypeToBeStoredInDataArray)

@@ -17,6 +17,9 @@ namespace rlogic::internal
     RamsesBindingImpl::RamsesBindingImpl(std::string_view name, uint64_t id) noexcept
         : LogicNodeImpl(name, id)
     {
+        // Bindings are not supposed to do anything unless user set an actual value to them
+        // Thus, they are not dirty by default!
+        setDirty(false);
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesReference> RamsesBindingImpl::SerializeRamsesReference(const ramses::SceneObject& object, flatbuffers::FlatBufferBuilder& builder)

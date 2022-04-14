@@ -36,10 +36,10 @@ namespace rlogic
         m_logicEngine.setStatisticsLoggingRate(0u);
 
         constexpr auto scriptSource = R"(
-            function interface()
-                IN.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -71,11 +71,11 @@ namespace rlogic
     TEST_F(ALogicEngine_UpdateReport, UpdateReportContainsUpdatedAndNotUpdatedNodes)
     {
         constexpr auto scriptSource = R"(
-            function interface()
-                IN.param = INT
-                OUT.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.param = IN.param
             end
         )";
@@ -121,10 +121,10 @@ namespace rlogic
     TEST_F(ALogicEngine_UpdateReport, UpdateReportCanBeStoredInContainer)
     {
         constexpr auto scriptSource = R"(
-            function interface()
-                IN.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -163,9 +163,9 @@ namespace rlogic
     TEST_F(ALogicEngine_UpdateReport, UpdateReportHasExecutionTimings)
     {
         constexpr auto slowScriptSource = R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 local str="a"
                 for i=0,1000 do
                     str = str .. "a"
@@ -195,17 +195,17 @@ namespace rlogic
     TEST_F(ALogicEngine_UpdateReport, HasLinkActivations)
     {
         constexpr auto scriptSource = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.ints = {
-                    int1 = INT,
-                    int2 = INT
+                    int1 = Type:Int32(),
+                    int2 = Type:Int32()
                 }
                 OUT.ints = {
-                    int1 = INT,
-                    int2 = INT
+                    int1 = Type:Int32(),
+                    int2 = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.ints = IN.ints
             end
         )";
@@ -249,11 +249,11 @@ namespace rlogic
     TEST_F(ALogicEngine_UpdateReport, UpdateReportCanBeRetrievedNextSuccessUpdateAfterFailedUpdate)
     {
         constexpr auto scriptSource = R"(
-            function interface()
-                IN.param = INT
-                OUT.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 if IN.param == 33 then error() end
                 OUT.param = IN.param
             end

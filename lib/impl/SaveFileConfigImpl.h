@@ -23,12 +23,14 @@ namespace rlogic::internal
     public:
         void setMetadataString(std::string_view metadata);
         void setExporterVersion(uint32_t major, uint32_t minor, uint32_t patch, uint32_t fileFormatVersion);
+        void setValidationEnabled(bool validationEnabled);
 
         [[nodiscard]] const std::string& getMetadataString() const;
         [[nodiscard]] uint32_t getExporterMajorVersion() const;
         [[nodiscard]] uint32_t getExporterMinorVersion() const;
         [[nodiscard]] uint32_t getExporterPatchVersion() const;
         [[nodiscard]] uint32_t getExporterFileFormatVersion() const;
+        [[nodiscard]] bool getValidationEnabled() const;
 
     private:
         std::string m_metadata;
@@ -36,5 +38,6 @@ namespace rlogic::internal
         uint32_t m_exporterMinorVersion = 0u;
         uint32_t m_exporterPatchVersion = 0u;
         uint32_t m_exporterFileFormatVersion = 0u;
+        bool m_validationEnabled = true;
     };
 }

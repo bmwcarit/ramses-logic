@@ -31,11 +31,11 @@ namespace rlogic
         m_logicEngine.setStatisticsLoggingRate(2u);
 
         constexpr auto scriptSource = R"(
-            function interface()
-                IN.param = INT
-                OUT.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.param = IN.param
             end
         )";

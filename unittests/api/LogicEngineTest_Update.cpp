@@ -39,11 +39,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Update, UpdatesRamsesNodeBindingValuesOnUpdate)
     {
         auto        luaScript = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.param = BOOL
-                OUT.param = BOOL
+            function interface(IN,OUT)
+                IN.param = Type:Bool()
+                OUT.param = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.param = IN.param
             end
         )");
@@ -69,11 +69,11 @@ namespace rlogic
         ramses::Scene* scene = testSetup.createScene();
 
         auto        luaScript = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.param = INT
-                OUT.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.param = IN.param
             end
         )");
@@ -138,11 +138,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Update, ProducesErrorIfLinkedScriptHasRuntimeError)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.param = BOOL
-                OUT.param = BOOL
+            function interface(IN,OUT)
+                IN.param = Type:Bool()
+                OUT.param = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
                 error("This will die")
             end
         )";
@@ -166,15 +166,15 @@ namespace rlogic
     TEST_F(ALogicEngine_Update, PropagatesValuesOnlyToConnectedLogicNodes)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.inFloat = FLOAT
-                IN.inVec3  = VEC3F
-                IN.inInt   = INT
-                OUT.outFloat = FLOAT
-                OUT.outVec3  = VEC3F
-                OUT.outInt   = INT
+            function interface(IN,OUT)
+                IN.inFloat = Type:Float()
+                IN.inVec3  = Type:Vec3f()
+                IN.inInt   = Type:Int32()
+                OUT.outFloat = Type:Float()
+                OUT.outVec3  = Type:Vec3f()
+                OUT.outInt   = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outFloat = IN.inFloat
                 OUT.outVec3 = IN.inVec3
                 OUT.outInt = IN.inInt
@@ -269,11 +269,11 @@ namespace rlogic
         m_logicEngine.enableUpdateReport(true);
 
         auto        scriptSource = R"(
-            function interface()
-                IN.inFloat = FLOAT
-                OUT.outFloat = FLOAT
+            function interface(IN,OUT)
+                IN.inFloat = Type:Float()
+                OUT.outFloat = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outFloat = IN.inFloat
             end
         )";
@@ -335,12 +335,12 @@ namespace rlogic
     TEST_F(ALogicEngine_Update, OnlyUpdatesDirtyLogicNodesInAComplexLogicGraph)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.in1 = INT
-                IN.in2 = INT
-                OUT.out = INT
+            function interface(IN,OUT)
+                IN.in1 = Type:Int32()
+                IN.in2 = Type:Int32()
+                OUT.out = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.out = IN.in1 + IN.in2
             end
         )";
@@ -426,11 +426,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Update, AlwaysUpdatesNodeIfDirtyHandlingIsDisabled)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.inFloat = FLOAT
-                OUT.outFloat = FLOAT
+            function interface(IN,OUT)
+                IN.inFloat = Type:Float()
+                OUT.outFloat = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outFloat = IN.inFloat
             end
         )";

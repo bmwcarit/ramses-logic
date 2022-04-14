@@ -19,7 +19,8 @@ namespace rlogic
 {
     /**
     * #LuaModule represents Lua source code in form of a reusable Lua module
-    * which can be used in Lua scripts of one or more #rlogic::LuaScript instances.
+    * which can be used in Lua scripts of one or more #rlogic::LuaScript instances. Lua modules can
+    * be also declared as dependency to other modules.
     * Lua modules are expected to follow these guidelines https://www.tutorialspoint.com/lua/lua_modules.htm
     * and have some limitations:
     *     - the name of the module given when creating it is only used to differentiate between #LuaModule
@@ -36,27 +37,26 @@ namespace rlogic
     *   \code{.lua}
     *       local mytypes = {}
     *       function mytypes.mystruct()
-    *           return {
-    *               name = STRING,
-    *               address =
-    *               {
-    *                   street = STRING,
-    *                   number = INT
-    *               }
-    *           }
+    *           return Type:Struct({
+    *               name = Type:String(),
+    *               address = Type:Struct({
+    *                   street = Type:String(),
+    *                   number = Type:Int32()
+    *               })
+    *           })
     *       end
     *       return mytypes
     *   \endcode
     * And script using above module to define its interface:
     *   \code{.lua}
     *       modules("mytypes")  -- must declare the dependency explicitly
-    *       function interface()
+    *       function interface(IN,OUT)
     *           IN.input_struct = mytypes.mystruct()
     *           OUT.output_struct = mytypes.mystruct()
     *       end
     *   \endcode
     *
-    * The labels (INT, FLOAT, etc.) are reserved keywords and must not be overwritten for other purposes (e.g. name of variable or function).
+    * The label 'Type' is a reserved keyword and must not be overwritten for other purposes (e.g. name of variable or function).
     */
     class LuaModule : public LogicObject
     {

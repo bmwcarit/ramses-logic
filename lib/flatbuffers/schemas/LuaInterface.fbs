@@ -1,17 +1,18 @@
 //  -------------------------------------------------------------------------
-//  Copyright (C) 2021 BMW AG
+//  Copyright (C) 2022 BMW AG
 //  -------------------------------------------------------------------------
 //  This Source Code Form is subject to the terms of the Mozilla Public
 //  License, v. 2.0. If a copy of the MPL was not distributed with this
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#pragma once
+include "LogicObject.fbs";
+include "Property.fbs";
 
-#include <cstdint>
+namespace rlogic_serialization;
 
-namespace rlogic::internal
+table LuaInterface
 {
-    // Always bump this with breaking file schema changes
-    constexpr uint32_t g_FileFormatVersion = 4;
+    base:LogicObject;
+    rootProperty:Property;
 }

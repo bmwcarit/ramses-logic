@@ -14,6 +14,8 @@
 Overview
 =========================
 
+This page provides an overview of the ``Logic Engine`` C++ API, primary object types, structure and interaction.
+
 .. note::
 
     Prefer learning by example? Jump straight to the :ref:`examples <List of all examples>`!
@@ -23,58 +25,65 @@ Overview
 Object types and their relationships
 --------------------------------------
 
-The ``Logic Engine`` consists of a network of ``Lua`` scripts with a set of inputs and outputs with
-links between them. A special type of object we call `binding` serves as a bridge to a Ramses scene.
+The ``Logic Engine`` consists of a network of logical ``nodes`` with a set of inputs and outputs and
+links between them to send data from one node to another.
 
-The following graph shows an example of such script network:
+The following graph shows an example of such network:
 
 .. image:: res/overview.svg
 
-The scripts have inputs and outputs which together define the script's ``interface``
-(:ref:`more info on scripts <Script creation>`). Scripts
-can be linked together directionally, so that the output of a script can provide its data to
-the input of another script (:ref:`more info on links <Creating links between scripts>`).
-Scripts can't interact with Ramses objects directly. Instead, they
+There are different types of logic nodes (Interfaces, Lua scripts, Animations, Bindings) which have different
+execution logic, but all share the same mechanism to link data between the nodes. Each node has a set of inputs
+and outputs which can be linked together to transfer data from one (node output) to another (node input).
+
+The logic nodes have inputs and outputs which let them interact with other entities
+(can be other logic nodes, or ramses objects, or application code/data). Logic nodes
+can be linked together using directional links, where the output of one node provides its data to
+the input of another node (:ref:`more info on links <Creating links between nodes>`).
+Logical nodes can't interact with Ramses objects directly. Instead, they
 can link to ``Bindings`` which are designed to "bind" ``Ramses`` objects and modify
-their properties' values (node visibility, transformation values, material properties etc.) (:ref:`more info on bindings <Linking scripts to Ramses scenes>`).
+their properties' values (node visibility, transformation values, material properties... etc.)
+(:ref:`more info on bindings <Linking logic nodes to Ramses scenes>`).
 
 The greyed-out slots in the image above represent input properties which are neither linked nor
 have a statically configured value. In bindings, this denotes that the corresponding ``Ramses`` property
-is not being updated by the ``Logic Engine`` (see also :ref:`next section <Data Flow>`). In scripts, these
-properties will receive a default value at runtime (0, 0.0f, "", true etc.) unless explicitly set by the application
+is not being updated by the ``Logic Engine`` (see also :ref:`the section on data flow <Data Flow>`). In other nodes, these
+properties will receive a default value at runtime (``0``, ``0.0f``, ``""``, ``true`` etc.) unless explicitly set by the application
 logic. Bindings' input values are initialized with the values of the bound `Ramses` object, for all bindings except
 :class:`rlogic::RamsesAppearanceBinding`.
-Usually, script inputs without a configured value or a link to other output are considered the ``interface``
-of the logic network towards a runtime application, and their values are supposed to be explicitly set at runtime.
 
-.. note::
-
-    One of the planned features of the ``Logic Engine`` is to formalize interface inputs in a special
-    interface class in a future release.
+Finally, ``Interface nodes`` have no execution logic, only inputs (and implicit outputs which are identical to the inputs).
+Interfaces are supposed to be the bridge between application code/data and the Ramses/Logic asset.
+Interface input values are supposed to be explicitly set at runtime, or statically linked to other outputs.
+Ideally, the logic node network with interfaces should be designed so that once all the interfaces' inputs are set, the
+whole underlying network of nodes is fully defined, i.e. all inputs of all nodes are linked.
 
 --------------------------------------
 Data flow
 --------------------------------------
 
 The cornerstone of the ``Logic Engine`` is the :func:`rlogic::LogicEngine::update` method which
-"executes" the network of logic nodes and updates the values of the ``Ramses`` scene bound to some of them. The nodes
+"executes" the network of logic nodes and updates the values of the ``Ramses`` scene bound to them. The nodes
 are executed based on a topological graph sort, where the traversal direction is given by the link
 pairs (A, B) where A is an output and B is an input property in the logic graph
 (as shown :ref:`here <Object types and their relationships>`).
 
-The update logic of each node depends on its type. ``Lua`` scripts execute their ``run()`` function
-and modify some or all of their outputs based on the logic defined in ``run()``. Ramses bindings pass the values of their
-input properties to the bound Ramses object.
+The update logic of each node depends on its type. :class:`rlogic::LuaScript` nodes execute their ``run()`` function
+and modify some or all of their outputs based on the logic defined in ``run()``.
+Nodes which derive from :class:`rlogic::RamsesBinding` pass the values of their
+input properties to the bound Ramses object. :class:`rlogic::LuaInterface` nodes
+pass the values of their inputs to other nodes connected to the interface's outputs.
 
 Logic nodes are not executed on every :func:`rlogic::LogicEngine::update` iteration in order to save performance.
 However, it's guaranteed that:
 
-* scripts which were just created will be executed on next update
-* scripts which inputs received a new value (either from calling :func:`rlogic::Property::set` or from a link)
+* logic nodes which were just created will be executed on next update
+* logic nodes whose inputs received a new value (either from calling :func:`rlogic::Property::set` or from a link)
   will be executed on next update
 * binding properties which received a value (regardless of their current value or from the value stored in Ramses) will
   overwrite the value in Ramses on next update. This works both for direct :func:`rlogic::Property::set` calls and for values
   received over links
+* TimerNodes will be executed always, regardless if their inputs were set
 
 
 Additionally, bindings' properties are applied selectively - e.g. setting the ``scaling`` property of a :class:`rlogic::RamsesNodeBinding`
@@ -98,7 +107,7 @@ called :func:`rlogic::Property::set` explicitly on any of the bindings' input pr
 see the :ref:`section further down <Saving/Loading from file>`.
 
 ===================================
-Script creation
+Logic node creation
 ===================================
 
 The entry point to ``RAMSES logic`` is a factory-style class :class:`rlogic::LogicEngine` which can
@@ -108,6 +117,8 @@ create instances of all other types of objects supported by ``RAMSES Logic``:
 * :class:`rlogic::RamsesNodeBinding`
 * :class:`rlogic::RamsesAppearanceBinding`
 * :class:`rlogic::RamsesCameraBinding`
+
+See the full list over at the :ref:`class index <Class index>`.
 
 You can create multiple instances of :class:`rlogic::LogicEngine`, but each copy owns the objects it
 created, and must be used to destroy them, as befits a factory class.
@@ -123,12 +134,12 @@ You can create scripts using the :class:`rlogic::LogicEngine` class like this:
     using namespace ramses::logic;
 
     std::string source = R"(
-        function interface()
-            IN.gear = INT
-            OUT.speed = FLOAT
+        function interface(IN, OUT)
+            IN.gear = Type:Int32()
+            OUT.speed = Type:Float()
         end
 
-        function run()
+        function run(IN, OUT)
             OUT.speed = IN.gear * 15
         end
     )"
@@ -146,9 +157,9 @@ For details regarding the ``Lua`` syntax and its specifics, check the :ref:`dedi
 :class:`rlogic::LogicNode` (the base class of :class:`rlogic::LuaScript`) provides an interface to access the inputs and outputs declared by the ``interface()``
 function - see :func:`rlogic::LogicNode::getInputs()` and :func:`rlogic::LogicNode::getOutputs()`.
 
-You can :ref:`link scripts <Creating links between scripts>` to form a more sophisticated logic execution graph.
+You can :ref:`link nodes <Creating links between nodes>` to form a more sophisticated logic execution graph.
 
-You can :ref:`bind to Ramses objects <Linking scripts to Ramses scenes>` to control a 3D ``Ramses`` scene.
+You can :ref:`bind to Ramses objects <Linking logic nodes to Ramses scenes>` to control a 3D ``Ramses`` scene.
 
 Finally, the :class:`rlogic::LogicEngine` class and all its content can be also saved/loaded from a file. Refer to
 :ref:`the section on saving/loading from files for more details <Saving/Loading from file>`.
@@ -182,33 +193,33 @@ explicitly created by calling ``create`` and ``destroy`` methods. There are two 
     create a fresh instance.
 
 ==================================================
-Creating links between scripts
+Creating links between nodes
 ==================================================
 
 One of the complex problems of 3D graphics development is managing complexity, especially for larger projects.
-For that purpose it is useful to split the application logic into multiple scripts, so that individual scripts
-can remain small and easy to understand. To do that, ``Ramses Logic`` provides a mechanism to link script
-properties - either statically or during runtime, in order to pass data from ``1`` producer script to ``N``
-consumer scripts.
+For that purpose it is useful to split the application logic into multiple logic nodes (usually Lua scripts), so that individual nodes
+can remain small and easy to understand. To do that, ``Ramses Logic`` provides a mechanism to link node
+properties - either statically or during runtime, in order to pass data from ``1`` producer node to ``N``
+consumer nodes.
 
-Here is a simple example how links are created:
+Here is a simple example how links are created to link two Lua scripts:
 
 .. code-block::
     :linenos:
 
     LogicEngine logicEngine;
     LuaScript* sourceScript = logicEngine.createLuaScript(R"(
-        function interface()
-            OUT.source = STRING
+        function interface(IN, OUT)
+            OUT.source = Type:String()
         end
-        function run()
+        function run(IN, OUT)
             OUT.source = "World!"
         end
     )");
 
     LuaScript* destinationScript = logicEngine.createLuaScript(R"(
-        function interface()
-            IN.destination = STRING
+        function interface(IN)
+            IN.destination = Type:String()
         end
         function run()
             print("Hello, " .. IN.destination)
@@ -255,13 +266,13 @@ and :func:`rlogic::LogicEngine::unlink` documentation. The `data flow section <D
 network of logic nodes when connected by links.
 
 ==================================================
-Linking scripts to Ramses scenes
+Linking logic nodes to Ramses scenes
 ==================================================
 
 Lua scripts would not make much sense on their own if they can't interact with ``Ramses`` scene objects. The way to
 link script output properties to ``Ramses`` scene objects is by creating :class:`rlogic::RamsesBinding` instances and linking their inputs to scripts' outputs.
 There are different binding types depending on the type of ``Ramses`` object - refer to :class:`rlogic::RamsesBinding` for the full list of derived classes.
-Bindings can be linked in the exact same way as :ref:`scripts can <Creating links between scripts>`. In fact, they derive from the
+Bindings can be linked in the exact same way as :ref:`scripts can <Creating links between nodes>`. In fact, they derive from the
 same base class - :class:`rlogic::LogicNode`. The only
 difference is that the bindings have only input properties (the outputs are implicitly defined and statically linked to the Ramses
 objects attached to them), whereas scripts have inputs and outputs explicitly defined in the script interface.
@@ -299,12 +310,6 @@ The animation support in ``Ramses Logic`` is provided by the following two class
 
 Consider also using :class`rlogic::TimerNode` for easy way to generate and provide timing information to :class:`rlogic::AnimationNode`.
 
-.. note::
-
-    Before implementing a solution for your animation, make sure you understand the nature of animations. Is it a simple easing in/out to/from a value
-    which might even change on the fly? Maybe a custom Lua script might do the job better. Is it a fixed animation or set of animations using splines
-    imported from a content creation tool? Then :class:`rlogic::AnimationNode` is probably better suited for it.
-
 -------------------------------
 Data Arrays
 -------------------------------
@@ -327,65 +332,21 @@ has an output property of corresponding data type (matching the keyframes data t
 The value of these outputs is updated after every :func:`rlogic::LogicEngine::update` call and can be directly queried
 or it can be linked to any other logic node, e.g. :class:`rlogic::RamsesBinding`.
 
-:class:`rlogic::AnimationNode` has a set of control states, most important being ``play`` and ``timeDelta``. Whenever ``play`` is true, the animation
-(all its channels) will advance in time by exactly ``timeDelta`` period everytime update is executed. Animation starts at time zero of all of its
-channels' timestamps, interpolates keyframes according to the interpolation type chosen for each channel and when the end is reached the value stays equal
-to last keyframe. The default time range [0, end] can be changed by setting custom begin and end via ``timeRange``.
-Animation can be set to looping via ``loop`` or restarted via ``rewindOnStop`` inputs.
+:class:`rlogic::AnimationNode` has a simple control interface, the ``progress`` input is a point in [0,1] normalized range,
+which tells the animation node logic to which position on the animation timeline to jump to during next update. The local animation
+timeline is simply starting from time zero to the last animation timestamp and ``progress`` is the normalized form of that.
+This gives the application full control over the way how time is applied to the animation, e.g. changing speed, reverse play, rewind,
+pause, restart etc., are all possible either from a control Lua script linked to the ``progress`` or from C++ API.
 
 -------------------------------
-Time Delta
+Timer Node
 -------------------------------
 
-A typical application using ``Ramses logic`` has a main loop and in each iteration
-(among other things) user and system inputs are processed, logic network inputs are set and finally :func:`rlogic::LogicEngine::update` is called.
-Typically, logic nodes are stateless and only do something when an input value is changed/set. Animation nodes bring in a new implicit input - `time`.
-The ``Logic Engine`` allows (and therefore also requires) the application logic to update its time based on its own loop logic and requirements.
-This is done for each animation node separately over its ``timeDelta`` input property. This allows for two things:
-
-* simulating time
-* stopping time
-* doing the above for each animation node separately
-
-In a typical setup, ``timeDelta`` is a relative value representing the time period between the updates, `timeDelta = timeNow - timeLastUpdate`.
-Note that even if ``timeDelta`` has the same value in two consecutive frames, it still needs to be set if the animation node's logic is supposed to
-be updated. It is possible to set a value of 0 which will trigger an update of the animation node, but not progress the time (e.g. if you load
-a file with running animations and want to re-apply their current value without progressing the time).
-
-.. note::
-
-    There is intentionally no mention of time units when describing usage of ``timeDelta``, that is because ``Ramses logic`` is time unit agnostic
-    when it comes to animations. It is fully up to the application to define the time units passed to animations to match those in the animation timestamps.
-    The type of ``timeDelta`` is ``float`` in order to match default glTF semantics (time is represented in seconds with float precision for sub-second fractions).
-
-``Ramses logic`` provides a tool that helps with dealing with time in your application, a :class`rlogic::TimerNode` can be linked to all animation nodes
-and generate ``timeDelta`` for you either using internal clock or a time ticker provided by application. This gives a single point where time can be set
-as clock ticker and it will auto-distribute it to all linked animation nodes in form of ``timeDelta``. There can be multiple timer nodes so different time
-contexts can be specified if needed.
-
-If however you prefer a full control of timing each animation node explicitly you can always do so, here is an example of how application time would be applied
-to all animation nodes:
-
-.. code-block::
-    :linenos:
-
-    void doOneLoop()
-    {
-        ...
-
-        const auto timeNow = now();
-        const auto timeDelta = timeNow - lastUpdateTime;
-        lastUpdateTime = timeNow;
-
-        for (const auto& animNode : logicEngine.animationNodes())
-        {
-            // It may be a good idea to cache the timeDelta property for better performance
-            auto* timeDelta = animNode->getInputs()->getChild("timeDelta");
-            timeDelta->set(timeDelta);
-        }
-
-        logicEngine.update();
-    }
+``Ramses logic`` provides a tool that can help with dealing with time in your application, a :class`rlogic::TimerNode` can be a central node
+which provides timing to all animation related logic. Timer node can operate in two modes, either generate time using system clock or forward
+application provided time to the logic network. This allows quick and easy switch between stages of the development, e.g. prototyping, testing
+or production, where for some use cases auto-generated time is easier to work and some require well specified timing provided by application.
+There can also be multiple timer nodes so different time contexts can be specified if needed.
 
 ---------------------------------
 Static vs. dynamic animation data
@@ -421,6 +382,11 @@ in the list, so that the list only ever contains the errors since the last metho
 
 For code samples which demonstrate how compile-time and runtime errors can be gracefully handled,
 have a look at the :ref:`examples <List of all examples>`.
+
+To intercept and fix potential content problems, you can use :func:`rlogic::LogicEngine::validate()`. This method will
+scan the contents of the ``Logic Engine`` and report pontential issues which are not fatal, but may result in suboptimal
+performance, data inconsistency or serialization bugs. It is highly advised to use this method in conjunction with the
+``Ramses`` validation methods (StatusObject::validate) to prevent issues during runtime.
 
 =====================================
 Iterating over object collections
@@ -718,5 +684,8 @@ List of all examples
     examples/04_ramses_scene
     examples/05_serialization
     examples/07_links
-    examples/08_animation
+    examples/08a_static_animation
+    examples/08b_dynamic_animation
     examples/09_modules
+    examples/10_globals
+    examples/11_interfaces

@@ -10,6 +10,7 @@
 
 #include "generated/PropertyGen.h"
 #include "generated/DataArrayGen.h"
+
 #include <unordered_map>
 
 namespace rlogic_serialization
@@ -59,15 +60,17 @@ namespace rlogic::internal
             return it->second;
         }
 
-        void storeLuaModule(const LuaModule& luaModule, flatbuffers::Offset<rlogic_serialization::LuaModule> offset)
+        void storeLuaModule(uint64_t luaModuleId, flatbuffers::Offset<rlogic_serialization::LuaModule> offset)
         {
-            assert(m_luaModules.count(&luaModule) == 0 && "one time store only");
-            m_luaModules.insert({ &luaModule, offset });
+            assert(luaModuleId != 0 && "Module must have valid id!");
+            assert(m_luaModules.count(luaModuleId) == 0 && "one time store only");
+            m_luaModules.insert({ luaModuleId, offset });
         }
 
-        flatbuffers::Offset<rlogic_serialization::LuaModule> resolveLuaModuleOffset(const LuaModule& luaModule) const
+        flatbuffers::Offset<rlogic_serialization::LuaModule> resolveLuaModuleOffset(uint64_t luaModuleId) const
         {
-            const auto it = m_luaModules.find(&luaModule);
+            assert(luaModuleId != 0 && "Module must have valid id!");
+            const auto it = m_luaModules.find(luaModuleId);
             assert(it != m_luaModules.cend());
             return it->second;
         }
@@ -75,7 +78,7 @@ namespace rlogic::internal
     private:
         std::unordered_map<const PropertyImpl*, flatbuffers::Offset<rlogic_serialization::Property>> m_properties;
         std::unordered_map<const DataArray*, flatbuffers::Offset<rlogic_serialization::DataArray>> m_dataArrays;
-        std::unordered_map<const LuaModule*, flatbuffers::Offset<rlogic_serialization::LuaModule>> m_luaModules;
+        std::unordered_map<uint64_t, flatbuffers::Offset<rlogic_serialization::LuaModule>> m_luaModules;
     };
 
 }

@@ -44,11 +44,11 @@ namespace rlogic::internal
             -- 'Local' symbols in the global space are inherited by functions
             local localSymbol = "localSymbol"
 
-            function interface()
-                OUT.result = STRING
+            function interface(IN,OUT)
+                OUT.result = Type:String()
             end
 
-            function run()
+            function run(IN,OUT)
                 -- local symbols from global scope are available here
                 OUT.result = localSymbol
             end
@@ -69,10 +69,10 @@ namespace rlogic::internal
             LogicEngine tempLogicEngine;
             auto script = tempLogicEngine.createLuaScript(
                 R"(
-                    function interface()
-                        IN.param = INT
+                    function interface(IN,OUT)
+                        IN.param = Type:Int32()
                     end
-                    function run()
+                    function run(IN,OUT)
                     end
                 )");
 
@@ -107,10 +107,10 @@ namespace rlogic::internal
             LogicEngine tempLogicEngine;
             auto script = tempLogicEngine.createLuaScript(
                 R"(
-                function interface()
-                    IN.array = ARRAY(2, FLOAT)
+                function interface(IN,OUT)
+                    IN.array = Type:Array(2, Type:Float())
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "MyScript");
 
@@ -152,13 +152,13 @@ namespace rlogic::internal
             LogicEngine tempLogicEngine;
             auto script = tempLogicEngine.createLuaScript(
                 R"(
-                function interface()
+                function interface(IN,OUT)
                     IN.nested =
                     {
-                        array = ARRAY(1, VEC3F)
+                        array = Type:Array(1, Type:Vec3f())
                     }
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "MyScript");
 
@@ -195,17 +195,17 @@ namespace rlogic::internal
             LogicEngine tempLogicEngine;
             auto script = tempLogicEngine.createLuaScript(
                 R"(
-                function interface()
-                    IN.int_param = INT
+                function interface(IN,OUT)
+                    IN.int_param = Type:Int32()
                     IN.nested_param = {
-                        int_param = INT
+                        int_param = Type:Int32()
                     }
-                    OUT.float_param = FLOAT
+                    OUT.float_param = Type:Float()
                     OUT.nested_param = {
-                        float_param = FLOAT
+                        float_param = Type:Float()
                     }
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.float_param = 47.11
                 end
             )");
@@ -263,19 +263,19 @@ namespace rlogic::internal
             LogicEngine tempLogicEngine;
             auto script = tempLogicEngine.createLuaScript(
                 R"(
-                function interface()
+                function interface(IN,OUT)
                     local structDecl = {
-                        str = STRING,
-                        array = ARRAY(2, INT),
+                        str = Type:String(),
+                        array = Type:Array(2, Type:Int32()),
                         nested_struct = {
-                            int = INT,
-                            nested_array = ARRAY(1, FLOAT),
+                            int = Type:Int32(),
+                            nested_array = Type:Array(1, Type:Float()),
                         }
                     }
-                    IN.arrayOfStructs = ARRAY(2, structDecl)
-                    OUT.arrayOfStructs = ARRAY(2, structDecl)
+                    IN.arrayOfStructs = Type:Array(2, structDecl)
+                    OUT.arrayOfStructs = Type:Array(2, structDecl)
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.arrayOfStructs = IN.arrayOfStructs
                 end
             )");
@@ -317,6 +317,7 @@ namespace rlogic::internal
             EPropertyType::Vec3f,
             EPropertyType::Vec4f,
             EPropertyType::Int32,
+            EPropertyType::Int64,
             EPropertyType::Vec2i,
             EPropertyType::Vec3i,
             EPropertyType::Vec4i,
@@ -324,22 +325,22 @@ namespace rlogic::internal
             EPropertyType::Bool
         };
 
-        std::string scriptSrc = "function interface()\n";
+        std::string scriptSrc = "function interface(IN,OUT)\n";
         size_t arraySize = 1;
         // For each type, create an input, output, and an array version of it with various sizes
         for (auto primType : allPrimitiveTypes)
         {
             const std::string typeName = GetLuaPrimitiveTypeName(primType);
-            scriptSrc += fmt::format("IN.{} =  {}\n", typeName, typeName);
-            scriptSrc += fmt::format("IN.array_{} = ARRAY({}, {})\n", typeName, arraySize, typeName);
-            scriptSrc += fmt::format("OUT.{} = {}\n", typeName, typeName);
-            scriptSrc += fmt::format("OUT.array_{} = ARRAY({}, {})\n", typeName, arraySize, typeName);
+            scriptSrc += fmt::format("IN.{} =  Type:{}()\n", typeName, typeName);
+            scriptSrc += fmt::format("IN.array_{} = Type:Array({}, Type:{}())\n", typeName, arraySize, typeName);
+            scriptSrc += fmt::format("OUT.{} = Type:{}()\n", typeName, typeName);
+            scriptSrc += fmt::format("OUT.array_{} = Type:Array({}, Type:{}())\n", typeName, arraySize, typeName);
             ++arraySize;
         }
 
         scriptSrc += R"(
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )";
 
@@ -398,10 +399,10 @@ namespace rlogic::internal
             LogicEngine tempLogicEngine;
             auto script = tempLogicEngine.createLuaScript(
                 R"(
-                function interface()
-                    IN.data = INT
+                function interface(IN,OUT)
+                    IN.data = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )");
 

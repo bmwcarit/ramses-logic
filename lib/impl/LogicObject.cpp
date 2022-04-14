@@ -36,6 +36,16 @@ namespace rlogic
         return m_impl->getId();
     }
 
+    bool LogicObject::setUserId(uint64_t lowId, uint64_t highId)
+    {
+        return m_impl->setUserId(lowId, highId);
+    }
+
+    std::pair<uint64_t, uint64_t> LogicObject::getUserId() const
+    {
+        return m_impl->getUserId();
+    }
+
     template <typename T>
     const T* LogicObject::internalCast() const
     {
@@ -48,9 +58,9 @@ namespace rlogic
         return dynamic_cast<T*>(this);
     }
 
-    void LogicObject::setName(std::string_view name)
+    bool LogicObject::setName(std::string_view name)
     {
-        m_impl->setName(name);
+        return m_impl->setName(name);
     }
 
     template RLOGIC_API const LogicObject*             LogicObject::internalCast() const;

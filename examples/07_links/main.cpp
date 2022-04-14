@@ -24,14 +24,14 @@ int main()
 
     // Create a simple script which increments an integer and prints the result
     const std::string_view scriptSrc = R"(
-        function interface()
-            IN.script_name = STRING
+        function interface(IN,OUT)
+            IN.script_name = Type:String()
 
-            IN.number = INT32
-            OUT.incremented_number = INT32
+            IN.number = Type:Int32()
+            OUT.incremented_number = Type:Int32()
         end
 
-        function run()
+        function run(IN,OUT)
             -- add 1 to the input and assign to the output
             OUT.incremented_number = IN.number + 1
 

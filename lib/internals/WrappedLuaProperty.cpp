@@ -311,7 +311,7 @@ namespace rlogic::internal
 
         if (potentialArrayData.hasError())
         {
-            sol_helper::throwSolException("Error while assigning output VEC{} property '{}'. {}",
+            sol_helper::throwSolException("Error while assigning output Vec{} property '{}'. {}",
                 N, m_wrappedProperty.get().getName(),
                 potentialArrayData.getError());
         }

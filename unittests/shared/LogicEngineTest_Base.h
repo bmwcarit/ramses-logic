@@ -62,9 +62,9 @@ namespace rlogic
         ramses::Appearance* m_appearance = { &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene) };
 
         const std::string_view m_valid_empty_script = R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 

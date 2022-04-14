@@ -53,7 +53,7 @@ namespace rlogic::internal
         void createRootProperties() final;
 
     private:
-        void updateChannel(size_t channelIdx, float beginOffset);
+        void updateChannel(size_t channelIdx, float localAnimationTime);
 
         template <typename T>
         T interpolateKeyframes_linear(T lowerVal, T upperVal, float interpRatio);
@@ -75,23 +75,18 @@ namespace rlogic::internal
         std::vector<ChannelWorkData> m_channelsWorkData;
 
         float m_maxChannelDuration = 0.f;
-        float m_elapsedPlayTime = 0.f;
 
         bool m_hasChannelDataExposedViaProperties = false;
 
         enum EInputIdx
         {
-            EInputIdx_TimeDelta = 0,
-            EInputIdx_Play,
-            EInputIdx_Loop,
-            EInputIdx_RewindOnStop,
-            EInputIdx_TimeRange,
+            EInputIdx_Progress = 0,
             EInputIdx_ChannelsData    // optional property for animation nodes with exposed channel data - should be always last!
         };
 
         enum EOutputIdx
         {
-            EOutputIdx_Progress = 0,
+            EOutputIdx_Duration = 0,
             EOutputIdx_ChannelsBegin // must be last
         };
     };

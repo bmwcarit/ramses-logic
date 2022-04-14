@@ -40,13 +40,13 @@ namespace rlogic
     {
         const int64_t scriptSize = state.range(0);
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 local result = 0
                 local p0 = IN.param0
                 local p1 = IN.param{}
@@ -63,13 +63,13 @@ namespace rlogic
     {
         const int64_t scriptSize = state.range(0);
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 local result = 0
                 GLOBAL.p0 = IN.param0
                 GLOBAL.p1 = IN.param{}
@@ -86,13 +86,13 @@ namespace rlogic
     {
         const int64_t scriptSize = state.range(0);
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 local result = 0
                 for i = 0,10000,1 do
                     result = result + IN.param0 + IN.param{}
@@ -107,19 +107,19 @@ namespace rlogic
     {
         const int64_t scriptSize = state.range(0);
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
                     IN["param"..tostring(i)] = {{
                         deeply = {{
                             nested = {{
-                                val = INT
+                                val = Type:Int32()
                             }}
                         }}
                     }}
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 local result = 0
                 for i = 0,10000,1 do
                     result = result + IN.param0.deeply.nested.val + IN.param{}.deeply.nested.val
@@ -214,13 +214,13 @@ namespace rlogic
     {
         const int64_t scriptSize = state.range(0);
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 local result = 0
                 for i = 0,10000,1 do
                     result = result + IN.param0 + IN.param{}
@@ -262,8 +262,7 @@ namespace rlogic
             "param100",
             &Userdata::param100
             );
-        sol["IN"] = userdata;
-        sol["OUT"] = userdata;
+
         auto result = sol.script(scriptSrc);
         if (!result.valid())
         {
@@ -273,7 +272,7 @@ namespace rlogic
 
         while (state.KeepRunning())
         {
-            result = sol["run"]();
+            result = sol["run"](std::ref(userdata), std::ref(userdata));
             if (!result.valid())
             {
                 sol::error err = result;
@@ -286,13 +285,13 @@ namespace rlogic
     {
         const int64_t scriptSize = state.range(0);
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 local result = 0
                 for i = 0,10000,1 do
                     result = result + IN.param0 + IN.param{}
@@ -312,8 +311,7 @@ namespace rlogic
             sol::meta_function::new_index,
             &Userdata::new_index
             );
-        sol["IN"] = userdata;
-        sol["OUT"] = userdata;
+
         auto result = sol.script(scriptSrc);
         if (!result.valid())
         {
@@ -323,7 +321,7 @@ namespace rlogic
 
         while (state.KeepRunning())
         {
-            result = sol["run"]();
+            result = sol["run"](std::ref(userdata), std::ref(userdata));
             if (!result.valid())
             {
                 sol::error err = result;
@@ -338,9 +336,9 @@ namespace rlogic
         const std::string scriptSrc = fmt::format(R"(
             function interface()
                 for i = 0,{},1 do
-                    IN["param"..tostring(i)] = INT
+                    IN["param"..tostring(i)] = Type:Int32()
                 end
-                OUT.param = INT
+                OUT.param = Type:Int32()
             end
             function run()
                 local result = 0

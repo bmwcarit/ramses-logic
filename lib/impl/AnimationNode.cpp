@@ -20,11 +20,6 @@ namespace rlogic
 
     AnimationNode::~AnimationNode() noexcept = default;
 
-    float AnimationNode::getDuration() const
-    {
-        return m_animationNodeImpl.getMaximumChannelDuration();
-    }
-
     const AnimationChannels& AnimationNode::getChannels() const
     {
         return m_animationNodeImpl.getChannels();

@@ -6,6 +6,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "LogicObject.fbs";
 include "Property.fbs";
 include "LuaModule.fbs";
 
@@ -13,8 +14,7 @@ namespace rlogic_serialization;
 
 table LuaScript
 {
-    name:string;
-    id:uint64;
+    base:LogicObject;
     luaSourceCode:string;
     userModules:[LuaModuleUsage];
     standardModules:[uint8];

@@ -19,6 +19,7 @@ content = [
     'options': '   :members:',
     'items': [
         'AnimationNode',
+        'AnimationNodeConfig',
         'Collection',
         'DataArray',
         'Iterator',
@@ -28,6 +29,7 @@ content = [
         'LogicObject',
         'LuaConfig',
         'LuaModule',
+        'LuaInterface',
         'LuaScript',
         'Property',
         'RamsesAppearanceBinding',
@@ -36,6 +38,20 @@ content = [
         'RamsesNodeBinding',
         'SaveFileConfig',
         'TimerNode',
+    ],
+    },
+    {
+    'directive': 'doxygenstruct',
+    'TOC_caption': 'API structs',
+    'namespace_prefix': 'rlogic::',
+    'options': '   :members:',
+    'items': [
+        'AnimationChannel',
+        'ErrorData',
+        'IsPrimitiveProperty',
+        'PropertyEnumToType',
+        'PropertyTypeToEnum',
+        'WarningData',
     ],
     },
     {
@@ -58,35 +74,16 @@ content = [
     ]
     },
     {
-    'directive': 'doxygenstruct',
-    'TOC_caption': 'Type Traits',
-    'namespace_prefix': 'rlogic::',
-    'options': '   :members:',
-    'items': [
-        'PropertyTypeToEnum',
-        'PropertyEnumToType',
-        'IsPrimitiveProperty',
-    ]
-    },
-    {
-    'directive': 'doxygenstruct',
-    'TOC_caption': 'Errors',
-    'namespace_prefix': 'rlogic::',
-    'options': '   :members:',
-    'items': [
-        'ErrorData',
-    ]
-    },
-    {
     'directive': 'doxygenenum',
     'TOC_caption': 'Enums',
     'namespace_prefix': 'rlogic::',
     'options': '',
     'items': [
-        'EStandardModule',
-        'EPropertyType',
         'EInterpolationType',
         'ELogMessageType',
+        'EPropertyType',
+        'ERotationType',
+        'EStandardModule',
     ],
     },
 ]
@@ -95,7 +92,7 @@ content = [
 class_template = textwrap.dedent(
 """..
     -------------------------------------------------------------------------
-    Copyright (C) 2021 BMW AG
+    Copyright (C) 2022 BMW AG
     -------------------------------------------------------------------------
     This Source Code Form is subject to the terms of the Mozilla Public
     License, v. 2.0. If a copy of the MPL was not distributed with this

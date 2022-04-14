@@ -23,14 +23,14 @@ int main()
 
     // A script which demonstrates how to access vector and array properties
     rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
-        function interface()
-            IN.vec3f = VEC3F
+        function interface(IN,OUT)
+            IN.vec3f = Type:Vec3f()
 
-            OUT.array = ARRAY(9, FLOAT)
-            OUT.vec4f = VEC4F
+            OUT.array = Type:Array(9, Type:Float())
+            OUT.vec4f = Type:Vec4f()
         end
 
-        function run()
+        function run(IN,OUT)
             -- Can access vec3f components by index. Beware Lua indexing convention starts at 1!
             print("From inside Lua: vec3f = [" .. IN.vec3f[1] .. ", " .. IN.vec3f[2] .. ", " .. IN.vec3f[3] .. "]")
 

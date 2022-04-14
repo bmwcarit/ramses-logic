@@ -58,6 +58,7 @@ add_custom_command(
         --filename-suffix Gen
         --filename-ext h
         --scoped-enums
+        --reflect-names
         --no-prefix
         --cpp-std c++17
     DEPENDS ${flatbuffers_schemas} $<TARGET_FILE:flatc>

@@ -19,5 +19,6 @@ namespace rlogic::internal
         ScriptOutput,
         AnimationInput,
         AnimationOutput,
+        Interface,
     };
 }

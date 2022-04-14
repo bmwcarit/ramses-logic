@@ -19,6 +19,7 @@
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/AnimationNodeConfig.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Logger.h"
 #include "ramses-logic/RamsesLogicVersion.h"
 
@@ -35,7 +36,6 @@
 #include "impl/PropertyImpl.h"
 #include "internals/ApiObjects.h"
 #include "internals/FileUtils.h"
-#include "internals/FileFormatVersions.h"
 #include "LogTestUtils.h"
 
 #include "generated/LogicEngineGen.h"
@@ -53,10 +53,10 @@ namespace rlogic::internal
         {
             LogicEngine logicEngineForSaving;
             logicEngineForSaving.createLuaScript(R"(
-                function interface()
-                    IN.param = INT
+                function interface(IN,OUT)
+                    IN.param = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "luascript");
 
@@ -97,12 +97,11 @@ namespace rlogic::internal
                     g_PROJECT_VERSION_MAJOR,
                     g_PROJECT_VERSION_MINOR,
                     g_PROJECT_VERSION_PATCH,
-                    builder.CreateString(g_PROJECT_VERSION),
-                    g_FileFormatVersion),
+                    builder.CreateString(g_PROJECT_VERSION)),
                 0
             );
 
-            builder.Finish(logicEngine);
+            FinishLogicEngineBuffer(builder, logicEngine);
             ASSERT_TRUE(FileUtils::SaveBinary("no_api_objects.bin", builder.GetBufferPointer(), builder.GetSize()));
         }
 
@@ -238,6 +237,31 @@ namespace rlogic::internal
         }
     }
 
+    // the special file identifiers in flatbuffers are at bytes 4-7, so a file smaller than 8 bytes is a special case of broken
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserializedFromFileSmallerThan8Bytes)
+    {
+        // Emulate data truncation
+        {
+            std::vector<char> bufferData = CreateTestBuffer();
+            ASSERT_GT(bufferData.size(), 60u);
+            std::vector<char> truncated(bufferData.begin(), bufferData.begin() + 7);
+            SaveBufferToFile(truncated, "LogicEngine.bin");
+        }
+
+        // Test with file API
+        {
+            EXPECT_FALSE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("(size: 7) contains corrupted data! Data should be at least 8 bytes"));
+        }
+
+        // Test with buffer API
+        {
+            std::vector<char> truncatedMemory = *FileUtils::LoadBinary("LogicEngine.bin");
+            EXPECT_FALSE(m_logicEngine.loadFromBuffer(truncatedMemory.data(), truncatedMemory.size()));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("(size: 7) contains corrupted data! Data should be at least 8 bytes"));
+        }
+    }
+
     TEST_F(ALogicEngine_Serialization, ProducesErrorIfDeserializedFromTruncatedData)
     {
         // Emulate data truncation
@@ -328,10 +352,10 @@ namespace rlogic::internal
         {
             LogicEngine logicEngine;
             logicEngine.createLuaScript(R"(
-                function interface()
-                    IN.param = INT
+                function interface(IN,OUT)
+                    IN.param = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "luascript");
 
@@ -351,25 +375,28 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALogicEngine_Serialization, ProducesWarningIfSavedWithBindingValuesWithoutCallingUpdateBefore)
+    TEST_F(ALogicEngine_Serialization, ProducesErrorIfSavedWithValidationWarning)
     {
         // Put logic engine to a dirty state (create new object and don't call update)
         RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "binding");
-        ASSERT_TRUE(m_logicEngine.m_impl->getApiObjects().isDirty());
 
-        std::string warningMessage;
-        ELogMessageType messageType;
-        ScopedLogContextLevel scopedLogs(ELogMessageType::Warn, [&warningMessage, &messageType](ELogMessageType msgType, std::string_view message) {
-            warningMessage = message;
-            messageType = msgType;
+        std::vector<std::string> messages;
+        std::vector<ELogMessageType> messageTypes;
+        ScopedLogContextLevel scopedLogs(ELogMessageType::Warn, [&](ELogMessageType msgType, std::string_view message) {
+            messages.emplace_back(message);
+            messageTypes.emplace_back(msgType);
         });
 
         // Set a valud and save -> causes warning
         nodeBinding->getInputs()->getChild("visibility")->set<bool>(false);
+        ASSERT_TRUE(m_logicEngine.m_impl->getApiObjects().isDirty());
         m_logicEngine.saveToFile("LogicEngine.bin");
 
-        EXPECT_EQ("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", warningMessage);
-        EXPECT_EQ(ELogMessageType::Warn, messageType);
+        ASSERT_EQ(2u, messages.size());
+        EXPECT_EQ("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", messages[0]);
+        EXPECT_EQ("Failed to saveToFile() because validation warnings were encountered! Refer to the documentation of saveToFile() for details how to address these gracefully.", messages[1]);
+        EXPECT_EQ(ELogMessageType::Warn, messageTypes[0]);
+        EXPECT_EQ(ELogMessageType::Error, messageTypes[1]);
 
         // Unset custom log handler
         Logger::SetLogHandler([](ELogMessageType msgType, std::string_view message) {
@@ -438,10 +465,10 @@ namespace rlogic::internal
         {
             LogicEngine logicEngine;
             logicEngine.createLuaScript(R"(
-                function interface()
-                    IN.param = INT
+                function interface(IN,OUT)
+                    IN.param = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "luascript");
 
@@ -489,7 +516,7 @@ namespace rlogic::internal
                 const auto inputs = rNodeBindingByName->getInputs();
                 ASSERT_NE(nullptr, inputs);
                 EXPECT_EQ(4u, inputs->getChildCount());
-                EXPECT_TRUE(rNodeBindingByName->m_impl.isDirty());
+                EXPECT_FALSE(rNodeBindingByName->m_impl.isDirty());
             }
             {
                 auto rCameraBindingByName = m_logicEngine.findByName<RamsesCameraBinding>("camerabinding");
@@ -499,7 +526,7 @@ namespace rlogic::internal
                 const auto inputs = rCameraBindingByName->getInputs();
                 ASSERT_NE(nullptr, inputs);
                 EXPECT_EQ(2u, inputs->getChildCount());
-                EXPECT_TRUE(rCameraBindingByName->m_impl.isDirty());
+                EXPECT_FALSE(rCameraBindingByName->m_impl.isDirty());
             }
             {
                 auto rAppearanceBindingByName = m_logicEngine.findByName<RamsesAppearanceBinding>("appearancebinding");
@@ -514,7 +541,7 @@ namespace rlogic::internal
                 ASSERT_NE(nullptr, floatUniform);
                 EXPECT_EQ("floatUniform", floatUniform->getName());
                 EXPECT_EQ(EPropertyType::Float, floatUniform->getType());
-                EXPECT_TRUE(rAppearanceBindingByName->m_impl.isDirty());
+                EXPECT_FALSE(rAppearanceBindingByName->m_impl.isDirty());
             }
             {
                 const auto dataArrayByName = m_logicEngine.findByName<DataArray>("dataarray");
@@ -542,10 +569,10 @@ namespace rlogic::internal
         {
             LogicEngine logicEngine;
             logicEngine.createLuaScript(R"(
-                function interface()
-                    IN.param = INT
+                function interface(IN,OUT)
+                    IN.param = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "luascript");
 
@@ -554,10 +581,10 @@ namespace rlogic::internal
         }
         {
             m_logicEngine.createLuaScript(R"(
-                function interface()
-                    IN.param2 = FLOAT
+                function interface(IN,OUT)
+                    IN.param2 = Type:Float()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", {}, "luascript2");
 
@@ -582,11 +609,11 @@ namespace rlogic::internal
     {
         {
             std::string_view scriptSource = R"(
-                function interface()
-                    IN.input = INT
-                    OUT.output = INT
+                function interface(IN,OUT)
+                    IN.input = Type:Int32()
+                    OUT.output = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )";
 
@@ -651,11 +678,11 @@ namespace rlogic::internal
     TEST_F(ALogicEngine_Serialization, InternalLinkDataIsDeletedAfterDeserialization)
     {
         std::string_view scriptSource = R"(
-            function interface()
-                IN.input = INT
-                OUT.output = INT
+            function interface(IN,OUT)
+                IN.input = Type:Int32()
+                OUT.output = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -704,10 +731,10 @@ namespace rlogic::internal
 
             std::string_view script = R"(
                 modules("mymath")
-                function interface()
-                    OUT.pi = FLOAT
+                function interface(IN,OUT)
+                    OUT.pi = Type:Float()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.pi = mymath.PI
                 end
             )";
@@ -746,7 +773,7 @@ namespace rlogic::internal
     class ALogicEngine_Serialization_Compatibility : public ALogicEngine
     {
     protected:
-        void createFlatLogicEngineData(ramses::RamsesVersion ramsesVersion, rlogic::RamsesLogicVersion logicVersion, uint32_t fileFormatVersion)
+        void createFlatLogicEngineData(ramses::RamsesVersion ramsesVersion, rlogic::RamsesLogicVersion logicVersion, const char* fileId = rlogic_serialization::LogicEngineIdentifier())
         {
             ApiObjects emptyApiObjects;
 
@@ -755,12 +782,11 @@ namespace rlogic::internal
                 rlogic_serialization::CreateVersion(m_fbBuilder,
                     ramsesVersion.major, ramsesVersion.minor, ramsesVersion.patch, m_fbBuilder.CreateString(ramsesVersion.string)),
                 rlogic_serialization::CreateVersion(m_fbBuilder,
-                    logicVersion.major, logicVersion.minor, logicVersion.patch, m_fbBuilder.CreateString(logicVersion.string),
-                    fileFormatVersion),
+                    logicVersion.major, logicVersion.minor, logicVersion.patch, m_fbBuilder.CreateString(logicVersion.string)),
                 ApiObjects::Serialize(emptyApiObjects, m_fbBuilder)
             );
 
-            m_fbBuilder.Finish(logicEngine);
+            m_fbBuilder.Finish(logicEngine, fileId);
         }
 
         static ramses::RamsesVersion FakeRamsesVersion()
@@ -780,8 +806,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromFileReferencingIncompatibleRamsesVersion)
     {
-        const uint32_t fileVersionDoesNotMatter = 0;
-        createFlatLogicEngineData(FakeRamsesVersion(), GetRamsesLogicVersion(), fileVersionDoesNotMatter);
+        createFlatLogicEngineData(FakeRamsesVersion(), GetRamsesLogicVersion());
 
         ASSERT_TRUE(FileUtils::SaveBinary("wrong_ramses_version.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
 
@@ -799,10 +824,23 @@ namespace rlogic::internal
         EXPECT_THAT(errors[0].message, ::testing::HasSubstr("Expected Ramses version 27.x.x but found 10.20.900-suffix"));
     }
 
-    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromNewerFileVersion)
+    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromDifferentTypeOfFile)
+    {
+        const char* badFileIdentifier = "xyWW";
+        createFlatLogicEngineData(ramses::GetRamsesVersion(), GetRamsesLogicVersion(), badFileIdentifier);
+
+        ASSERT_TRUE(FileUtils::SaveBinary("temp.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+
+        EXPECT_FALSE(m_logicEngine.loadFromFile("temp.bin"));
+        auto errors = m_logicEngine.getErrors();
+        ASSERT_EQ(1u, errors.size());
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Tried loading a binary data which doesn't a Ramses Logic! Expected file bytes 4-5 to be 'rl', but found 'xy' instead")));
+    }
+
+    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromIncompatibleFileVersion)
     {
         // Format was changed
-        constexpr uint32_t versionFromFuture = g_FileFormatVersion + 1;
+        const char* versionFromFuture = "rl99";
         createFlatLogicEngineData(ramses::GetRamsesVersion(), GetRamsesLogicVersion(), versionFromFuture);
 
         ASSERT_TRUE(FileUtils::SaveBinary("temp.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
@@ -810,21 +848,121 @@ namespace rlogic::internal
         EXPECT_FALSE(m_logicEngine.loadFromFile("temp.bin"));
         auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("is too new! Expected file version {} but found {}", g_FileFormatVersion, versionFromFuture)));
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Version mismatch while loading binary data! Expected version '01', but found '99'")));
     }
 
-    TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromOlderFileVersion)
+    TEST_F(ALogicEngine_Serialization, IDsAfterDeserializationAreUnique)
     {
-        // Format was changed
-        constexpr uint32_t oldVersion = g_FileFormatVersion - 1;
-        createFlatLogicEngineData(ramses::GetRamsesVersion(), GetRamsesLogicVersion(), oldVersion);
+        uint64_t serializedId = 0u;
+        {
+            LogicEngine logicEngine;
+            const auto script = logicEngine.createLuaScript(R"(
+                function interface(IN,OUT)
+                    IN.param = Type:Int32()
+                end
+                function run(IN,OUT)
+                end
+            )", {}, "luascript");
+            serializedId = script->getId();
 
-        ASSERT_TRUE(FileUtils::SaveBinary("temp.bin", m_fbBuilder.GetBufferPointer(), m_fbBuilder.GetSize()));
+            logicEngine.saveToFile("LogicEngine.bin");
+        }
 
-        EXPECT_FALSE(m_logicEngine.loadFromFile("temp.bin"));
-        auto errors = m_logicEngine.getErrors();
-        ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("is too old! Expected file version {} but found {}", g_FileFormatVersion, oldVersion)));
+        EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+        EXPECT_TRUE(m_logicEngine.getErrors().empty());
+
+        auto script = m_logicEngine.findLogicObjectById(serializedId);
+        ASSERT_NE(nullptr, script);
+        EXPECT_EQ("luascript", script->getName());
+
+        const auto anotherScript = m_logicEngine.createLuaScript(R"(
+            function interface(IN,OUT)
+            end
+            function run(IN,OUT)
+            end
+        )");
+        EXPECT_GT(anotherScript->getId(), script->getId());
+    }
+
+    TEST_F(ALogicEngine_Serialization, persistsUserIds)
+    {
+        {
+            LogicEngine logicEngine;
+            auto* luaModule = logicEngine.createLuaModule(m_moduleSourceCode, {}, "module");
+            auto* luaScript = logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+            auto* nodeBinding = logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodeBinding");
+            auto* appearanceBinding = logicEngine.createRamsesAppearanceBinding(*m_appearance, "appearanceBinding");
+            auto* cameraBinding = logicEngine.createRamsesCameraBinding(*m_camera, "cameraBinding");
+            auto* dataArray = logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataArray");
+            AnimationNodeConfig config;
+            config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+            auto* animationNode = logicEngine.createAnimationNode(config, "animNode");
+            auto* timerNode = logicEngine.createTimerNode("timerNode");
+            auto* luaInterface = logicEngine.createLuaInterface(R"(
+                function interface(IN, OUT)
+                end
+            )", "intf");
+
+            EXPECT_TRUE(luaModule->setUserId(1u, 2u));
+            EXPECT_TRUE(luaScript->setUserId(3u, 4u));
+            EXPECT_TRUE(nodeBinding->setUserId(5u, 6u));
+            EXPECT_TRUE(appearanceBinding->setUserId(7u, 8u));
+            EXPECT_TRUE(cameraBinding->setUserId(9u, 10u));
+            EXPECT_TRUE(dataArray->setUserId(11u, 12u));
+            EXPECT_TRUE(animationNode->setUserId(13u, 14u));
+            EXPECT_TRUE(timerNode->setUserId(15u, 16u));
+            EXPECT_TRUE(luaInterface->setUserId(17u, 18u));
+
+            logicEngine.saveToFile("LogicEngine.bin");
+        }
+
+        EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
+        EXPECT_TRUE(m_logicEngine.getErrors().empty());
+
+        auto obj = m_logicEngine.findByName<LogicObject>("module");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(1u, obj->getUserId().first);
+        EXPECT_EQ(2u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("script");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(3u, obj->getUserId().first);
+        EXPECT_EQ(4u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("nodeBinding");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(5u, obj->getUserId().first);
+        EXPECT_EQ(6u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("appearanceBinding");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(7u, obj->getUserId().first);
+        EXPECT_EQ(8u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("cameraBinding");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(9u, obj->getUserId().first);
+        EXPECT_EQ(10u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("dataArray");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(11u, obj->getUserId().first);
+        EXPECT_EQ(12u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("animNode");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(13u, obj->getUserId().first);
+        EXPECT_EQ(14u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("timerNode");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(15u, obj->getUserId().first);
+        EXPECT_EQ(16u, obj->getUserId().second);
+
+        obj = m_logicEngine.findByName<LogicObject>("intf");
+        ASSERT_NE(nullptr, obj);
+        EXPECT_EQ(17u, obj->getUserId().first);
+        EXPECT_EQ(18u, obj->getUserId().second);
     }
 
     TEST(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine)
@@ -835,9 +973,9 @@ namespace rlogic::internal
             // Load and update works
             RamsesTestSetup ramses;
             LogicEngine     logicEngine;
-            ramses::Scene*  scene = &ramses.loadSceneFromFile("res/unittests/testScene.bin");
+            ramses::Scene*  scene = &ramses.loadSceneFromFile("res/unittests/testScene.ramses");
             ASSERT_NE(nullptr, scene);
-            ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic.bin", scene));
+            ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic.rlogic", scene));
 
             // Contains objects and their input/outputs
 
@@ -868,10 +1006,11 @@ namespace rlogic::internal
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("height"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("floatUniform"));
             ASSERT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNode"));
-            EXPECT_EQ(5u, logicEngine.findByName<AnimationNode>("animNode")->getInputs()->getChildCount());
+            EXPECT_EQ(1u, logicEngine.findByName<AnimationNode>("animNode")->getInputs()->getChildCount());
+            ASSERT_EQ(2u, logicEngine.findByName<AnimationNode>("animNode")->getOutputs()->getChildCount());
             EXPECT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNode")->getOutputs()->getChild("channel"));
             ASSERT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties"));
-            EXPECT_EQ(6u, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties")->getInputs()->getChildCount());
+            EXPECT_EQ(2u, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties")->getInputs()->getChildCount());
             EXPECT_NE(nullptr, logicEngine.findByName<TimerNode>("timerNode"));
 
             EXPECT_NE(nullptr, logicEngine.findByName<RamsesNodeBinding>("nodebinding"));
@@ -898,8 +1037,8 @@ namespace rlogic::internal
             // Animation node is linked and can be animated
             const auto animNode = logicEngine.findByName<AnimationNode>("animNode");
             EXPECT_TRUE(logicEngine.isLinked(*animNode));
-            animNode->getInputs()->getChild("play")->set(true);
-            animNode->getInputs()->getChild("timeDelta")->set(1.5f);
+            EXPECT_FLOAT_EQ(2.f, *animNode->getOutputs()->getChild("duration")->get<float>());
+            animNode->getInputs()->getChild("progress")->set(0.75f);
             EXPECT_TRUE(logicEngine.update());
 
             ramses::UniformInput uniform;

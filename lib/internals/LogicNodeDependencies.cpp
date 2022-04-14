@@ -101,19 +101,19 @@ namespace rlogic::internal
     {
         if (!m_logicNodeDAG.containsNode(output.getLogicNode()))
         {
-            errorReporting.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", output.getLogicNode().getName()), nullptr);
+            errorReporting.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", output.getLogicNode().getName()), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
         if (!m_logicNodeDAG.containsNode(input.getLogicNode()))
         {
-            errorReporting.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", input.getLogicNode().getName()), nullptr);
+            errorReporting.add(fmt::format("LogicNode '{}' is not an instance of this LogicEngine", input.getLogicNode().getName()), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
         if (&output.getLogicNode() == &input.getLogicNode())
         {
-            errorReporting.add("SourceNode and TargetNode are equal", nullptr);
+            errorReporting.add("SourceNode and TargetNode are equal", nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -121,7 +121,7 @@ namespace rlogic::internal
         {
             std::string_view lhsType = output.isOutput() ? "output" : "input";
             std::string_view rhsType = input.isOutput() ? "output" : "input";
-            errorReporting.add(fmt::format("Failed to link {} property '{}' to {} property '{}'. Only outputs can be linked to inputs", lhsType, output.getName(), rhsType, input.getName()), nullptr);
+            errorReporting.add(fmt::format("Failed to link {} property '{}' to {} property '{}'. Only outputs can be linked to inputs", lhsType, output.getName(), rhsType, input.getName()), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -131,14 +131,14 @@ namespace rlogic::internal
                 output.getName(),
                 GetLuaPrimitiveTypeName(output.getType()),
                 input.getName(),
-                GetLuaPrimitiveTypeName(input.getType())), nullptr);
+                GetLuaPrimitiveTypeName(input.getType())), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
         // No need to also test input type, above check already makes sure output and input are of the same type
         if (!TypeUtils::IsPrimitiveType(output.getType()))
         {
-            errorReporting.add(fmt::format("Can't link properties of complex types directly, currently only primitive properties can be linked"), nullptr);
+            errorReporting.add(fmt::format("Can't link properties of complex types directly, currently only primitive properties can be linked"), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -150,7 +150,7 @@ namespace rlogic::internal
                 input.getLogicNode().getName(),
                 linkedIncomingProperty->getName(),
                 linkedIncomingProperty->getLogicNode().getName()
-            ), nullptr);
+            ), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -176,20 +176,20 @@ namespace rlogic::internal
     {
         if (TypeUtils::CanHaveChildren(input.getType()))
         {
-            errorReporting.add(fmt::format("Can't unlink properties of complex types directly!"), nullptr);
+            errorReporting.add(fmt::format("Can't unlink properties of complex types directly!"), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
         const PropertyImpl* linkedIncomingProperty = input.getIncomingLink().property;
         if (linkedIncomingProperty == nullptr)
         {
-            errorReporting.add(fmt::format("Input property '{}' is not currently linked!", input.getName()), nullptr);
+            errorReporting.add(fmt::format("Input property '{}' is not currently linked!", input.getName()), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
         if (linkedIncomingProperty != &output)
         {
-            errorReporting.add(fmt::format("Input property '{}' is currently linked to another property '{}'", linkedIncomingProperty->getName(), input.getName()), nullptr);
+            errorReporting.add(fmt::format("Input property '{}' is currently linked to another property '{}'", linkedIncomingProperty->getName(), input.getName()), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 

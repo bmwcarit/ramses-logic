@@ -8,6 +8,7 @@
 
 include "LuaModule.fbs";
 include "LuaScript.fbs";
+include "LuaInterface.fbs";
 include "RamsesNodeBinding.fbs";
 include "RamsesAppearanceBinding.fbs";
 include "RamsesCameraBinding.fbs";
@@ -22,6 +23,7 @@ table ApiObjects
 {
     luaModules:[LuaModule];
     luaScripts:[LuaScript];
+    luaInterfaces:[LuaInterface];
     nodeBindings:[RamsesNodeBinding];
     appearanceBindings:[RamsesAppearanceBinding];
     cameraBindings:[RamsesCameraBinding];
@@ -29,4 +31,5 @@ table ApiObjects
     animationNodes:[AnimationNode];
     timerNodes:[TimerNode];
     links:[Link];
+    lastObjectId:uint64 = 0;
 }

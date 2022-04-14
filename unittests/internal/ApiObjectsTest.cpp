@@ -16,13 +16,17 @@
 
 #include "impl/LogicEngineImpl.h"
 #include "impl/PropertyImpl.h"
+#include "impl/LuaModuleImpl.h"
 #include "impl/LuaScriptImpl.h"
+#include "impl/LuaInterfaceImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
 #include "impl/RamsesCameraBindingImpl.h"
+#include "impl/DataArrayImpl.h"
 
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
@@ -61,9 +65,14 @@ namespace rlogic::internal
         )";
 
         const std::string_view m_valid_empty_script = R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
+            end
+        )";
+
+        const std::string_view m_valid_empty_interface = R"(
+            function interface(IN,OUT)
             end
         )";
 
@@ -77,6 +86,18 @@ namespace rlogic::internal
             auto script = apiObjects.createLuaScript(source, {}, "script", m_errorReporting);
             EXPECT_NE(nullptr, script);
             return script;
+        }
+
+        LuaInterface* createInterface()
+        {
+            return createInterface(m_apiObjects);
+        }
+
+        LuaInterface* createInterface(ApiObjects& apiObjects)
+        {
+            auto intf = apiObjects.createLuaInterface(m_valid_empty_interface, "intf", m_errorReporting);
+            EXPECT_NE(nullptr, intf);
+            return intf;
         }
 
         // Silence logs, unless explicitly enabled, to reduce spam and speed up tests
@@ -115,6 +136,40 @@ namespace rlogic::internal
         EXPECT_EQ(script, otherInstance.getApiObject(script->m_impl));
         EXPECT_EQ(script, otherInstance.getApiObjectOwningContainer().back().get());
         EXPECT_EQ(script, otherInstance.getApiObjectContainer<LogicObject>().back());
+    }
+
+    TEST_F(AnApiObjects, CreatesInterfaceFromValidLuaWithoutErrors)
+    {
+        const LuaInterface* intf = createInterface();
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+        EXPECT_EQ(intf, m_apiObjects.getApiObject(intf->m_impl));
+        EXPECT_EQ(intf, m_apiObjects.getApiObjectOwningContainer().back().get());
+        EXPECT_EQ(intf, m_apiObjects.getApiObjectContainer<LogicObject>().back());
+    }
+
+    TEST_F(AnApiObjects, DestroysInterfaceWithoutErrors)
+    {
+        LuaInterface* intf = createInterface();
+        ASSERT_TRUE(m_apiObjects.destroy(*intf, m_errorReporting));
+        EXPECT_TRUE(m_apiObjects.getApiObjectOwningContainer().empty());
+        EXPECT_TRUE(m_apiObjects.getApiObjectContainer<LogicObject>().empty());
+    }
+
+    TEST_F(AnApiObjects, ProducesErrorsWhenDestroyingInterfaceFromAnotherClassInstance)
+    {
+        ApiObjects otherInstance;
+        LuaInterface* intf = createInterface(otherInstance);
+        EXPECT_EQ(intf, otherInstance.getApiObjectOwningContainer().back().get());
+        EXPECT_EQ(intf, otherInstance.getApiObjectContainer<LogicObject>().back());
+        ASSERT_FALSE(m_apiObjects.destroy(*intf, m_errorReporting));
+        EXPECT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Can't find interface in logic engine!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, intf);
+
+        // Did not affect existence in otherInstance!
+        EXPECT_EQ(intf, otherInstance.getApiObject(intf->m_impl));
+        EXPECT_EQ(intf, otherInstance.getApiObjectOwningContainer().back().get());
+        EXPECT_EQ(intf, otherInstance.getApiObjectContainer<LogicObject>().back());
     }
 
     TEST_F(AnApiObjects, CreatesLuaModule)
@@ -461,6 +516,20 @@ namespace rlogic::internal
         EXPECT_EQ(script, *scripts.begin());
     }
 
+    TEST_F(AnApiObjects, ProvidesNonEmptyInterfaceCollection_WhenInterfacesWereCreated)
+    {
+        const LuaInterface* intf = createInterface();
+        ApiObjectContainer<LuaInterface>& interfaces = m_apiObjects.getApiObjectContainer<LuaInterface>();
+
+        EXPECT_EQ(*interfaces.begin(), intf);
+        EXPECT_EQ(*interfaces.cbegin(), intf);
+
+        EXPECT_NE(interfaces.begin(), interfaces.end());
+        EXPECT_NE(interfaces.cbegin(), interfaces.cend());
+
+        EXPECT_EQ(intf, *interfaces.begin());
+    }
+
     TEST_F(AnApiObjects, ProvidesNonEmptyNodeBindingsCollection_WhenNodeBindingsWereCreated)
     {
         RamsesNodeBinding* binding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
@@ -510,6 +579,7 @@ namespace rlogic::internal
 
         const auto* luaModule         = m_apiObjects.createLuaModule(m_moduleSrc, {}, "module", m_errorReporting);
         const auto* luaScript         = createScript(m_apiObjects, m_valid_empty_script);
+        const auto* luaInterface      = createInterface();
         const auto* nodeBinding       = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         const auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "");
         const auto* cameraBinding     = m_apiObjects.createRamsesCameraBinding(*m_camera, "");
@@ -522,8 +592,8 @@ namespace rlogic::internal
         std::vector<LogicObject*> ownedLogicObjectsRawPointers;
         std::transform(ownedObjects.cbegin(), ownedObjects.cend(), std::back_inserter(ownedLogicObjectsRawPointers), [&](std::unique_ptr<LogicObject>const& obj) { return obj.get(); });
 
-        EXPECT_THAT(logicObjects, ::testing::ElementsAre(luaModule, luaScript, nodeBinding, appearanceBinding, cameraBinding, dataArray, animationNode, timerNode));
-        EXPECT_THAT(ownedLogicObjectsRawPointers, ::testing::ElementsAre(luaModule, luaScript, nodeBinding, appearanceBinding, cameraBinding, dataArray, animationNode, timerNode));
+        EXPECT_THAT(logicObjects, ::testing::ElementsAre(luaModule, luaScript, luaInterface, nodeBinding, appearanceBinding, cameraBinding, dataArray, animationNode, timerNode));
+        EXPECT_THAT(ownedLogicObjectsRawPointers, ::testing::ElementsAre(luaModule, luaScript, luaInterface, nodeBinding, appearanceBinding, cameraBinding, dataArray, animationNode, timerNode));
 
         const ApiObjects& apiObjectsConst = m_apiObjects;
         EXPECT_EQ(logicObjects, apiObjectsConst.getApiObjectContainer<LogicObject>());
@@ -533,6 +603,7 @@ namespace rlogic::internal
     {
         const auto* luaModule         = m_apiObjects.createLuaModule(m_moduleSrc, {}, "module", m_errorReporting);
         const auto* luaScript         = createScript(m_apiObjects, m_valid_empty_script);
+        const auto* luaInterface      = createInterface();
         const auto* nodeBinding       = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
         const auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "");
         const auto* cameraBinding     = m_apiObjects.createRamsesCameraBinding(*m_camera, "");
@@ -546,6 +617,7 @@ namespace rlogic::internal
         {
             luaModule->getId(),
             luaScript->getId(),
+            luaInterface->getId(),
             nodeBinding->getId(),
             appearanceBinding->getId(),
             cameraBinding->getId(),
@@ -554,7 +626,7 @@ namespace rlogic::internal
             timerNode->getId()
         };
 
-        EXPECT_EQ(8u, logicObjectIds.size());
+        EXPECT_EQ(9u, logicObjectIds.size());
     }
 
     TEST_F(AnApiObjects, canGetLogicObjectById)
@@ -569,6 +641,7 @@ namespace rlogic::internal
         config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
         const auto* animationNode     = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         const auto* timerNode         = m_apiObjects.createTimerNode("timerNode");
+        const auto* luaInterface      = createInterface();
 
         EXPECT_EQ(luaModule->getId(), 1u);
         EXPECT_EQ(luaScript->getId(), 2u);
@@ -578,6 +651,7 @@ namespace rlogic::internal
         EXPECT_EQ(dataArray->getId(), 6u);
         EXPECT_EQ(animationNode->getId(), 7u);
         EXPECT_EQ(timerNode->getId(), 8u);
+        EXPECT_EQ(luaInterface->getId(), 9u);
 
         EXPECT_EQ(m_apiObjects.getApiObjectById(1u), luaModule);
         EXPECT_EQ(m_apiObjects.getApiObjectById(2u), luaScript);
@@ -587,6 +661,7 @@ namespace rlogic::internal
         EXPECT_EQ(m_apiObjects.getApiObjectById(6u), dataArray);
         EXPECT_EQ(m_apiObjects.getApiObjectById(7u), animationNode);
         EXPECT_EQ(m_apiObjects.getApiObjectById(8u), timerNode);
+        EXPECT_EQ(m_apiObjects.getApiObjectById(9u), luaInterface);
     }
 
     TEST_F(AnApiObjects, logicObjectIdsAreRemovedFromIdMappingWhenObjectIsDestroyed)
@@ -601,6 +676,7 @@ namespace rlogic::internal
         config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
         auto* animationNode           = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
         const auto* timerNode         = m_apiObjects.createTimerNode("timerNode");
+        const auto* luaInterface      = createInterface();
 
         EXPECT_EQ(m_apiObjects.getApiObjectById(1u), luaModule);
         EXPECT_EQ(m_apiObjects.getApiObjectById(2u), luaScript);
@@ -610,6 +686,7 @@ namespace rlogic::internal
         EXPECT_EQ(m_apiObjects.getApiObjectById(6u), dataArray);
         EXPECT_EQ(m_apiObjects.getApiObjectById(7u), animationNode);
         EXPECT_EQ(m_apiObjects.getApiObjectById(8u), timerNode);
+        EXPECT_EQ(m_apiObjects.getApiObjectById(9u), luaInterface);
 
         EXPECT_TRUE(m_apiObjects.destroy(*luaScript, m_errorReporting));
         EXPECT_TRUE(m_apiObjects.destroy(*appearanceBinding, m_errorReporting));
@@ -623,8 +700,125 @@ namespace rlogic::internal
         EXPECT_EQ(m_apiObjects.getApiObjectById(6u), dataArray);
         EXPECT_EQ(m_apiObjects.getApiObjectById(7u), nullptr);
         EXPECT_EQ(m_apiObjects.getApiObjectById(8u), timerNode);
+        EXPECT_EQ(m_apiObjects.getApiObjectById(9u), luaInterface);
     }
 
+    TEST_F(AnApiObjects, logicObjectsGenerateIdentificationString)
+    {
+        const auto* luaModule = m_apiObjects.createLuaModule(m_moduleSrc, {}, "module", m_errorReporting);
+        auto* luaScript = createScript(m_apiObjects, m_valid_empty_script);
+        const auto* nodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodeBinding");
+        auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "appearanceBinding");
+        const auto* cameraBinding = m_apiObjects.createRamsesCameraBinding(*m_camera, "cameraBinding");
+        const auto* dataArray = m_apiObjects.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataArray");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+        auto* animationNode = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
+        const auto* timerNode = m_apiObjects.createTimerNode("timerNode");
+        const auto* luaInterface = createInterface();
+
+        EXPECT_EQ(luaModule->m_impl.getIdentificationString(), "module [Id=1]");
+        EXPECT_EQ(luaScript->m_impl.getIdentificationString(), "script [Id=2]");
+        EXPECT_EQ(nodeBinding->m_impl.getIdentificationString(), "nodeBinding [Id=3]");
+        EXPECT_EQ(appearanceBinding->m_impl.getIdentificationString(), "appearanceBinding [Id=4]");
+        EXPECT_EQ(cameraBinding->m_impl.getIdentificationString(), "cameraBinding [Id=5]");
+        EXPECT_EQ(dataArray->m_impl.getIdentificationString(), "dataArray [Id=6]");
+        EXPECT_EQ(animationNode->m_impl.getIdentificationString(), "animNode [Id=7]");
+        EXPECT_EQ(timerNode->m_impl.getIdentificationString(), "timerNode [Id=8]");
+        EXPECT_EQ(luaInterface->m_impl.getIdentificationString(), "intf [Id=9]");
+    }
+
+    TEST_F(AnApiObjects, logicObjectsGenerateIdentificationStringWithUserId)
+    {
+        auto* luaModule = m_apiObjects.createLuaModule(m_moduleSrc, {}, "module", m_errorReporting);
+        auto* luaScript = createScript(m_apiObjects, m_valid_empty_script);
+        auto* nodeBinding = m_apiObjects.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodeBinding");
+        auto* appearanceBinding = m_apiObjects.createRamsesAppearanceBinding(*m_appearance, "appearanceBinding");
+        auto* cameraBinding = m_apiObjects.createRamsesCameraBinding(*m_camera, "cameraBinding");
+        auto* dataArray = m_apiObjects.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataArray");
+        AnimationNodeConfig config;
+        config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+        auto* animationNode = m_apiObjects.createAnimationNode(*config.m_impl, "animNode");
+        auto* timerNode = m_apiObjects.createTimerNode("timerNode");
+        auto* luaInterface = createInterface();
+
+        EXPECT_TRUE(luaModule->setUserId(1u, 2u));
+        EXPECT_TRUE(luaScript->setUserId(3u, 4u));
+        EXPECT_TRUE(nodeBinding->setUserId(5u, 6u));
+        EXPECT_TRUE(appearanceBinding->setUserId(7u, 8u));
+        EXPECT_TRUE(cameraBinding->setUserId(9u, 10u));
+        EXPECT_TRUE(dataArray->setUserId(11u, 12u));
+        EXPECT_TRUE(animationNode->setUserId(13u, 14u));
+        EXPECT_TRUE(timerNode->setUserId(15u, 16u));
+        EXPECT_TRUE(luaInterface->setUserId(17u, 18u));
+
+        EXPECT_EQ(luaModule->m_impl.getIdentificationString(), "module [Id=1 UserId=00000000000000010000000000000002]");
+        EXPECT_EQ(luaScript->m_impl.getIdentificationString(), "script [Id=2 UserId=00000000000000030000000000000004]");
+        EXPECT_EQ(nodeBinding->m_impl.getIdentificationString(), "nodeBinding [Id=3 UserId=00000000000000050000000000000006]");
+        EXPECT_EQ(appearanceBinding->m_impl.getIdentificationString(), "appearanceBinding [Id=4 UserId=00000000000000070000000000000008]");
+        EXPECT_EQ(cameraBinding->m_impl.getIdentificationString(), "cameraBinding [Id=5 UserId=0000000000000009000000000000000A]");
+        EXPECT_EQ(dataArray->m_impl.getIdentificationString(), "dataArray [Id=6 UserId=000000000000000B000000000000000C]");
+        EXPECT_EQ(animationNode->m_impl.getIdentificationString(), "animNode [Id=7 UserId=000000000000000D000000000000000E]");
+        EXPECT_EQ(timerNode->m_impl.getIdentificationString(), "timerNode [Id=8 UserId=000000000000000F0000000000000010]");
+        EXPECT_EQ(luaInterface->m_impl.getIdentificationString(), "intf [Id=9 UserId=00000000000000110000000000000012]");
+    }
+
+    TEST_F(AnApiObjects, CanCheckIfAllLuaInterfaceOutputsAreLinked_GeneratesWarningsIfOutputsNotLinked)
+    {
+        LuaInterface* intf = m_apiObjects.createLuaInterface(R"(
+            function interface(IN,OUT)
+
+                IN.param1 = Type:Int32()
+                IN.param2 = {a=Type:Float(), b=Type:Int32()}
+
+            end
+        )", "intf name", m_errorReporting);
+        ASSERT_NE(nullptr, intf);
+
+        ValidationResults validationResults;
+        m_apiObjects.checkAllInterfaceOutputsLinked(validationResults);
+        EXPECT_EQ(3u, validationResults.getWarnings().size());
+        EXPECT_THAT(validationResults.getWarnings(),
+            ::testing::Each(::testing::Field(&WarningData::message, ::testing::HasSubstr("Interface [intf name] has unlinked output"))));
+        EXPECT_THAT(validationResults.getWarnings(), ::testing::Each(::testing::Field(&WarningData::type, ::testing::Eq(EWarningType::UnusedContent))));
+    }
+
+    TEST_F(AnApiObjects, CanCheckIfAllLuaInterfaceOutputsAreLinked_DoesNotGenerateWarningsIfAllOutputsLinked)
+    {
+        LuaInterface* intf = m_apiObjects.createLuaInterface(R"(
+            function interface(IN,OUT)
+
+                IN.param1 = Type:Int32()
+                IN.param2 = {a=Type:Float(), b=Type:Int32()}
+
+            end
+        )", "intf name", m_errorReporting);
+
+        LuaScript* inputsScript = m_apiObjects.createLuaScript(R"LUA_SCRIPT(
+        function interface(IN,OUT)
+
+            IN.param1 = Type:Int32()
+            IN.param21 = Type:Float()
+            IN.param22 = Type:Int32()
+
+        end
+
+        function run(IN,OUT)
+        end
+        )LUA_SCRIPT", {}, "inputs script", m_errorReporting);
+
+        const auto* output1 = intf->getOutputs()->getChild(0);
+        const auto* output21 = intf->getOutputs()->getChild(1)->getChild(0);
+        const auto* output22 = intf->getOutputs()->getChild(1)->getChild(1);
+
+        m_apiObjects.getLogicNodeDependencies().link(*output1->m_impl, *inputsScript->getInputs()->getChild(0)->m_impl, false, m_errorReporting);
+        m_apiObjects.getLogicNodeDependencies().link(*output21->m_impl, *inputsScript->getInputs()->getChild(1)->m_impl, false, m_errorReporting);
+        m_apiObjects.getLogicNodeDependencies().link(*output22->m_impl, *inputsScript->getInputs()->getChild(2)->m_impl, false, m_errorReporting);
+
+        ValidationResults validationResults;
+        m_apiObjects.checkAllInterfaceOutputsLinked(validationResults);
+        EXPECT_TRUE(validationResults.getWarnings().empty());
+    }
 
     class AnApiObjects_SceneMismatch : public AnApiObjects
     {
@@ -717,6 +911,9 @@ namespace rlogic::internal
         ASSERT_NE(nullptr, serialized.luaScripts());
         ASSERT_EQ(0u, serialized.luaScripts()->size());
 
+        ASSERT_NE(nullptr, serialized.luaInterfaces());
+        ASSERT_EQ(0u, serialized.luaInterfaces()->size());
+
         ASSERT_NE(nullptr, serialized.nodeBindings());
         ASSERT_EQ(0u, serialized.nodeBindings()->size());
 
@@ -728,6 +925,8 @@ namespace rlogic::internal
 
         ASSERT_NE(nullptr, serialized.links());
         ASSERT_EQ(0u, serialized.links()->size());
+
+        EXPECT_EQ(0u, serialized.lastObjectId());
     }
 
     TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainer_ForScripts)
@@ -746,8 +945,30 @@ namespace rlogic::internal
         ASSERT_EQ(1u, serialized.luaScripts()->size());
         const rlogic_serialization::LuaScript& serializedScript = *serialized.luaScripts()->Get(0);
         EXPECT_EQ(std::string(m_valid_empty_script), serializedScript.luaSourceCode()->str());
-        EXPECT_EQ("script", serializedScript.name()->str());
-        EXPECT_EQ(1u, serializedScript.id());
+        EXPECT_EQ("script", serializedScript.base()->name()->str());
+        EXPECT_EQ(1u, serializedScript.base()->id());
+
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "test", m_errorReporting);
+        EXPECT_TRUE(deserialized);
+    }
+
+    TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainer_ForInterfaces)
+    {
+        // Create test flatbuffer with only a script
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            ApiObjects toSerialize;
+            createInterface(toSerialize);
+            ApiObjects::Serialize(toSerialize, builder);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(builder.GetBufferPointer());
+
+        ASSERT_NE(nullptr, serialized.luaInterfaces());
+        ASSERT_EQ(1u, serialized.luaInterfaces()->size());
+        const rlogic_serialization::LuaInterface& serializedInterface = *serialized.luaInterfaces()->Get(0);
+        EXPECT_EQ("intf", serializedInterface.base()->name()->str());
+        EXPECT_EQ(1u, serializedInterface.base()->id());
 
         std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "test", m_errorReporting);
         EXPECT_TRUE(deserialized);
@@ -770,20 +991,20 @@ namespace rlogic::internal
         ASSERT_NE(nullptr, serialized.nodeBindings());
         ASSERT_EQ(1u, serialized.nodeBindings()->size());
         const rlogic_serialization::RamsesNodeBinding& serializedNodeBinding = *serialized.nodeBindings()->Get(0);
-        EXPECT_EQ("node", serializedNodeBinding.base()->name()->str());
-        EXPECT_EQ(1u, serializedNodeBinding.base()->id());
+        EXPECT_EQ("node", serializedNodeBinding.base()->base()->name()->str());
+        EXPECT_EQ(1u, serializedNodeBinding.base()->base()->id());
 
         ASSERT_NE(nullptr, serialized.appearanceBindings());
         ASSERT_EQ(1u, serialized.appearanceBindings()->size());
         const rlogic_serialization::RamsesAppearanceBinding& serializedAppBinding = *serialized.appearanceBindings()->Get(0);
-        EXPECT_EQ("appearance", serializedAppBinding.base()->name()->str());
-        EXPECT_EQ(2u, serializedAppBinding.base()->id());
+        EXPECT_EQ("appearance", serializedAppBinding.base()->base()->name()->str());
+        EXPECT_EQ(2u, serializedAppBinding.base()->base()->id());
 
         ASSERT_NE(nullptr, serialized.cameraBindings());
         ASSERT_EQ(1u, serialized.cameraBindings()->size());
         const rlogic_serialization::RamsesCameraBinding& serializedCameraBinding = *serialized.cameraBindings()->Get(0);
-        EXPECT_EQ("camera", serializedCameraBinding.base()->name()->str());
-        EXPECT_EQ(3u, serializedCameraBinding.base()->id());
+        EXPECT_EQ("camera", serializedCameraBinding.base()->base()->name()->str());
+        EXPECT_EQ(3u, serializedCameraBinding.base()->base()->id());
     }
 
     TEST_F(AnApiObjects_Serialization, CreatesFlatbufferContainers_ForLinks)
@@ -794,13 +1015,13 @@ namespace rlogic::internal
             ApiObjects toSerialize;
 
             const std::string_view scriptWithOutput = R"(
-                function interface()
+                function interface(IN,OUT)
                     OUT.nested = {
-                        anUnusedValue = FLOAT,
-                        rotation = VEC3F
+                        anUnusedValue = Type:Float(),
+                        rotation = Type:Vec3f()
                     }
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )";
 
@@ -837,6 +1058,7 @@ namespace rlogic::internal
         {
             ApiObjects toSerialize;
             createScript(toSerialize, m_valid_empty_script);
+            createInterface(toSerialize);
             toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "node");
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
             toSerialize.createRamsesCameraBinding(*m_camera, "camera");
@@ -855,11 +1077,15 @@ namespace rlogic::internal
 
         ApiObjects& apiObjects = *apiObjectsOptional;
 
-        ASSERT_EQ(4u, apiObjects.getReverseImplMapping().size());
+        ASSERT_EQ(5u, apiObjects.getReverseImplMapping().size());
 
         LuaScript* script = apiObjects.getApiObjectContainer<LuaScript>()[0];
         EXPECT_EQ(script, apiObjects.getApiObject(script->m_impl));
         EXPECT_EQ(script->getName(), "script");
+
+        LuaInterface* intf = apiObjects.getApiObjectContainer<LuaInterface>()[0];
+        EXPECT_EQ(intf, apiObjects.getApiObject(intf->m_impl));
+        EXPECT_EQ(intf->getName(), "intf");
 
         RamsesNodeBinding* nodeBinding = apiObjects.getApiObjectContainer<RamsesNodeBinding>()[0];
         EXPECT_EQ(nodeBinding, apiObjects.getApiObject(nodeBinding->m_impl));
@@ -874,6 +1100,31 @@ namespace rlogic::internal
         EXPECT_EQ(camBinding->getName(), "camera");
     }
 
+    TEST_F(AnApiObjects_Serialization, ObjectsCreatedAfterLoadingReceiveUniqueId)
+    {
+        ApiObjects beforeSaving;
+
+        // Create dummy data and serialize
+        flatbuffers::FlatBufferBuilder builder;
+        {
+            createScript(beforeSaving, m_valid_empty_script);
+            createScript(beforeSaving, m_valid_empty_script);
+            createScript(beforeSaving, m_valid_empty_script);
+
+            ApiObjects::Serialize(beforeSaving, builder);
+        }
+
+        auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(builder.GetBufferPointer());
+
+        EXPECT_EQ(3u, serialized.lastObjectId());
+
+        std::unique_ptr<ApiObjects> afterLoadingObjects = ApiObjects::Deserialize(serialized, m_resolverMock, "", m_errorReporting);
+
+        auto* newScript = createScript(*afterLoadingObjects, m_valid_empty_script);
+        // new script's ID does not overlap with one of the IDs of the objects before saving
+        EXPECT_EQ(nullptr, beforeSaving.getApiObjectById(newScript->getId()));
+    }
+
     TEST_F(AnApiObjects_Serialization, ReConstructsLinksWhenCreatedFromDeserializedData)
     {
         // Create dummy data and serialize
@@ -882,14 +1133,14 @@ namespace rlogic::internal
             ApiObjects toSerialize;
 
             const std::string_view scriptForLinks = R"(
-                function interface()
-                    IN.integer = INT
+                function interface(IN,OUT)
+                    IN.integer = Type:Int32()
                     OUT.nested = {
-                        unused = FLOAT,
-                        integer = INT
+                        unused = Type:Float(),
+                        integer = Type:Int32()
                     }
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )";
 
@@ -938,6 +1189,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 0, // no modules container
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -964,6 +1216,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 0, // no scripts container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -983,6 +1236,33 @@ namespace rlogic::internal
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing Lua scripts container!");
     }
 
+    TEST_F(AnApiObjects_Serialization, ErrorWhenInterfacesContainerMissing)
+    {
+        {
+            auto apiObjects = rlogic_serialization::CreateApiObjects(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                0, // no interfaces container
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::TimerNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
+            );
+            m_flatBufferBuilder.Finish(apiObjects);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading from serialized data: missing Lua interfaces container!");
+    }
+
     TEST_F(AnApiObjects_Serialization, ErrorWhenNodeBindingsContainerMissing)
     {
         {
@@ -990,6 +1270,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 0, // no node bindings container
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1016,6 +1297,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 0, // no appearance bindings container
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1042,6 +1324,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 0, // no camera bindings container
@@ -1068,6 +1351,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1094,6 +1378,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1120,6 +1405,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1146,6 +1432,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1171,7 +1458,36 @@ namespace rlogic::internal
             auto apiObjects = rlogic_serialization::CreateApiObjects(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
-                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{ m_testUtils.serializeTestScriptWithError() }), // script has errors
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{ m_testUtils.serializeTestScriptWithError() }),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::AnimationNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::TimerNode>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::Link>>{})
+            );
+            m_flatBufferBuilder.Finish(apiObjects);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::ApiObjects>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 2u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LogicObject base from serialized data: missing base table!");
+        EXPECT_EQ(m_errorReporting.getErrors()[1].message, "Fatal error during loading of LuaScript from serialized data: missing name and/or ID!");
+    }
+
+    TEST_F(AnApiObjects_Serialization, ReportsErrorWhenInterfaceCouldNotBeDeserialized)
+    {
+        {
+            auto apiObjects = rlogic_serialization::CreateApiObjects(
+                m_flatBufferBuilder,
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{m_testUtils.serializeTestInterfaceWithError()}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1188,7 +1504,7 @@ namespace rlogic::internal
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing name!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaInterface from serialized data: empty name!");
     }
 
     TEST_F(AnApiObjects_Serialization, ReportsErrorWhenModuleCouldNotBeDeserialized)
@@ -1198,6 +1514,7 @@ namespace rlogic::internal
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>>{ m_testUtils.serializeTestModule(true) }), // module has errors
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>>{}),
@@ -1213,8 +1530,9 @@ namespace rlogic::internal
         std::unique_ptr<ApiObjects> deserialized = ApiObjects::Deserialize(serialized, m_resolverMock, "unit test", m_errorReporting);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaModule from serialized data: missing name!");
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 2u);
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LogicObject base from serialized data: missing name!");
+        EXPECT_EQ(m_errorReporting.getErrors()[1].message, "Fatal error during loading of LuaModule from serialized data: missing name and/or ID!");
     }
 
     TEST_F(AnApiObjects_Serialization, FillsLogicObjectAndOwnedContainerOnDeserialization)
@@ -1225,6 +1543,7 @@ namespace rlogic::internal
             ApiObjects toSerialize;
             toSerialize.createLuaModule(m_moduleSrc, {}, "module", m_errorReporting);
             createScript(toSerialize, m_valid_empty_script);
+            createInterface(toSerialize);
             toSerialize.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "node");
             toSerialize.createRamsesAppearanceBinding(*m_appearance, "appearance");
             toSerialize.createRamsesCameraBinding(*m_camera, "camera");
@@ -1250,12 +1569,13 @@ namespace rlogic::internal
 
         const ApiObjectContainer<LogicObject>& logicObjects = apiObjects.getApiObjectContainer<LogicObject>();
         const ApiObjectOwningContainer& ownedObjects = apiObjects.getApiObjectOwningContainer();
-        ASSERT_EQ(8u, logicObjects.size());
-        ASSERT_EQ(8u, ownedObjects.size());
+        ASSERT_EQ(9u, logicObjects.size());
+        ASSERT_EQ(9u, ownedObjects.size());
 
         const std::vector<LogicObject*> expected{
             apiObjects.getApiObjectContainer<LuaModule>()[0],
             apiObjects.getApiObjectContainer<LuaScript>()[0],
+            apiObjects.getApiObjectContainer<LuaInterface>()[0],
             apiObjects.getApiObjectContainer<RamsesNodeBinding>()[0],
             apiObjects.getApiObjectContainer<RamsesAppearanceBinding>()[0],
             apiObjects.getApiObjectContainer<RamsesCameraBinding>()[0],

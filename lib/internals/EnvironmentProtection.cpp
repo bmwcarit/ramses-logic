@@ -44,21 +44,32 @@ namespace rlogic::internal
             protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_LoadScript;
             protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_LoadScript;
             break;
+        case EEnvProtectionFlag::LoadInterface:
+            protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_LoadInterface;
+            protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_LoadInterface;
+            break;
         case EEnvProtectionFlag::InitFunction:
             protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_InitializeFunction;
             protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_InitializeFunction;
             break;
-        case EEnvProtectionFlag::InterfaceFunction:
-            protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_InterfaceFunction;
-            protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_InterfaceFunction;
+        case EEnvProtectionFlag::InterfaceFunctionInScript:
+            protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_InterfaceFunctionInScript;
+            protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_InterfaceFunctionInScript;
+            break;
+        case EEnvProtectionFlag::InterfaceFunctionInInterface:
+            protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_InterfaceFunctionInInterface;
+            protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_InterfaceFunctionInInterface;
             break;
         case EEnvProtectionFlag::RunFunction:
             protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_RunFunction;
             protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_RunFunction;
             break;
+        case EEnvProtectionFlag::Module:
+            protectedMetatable[sol::meta_function::new_index] = EnvironmentProtection::protectedNewIndex_Module;
+            protectedMetatable[sol::meta_function::index] = EnvironmentProtection::protectedIndex_Module;
+            break;
         }
     }
-
 
     void EnvironmentProtection::EnsureStringKey(const sol::object& key)
     {
@@ -108,6 +119,40 @@ namespace rlogic::internal
         return GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key);
     };
 
+    void EnvironmentProtection::protectedNewIndex_LoadInterface(const sol::lua_table& tbl, const sol::object& key, const sol::object& value)
+    {
+        EnsureStringKey(key);
+        const std::string keyStr(key.as<std::string>());
+        const sol::type valueType = value.get_type();
+
+        if (valueType != sol::type::function)
+        {
+            sol_helper::throwSolException("Declaring global variables is forbidden (exception: the 'interface' function)! (found value of type '{}')",
+                sol_helper::GetSolTypeName(valueType));
+        }
+
+        if (keyStr != "interface")
+        {
+            sol_helper::throwSolException("Unexpected function name '{}'! Only 'interface' function can be declared!", keyStr);
+        }
+
+        if (GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key) != sol::nil)
+        {
+            sol_helper::throwSolException("Function '{}' can only be declared once!", keyStr);
+        }
+
+        GetProtectedEnvironmentTable(tbl).raw_set(key, value);
+    };
+
+    sol::object EnvironmentProtection::protectedIndex_LoadInterface(const sol::lua_table& /*tbl*/, const sol::object& key)
+    {
+        EnsureStringKey(key);
+        const std::string keyStr(key.as<std::string>());
+        sol_helper::throwSolException("Trying to read global variable '{}' in an interface!", keyStr);
+
+        return {};
+    };
+
     void EnvironmentProtection::protectedNewIndex_InitializeFunction(const sol::lua_table& /*tbl*/, const sol::object& key, const sol::object& /*value*/)
     {
         EnsureStringKey(key);
@@ -116,6 +161,10 @@ namespace rlogic::internal
         if (keyStr == "GLOBAL")
         {
             sol_helper::throwSolException("Trying to override the GLOBAL table in init()! You can only add data, but not overwrite the table!");
+        }
+        else if (keyStr == "Type")
+        {
+            sol_helper::throwSolException("Can't override the Type special table in init()!");
         }
         else
         {
@@ -127,7 +176,7 @@ namespace rlogic::internal
     {
         EnsureStringKey(key);
         const std::string keyStr(key.as<std::string>());
-        if (keyStr != "GLOBAL")
+        if (keyStr != "GLOBAL" && keyStr != "Type")
         {
             sol_helper::throwSolException(
                 "Trying to read global variable '{}' in the init() function! This can cause undefined behavior and is forbidden! Use the GLOBAL table to read/write global data!", keyStr);
@@ -135,7 +184,7 @@ namespace rlogic::internal
         return GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key);
     }
 
-    void EnvironmentProtection::protectedNewIndex_InterfaceFunction(const sol::lua_table& /*tbl*/, const sol::object& key, const sol::object& /*value*/)
+    void EnvironmentProtection::protectedNewIndex_InterfaceFunctionInScript(const sol::lua_table& /*tbl*/, const sol::object& key, const sol::object& /*value*/)
     {
         EnsureStringKey(key);
         const std::string keyStr(key.as<std::string>());
@@ -143,20 +192,47 @@ namespace rlogic::internal
         {
             sol_helper::throwSolException("Trying to override the GLOBAL table in interface()! You can only read data, but not overwrite the GLOBAL table!");
         }
-        else
+
+        if (keyStr == "Type")
         {
-            sol_helper::throwSolException(
-                "Unexpected global variable definition '{}' in interface()! Use the GLOBAL table inside the init() function to declare global data and functions, or use modules!", keyStr);
+            sol_helper::throwSolException("Can't override the 'Type' symbol in interface()!");
         }
+
+        sol_helper::throwSolException(
+            "Unexpected global variable definition '{}' in interface()! Use the GLOBAL table inside the init() function to declare global data and functions, or use modules!", keyStr);
     }
 
-    sol::object EnvironmentProtection::protectedIndex_InterfaceFunction(const sol::lua_table& tbl, const sol::object& key)
+    void EnvironmentProtection::protectedNewIndex_InterfaceFunctionInInterface(const sol::lua_table& /*tbl*/, const sol::object& key, const sol::object& /*value*/)
     {
         EnsureStringKey(key);
         const std::string keyStr(key.as<std::string>());
-        if (keyStr != "GLOBAL" && keyStr != "IN" && keyStr != "OUT")
+
+        if (keyStr == "Type")
         {
-            sol_helper::throwSolException("Unexpected global access to key '{}' in interface()! Allowed keys: 'GLOBAL', 'IN', 'OUT'", keyStr);
+            sol_helper::throwSolException("Special global '{}' symbol should not be overwritten in the interface() function!", keyStr);
+        }
+
+        sol_helper::throwSolException("Unexpected variable definition '{}' in interface()!", keyStr);
+    }
+
+    sol::object EnvironmentProtection::protectedIndex_InterfaceFunctionInScript(const sol::lua_table& tbl, const sol::object& key)
+    {
+        EnsureStringKey(key);
+        const std::string keyStr(key.as<std::string>());
+        if (keyStr != "GLOBAL" && keyStr != "Type")
+        {
+            sol_helper::throwSolException("Unexpected global access to key '{}' in interface()! Only 'GLOBAL' and 'Type' are allowed as a key", keyStr);
+        }
+        return GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key);
+    }
+
+    sol::object EnvironmentProtection::protectedIndex_InterfaceFunctionInInterface(const sol::lua_table& tbl, const sol::object& key)
+    {
+        EnsureStringKey(key);
+        const std::string keyStr(key.as<std::string>());
+        if (keyStr != "Type")
+        {
+            sol_helper::throwSolException("Unexpected global access to key '{}' in interface()! Only 'Type' is allowed as a key", keyStr);
         }
         return GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key);
     }
@@ -179,12 +255,44 @@ namespace rlogic::internal
     {
         EnsureStringKey(key);
         const std::string_view keyStr(key.as<std::string_view>());
-        if (keyStr != "GLOBAL" && keyStr != "IN" && keyStr != "OUT")
+        if (keyStr != "GLOBAL")
         {
-            sol_helper::throwSolException("Unexpected global access to key '{}' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'", keyStr);
+            sol_helper::throwSolException("Unexpected global access to key '{}' in run()! Only 'GLOBAL' is allowed as a key", keyStr);
         }
         return GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key);
     }
+
+    void EnvironmentProtection::protectedNewIndex_Module(const sol::lua_table& /*tbl*/, const sol::object& key, const sol::object& value)
+    {
+        EnsureStringKey(key);
+        const std::string keyStr(key.as<std::string>());
+        const sol::type valueType = value.get_type();
+
+        if (keyStr == "Type")
+        {
+            sol_helper::throwSolException("Special global 'Type' symbol should not be overwritten in modules!");
+        }
+
+        sol_helper::throwSolException("Declaring global variables is forbidden in modules! (found value of type '{}' assigned to variable '{}')",
+            sol_helper::GetSolTypeName(valueType), keyStr);
+    };
+
+    sol::object EnvironmentProtection::protectedIndex_Module(const sol::lua_table& tbl, const sol::object& key)
+    {
+        EnsureStringKey(key);
+
+        const std::string keyStr(key.as<std::string>());
+
+        // Allows reading existing symbols (e.g. standard modules), but reports error if accessing anything else
+        sol::object existingObject = GetProtectedEnvironmentTable(tbl).raw_get<sol::object>(key);
+        if (!existingObject.valid())
+        {
+            sol_helper::throwSolException(
+                "Trying to read global variable '{}' in module! This can cause undefined behavior and is forbidden!", keyStr);
+        }
+
+        return existingObject;
+    };
 
     ScopedEnvironmentProtection::ScopedEnvironmentProtection(sol::environment& env, EEnvProtectionFlag protectionFlag)
         : m_env(env)

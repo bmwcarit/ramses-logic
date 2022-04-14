@@ -10,8 +10,21 @@
 
 #include <string>
 
+namespace flatbuffers
+{
+    template<typename T> struct Offset;
+    class FlatBufferBuilder;
+}
+
+namespace rlogic_serialization
+{
+    struct LogicObject;
+}
+
 namespace rlogic::internal
 {
+    class ErrorReporting;
+
     class LogicObjectImpl
     {
     public:
@@ -22,10 +35,24 @@ namespace rlogic::internal
 
         [[nodiscard]] std::string_view getName() const;
         [[nodiscard]] uint64_t getId() const;
-        void setName(std::string_view name);
+        bool setName(std::string_view name);
+        bool setUserId(uint64_t highId, uint64_t lowId);
+        [[nodiscard]] std::pair<uint64_t, uint64_t> getUserId() const;
+
+        [[nodiscard]] std::string getIdentificationString() const;
+
+    protected:
+        static flatbuffers::Offset<rlogic_serialization::LogicObject> Serialize(const LogicObjectImpl& object, flatbuffers::FlatBufferBuilder& builder);
+        static bool Deserialize(const rlogic_serialization::LogicObject* object,
+            std::string& name,
+            uint64_t& id,
+            uint64_t& userIdHigh,
+            uint64_t& userIdLow,
+            ErrorReporting& errorReporting);
 
     private:
         std::string m_name;
         uint64_t    m_id;
+        std::pair<uint64_t, uint64_t> m_userId{ 0u, 0u };
     };
 }

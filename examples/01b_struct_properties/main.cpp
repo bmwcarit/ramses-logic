@@ -24,23 +24,23 @@ int main()
 
     // Create a script with inputs and outputs of the same type (consists of nested structs)
     rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
-        function interface()
+        function interface(IN,OUT)
             IN.struct = {
                 nested = {
-                    data1 = STRING,
-                    data2 = INT32
+                    data1 = Type:String(),
+                    data2 = Type:Int32()
                 }
             }
 
             OUT.struct = {
                 nested = {
-                    data1 = STRING,
-                    data2 = INT32
+                    data1 = Type:String(),
+                    data2 = Type:Int32()
                 }
             }
         end
 
-        function run()
+        function run(IN,OUT)
             -- can assign whole structs if both sides are of compatible types
             OUT.struct = IN.struct
 

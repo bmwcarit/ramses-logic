@@ -35,7 +35,7 @@ namespace rlogic::internal
                 fmt::format("Fatal error during loading from file! Serialized Ramses Logic object '{}' points to a Ramses object (id: {}), but no Ramses scene was provided to resolve the Ramses object!",
                             logicNodeName,
                             objectId.getValue()
-                    ), nullptr);
+                    ), nullptr, EErrorType::ContentStateError);
             return nullptr;
         }
 
@@ -47,7 +47,7 @@ namespace rlogic::internal
                 fmt::format("Fatal error during loading from file! Serialized Ramses Logic object '{}' points to a Ramses object (id: {}) which couldn't be found in the provided scene!",
                             logicNodeName,
                             objectId.getValue()
-                ), nullptr);
+                ), nullptr, EErrorType::ContentStateError);
             return nullptr;
         }
 
@@ -67,7 +67,7 @@ namespace rlogic::internal
 
         if (nullptr == ramsesNode)
         {
-            m_errors.add("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!", nullptr);
+            m_errors.add("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!", nullptr, EErrorType::ContentStateError);
             return nullptr;
         }
 
@@ -87,7 +87,7 @@ namespace rlogic::internal
 
         if (nullptr == ramsesAppearance)
         {
-            m_errors.add("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!", nullptr);
+            m_errors.add("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!", nullptr, EErrorType::ContentStateError);
             return nullptr;
         }
 
@@ -107,7 +107,7 @@ namespace rlogic::internal
 
         if (nullptr == ramsesCamera)
         {
-            m_errors.add("Fatal error during loading from file! Camera binding points to a Ramses scene object which is not of type 'Camera'!", nullptr);
+            m_errors.add("Fatal error during loading from file! Camera binding points to a Ramses scene object which is not of type 'Camera'!", nullptr, EErrorType::ContentStateError);
             return nullptr;
         }
 

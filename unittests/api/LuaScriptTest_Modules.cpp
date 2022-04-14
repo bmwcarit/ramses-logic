@@ -39,15 +39,15 @@ namespace rlogic::internal
             end
             function myothermath.colorType()
                 return {
-                    red = INT,
-                    blue = INT,
-                    green = INT
+                    red = Type:Int32(),
+                    blue = Type:Int32(),
+                    green = Type:Int32()
                 }
             end
             function myothermath.structWithArray()
                 return {
-                    value = INT,
-                    array = ARRAY(2, INT)
+                    value = Type:Int32(),
+                    array = Type:Array(2, Type:Int32())
                 }
             end
 
@@ -91,12 +91,12 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymath")
 
-            function interface()
-                OUT.v = INT
-                OUT.pi = FLOAT
+            function interface(IN,OUT)
+                OUT.v = Type:Int32()
+                OUT.pi = Type:Float()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymath.add(1,2)
                 OUT.pi = mymath.PI
             end
@@ -114,12 +114,12 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymodule")
 
-            function interface()
-                OUT.v = INT
-                OUT.pi = FLOAT
+            function interface(IN,OUT)
+                OUT.v = Type:Int32()
+                OUT.pi = Type:Float()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymodule.add(1,2)
                 OUT.pi = mymodule.PI
             end
@@ -136,11 +136,11 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymath", "mymath2")
 
-            function interface()
-                OUT.v = INT
+            function interface(IN,OUT)
+                OUT.v = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymath.add(1,2) + mymath2.sub(20,10)
             end
         )", createDeps({ { "mymath", m_moduleSourceCode }, { "mymath2", m_moduleSourceCode2 } }));
@@ -161,11 +161,11 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymath", "mymath2")
 
-            function interface()
-                OUT.v = INT
+            function interface(IN,OUT)
+                OUT.v = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymath.add(1,2) + mymath2.add(20,10)
             end
         )", config);
@@ -186,11 +186,11 @@ namespace rlogic::internal
         const auto script1 = m_logicEngine.createLuaScript(R"(
             modules("mymath")
 
-            function interface()
-                OUT.v = INT
+            function interface(IN,OUT)
+                OUT.v = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymath.add(1,2)
             end
         )", config1);
@@ -202,11 +202,11 @@ namespace rlogic::internal
         const auto script2 = m_logicEngine.createLuaScript(R"(
             modules("mymathother")
 
-            function interface()
-                OUT.v = INT
+            function interface(IN,OUT)
+                OUT.v = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymathother.add(10,20)
             end
         )", config2);
@@ -217,17 +217,42 @@ namespace rlogic::internal
         EXPECT_EQ(30, *script2->getOutputs()->getChild("v")->get<int32_t>());
     }
 
+    TEST_F(ALuaScriptWithModule, ErrorIfModuleReadsGlobalVariablesWhichDontExist)
+    {
+        const std::string_view moduleSrc = R"(
+            local mymath = {}
+            mymath.PI = peterPan -- does not exist
+            return mymath
+        )";
+        LuaModule* luaModule = m_logicEngine.createLuaModule(moduleSrc, {}, "mod");
+        EXPECT_EQ(nullptr, luaModule);
+
+        EXPECT_FALSE(m_logicEngine.getErrors().empty());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Trying to read global variable 'peterPan' in module! This can cause undefined behavior and is forbidden!"));
+    }
+
+    TEST_F(ALuaScriptWithModule, ErrorIfModuleWritesGlobalVariables)
+    {
+        const std::string_view moduleSrc = R"(
+            local mymath = {}
+            someGlobalVar = 15
+            return mymath
+        )";
+        LuaModule* luaModule = m_logicEngine.createLuaModule(moduleSrc, {}, "mod");
+        EXPECT_EQ(nullptr, luaModule);
+
+        EXPECT_FALSE(m_logicEngine.getErrors().empty());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Declaring global variables is forbidden in modules! (found value of type 'number' assigned to variable 'someGlobalVar')"));
+    }
+
     TEST_F(ALuaScriptWithModule, ErrorIfModuleDoesNotReturnTable)
     {
         std::vector<std::string> errorCases = {
             "return nil",
-            "return IN",
-            "return OUT",
             "return 5",
             "return \"TheModule\"",
             "return false",
             "return true",
-            "return print",
         };
 
         for (const auto& moduleSrc : errorCases)
@@ -238,17 +263,16 @@ namespace rlogic::internal
             EXPECT_FALSE(m_logicEngine.getErrors().empty());
             EXPECT_EQ("[mod] Error while loading module. Module script must return a table!", m_logicEngine.getErrors()[0].message);
         }
-
     }
 
     TEST_F(ALuaScriptWithModule, CanUseTableDataAndItsTypeDefinitionFromModule)
     {
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
+            function interface(IN,OUT)
                 OUT.color = mymath.colorType()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.color = mymath.color
             end
         )", createDeps({ { "mymath", m_moduleSourceCode2 } }));
@@ -267,8 +291,8 @@ namespace rlogic::internal
         const auto modSrc = R"(
             local mod = {}
             mod.structType = {
-                a = STRING,
-                b = INT32
+                a = Type:String(),
+                b = Type:Int32()
             }
             return mod
         )";
@@ -276,11 +300,11 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mod")
 
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = mod.structType
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )", createDeps({{"mod", modSrc}}));
         ASSERT_NE(nullptr, script);
@@ -299,8 +323,8 @@ namespace rlogic::internal
             coalaModule.coalaChief = "Alfred"
 
             coalaModule.coalaStruct = {
-                preferredFood = STRING,
-                weight = INT
+                preferredFood = Type:String(),
+                weight = Type:Int32()
             }
 
             function coalaModule.bark()
@@ -321,11 +345,11 @@ namespace rlogic::internal
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("coalas")
 
-            function interface()
-                OUT.coalas = ARRAY(2, coalas.coalaStruct)
+            function interface(IN,OUT)
+                OUT.coalas = Type:Array(2, coalas.coalaStruct)
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.coalas = {
                     {
                         preferredFood = "bamboo",
@@ -356,11 +380,11 @@ namespace rlogic::internal
     {
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = mymath.structWithArray()
                 OUT.struct = mymath.structWithArray()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.struct = IN.struct
                 OUT.struct.array[2] = 42
             end
@@ -394,12 +418,12 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mod")
-            function interface()
-                OUT.table1size = INT
-                OUT.table2size = INT
-                OUT.table3size = INT
+            function interface(IN,OUT)
+                OUT.table1size = Type:Int32()
+                OUT.table2size = Type:Int32()
+                OUT.table3size = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.table1size = rl_len(mod.table1)
                 OUT.table2size = rl_len(mod.table2)
                 OUT.table3size = rl_len(mod.table3)
@@ -427,18 +451,18 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mod")
-            function interface()
-                OUT.vec4isize = INT
-                OUT.vec2fsize = INT
-                OUT.vec4i = VEC4I
-                OUT.vec2f = VEC2F
+            function interface(IN,OUT)
+                OUT.vec4isize = Type:Int32()
+                OUT.vec2fsize = Type:Int32()
+                OUT.vec4i = Type:Vec4i()
+                OUT.vec2f = Type:Vec2f()
 
                 -- test that vec can be also read during interface extraction
                 local vec4i = mod.vec4i
                 assert(rl_len(vec4i) == 4)
                 assert(vec4i[4] == 7)
             end
-            function run()
+            function run(IN,OUT)
                 OUT.vec4isize = rl_len(mod.vec4i)
                 OUT.vec2fsize = rl_len(mod.vec2f)
                 OUT.vec4i = mod.vec4i
@@ -466,10 +490,10 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mod")
-            function interface()
-                OUT.size = INT
+            function interface(IN,OUT)
+                OUT.size = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.size = mod.tableSize
             end
         )", createDeps({ { "mod", modSrc } }));
@@ -488,10 +512,10 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mod")
-            function interface()
-                OUT.size = INT
+            function interface(IN,OUT)
+                OUT.size = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.size = rl_len(mod.invalidTypeForLength)
             end
         )", createDeps({ { "mod", modSrc } }));
@@ -519,10 +543,10 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("wrapped")
-            function interface()
-                OUT.result = INT
+            function interface(IN,OUT)
+                OUT.result = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.result = wrapped.add(10, 20)
             end
         )", config);
@@ -552,18 +576,18 @@ namespace rlogic::internal
 
         m_logicEngine.createLuaScript(R"(
             modules("wrapped")
-            function interface()
-                OUT.add = INT
-                OUT.PI = FLOAT
+            function interface(IN,OUT)
+                OUT.add = Type:Int32()
+                OUT.PI = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 -- This should generate 'global access error' if indirect dependency is not correctly hidden
                 mymath.add(10, 20)
             end
         )", config);
 
         EXPECT_FALSE(m_logicEngine.update());
-        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Unexpected global access to key 'mymath' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Unexpected global access to key 'mymath' in run()! Only 'GLOBAL' is allowed as a key"));
     }
 
     TEST_F(ALuaScriptWithModule, ReloadsModuleUsingTheSameNameCausesItToBeRecompiled)
@@ -582,10 +606,10 @@ namespace rlogic::internal
 
         const std::string_view scriptSrc = R"(
             modules("module")
-            function interface()
-                OUT.pi = FLOAT
+            function interface(IN,OUT)
+                OUT.pi = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.pi = module.pi
             end
         )";
@@ -633,21 +657,21 @@ namespace rlogic::internal
 
             logic.createLuaScript(R"(
                 modules("mymath", "mymathother")
-                function interface()
-                    OUT.v = INT
+                function interface(IN,OUT)
+                    OUT.v = Type:Int32()
                     OUT.color = mymathother.colorType()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.v = mymath.add(1,2) + mymathother.sub(60,30)
                     OUT.color = mymathother.color
                 end
             )", config1, "script1");
             logic.createLuaScript(R"(
                 modules("mymath")
-                function interface()
-                    OUT.v = INT
+                function interface(IN,OUT)
+                    OUT.v = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.v = mymath.sub(90,60)
                 end
             )", config2, "script2");
@@ -683,11 +707,11 @@ namespace rlogic::internal
             local mytypes = {}
             function mytypes.mystruct()
                 return {
-                    name = STRING,
+                    name = Type:String(),
                     address =
                     {
-                        street = STRING,
-                        number = INT
+                        street = Type:String(),
+                        number = Type:Int32()
                     }
                 }
             end
@@ -696,12 +720,12 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mytypes")
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = mytypes.mystruct()
                 OUT.struct = mytypes.mystruct()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.struct = IN.struct
             end
         )", createDeps({ { "mytypes", moduleDefiningInterfaceType } }));
@@ -734,11 +758,11 @@ namespace rlogic::internal
             local mytypes = {}
             function mytypes.mystruct()
                 return {
-                    name = STRING,
+                    name = Type:String(),
                     address =
                     {
-                        street = STRING,
-                        number = INT
+                        street = Type:String(),
+                        number = Type:Int32()
                     }
                 }
             end
@@ -747,12 +771,12 @@ namespace rlogic::internal
 
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mytypes")
-            function interface()
-                IN.array_of_structs = ARRAY(2, mytypes.mystruct())
-                OUT.array_of_structs = ARRAY(2, mytypes.mystruct())
+            function interface(IN,OUT)
+                IN.array_of_structs = Type:Array(2, mytypes.mystruct())
+                OUT.array_of_structs = Type:Array(2, mytypes.mystruct())
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.array_of_structs = IN.array_of_structs
             end
         )", createDeps({ { "mytypes", moduleDefiningInterfaceType } }));
@@ -795,11 +819,11 @@ namespace rlogic::internal
                 local mytypes = {}
                 function mytypes.mystruct()
                     return {
-                        name = STRING,
+                        name = Type:String(),
                         address =
                         {
-                            street = STRING,
-                            number = INT
+                            street = Type:String(),
+                            number = Type:Int32()
                         }
                     }
                 end
@@ -807,12 +831,12 @@ namespace rlogic::internal
 
             constexpr std::string_view scriptSrc = R"(
                 modules("mytypes")
-                function interface()
-                    IN.array_of_structs = ARRAY(2, mytypes.mystruct())
-                    OUT.array_of_structs = ARRAY(2, mytypes.mystruct())
+                function interface(IN,OUT)
+                    IN.array_of_structs = Type:Array(2, mytypes.mystruct())
+                    OUT.array_of_structs = Type:Array(2, mytypes.mystruct())
                 end
 
-                function run()
+                function run(IN,OUT)
                     OUT.array_of_structs = IN.array_of_structs
                     OUT.array_of_structs[2].address.number = 42
                 end)";
@@ -871,11 +895,11 @@ namespace rlogic::internal
     TEST_F(ALuaScriptWithModule, ScriptOverwritingBaseLibraryWontAffectOtherScriptUsingIt)
     {
         const auto script1 = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.v = FLOAT
-                OUT.v = INT
+            function interface(IN,OUT)
+                IN.v = Type:Float()
+                OUT.v = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.v = math.floor(IN.v)
                 math.floor = nil
             end
@@ -883,11 +907,11 @@ namespace rlogic::internal
         ASSERT_NE(nullptr, script1);
 
         const auto script2 = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.v = FLOAT
-                OUT.v = INT
+            function interface(IN,OUT)
+                IN.v = Type:Float()
+                OUT.v = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.v = math.floor(IN.v + 1.0)
             end
         )", WithStdMath());
@@ -916,7 +940,7 @@ namespace rlogic::internal
         const std::string_view maliciousModuleSrc = R"(
             local mymath = {}
             function mymath.breakFloor(v)
-                ret = math.floor(v)
+                local ret = math.floor(v)
                 math.floor = nil
                 return ret
             end
@@ -929,22 +953,22 @@ namespace rlogic::internal
         withMaliciousModule.addDependency("mymath", *maliciousModule);
         const auto script1 = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
-                IN.v = FLOAT
-                OUT.v = INT
+            function interface(IN,OUT)
+                IN.v = Type:Float()
+                OUT.v = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.v = mymath.breakFloor(IN.v)
             end
         )", withMaliciousModule);
         ASSERT_NE(nullptr, script1);
 
         const auto script2 = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.v = FLOAT
-                OUT.v = INT
+            function interface(IN,OUT)
+                IN.v = Type:Float()
+                OUT.v = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.v = math.floor(IN.v + 1.0)
             end
         )", WithStdMath());
@@ -976,9 +1000,9 @@ namespace rlogic::internal
     {
         constexpr std::string_view src = R"(
             modules("dep1", "dep2")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
         EXPECT_EQ(nullptr, m_logicEngine.createLuaScript(src, createDeps({ {"dep2", m_moduleSourceCode} })));
@@ -990,9 +1014,9 @@ namespace rlogic::internal
     {
         constexpr std::string_view src = R"(
             modules("dep1", "dep2")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
         EXPECT_EQ(nullptr, m_logicEngine.createLuaScript(src, createDeps({ {"dep1", m_moduleSourceCode}, {"dep2", m_moduleSourceCode}, {"dep3", m_moduleSourceCode} })));
@@ -1004,9 +1028,9 @@ namespace rlogic::internal
     {
         constexpr std::string_view src = R"(
             modules("dep1", "dep1") -- duplicate dependency
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
         EXPECT_EQ(nullptr, m_logicEngine.createLuaScript(src, createDeps({ {"dep1", m_moduleSourceCode} })));
@@ -1040,9 +1064,9 @@ namespace rlogic::internal
 
         const auto script1 = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 mymath.floor1 = mymath.floor2
             end
         )", config);
@@ -1073,10 +1097,10 @@ namespace rlogic::internal
 
         const auto script1 = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
+            function interface(IN,OUT)
                 mymath.floor1 = mymath.floor2
             end
-            function run()
+            function run(IN,OUT)
             end
         )", config);
         EXPECT_EQ(nullptr, script1);
@@ -1099,9 +1123,9 @@ namespace rlogic::internal
 
         const auto script1 = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 mymath.data = 42
             end
         )", config);
@@ -1127,10 +1151,10 @@ namespace rlogic::internal
 
         const auto script1 = m_logicEngine.createLuaScript(R"(
             modules("mymath")
-            function interface()
+            function interface(IN,OUT)
                 mymath.data = 42
             end
-            function run()
+            function run(IN,OUT)
             end
         )", config);
         EXPECT_EQ(nullptr, script1);
@@ -1151,11 +1175,11 @@ namespace rlogic::internal
 
         const std::string_view scriptSrc = R"(
             modules("mappedMod")
-            function interface()
-                OUT.result = INT
+            function interface(IN,OUT)
+                OUT.result = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 -- Will modify the module because it's passed as argument by the
                 -- script to the module
                 mappedMod.modifyModule(mappedMod)
@@ -1183,12 +1207,12 @@ namespace rlogic::internal
 
         const std::string_view scriptSrc = R"(
             modules("mappedMod")
-            function interface()
-                OUT.resultBeforeMod = INT
-                OUT.resultAfterMod = INT
+            function interface(IN,OUT)
+                OUT.resultBeforeMod = Type:Int32()
+                OUT.resultAfterMod = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.resultBeforeMod = mappedMod.getJoeAge()
                 -- This will modify the module's copy of joe
                 mappedMod.people.joe.age = 42
@@ -1230,9 +1254,9 @@ namespace rlogic::internal
         config.addDependency("mymathWrap", *mymathModule2);
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymathWrap")
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
                 mymathWrap.modify()
             end
         )", config);
@@ -1270,14 +1294,42 @@ namespace rlogic::internal
         config.addDependency("mymathWrap", *mymathModule2);
         const auto script = m_logicEngine.createLuaScript(R"(
             modules("mymathWrap")
-            function interface()
+            function interface(IN,OUT)
                 mymathWrap.modify()
             end
-            function run()
+            function run(IN,OUT)
             end
         )", config);
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
         EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
+    }
+
+
+    TEST_F(ALuaScriptWithModule_Isolation, FailsToRunScriptUsingModuleOverwritingTypeSymbols_InInterfaceFunction)
+    {
+        const std::string_view modSrc = R"(
+            local m = {}
+            function m.killTypes()
+                Type = {}
+            end
+            return m
+        )";
+        const auto luaModule = m_logicEngine.createLuaModule(modSrc);
+        ASSERT_NE(nullptr, luaModule);
+
+        LuaConfig config;
+        config.addDependency("m", *luaModule);
+        const auto script = m_logicEngine.createLuaScript(R"(
+            modules("m")
+            function interface(IN,OUT)
+                m.killTypes()
+            end
+            function run(IN,OUT)
+            end
+        )", config);
+        EXPECT_EQ(nullptr, script);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Special global 'Type' symbol should not be overwritten in modules!"));
     }
 }

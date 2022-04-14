@@ -49,24 +49,24 @@ namespace rlogic
         }
 
         const std::string_view m_minimalLinkScript = R"(
-            function interface()
-                IN.target = BOOL
-                OUT.source = BOOL
+            function interface(IN,OUT)
+                IN.target = Type:Bool()
+                OUT.source = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
         const std::string_view m_linkScriptMultipleTypes = R"(
-            function interface()
-                IN.target_INT = INT
-                OUT.source_INT = INT
-                IN.target_VEC3F = VEC3F
-                OUT.source_VEC3F = VEC3F
+            function interface(IN,OUT)
+                IN.target_int = Type:Int32()
+                OUT.source_int = Type:Int32()
+                IN.target_vec3f = Type:Vec3f()
+                OUT.source_vec3f = Type:Vec3f()
             end
-            function run()
-                OUT.source_INT = IN.target_INT
-                OUT.source_VEC3F = IN.target_VEC3F
+            function run(IN,OUT)
+                OUT.source_int = IN.target_int
+                OUT.source_vec3f = IN.target_vec3f
             end
         )";
 
@@ -82,27 +82,27 @@ namespace rlogic
         const char* errorString = "Types of source property 'outParam:{}' does not match target property 'inParam:{}'";
 
         std::array<std::tuple<std::string, std::string, std::string>, 7> errorCases = {
-            std::make_tuple("FLOAT", "INT",   fmt::format(errorString, "FLOAT", "INT32")),
-            std::make_tuple("INT32", "INT64", fmt::format(errorString, "INT32", "INT64")),
-            std::make_tuple("INT64", "INT32", fmt::format(errorString, "INT64", "INT32")),
-            std::make_tuple("VEC3F", "VEC3I", fmt::format(errorString, "VEC3F", "VEC3I")),
-            std::make_tuple("VEC2F", "VEC4I", fmt::format(errorString, "VEC2F", "VEC4I")),
-            std::make_tuple("VEC2I", "FLOAT", fmt::format(errorString, "VEC2I", "FLOAT")),
-            std::make_tuple("INT",
+            std::make_tuple("Type:Float()", "Type:Int32()", fmt::format(errorString, "Float", "Int32")),
+            std::make_tuple("Type:Int32()", "Type:Int64()", fmt::format(errorString, "Int32", "Int64")),
+            std::make_tuple("Type:Int64()", "Type:Int32()", fmt::format(errorString, "Int64", "Int32")),
+            std::make_tuple("Type:Vec3f()", "Type:Vec3i()", fmt::format(errorString, "Vec3f", "Vec3i")),
+            std::make_tuple("Type:Vec2f()", "Type:Vec4i()", fmt::format(errorString, "Vec2f", "Vec4i")),
+            std::make_tuple("Type:Vec2i()", "Type:Float()", fmt::format(errorString, "Vec2i", "Float")),
+            std::make_tuple("Type:Int32()",
             R"({
-                param1 = INT,
-                param2 = FLOAT
-            })", fmt::format(errorString, "INT32", "STRUCT"))
+                param1 = Type:Int32(),
+                param2 = Type:Float()
+            })", fmt::format(errorString, "Int32", "Struct"))
         };
 
         for (const auto& errorCase : errorCases)
         {
             const auto  luaScriptSource = fmt::format(R"(
-                function interface()
+                function interface(IN,OUT)
                     IN.inParam = {}
                     OUT.outParam = {}
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )", std::get<1>(errorCase), std::get<0>(errorCase));
 
@@ -162,14 +162,14 @@ namespace rlogic
         auto       sourceScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
         auto       targetScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
 
-        const auto sourceOuput  = sourceScript->getOutputs()->getChild("source_INT");
-        const auto targetOutput = targetScript->getOutputs()->getChild("source_INT");
+        const auto sourceOuput  = sourceScript->getOutputs()->getChild("source_int");
+        const auto targetOutput = targetScript->getOutputs()->getChild("source_int");
 
         EXPECT_FALSE(m_logicEngine.link(*sourceOuput, *targetOutput));
 
         const auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_EQ("Failed to link output property 'source_INT' to output property 'source_INT'. Only outputs can be linked to inputs", errors[0].message);
+        EXPECT_EQ("Failed to link output property 'source_int' to output property 'source_int'. Only outputs can be linked to inputs", errors[0].message);
     }
 
     TEST_F(ALogicEngine_Linking, ProducesNoErrorIfMatchingPropertiesAreLinked)
@@ -226,21 +226,21 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, ProducesNoErrorIfLinkedToMatchingType)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.boolTarget  = BOOL
-                IN.intTarget   = INT
-                IN.int64Target = INT64
-                IN.floatTarget = FLOAT
-                IN.vec2Target  = VEC2F
-                IN.vec3Target  = VEC3F
-                OUT.boolSource  = BOOL
-                OUT.intSource   = INT
-                OUT.int64Source = INT64
-                OUT.floatSource = FLOAT
-                OUT.vec2Source  = VEC2F
-                OUT.vec3Source  = VEC3F
+            function interface(IN,OUT)
+                IN.boolTarget  = Type:Bool()
+                IN.intTarget   = Type:Int32()
+                IN.int64Target = Type:Int64()
+                IN.floatTarget = Type:Float()
+                IN.vec2Target  = Type:Vec2f()
+                IN.vec3Target  = Type:Vec3f()
+                OUT.boolSource  = Type:Bool()
+                OUT.intSource   = Type:Int32()
+                OUT.int64Source = Type:Int64()
+                OUT.floatSource = Type:Float()
+                OUT.vec2Source  = Type:Vec2f()
+                OUT.vec3Source  = Type:Vec3f()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -300,12 +300,12 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesValuesAcrossMultipleLinksInAChain)
     {
         auto scriptSource = R"(
-            function interface()
-                IN.inString1 = STRING
-                IN.inString2 = STRING
-                OUT.outString = STRING
+            function interface(IN,OUT)
+                IN.inString1 = Type:String()
+                IN.inString2 = Type:String()
+                OUT.outString = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outString = IN.inString1 .. IN.inString2
             end
         )";
@@ -338,19 +338,19 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingStructs)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
+            function interface(IN,OUT)
+                IN.intTarget = Type:Int32()
                 IN.structTarget = {
-                    intTarget = INT,
-                    floatTarget = FLOAT
+                    intTarget = Type:Int32(),
+                    floatTarget = Type:Float()
                 }
-                OUT.intSource = INT
+                OUT.intSource = Type:Int32()
                 OUT.structSource  = {
-                    intTarget = INT,
-                    floatTarget = FLOAT
+                    intTarget = Type:Int32(),
+                    floatTarget = Type:Float()
                 }
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -377,11 +377,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingArrays)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.array = ARRAY(2, INT)
-                OUT.array = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array = Type:Array(2, Type:Int32())
+                OUT.array = Type:Array(2, Type:Int32())
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -400,12 +400,12 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_WhenAnotherLinkFromTheSameScriptExists)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget1 = INT
-                IN.intTarget2 = INT
-                OUT.intSource = INT
+            function interface(IN,OUT)
+                IN.intTarget1 = Type:Int32()
+                IN.intTarget2 = Type:Int32()
+                OUT.intSource = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -485,26 +485,26 @@ namespace rlogic
         auto sourceScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
         auto targetScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
 
-        auto output = sourceScript->getOutputs()->getChild("source_INT");
-        auto input  = targetScript->getInputs()->getChild("target_INT");
+        auto output = sourceScript->getOutputs()->getChild("source_int");
+        auto input  = targetScript->getInputs()->getChild("target_int");
 
         EXPECT_TRUE(m_logicEngine.link(*output, *input));
 
-        sourceScript->getInputs()->getChild("target_INT")->set<int32_t>(42);
+        sourceScript->getInputs()->getChild("target_int")->set<int32_t>(42);
 
         m_logicEngine.update();
 
-        EXPECT_EQ(42, *targetScript->getOutputs()->getChild("source_INT")->get<int32_t>());
+        EXPECT_EQ(42, *targetScript->getOutputs()->getChild("source_int")->get<int32_t>());
     }
 
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_Int64)
     {
         const std::string_view scriptSrc = R"(
-            function interface()
-                IN.data = INT64
-                OUT.data = INT64
+            function interface(IN,OUT)
+                IN.data = Type:Int64()
+                OUT.data = Type:Int64()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = IN.data
             end
         )";
@@ -528,21 +528,21 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_ArraysOfStructs)
     {
         const std::string_view scriptArrayOfStructs = R"(
-            function interface()
-                IN.data = ARRAY(3,
+            function interface(IN,OUT)
+                IN.data = Type:Array(3,
                     {
-                        one = INT,
-                        two = INT
+                        one = Type:Int32(),
+                        two = Type:Int32()
                     }
                 )
-                OUT.data = ARRAY(3,
+                OUT.data = Type:Array(3,
                     {
-                        one = INT,
-                        two = INT
+                        one = Type:Int32(),
+                        two = Type:Int32()
                     }
                 )
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = IN.data
             end
         )";
@@ -565,19 +565,19 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_StructOfArrays)
     {
         const std::string_view scriptArrayOfStructs = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.data =
                 {
-                    one = ARRAY(3, INT),
-                    two = ARRAY(3, INT)
+                    one = Type:Array(3, Type:Int32()),
+                    two = Type:Array(3, Type:Int32())
                 }
                 OUT.data =
                 {
-                    one = ARRAY(3, INT),
-                    two = ARRAY(3, INT)
+                    one = Type:Array(3, Type:Int32()),
+                    two = Type:Array(3, Type:Int32())
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.data = IN.data
             end
         )";
@@ -600,11 +600,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, DoesNotPropagateOutputsToInputsAfterUnlink)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.intTarget = INT
-                OUT.intSource = INT
+            function interface(IN,OUT)
+                IN.intTarget = Type:Int32()
+                OUT.intSource = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.intSource = IN.intTarget
             end
         )";
@@ -632,20 +632,20 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesOneOutputToMultipleInputs)
     {
         const auto  luaScriptSource1 = R"(
-            function interface()
-                OUT.intSource = INT
+            function interface(IN,OUT)
+                OUT.intSource = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.intSource = 5
             end
         )";
 
         const auto  luaScriptSource2 = R"(
-            function interface()
-                IN.intTarget1 = INT
-                IN.intTarget2 = INT
+            function interface(IN,OUT)
+                IN.intTarget1 = Type:Int32()
+                IN.intTarget2 = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -677,11 +677,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesAppearanceBindings)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
@@ -708,11 +708,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesCameraBindings)
     {
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
@@ -736,19 +736,19 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndOutputValueIsSetBeforehand)
     {
         const auto  luaScriptSource1 = R"(
-            function interface()
-                OUT.output = INT
+            function interface(IN,OUT)
+                OUT.output = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.output = 5
             end
         )";
 
         const auto  luaScriptSource2 = R"(
-            function interface()
-                IN.input = INT
+            function interface(IN,OUT)
+                IN.input = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -772,19 +772,19 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndInputValueIsSetBeforehand)
     {
         const auto  luaScriptSource1 = R"(
-            function interface()
-                OUT.output = INT
+            function interface(IN,OUT)
+                OUT.output = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.output = 5
             end
         )";
 
         const auto  luaScriptSource2 = R"(
-            function interface()
-                IN.input = INT
+            function interface(IN,OUT)
+                IN.input = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -816,11 +816,11 @@ namespace rlogic
     {
         LogicEngine otherLogicEngine;
         const auto  luaScriptSource = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
@@ -849,22 +849,22 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesValuesFromMultipleOutputScriptsToOneInputScript)
     {
         const auto  sourceScript = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
         const auto  targetScript = R"(
-            function interface()
-                IN.floatInput1 = FLOAT
-                IN.floatInput2 = FLOAT
-                OUT.floatOutput1 = FLOAT
-                OUT.floatOutput2 = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput1 = Type:Float()
+                IN.floatInput2 = Type:Float()
+                OUT.floatOutput1 = Type:Float()
+                OUT.floatOutput2 = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput1 = IN.floatInput1
                 OUT.floatOutput2 = IN.floatInput2
             end
@@ -899,11 +899,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesValuesFromOutputScriptToMultipleInputScripts)
     {
         const auto  scriptSource = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
@@ -933,22 +933,22 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesOutputToMultipleScriptsWithMultipleInputs)
     {
         const auto  sourceScript = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
         const auto  targetScript = R"(
-            function interface()
-                IN.floatInput1 = FLOAT
-                IN.floatInput2 = FLOAT
-                OUT.floatOutput1 = FLOAT
-                OUT.floatOutput2 = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput1 = Type:Float()
+                IN.floatInput2 = Type:Float()
+                OUT.floatOutput1 = Type:Float()
+                OUT.floatOutput2 = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput1 = IN.floatInput1
                 OUT.floatOutput2 = IN.floatInput2
             end
@@ -988,11 +988,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, DoesNotPropagateValuesIfScriptIsDestroyed)
     {
         const auto  scriptSource = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
@@ -1025,28 +1025,28 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, LinksNestedPropertiesBetweenScripts)
     {
         const auto  srcScriptA = R"(
-            function interface()
-                OUT.output = STRING
+            function interface(IN,OUT)
+                OUT.output = Type:String()
                 OUT.nested = {
-                    str1 = STRING,
-                    str2 = STRING
+                    str1 = Type:String(),
+                    str2 = Type:String()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.output = "foo"
                 OUT.nested = {str1 = "str1", str2 = "str2"}
             end
         )";
         const auto  srcScriptB = R"(
-            function interface()
-                IN.input = STRING
+            function interface(IN,OUT)
+                IN.input = Type:String()
                 IN.nested = {
-                    str1 = STRING,
-                    str2 = STRING
+                    str1 = Type:String(),
+                    str2 = Type:String()
                 }
-                OUT.concat_all = STRING
+                OUT.concat_all = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.concat_all = IN.input .. " {" .. IN.nested.str1 .. ", " .. IN.nested.str2 .. "}"
             end
         )";
@@ -1077,13 +1077,13 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, LinksNestedScriptPropertiesToBindingInputs)
     {
         const auto  scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.nested = {
-                    bool = BOOL,
-                    vec3f = VEC3F
+                    bool = Type:Bool(),
+                    vec3f = Type:Vec3f()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.nested = {bool = false, vec3f = {0.1, 0.2, 0.3}}
             end
         )";
@@ -1116,22 +1116,22 @@ namespace rlogic
          */
 
         const auto  sourceScript = R"(
-            function interface()
-                IN.floatInput = FLOAT
-                OUT.floatOutput = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput = Type:Float()
+                OUT.floatOutput = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput = IN.floatInput
             end
         )";
         const auto  targetScript = R"(
-            function interface()
-                IN.floatInput1 = FLOAT
-                IN.floatInput2 = FLOAT
-                OUT.floatOutput1 = FLOAT
-                OUT.floatOutput2 = FLOAT
+            function interface(IN,OUT)
+                IN.floatInput1 = Type:Float()
+                IN.floatInput2 = Type:Float()
+                OUT.floatOutput1 = Type:Float()
+                OUT.floatOutput2 = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.floatOutput1 = IN.floatInput1
                 OUT.floatOutput2 = IN.floatInput2
             end
@@ -1183,11 +1183,11 @@ namespace rlogic
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
         auto* outScript = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.out_vec3f = VEC3F
+            function interface(IN,OUT)
+                OUT.out_vec3f = Type:Vec3f()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.out_vec3f = { 0.0, 0.0, 0.0 }
             end
             )");
@@ -1215,12 +1215,12 @@ namespace rlogic
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
         auto* outScript = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.translation = VEC3F
-                OUT.visibility = BOOL
+            function interface(IN,OUT)
+                OUT.translation = Type:Vec3f()
+                OUT.visibility = Type:Bool()
             end
 
-            function run()
+            function run(IN,OUT)
             end
             )");
 
@@ -1262,12 +1262,12 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLink)
     {
         auto scriptSource = R"(
-            function interface()
-                IN.inString1 = STRING
-                IN.inString2 = STRING
-                OUT.outString = STRING
+            function interface(IN,OUT)
+                IN.inString1 = Type:String()
+                IN.inString2 = Type:String()
+                OUT.outString = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outString = IN.inString1 .. IN.inString2
             end
         )";
@@ -1325,21 +1325,21 @@ namespace rlogic
             LuaConfig config;
             config.addStandardModuleDependency(EStandardModule::Base);
             const auto  srcScriptAB = R"(
-                function interface()
-                    IN.input = STRING
-                    OUT.output = STRING
+                function interface(IN,OUT)
+                    IN.input = Type:String()
+                    OUT.output = Type:String()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.output = "forward " .. tostring(IN.input)
                 end
             )";
             const auto  srcScriptCsrc = R"(
-                function interface()
-                    IN.fromA = STRING
-                    IN.fromB = STRING
-                    OUT.concatenate_AB = STRING
+                function interface(IN,OUT)
+                    IN.fromA = Type:String()
+                    IN.fromB = Type:String()
+                    OUT.concatenate_AB = Type:String()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.concatenate_AB = "A: " .. IN.fromA .. " & B: " .. IN.fromB
                 end
             )";
@@ -1437,29 +1437,29 @@ namespace rlogic
         {
             LogicEngine tmpLogicEngine;
             const auto  srcScriptA = R"(
-                function interface()
-                    IN.appendixNestedStr2 = STRING
-                    OUT.output = STRING
+                function interface(IN,OUT)
+                    IN.appendixNestedStr2 = Type:String()
+                    OUT.output = Type:String()
                     OUT.nested = {
-                        str1 = STRING,
-                        str2 = STRING
+                        str1 = Type:String(),
+                        str2 = Type:String()
                     }
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.output = "foo"
                     OUT.nested = {str1 = "str1", str2 = "str2" .. IN.appendixNestedStr2}
                 end
             )";
             const auto  srcScriptB = R"(
-                function interface()
-                    IN.input = STRING
+                function interface(IN,OUT)
+                    IN.input = Type:String()
                     IN.nested = {
-                        str1 = STRING,
-                        str2 = STRING
+                        str1 = Type:String(),
+                        str2 = Type:String()
                     }
-                    OUT.concat_all = STRING
+                    OUT.concat_all = Type:String()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.concat_all = IN.input .. " {" .. IN.nested.str1 .. ", " .. IN.nested.str2 .. "}"
                 end
             )";
@@ -1548,12 +1548,12 @@ namespace rlogic
     {
         {
             constexpr auto scriptSource = R"(
-            function interface()
-                IN.inString1 = STRING
-                IN.inString2 = STRING
-                OUT.outString = STRING
+            function interface(IN,OUT)
+                IN.inString1 = Type:String()
+                IN.inString2 = Type:String()
+                OUT.outString = Type:String()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.outString = IN.inString1 .. IN.inString2
             end)";
 
@@ -1699,11 +1699,11 @@ namespace rlogic
         {
             LogicEngine tmpLogicEngine;
             const auto  scriptSrc = R"(
-                function interface()
-                    OUT.vec3f = VEC3F
-                    OUT.visibility = BOOL
+                function interface(IN,OUT)
+                    OUT.vec3f = Type:Vec3f()
+                    OUT.visibility = Type:Bool()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.vec3f = {100.0, 200.0, 300.0}
                     OUT.visibility = false
                 end
@@ -1808,10 +1808,10 @@ namespace rlogic
         {
             LogicEngine tmpLogicEngine;
             const auto  scriptSrc = R"(
-                function interface()
-                    OUT.uniform = VEC3F
+                function interface(IN,OUT)
+                    OUT.uniform = Type:Vec3f()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.uniform = {100.0, 200.0, 300.0}
                 end
             )";
@@ -1891,11 +1891,11 @@ namespace rlogic
         {
             LogicEngine tmpLogicEngine;
                     const std::string_view scriptSrc = R"(
-            function interface()
-                OUT.vpOffsetX = INT
-                OUT.farPlane = FLOAT
+            function interface(IN,OUT)
+                OUT.vpOffsetX = Type:Int32()
+                OUT.farPlane = Type:Float()
                 end
-                function run()
+                function run(IN,OUT)
                     OUT.vpOffsetX = 19
                     OUT.farPlane = 7.8
                 end
@@ -1966,15 +1966,15 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, ReportsNodeAsLinked_IFF_ItHasIncomingOrOutgoingLinks)
     {
         auto        scriptSource = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.input = {
-                    inBool = BOOL
+                    inBool = Type:Bool()
                 }
                 OUT.output = {
-                    outBool = BOOL
+                    outBool = Type:Bool()
                 }
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -2010,11 +2010,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinking)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.input = BOOL
-                OUT.output = BOOL
+            function interface(IN,OUT)
+                IN.input = Type:Bool()
+                OUT.output = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -2038,15 +2038,15 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinkingWithStructs)
     {
         auto scriptSource = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = {
-                    inBool = BOOL
+                    inBool = Type:Bool()
                 }
                 OUT.struct = {
-                    outBool = BOOL
+                    outBool = Type:Bool()
                 }
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -2070,11 +2070,11 @@ namespace rlogic
     TEST_F(ALogicEngine_Linking, SetsNeitherTargetNodeNorSourceNodeToDirtyAfterUnlink)
     {
         auto        scriptSource = R"(
-            function interface()
-                IN.input = BOOL
-                OUT.output = BOOL
+            function interface(IN,OUT)
+                IN.input = Type:Bool()
+                OUT.output = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -2101,36 +2101,36 @@ namespace rlogic
     {
     protected:
         const std::string_view m_scriptNestedStructs = R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = {
                     nested = {
-                        vec3f = VEC3F
+                        vec3f = Type:Vec3f()
                     }
                 }
 
                 OUT.struct = {
                     nested = {
-                        vec3f = VEC3F
+                        vec3f = Type:Vec3f()
                     }
                 }
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 
         const std::string_view m_scriptArrayOfStructs = R"(
-            function interface()
-                IN.array = ARRAY(2, {
-                        vec3f = VEC3F
+            function interface(IN,OUT)
+                IN.array = Type:Array(2, {
+                        vec3f = Type:Vec3f()
                     })
 
-                OUT.array = ARRAY(2, {
-                        vec3f = VEC3F
+                OUT.array = Type:Array(2, {
+                        vec3f = Type:Vec3f()
                     })
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
     };

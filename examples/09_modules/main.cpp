@@ -50,11 +50,11 @@ int main()
         -- The name here must match the alias provided in the LuaConfig above!
         modules('PrintModule')
 
-        function interface()
-            IN.name = STRING
+        function interface(IN,OUT)
+            IN.name = Type:String()
         end
 
-        function run()
+        function run(IN,OUT)
             -- Calls the 'print' function packaged in the PrintModule
             PrintModule.print(IN.name)
         end

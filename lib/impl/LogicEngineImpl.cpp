@@ -23,7 +23,6 @@
 
 #include "internals/FileUtils.h"
 #include "internals/TypeUtils.h"
-#include "internals/FileFormatVersions.h"
 #include "internals/RamsesObjectResolver.h"
 #include "internals/ApiObjects.h"
 
@@ -49,6 +48,12 @@ namespace rlogic::internal
     {
         m_errors.clear();
         return m_apiObjects->createLuaScript(source, config, scriptName, m_errors);
+    }
+
+    LuaInterface* LogicEngineImpl::createLuaInterface(std::string_view source, std::string_view interfaceName)
+    {
+        m_errors.clear();
+        return m_apiObjects->createLuaInterface(source, interfaceName, m_errors);
     }
 
     LuaModule* LogicEngineImpl::createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName)
@@ -95,7 +100,7 @@ namespace rlogic::internal
         m_errors.clear();
         if (data.empty())
         {
-            m_errors.add(fmt::format("Cannot create DataArray '{}' with empty data.", name), nullptr);
+            m_errors.add(fmt::format("Cannot create DataArray '{}' with empty data.", name), nullptr, EErrorType::IllegalArgument);
             return nullptr;
         }
 
@@ -115,7 +120,7 @@ namespace rlogic::internal
 
         if (config.getChannels().empty())
         {
-            m_errors.add(fmt::format("Failed to create AnimationNode '{}': must provide at least one channel.", name), nullptr);
+            m_errors.add(fmt::format("Failed to create AnimationNode '{}': must provide at least one channel.", name), nullptr, EErrorType::IllegalArgument);
             return nullptr;
         }
 
@@ -124,14 +129,14 @@ namespace rlogic::internal
             if (!containsDataArray(channel.timeStamps) ||
                 !containsDataArray(channel.keyframes))
             {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': timestamps or keyframes were not found in this logic instance.", name), nullptr);
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': timestamps or keyframes were not found in this logic instance.", name), nullptr, EErrorType::IllegalArgument);
                 return nullptr;
             }
 
             if ((channel.tangentsIn && !containsDataArray(channel.tangentsIn)) ||
                 (channel.tangentsOut && !containsDataArray(channel.tangentsOut)))
             {
-                m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were not found in this logic instance.", name), nullptr);
+                m_errors.add(fmt::format("Failed to create AnimationNode '{}': tangents were not found in this logic instance.", name), nullptr, EErrorType::IllegalArgument);
                 return nullptr;
             }
         }
@@ -205,7 +210,7 @@ namespace rlogic::internal
         const std::optional<NodeVector>& sortedNodes = m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes();
         if (!sortedNodes)
         {
-            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!", nullptr);
+            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling update()!", nullptr, EErrorType::ContentStateError);
             return false;
         }
 
@@ -213,7 +218,7 @@ namespace rlogic::internal
             m_updateReport.sectionFinished(UpdateReport::ETimingSection::TopologySort);
 
         // force dirty all timer nodes and their dependents so they update their tickers
-        setTimerNodesAndDependentsDirty();
+        setTimerNodesDirty();
 
         const bool success = updateNodes(*sortedNodes);
 
@@ -251,7 +256,7 @@ namespace rlogic::internal
             const std::optional<LogicNodeRuntimeError> potentialError = node.update();
             if (potentialError)
             {
-                m_errors.add(potentialError->message, m_apiObjects->getApiObject(node));
+                m_errors.add(potentialError->message, m_apiObjects->getApiObject(node), EErrorType::RuntimeError);
                 return false;
             }
 
@@ -273,19 +278,12 @@ namespace rlogic::internal
         return true;
     }
 
-    void LogicEngineImpl::setTimerNodesAndDependentsDirty()
+    void LogicEngineImpl::setTimerNodesDirty()
     {
         for (TimerNode* timerNode : m_apiObjects->getApiObjectContainer<TimerNode>())
         {
             // force set timer node itself dirty so it can update its ticker
             timerNode->m_impl.setDirty(true);
-
-            // force set all nodes linked to timeDelta dirty (timeDelta is often constant but that does not mean update is not needed)
-            auto timeDeltaOutput = timerNode->getOutputs()->getChild(0u);
-            assert(timeDeltaOutput && timeDeltaOutput->getName() == "timeDelta");
-            const auto& outgoingLinks = timeDeltaOutput->m_impl->getOutgoingLinks();
-            for (const auto& outLink : outgoingLinks)
-                outLink.property->getLogicNode().setDirty(true);
         }
     }
 
@@ -294,27 +292,17 @@ namespace rlogic::internal
         return m_errors.getErrors();
     }
 
-    bool LogicEngineImpl::checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion)
+    const std::vector<WarningData>& LogicEngineImpl::validate() const
     {
-        // Backwards compatibility check
-        if (fileVersion < g_FileFormatVersion)
+        m_validationResults.clear();
+        if (m_apiObjects->bindingsDirty())
         {
-            // TODO Violin write unit test for this case once we have a breaking change in the serialization format
-            // Currently not possible because 1 is the first version and 0 has special semantic (== version not set)
-            m_errors.add(fmt::format("Version of data source '{}' is too old! Expected file version {} but found {}",
-                dataSourceDescription, g_FileFormatVersion, fileVersion), nullptr);
-            return false;
+            m_validationResults.add("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", nullptr, EWarningType::UnsafeDataState);
         }
 
-        // Forward compatibility check
-        if (fileVersion > g_FileFormatVersion)
-        {
-            m_errors.add(fmt::format("Version of data source '{}' is too new! Expected file version {} but found {}",
-                dataSourceDescription, g_FileFormatVersion, fileVersion), nullptr);
-            return false;
-        }
+        m_apiObjects->checkAllInterfaceOutputsLinked(m_validationResults);
 
-        return true;
+        return m_validationResults.getWarnings();
     }
 
     bool LogicEngineImpl::CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion)
@@ -333,12 +321,38 @@ namespace rlogic::internal
         std::optional<std::vector<char>> maybeBytesFromFile = FileUtils::LoadBinary(std::string(filename));
         if (!maybeBytesFromFile)
         {
-            m_errors.add(fmt::format("Failed to load file '{}'", filename), nullptr);
+            m_errors.add(fmt::format("Failed to load file '{}'", filename), nullptr, EErrorType::BinaryDataAccessError);
             return false;
         }
 
         const size_t fileSize = (*maybeBytesFromFile).size();
         return loadFromByteData((*maybeBytesFromFile).data(), fileSize, scene, enableMemoryVerification, fmt::format("file '{}' (size: {})", filename, fileSize));
+    }
+
+    bool LogicEngineImpl::checkFileIdentifierBytes(const std::string& dataSourceDescription, const std::string& fileIdBytes)
+    {
+        const std::string expected(rlogic_serialization::LogicEngineIdentifier());
+        if (expected.substr(0, 2) != fileIdBytes.substr(0, 2))
+        {
+            m_errors.add(fmt::format("{}: Tried loading a binary data which doesn't a Ramses Logic! Expected file bytes 4-5 to be '{}', but found '{}' instead",
+                dataSourceDescription,
+                expected.substr(0, 2),
+                fileIdBytes.substr(0, 2)
+            ), nullptr, EErrorType::BinaryDataAccessError);
+            return false;
+        }
+
+        if (expected.substr(2, 2) != fileIdBytes.substr(2, 2))
+        {
+            m_errors.add(fmt::format("{}: Version mismatch while loading binary data! Expected version '{}', but found '{}'",
+                dataSourceDescription,
+                expected.substr(2, 2),
+                fileIdBytes.substr(2, 2)
+            ),nullptr, EErrorType::BinaryVersionMismatch);
+            return false;
+        }
+
+        return true;
     }
 
     // TODO Violin consider handling errors gracefully, e.g. don't change state when error occurs
@@ -347,14 +361,29 @@ namespace rlogic::internal
     {
         m_errors.clear();
 
+        if (byteSize < 8)
+        {
+            m_errors.add(fmt::format("{} contains corrupted data! Data should be at least 8 bytes", dataSourceDescription), nullptr, EErrorType::BinaryDataAccessError);
+            return false;
+        }
+
+        auto* char8Data(static_cast<const char*>(byteData));
+        // file identifier bytes are always placed at bytes 4-7 in the buffer
+        const std::string fileIdBytes(&char8Data[4], 4); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic) No better options
+        if (!checkFileIdentifierBytes(dataSourceDescription, fileIdBytes))
+        {
+            return false;
+        }
+
+        auto* uint8Data(static_cast<const uint8_t*>(byteData));
         if (enableMemoryVerification)
         {
-            flatbuffers::Verifier bufferVerifier(static_cast<const uint8_t*>(byteData), byteSize);
+            flatbuffers::Verifier bufferVerifier(uint8Data, byteSize);
             const bool bufferOK = rlogic_serialization::VerifyLogicEngineBuffer(bufferVerifier);
 
             if (!bufferOK)
             {
-                m_errors.add(fmt::format("{} contains corrupted data!", dataSourceDescription), nullptr);
+                m_errors.add(fmt::format("{} contains corrupted data!", dataSourceDescription), nullptr, EErrorType::BinaryDataAccessError);
                 return false;
             }
         }
@@ -363,7 +392,7 @@ namespace rlogic::internal
 
         if (nullptr == logicEngine)
         {
-            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSourceDescription), nullptr);
+            m_errors.add(fmt::format("{} doesn't contain logic engine data with readable version specifiers", dataSourceDescription), nullptr, EErrorType::BinaryVersionMismatch);
             return false;
         }
 
@@ -376,16 +405,13 @@ namespace rlogic::internal
         {
             m_errors.add(fmt::format("Version mismatch while loading {}! Expected Ramses version {}.x.x but found {}",
                 dataSourceDescription, ramses::GetRamsesVersion().major,
-                ramsesVersion.v_string()->string_view()), nullptr);
+                ramsesVersion.v_string()->string_view()), nullptr, EErrorType::BinaryVersionMismatch);
             return false;
         }
 
-        if (!checkLogicVersionFromFile(dataSourceDescription, logicEngine->rlogicVersion()->v_fileFormatVersion()))
-            return false;
-
         if (nullptr == logicEngine->apiObjects())
         {
-            m_errors.add(fmt::format("Fatal error while loading {}: doesn't contain API objects!", dataSourceDescription), nullptr);
+            m_errors.add(fmt::format("Fatal error while loading {}: doesn't contain API objects!", dataSourceDescription), nullptr, EErrorType::BinaryVersionMismatch);
             return false;
         }
 
@@ -415,20 +441,28 @@ namespace rlogic::internal
 
         if (!m_apiObjects->checkBindingsReferToSameRamsesScene(m_errors))
         {
-            m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!", nullptr);
+            m_errors.add("Can't save a logic engine to file while it has references to more than one Ramses scene!", nullptr, EErrorType::ContentStateError);
             return false;
         }
 
         // Refuse save() if logic graph has loops
         if (!m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes())
         {
-            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!", nullptr);
+            m_errors.add("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!", nullptr, EErrorType::ContentStateError);
             return false;
         }
 
-        if (m_apiObjects->bindingsDirty())
+        if (config.getValidationEnabled())
         {
-            LOG_WARN("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!");
+            const std::vector<WarningData>& warnings = validate();
+
+            if (!warnings.empty())
+            {
+                m_errors.add(
+                    "Failed to saveToFile() because validation warnings were encountered! "
+                    "Refer to the documentation of saveToFile() for details how to address these gracefully.", nullptr, EErrorType::ContentStateError);
+                return false;
+            }
         }
 
         flatbuffers::FlatBufferBuilder builder;
@@ -445,21 +479,20 @@ namespace rlogic::internal
             g_PROJECT_VERSION_MAJOR,
             g_PROJECT_VERSION_MINOR,
             g_PROJECT_VERSION_PATCH,
-            builder.CreateString(g_PROJECT_VERSION),
-            g_FileFormatVersion);
+            builder.CreateString(g_PROJECT_VERSION));
         builder.Finish(ramsesLogicVersionOffset);
 
         const auto exporterVersionOffset = rlogic_serialization::CreateVersion(builder,
             config.getExporterMajorVersion(),
             config.getExporterMinorVersion(),
             config.getExporterPatchVersion(),
-            builder.CreateString(""),
-            config.getExporterFileFormatVersion());
+            builder.CreateString(""));
         builder.Finish(exporterVersionOffset);
 
         const auto assetMetadataOffset = rlogic_serialization::CreateMetadata(builder,
             builder.CreateString(config.getMetadataString()),
-            exporterVersionOffset);
+            exporterVersionOffset,
+            config.getExporterFileFormatVersion());
         builder.Finish(assetMetadataOffset);
 
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
@@ -467,11 +500,12 @@ namespace rlogic::internal
             ramsesLogicVersionOffset,
             ApiObjects::Serialize(*m_apiObjects, builder),
             assetMetadataOffset);
-        builder.Finish(logicEngine);
+
+        FinishLogicEngineBuffer(builder, logicEngine);
 
         if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
         {
-            m_errors.add(fmt::format("Failed to save content to path '{}'!", filename), nullptr);
+            m_errors.add(fmt::format("Failed to save content to path '{}'!", filename), nullptr, EErrorType::BinaryDataAccessError);
             return false;
         }
 
@@ -489,7 +523,7 @@ namespace rlogic::internal
                 assetMetadata.exporterVersion()->v_major(),
                 assetMetadata.exporterVersion()->v_minor(),
                 assetMetadata.exporterVersion()->v_patch(),
-                assetMetadata.exporterVersion()->v_fileFormatVersion()) : "undefined";
+                assetMetadata.exporterFileVersion()) : "undefined";
         LOG_INFO("Exporter version: {}", exporterVersion);
     }
 

@@ -160,7 +160,7 @@ int main(int argc, char* argv[])
 
     sceneSetup->apply();
 
-    auto loadStatus = args.luaFile.empty() ? rlogic::LogicViewer::Result() : viewer.loadLuaFile(args.luaFile);
+    auto loadStatus = args.luaFile.empty() ? rlogic::Result() : viewer.loadLuaFile(args.luaFile);
 
     if (!args.luaFunction.empty())
     {
@@ -186,7 +186,7 @@ int main(int argc, char* argv[])
             if (!loadStatus.ok())
             {
                 gui.openErrorPopup(loadStatus.getMessage());
-                loadStatus = rlogic::LogicViewer::Result();
+                loadStatus = rlogic::Result();
             }
             if (!updateStatus.ok())
                 gui.openErrorPopup(updateStatus.getMessage());

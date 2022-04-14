@@ -9,21 +9,22 @@
 #include "internals/ErrorReporting.h"
 #include "ramses-logic/LogicNode.h"
 #include "impl/LoggerImpl.h"
+#include "impl/LogicObjectImpl.h"
 
 namespace rlogic::internal
 {
-    void ErrorReporting::add(std::string errorMessage, const LogicObject* logicObject)
+    void ErrorReporting::add(std::string errorMessage, const LogicObject* logicObject, EErrorType type)
     {
         if (logicObject)
         {
-            LOG_ERROR("[{}] {}", logicObject->getName(), errorMessage);
+            LOG_ERROR("[{}] {}", logicObject->m_impl->getIdentificationString(), errorMessage);
         }
         else
         {
             LOG_ERROR(errorMessage);
         }
 
-        m_errors.emplace_back(ErrorData{ std::move(errorMessage), logicObject });
+        m_errors.emplace_back(ErrorData{ std::move(errorMessage), type, logicObject });
     }
 
     void ErrorReporting::clear()

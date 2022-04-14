@@ -16,8 +16,9 @@ Quick start
 
 The ``Logic Engine`` uses an extended Lua syntax to declare what should happen with the attached Ramses scene when application
 inputs/signals/configuration changes. If you prefer learning by example and/or have previous experience with scripting languages,
-you could have a look at the `Ramses Composer examples <https://github.com/COVESA/ramses-composer-docs>`_ and come back to these docs for details.
-If not, we suggest reading through the docs and trying out the presented concepts on your own in a freshly created `Ramses Composer <https://github.com/COVESA/ramses-composer>`_ project.
+you could have a look at the `Ramses Composer examples <https://github.com/bmwcarit/ramses-composer-docs>`_ and come back to these docs for details.
+If not, we suggest reading through the docs and trying out the presented concepts on your own in a freshly
+created `Ramses Composer <https://github.com/bmwcarit/ramses-composer>`_ project.
 Just create a new LuaScript object (right-clicking the resource menu), set its URI to a file on your local machine, and start jamming!
 
 .. todo: (Violin) maybe create a dedicated "test" binary, a-la "Lua shell" which can read a lua file and execute/print result? Or maybe have a special mode in the IMgui tool?
@@ -36,8 +37,8 @@ we chose it over Python, C# and other popular languages for gaming/3D developmen
 .. note::
 
     The Lua community has two camps - those who use the latest version
-    (5.4) and those who use 5.1 (there have been major changes since 5.1 which split the community to an extent). We use a subset of the 5.1 version of Lua, although
-    there are no major differences from a syntax point of view.
+    (5.4) and those who use 5.1 (there have been major changes since 5.1 which split the community to an extent).
+    We use a subset of the 5.1 version of Lua, although there are no major differences from a syntax point of view.
 
 You can have a look at the official docs of Lua `here <https://www.lua.org/manual/5.1/>`_ for the full language specification. A basic script in Lua looks
 like this:
@@ -69,7 +70,8 @@ like this:
 
 The ``Logic Engine`` provides full support for the Lua 5.1 language, with some restrictions and some enhancements.
 The restrictions are necessary to ensure the safety of applications running the scripts, while the enhancements are
-needed to enable a seamless integration with the outside world (other scripts, Ramses, the Ramses Composer GUI). Let's get a closer look!
+needed to enable a seamless integration with the outside world (other scripts, Ramses, the
+`Ramses Composer <https://github.com/bmwcarit/ramses-composer>`_). Let's get a closer look!
 
 ==============================================
 Declaring an interface() and a run() function
@@ -80,68 +82,70 @@ should not accept any parameters and should not return values. The ``interface()
 what outputs it may produce. The ``run()`` function, which is executed whenever any of the inputs is changed, defines
 how the outputs' data shall be computed based on the current values of the inputs.
 
-The ``interface()``
-function is the place where script inputs and outputs are declared using the special global objects
-``IN`` and ``OUT``. The ``run()`` function can access the values of inputs and may set
-the values of outputs using the ``IN`` and ``OUT`` globals respectively.
+The ``interface()`` function is the place where script inputs and outputs are declared. It accepts two arguments,
+one to declare inputs and one to declare outputs of the script (the order is important - inputs are always the first argument!).
+The ``run()`` function also accepts two arguments, one for inputs and one for outputs. It can access the values of inputs and may set
+the values of outputs. We will name these arguments ``IN`` and ``OUT`` in the documents below, but you can give them any other name
+you want, as long as you keep the order (inputs first, outputs second). As per standard Lua syntax, any extra arguments will be set to nil.
 
 The ``interface()`` function can declare inputs and outputs by adding properties to ``IN`` and ``OUT`` as
-if they were standard ``Lua`` tables, with two restrictions:
-
-* the key has to be a string (and not a number or anything else) so that it can be shown as a human-readable property in the Ramses Composer
-* the value has to be one of the types supported by the ``Logic Engine`` (INT32, FLOAT, etc. - full list further down) or a table which obeys the same rules
-
-Here is an example:
+if they were standard ``Lua`` tables. For example:
 
 .. code-block:: lua
 
-    function interface()
-        IN.name = STRING
-        IN.hungry = BOOL
+    function interface(IN, OUT)
+        IN.name = Type:String()
+        IN.hungry = Type:Bool()
 
         OUT.coala = {
-            name = STRING,
+            name = Type:String(),
             coalafications = {
-                bear = BOOL,
-                bamboo_eaten = INT32
+                bear = Type:Bool(),
+                bamboo_eaten = Type:Int32()
             }
         }
     end
 
-Following types are supported for individual properties:
+In the above script, we declare two inputs (name and hungry) of type String and Bool respectively. We also define one output
+of type Struct (coala) which has two nested properties - name and coalifications.
+Coalifications is itself a struct (nested in coala).
 
-* INT32
-* INT64
-* FLOAT
-* BOOL
-* STRING
-* VEC2F, VEC3F, VEC4F (fixed vector of Floats)
-* VEC2I, VEC3I, VEC4I (fixed vector of Ints)
+The exact syntax for interface properties is:
 
-Additionally, a property can be a `struct` or an `array`. In the example above, ``coala`` is a struct, and ``coalafications`` is also a struct
-nested under ``coala``. Here is another example, this time with arrays:
+- the key has to be a string (not a number or anything else) so that it can be shown as a human-readable property in the
+  `Ramses Composer <https://github.com/bmwcarit/ramses-composer>`_
+- the value has to be one of the following
+
+    - a ``Logic Engine`` value type declared with ``Type:T()`` where ``T`` can be one of:
+
+        - ``Int32``, ``Int64``, ``Float``, ``String``, ``Bool`` (primitive values)
+        - ``Vec2f``, ``Vec3f``, ``Vec4f`` (fixed vector of Float)
+        - ``Vec2i``, ``Vec3i``, ``Vec4i`` (fixed vector of Int32)
+
+    - a ``Type:Struct(T)`` where ``T`` is a Lua table which properties obey the same rules (string keys and values declared with ``Type:<T>()``)
+    - a ``Type:Array(N, T)`` where 1 <= ``N`` <= 255 and ``T`` is another type declared with ``Type:<T>()``
+
+- as a shortcut for typing ``Type:Struct(T)`` you can also type ``T`` directly (tables get converted to ``Type:Struct`` automatically)
+
+Here is another example, this time with arrays:
 
 .. code-block:: lua
 
-    function interface()
-        IN.bamboo_coordinates = ARRAY(10, VEC3F)
-        IN.bamboo_sizes = ARRAY(10, FLOAT)
+    function interface(IN, OUT)
+        IN.bamboo_coordinates = Type:Array(10, Type:Vec3f())
+        IN.bamboo_sizes = Type:Array(10, Type:Float())
 
-        OUT.located_bamboo = ARRAY(10, {
-            position = VEC3F,
-            not_eaten_yet = BOOL
+        OUT.located_bamboo = Type:Array(10, {
+            position = Type:Vec3f(),
+            not_eaten_yet = Type:Bool()
         })
     end
 
-.. note::
 
-    ARRAY(n, T) is defined such as ``n`` is a number between 1 and 255, and ``T`` is a type for the array elements. ``T`` can be anything except an array itself
-    (multi-dimensional arrays are currently not supported by the ``Logic Engine``)
+In the example above, ``IN.bamboo_coordinates`` is an input array of 10 elements, each of type ``Vec3f``. ``OUT.located_bamboo`` is an output
+array with a `Struct` type - each of the 10 elements has a ``position`` and a ``not_eaten_yet`` property.
 
-In the example above, ``IN.bamboo_coordinates`` is an input array of 10 elements, each of type ``VEC3F``. ``OUT.located_bamboo`` is an output
-array with a `struct` type - each of the 10 elements has a ``position`` and a ``not_eaten_yet`` property.
-
-Even though the ``IN`` and ``OUT`` objects are accessible in both ``interface()`` and ``run()`` functions,
+Even though the ``IN`` and ``OUT`` objects are used by both ``interface()`` and ``run()`` functions,
 they have different semantics in each function. The ``interface`` function only **declares** the interface
 of the script, thus properties declared there can **only have a type**, they don't have a **value** yet -
 similar to function signatures in programming languages.
@@ -151,20 +155,20 @@ but the properties have a value which can be read and written. Like in this exam
 
 .. code-block:: lua
 
-    function interface()
-        IN.name = STRING
-        IN.hungry = BOOL
+    function interface(IN, OUT)
+        IN.name = Type:String()
+        IN.hungry = Type:Bool()
 
         OUT.coala = {
-            name = STRING,
+            name = Type:String(),
             coalafications = {
-                bear = BOOL,
-                bamboo_eaten = INT32
+                bear = Type:Bool(),
+                bamboo_eaten = Type:Int32()
             }
         }
     end
 
-    function run()
+    function run(IN, OUT)
         local coala_name = IN.name .. " the Coala"
         local bamboos_fed = 3
 
@@ -182,18 +186,20 @@ but the properties have a value which can be read and written. Like in this exam
     end
 
 Here, ``run()`` will compute a few values and store the result in the output ``coala``. Note that the structure of the ``coala`` output table is exactly the
-same as declared in the ``interface()`` function. In this example we assign all properties of ``coala``, but you can only set specific ones.
+same as declared in the ``interface()`` function. In this example we assign all properties of ``coala``, but you can only set a subset of them.
 
 Furthermore, trying to declare new properties in ``run()``
-will result in errors, same goes when trying to get/set the values of properties from within ``interface()``.
+will result in errors.
 
 The ``interface()`` function is only ever executed once - during the creation of the script. The ``run()``
-function is executed every time one or more of the values in ``IN`` changes, either when changed explicitly (in the Composer GUI or in code),
+function is executed every time one or more of the values in ``IN`` changes, either when changed explicitly
+(in the `Ramses Composer <https://github.com/bmwcarit/ramses-composer>`_ or in code),
 or when any of the inputs is linked to another script's output whose value changed.
 
-The examples above demonstrate how structs can be nested in other structs or in arrays. The ``Logic Engine`` supports arbitrary nesting for structs. Arrays can
-have a primitive type (e.g. ``INT32``) or a complex type (a struct, an array etc.) which can have arbitrary properties, also nested ones. It is not possible to have arrays of arrays
-(multidimensional arrays). Also, array size is limited to 255 elements currently.
+.. note::
+
+    Accessing properties is quite expensive compared to a local variable access.
+    If a property value needs to be used several times in ``run()`` (e.g. in a loop), it's preferrable to store its value in a ``local`` variable.
 
 ==============================================
 Global variables and the init() function
@@ -215,7 +221,7 @@ Here is an example:
         }
     end
 
-    function interface()
+    function interface(IN, OUT)
     end
 
     function run()
@@ -307,11 +313,11 @@ lists for arrays, without having to provide indices. Take a look at the followin
     :linenos:
     :emphasize-lines: 7,9-12,14-17
 
-    function interface()
-        OUT.array = ARRAY(2, INT32)
+    function interface(IN, OUT)
+        OUT.array = Type:Array(2, Type:Int32())
     end
 
-    function run()
+    function run(IN, OUT)
         -- This will work
         OUT.array = {11, 12}
         -- This will also work and produce the same result
@@ -393,8 +399,8 @@ script):
     coalaModule.coalaChief = "Alfred"
 
     coalaModule.coalaStruct = {
-        preferredFood = STRING,
-        weight = INT32
+        preferredFood = Type:String(),
+        weight = Type:Int32()
     }
 
     function coalaModule.bark()
@@ -418,12 +424,12 @@ function ``modules()`` to declare the modules needed by the script:
 
     modules("coalas")
 
-    function interface()
+    function interface(IN, OUT)
         local s = coalas.coalaStruct
-        OUT.coalas = ARRAY(2, s)
+        OUT.coalas = Type:Array(2, s)
     end
 
-    function run()
+    function run(IN, OUT)
         OUT.coalas = {
             {
                 preferredFood = "bamboo",
@@ -479,7 +485,7 @@ special cases worth explaining.
 Userdata vs. table
 -----------------------------------------------------
 
-The properties declared in the IN and OUT objects are stored as so-called `usertype` Lua objects, not standard tables.
+The properties declared in the ``IN`` and ``OUT`` arguments are stored as so-called `usertype` Lua objects, not standard tables.
 `Userdata` are C++ objects which are exposed to the Lua script. This limits the operations possible with
 those types - only the `index`, `newIndex` and for some containers the size (`#` operator) are supported.
 Using other Lua operations (e.g. pairs/ipairs) will result in errors.
@@ -488,10 +494,10 @@ Using other Lua operations (e.g. pairs/ipairs) will result in errors.
 Vec2/3/4 types
 -----------------------------------------------------
 
-While the property types which reflect Lua built-in types (BOOL, INT32, FLOAT, STRING) inherit the standard
-Lua value semantics, the more complex types (VEC2/3/4/I/F) have no representation in Lua, and are wrapped as
+While the property types which reflect Lua built-in types (Bool, Int32, Int64, Float, String) inherit the standard
+Lua value semantics, the more complex types (Vec2/3/4/i/f) have no representation in Lua, and are wrapped as
 ``Lua`` tables. They have the additional constraint that all values must be set simultaneously. It's not possible
-for example to set just one component of a VEC3F - all three must be set at once. The reason for this design decision
+for example to set just one component of a Vec3f - all three must be set at once. The reason for this design decision
 is to ensure consistent behavior when propagating these values - for example when setting ``Ramses`` node properties
 or uniforms.
 
@@ -511,14 +517,14 @@ floating point arithmetics when computing indices. One way to denote an `invalid
 negative number and explicitly checking the sign of indices. Floats can be assigned
 to integers by using the `math.floor/ceil` Lua functions explicitly.
 
-Numeric rules apply for all number types, independent if they are part of a struct, array or component in VECx.
+Numeric rules apply for all number types, independent if they are part of a struct, array or component in VecXy.
 
 -----------------------------------------------------
-The global IN and OUT objects
+Reading error stack traces
 -----------------------------------------------------
 
-The ``IN`` and ``OUT`` objects are global ``Lua`` variables accessible anywhere. They are so-called user
-types, meaning that the logic to deal with them is in ``C++`` code, not in ``Lua``. This means that any kind of
+The ``IN`` and ``OUT`` parameters to the interface and run functions are of so-called usertypes, meaning that the logic to deal with
+them is in ``C++`` code, not in ``Lua``. This means that any kind of
 error which is not strictly a ``Lua`` syntax error will be handled in ``C++`` code. For example, assigning a boolean value
 to a variable which was declared of string type is valid in ``Lua``, but will cause a type error when using
 ``RAMSES Logic``. This is intended and desired, however the ``Lua`` VM will not know where this error comes from
@@ -537,94 +543,6 @@ The top line in this stack is to be interpreted like this:
 * The error happened somewhere in the ``C`` code (remember, ``Lua`` is based on ``C``, not on ``C++``)
 * The function where the error happened is not known (**?**) - ``Lua`` doesn't know the name of the function
 
-The rest of the information is coming from ``Lua``, thus it makes more sense - the printed error message originates
+The rest of the information is coming from ``Lua``, thus it is more comprehensible - the printed error message originates
 from ``C++`` code, but is passed to the ``Lua`` VM as a verbose error. The lower parts of the stack trace are
 coming from ``Lua`` source code and ``Lua`` knows where that code is.
-
-Furthermore, assigning any other value to the ``IN`` and ``OUT`` globals is perfectly fine in ``Lua``, but will
-result in unexpected behavior. The ``C++`` runtime will have no way of knowing that this happened, and will
-not receive any notification that something is being written in the newly created objects.
-
------------------------------------------------------
-Things you should never do
------------------------------------------------------
-
-There are other things which will result in undefined behavior, and ``RAMSES Logic`` has no way of capturing
-this and reporting errors. Here is a list:
-
-* Assign ``IN`` directly to ``OUT``. This will not have the effect you expect (assigning values), but instead it
-  will set the ``OUT`` label to refer to the ``IN`` object, essentially yielding two *references* to the same object - the ``IN`` object.
-  If you want to be able to assign all input values to all output values, put them in a struct and assign the struct, e.g.:
-
-.. code:: lua
-
-    function interface()
-        IN.struct = {}
-        OUT.struct = {} -- must have the exact same properties as IN.struct! In this example - zero properties
-    end
-
-    function run()
-        -- This will work!
-        OUT.struct = IN.struct
-        -- This will not work!
-        OUT = IN
-    end
-
-* Do anything with ``IN`` and ``OUT`` in the global script scope - these objects don't exist there. However, you
-  can pass ``IN`` and ``OUT`` as arguments to other functions, but consider :ref:`Special case: using OUT object in other functions`
-* Calling the ``interface()`` function from within the ``run()`` function or vice-versa
-* Using recursion in the ``interface()`` or ``run()`` functions
-* Overwriting the ``IN`` and ``OUT`` objects. Exception to this is assigning ``OUT = IN`` in the ``run()`` function
-* Using threads or coroutines. We might add this in future, but for now - don't use them
-
------------------------------------------------------
-Things you should avoid if possible
------------------------------------------------------
-
-Even though it is not strictly prohibited, it is not advised to store and read global variables
-inside the ``run()`` function, as this introduces a side effect and makes the script more vulnerable
-to errors. Instead, design the script so that it needs only be executed if the values of any of the
-inputs changed - similar to how functional programming works.
-
------------------------------------------------------
-Special case: using OUT object in other functions
------------------------------------------------------
-
-It is possible to pass the OUT struct from the run() function to a different function to set the output values.
-But be aware that not all constellations are working. Here are some examples to explain the working variants:
-
-.. code-block:: lua
-    :linenos:
-    :emphasize-lines: 13,18-20
-
-    function interface()
-        OUT.param1 = INT32
-        OUT.struct1 = {
-            param2 = INT32
-        }
-    end
-
-    function setParam1(out)
-        out.param1 = 42 -- OK
-    end
-
-    function setDirect(p)
-        p = 42 -- NOT OK: Will create local variable "p" with value 42
-    end
-
-    function setStruct(struct)
-        struct.param2 = 42 -- OK
-        struct = {
-            param2 = 42 -- NOT OK: Will create local variable "struct" with table
-        }
-    end
-
-    function run()
-        setParam1(OUT)
-        setDirect(OUT.param1)
-        setStruct(OUT.struct1)
-    end
-
-As the above example demonstrates, passing objects to functions in ``Lua`` is done by reference. However, whenever the
-reference is overwritten with something else, this has no effect on the object which was passed from outside, but only
-lets the local copy of the reference point to a different value.

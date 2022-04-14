@@ -47,9 +47,5 @@ namespace rlogic::internal
             const rlogic_serialization::TimerNode& timerNodeFB,
             ErrorReporting& errorReporting,
             DeserializationMap& deserializationMap);
-
-    private:
-        std::optional<std::chrono::time_point<std::chrono::steady_clock>> m_lastTimePoint;
-        std::optional<int64_t> m_lastTick;
     };
 }

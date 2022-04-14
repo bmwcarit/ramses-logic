@@ -11,9 +11,14 @@ namespace rlogic_serialization {
 struct RamsesReference;
 struct RamsesReferenceBuilder;
 
+inline const flatbuffers::TypeTable *RamsesReferenceTypeTable();
+
 struct RamsesReference FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef RamsesReferenceBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RamsesReferenceTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_OBJECTID = 4,
     VT_OBJECTTYPE = 6
@@ -68,6 +73,21 @@ struct RamsesReference::Traits {
   using type = RamsesReference;
   static auto constexpr Create = CreateRamsesReference;
 };
+
+inline const flatbuffers::TypeTable *RamsesReferenceTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_ULONG, 0, -1 },
+    { flatbuffers::ET_UINT, 0, -1 }
+  };
+  static const char * const names[] = {
+    "objectId",
+    "objectType"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+  };
+  return &tt;
+}
 
 }  // namespace rlogic_serialization
 

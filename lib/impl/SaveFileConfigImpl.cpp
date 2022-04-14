@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/SaveFileConfigImpl.h"
+#include "impl/LoggerImpl.h"
 
 namespace rlogic::internal
 {
@@ -21,6 +22,20 @@ namespace rlogic::internal
         m_exporterMinorVersion = minor;
         m_exporterPatchVersion = patch;
         m_exporterFileFormatVersion = fileFormatVersion;
+    }
+
+    void SaveFileConfigImpl::setValidationEnabled(bool validationEnabled)
+    {
+        if (validationEnabled == false)
+        {
+            LOG_INFO("Validation before saving was disabled during save*() calls! Possible content issues will not yield further warnings.");
+        }
+        m_validationEnabled = validationEnabled;
+    }
+
+    bool SaveFileConfigImpl::getValidationEnabled() const
+    {
+        return m_validationEnabled;
     }
 
     uint32_t SaveFileConfigImpl::getExporterMajorVersion() const

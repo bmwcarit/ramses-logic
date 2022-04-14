@@ -37,7 +37,7 @@ namespace rlogic::internal
     private:
         static HierarchicalTypeData CreateTestInputsType(bool createNestedProperties)
         {
-            HierarchicalTypeData inputsStruct = MakeStruct("IN", {
+            HierarchicalTypeData inputsStruct = MakeStruct("", {
                 {"input1", EPropertyType::Int32},
                 {"input2", EPropertyType::Int32},
                 });
@@ -53,7 +53,7 @@ namespace rlogic::internal
 
         static HierarchicalTypeData CreateTestOutputsType(bool createNestedProperties)
         {
-            HierarchicalTypeData outputsStruct = MakeStruct("OUT", {
+            HierarchicalTypeData outputsStruct = MakeStruct("", {
                 {"output1", EPropertyType::Int32},
                 {"output2", EPropertyType::Int32},
                 });

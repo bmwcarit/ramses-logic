@@ -34,7 +34,7 @@ namespace rlogic::internal
     void RamsesNodeBindingImpl::createRootProperties()
     {
         // Attention! This order is important - it has to match the indices in ENodePropertyStaticIndex!
-        auto inputsType = MakeStruct("IN", {
+        auto inputsType = MakeStruct("", {
                 TypeData{"visibility", EPropertyType::Bool},
                 TypeData{"rotation", m_rotationType == ERotationType::Quaternion ? EPropertyType::Vec4f : EPropertyType::Vec3f},
                 TypeData{"translation", EPropertyType::Vec3f},
@@ -55,8 +55,7 @@ namespace rlogic::internal
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(nodeBinding.m_ramsesNode, builder);
 
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
-            builder.CreateString(nodeBinding.getName()),
-            nodeBinding.getId(),
+            LogicObjectImpl::Serialize(nodeBinding, builder),
             ramsesReference,
             // TODO Violin don't serialize inputs - it's better to re-create them on the fly, they are uniquely defined and don't need serialization
             PropertyImpl::Serialize(*nodeBinding.getInputs()->m_impl, builder, serializationMap));
@@ -79,28 +78,23 @@ namespace rlogic::internal
     {
         if (!nodeBinding.base())
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing base class info!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing base class info!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        if (nodeBinding.base()->id() == 0u)
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(nodeBinding.base()->base(), name, id, userIdHigh, userIdLow, errorReporting))
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing id!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing name and/or ID!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-
-        // TODO Violin make optional - no need to always serialize string if not used
-        if (!nodeBinding.base()->name())
-        {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing name!", nullptr);
-            return nullptr;
-        }
-
-        const std::string_view name = nodeBinding.base()->name()->string_view();
 
         if (!nodeBinding.base()->rootInput())
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing root input!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing root input!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -112,16 +106,16 @@ namespace rlogic::internal
         }
 
         // TODO Violin don't serialize these inputs -> get rid of the check
-        if (deserializedRootInput->getName() != "IN" || deserializedRootInput->getType() != EPropertyType::Struct)
+        if (deserializedRootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: root input has unexpected name or type!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: root input has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         const auto* boundObject = nodeBinding.base()->boundRamsesObject();
         if (!boundObject)
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing ramses object reference!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: missing ramses object reference!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -136,13 +130,14 @@ namespace rlogic::internal
 
         if (ramsesNode->getType() != static_cast<int>(boundObject->objectType()))
         {
-            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: loaded node type does not match referenced node type!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: loaded node type does not match referenced node type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         const auto rotationType (static_cast<ERotationType>(nodeBinding.rotationType()));
 
-        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name, nodeBinding.base()->id());
+        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name, id);
+        binding->setUserId(userIdHigh, userIdLow);
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         ApplyRamsesValuesToInputProperties(*binding, *ramsesNode);
@@ -258,7 +253,12 @@ namespace rlogic::internal
             std::optional<ERotationType> convertedType = RotationUtils::RamsesRotationConventionToRotationType(rotationConvention);
             if (!convertedType || binding.m_rotationType != *convertedType)
             {
-                LOG_WARN("Initial rotation values for RamsesNodeBinding '{}' will not be imported from bound Ramses node due to mismatching rotation type.", binding.getName());
+                // Allow special case where rotation is not set (i.e. zero) -> mismatching convention is OK in this case
+                // Otherwise issue a warning
+                if (rotationValue[0] != 0.f || rotationValue[1] != 0.f || rotationValue[2] != 0.f)
+                {
+                    LOG_WARN("Initial rotation values for RamsesNodeBinding '{}' will not be imported from bound Ramses node due to mismatching rotation type.", binding.getIdentificationString());
+                }
             }
             else
             {

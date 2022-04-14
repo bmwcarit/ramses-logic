@@ -22,14 +22,14 @@ int main()
     /**
      * This script contains a runtime error, i.e. from Lua point of view this is
      * valid syntax, but the type check of the Logic engine will fire a runtime
-     * error for trying to assign a string to a VEC4F property
+     * error for trying to assign a string to a Type:Vec4f() property
      */
     rlogic::LuaScript* faultyScript = logicEngine.createLuaScript(R"(
-        function interface()
-            OUT.vec4f = VEC4F
+        function interface(IN,OUT)
+            OUT.vec4f = Type:Vec4f()
         end
 
-        function run()
+        function run(IN,OUT)
             OUT.vec4f = "this is not a table with 4 floats and will trigger a runtime error!"
         end
     )", {}, "faultyScript");

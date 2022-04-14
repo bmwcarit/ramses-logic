@@ -52,6 +52,15 @@ namespace rlogic
         RLOGIC_API void setExporterVersion(uint32_t major, uint32_t minor, uint32_t patch, uint32_t fileFormatVersion);
 
         /**
+        * By default, saving to file validates the content and issues warnings (see #rlogic::LogicEngine::validate).
+        * This behavior can be disabled here. Calling this with validationEnabled=false will itself cause a INFO log,
+        * but will silence further warnings in the content.
+        *
+        * @param validationEnabled flag to disable/enable validation upon saving to file
+        */
+        RLOGIC_API void setValidationEnabled(bool validationEnabled);
+
+        /**
          * Destructor of #SaveFileConfig
          */
         RLOGIC_API ~SaveFileConfig() noexcept;

@@ -30,13 +30,13 @@ namespace rlogic
                 GLOBAL.bool = false
             end
 
-            function interface()
-                OUT.number = INT
-                OUT.string = STRING
-                OUT.bool = BOOL
+            function interface(IN,OUT)
+                OUT.number = Type:Int32()
+                OUT.string = Type:String()
+                OUT.bool = Type:Bool()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.number = GLOBAL.number
                 OUT.string = GLOBAL.string
                 OUT.bool = GLOBAL.bool
@@ -56,13 +56,13 @@ namespace rlogic
                 GLOBAL.inputNames = {"foo", "bar"}
             end
 
-            function interface()
+            function interface(IN,OUT)
                 for key,value in pairs(GLOBAL.inputNames) do
-                    OUT[value] = FLOAT
+                    OUT[value] = Type:Float()
                 end
             end
 
-            function run()
+            function run(IN,OUT)
                 for key,value in pairs(GLOBAL.inputNames) do
                     OUT[value] = 4.2
                 end
@@ -82,12 +82,12 @@ namespace rlogic
                 GLOBAL.number = 5
             end
 
-            function interface()
-                IN.setGlobal = INT
-                OUT.getGlobal = INT
+            function interface(IN,OUT)
+                IN.setGlobal = Type:Int32()
+                OUT.getGlobal = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 if IN.setGlobal ~= 0 then
                     GLOBAL.number = IN.setGlobal
                 end
@@ -110,11 +110,11 @@ namespace rlogic
                 GLOBAL.fun = function () return 42 end
             end
 
-            function interface()
-                OUT.getGlobal = INT
+            function interface(IN,OUT)
+                OUT.getGlobal = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.getGlobal = GLOBAL.fun()
             end
         )");
@@ -130,11 +130,11 @@ namespace rlogic
                 GLOBAL.number = math.floor(4.2)
             end
 
-            function interface()
-                OUT.getGlobal = INT
+            function interface(IN,OUT)
+                OUT.getGlobal = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.getGlobal = GLOBAL.number
             end
         )", WithStdModules({ EStandardModule::Math }));
@@ -163,10 +163,10 @@ namespace rlogic
             function init()
                 GLOBAL.number = mymath.add(5, mymath.PI)
             end
-            function interface()
-                OUT.getGlobal = FLOAT
+            function interface(IN,OUT)
+                OUT.getGlobal = Type:Float()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.getGlobal = GLOBAL.number
             end
         )", config);
@@ -175,21 +175,22 @@ namespace rlogic
         EXPECT_FLOAT_EQ(8.1415f, *script->getOutputs()->getChild("getGlobal")->get<float>());
     }
 
-    // TODO Violin re-enable this test after fixing isolation of modules
-    TEST_F(ALuaScript_Init, DISABLED_IssuesErrorWhenUsingUndeclaredStandardModule)
+    TEST_F(ALuaScript_Init, IssuesErrorWhenUsingUndeclaredStandardModule)
     {
-        m_logicEngine.createLuaScript(R"(
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
             function init()
                 GLOBAL.number = math.floor(4.2)
             end
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end
         )");
 
-        EXPECT_FALSE(m_logicEngine.update());
-        // Expect error
+        EXPECT_EQ(script, nullptr);
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr(
+                "Trying to read global variable 'math' in the init() function!"));
     }
 
     TEST_F(ALuaScript_Init, InitializesAfterDeserilization)
@@ -203,12 +204,12 @@ namespace rlogic
                     GLOBAL.number = 5
                 end
 
-                function interface()
-                    OUT.globalValueBefore = INT
-                    OUT.globalValueAfter = INT
+                function interface(IN,OUT)
+                    OUT.globalValueBefore = Type:Int32()
+                    OUT.globalValueAfter = Type:Int32()
                 end
 
-                function run()
+                function run(IN,OUT)
                     OUT.globalValueBefore = GLOBAL.number
                     GLOBAL.number = 42
                     OUT.globalValueAfter = GLOBAL.number
@@ -230,9 +231,9 @@ namespace rlogic
     TEST_F(ALuaScript_Init, DoesNotLeaveAnyLuaStackObjectsWhenLuaScriptDestroyed)
     {
         constexpr std::string_view scriptText = R"(
-            function interface()
+            function interface(IN,OUT)
             end
-            function run()
+            function run(IN,OUT)
             end)";
 
         for (int i = 0; i < 100; ++i)
@@ -250,15 +251,15 @@ namespace rlogic
             local mymodule = {}
             function mymodule.colorType()
                 return {
-                    red = INT,
-                    blue = INT,
-                    green = INT
+                    red = Type:Int32(),
+                    blue = Type:Int32(),
+                    green = Type:Int32()
                 }
             end
             function mymodule.structWithArray()
                 return {
-                    value = INT,
-                    array = ARRAY(2, INT)
+                    value = Type:Int32(),
+                    array = Type:Array(2, Type:Int32())
                 }
             end
             mymodule.color = {
@@ -274,13 +275,13 @@ namespace rlogic
             function init()
                 GLOBAL.number = 5
             end
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = mymodule.structWithArray()
                 OUT.struct = mymodule.structWithArray()
                 OUT.color = mymodule.colorType();
-                OUT.value = INT
+                OUT.value = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.struct = IN.struct
                 OUT.color = mymodule.color
                 OUT.value = GLOBAL.number
@@ -304,16 +305,16 @@ namespace rlogic
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
             function init()
-                GLOBAL.outputType = STRING
+                GLOBAL.outputType = Type:String()
                 GLOBAL.outputName = "name"
                 GLOBAL.outputValue = "MrAnderson"
             end
 
-            function interface()
+            function interface(IN,OUT)
                 OUT[GLOBAL.outputName] = GLOBAL.outputType
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT[GLOBAL.outputName] = GLOBAL.outputValue
             end)");
         ASSERT_NE(nullptr, script);
@@ -327,14 +328,14 @@ namespace rlogic
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
             function init()
-                GLOBAL.outputType = ARRAY(2, INT)
+                GLOBAL.outputType = Type:Array(2, Type:Int32())
             end
 
-            function interface()
+            function interface(IN,OUT)
                 OUT.array = GLOBAL.outputType
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.array[2] = 42
             end)");
         ASSERT_NE(nullptr, script);
@@ -351,14 +352,14 @@ namespace rlogic
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
             function init()
-                GLOBAL.outputDefinition = { value = INT }
+                GLOBAL.outputDefinition = { value = Type:Int32() }
             end
 
-            function interface()
+            function interface(IN,OUT)
                 OUT.struct = GLOBAL.outputDefinition
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.struct.value = 666
             end)");
         ASSERT_NE(nullptr, script);
@@ -374,16 +375,16 @@ namespace rlogic
         LuaScript* script = m_logicEngine.createLuaScript(R"(
             function init()
                 GLOBAL.outputDefinition = {
-                    value = INT,
-                    array = ARRAY(2, INT)
+                    value = Type:Int32(),
+                    array = Type:Array(2, Type:Int32())
                 }
             end
 
-            function interface()
+            function interface(IN,OUT)
                 OUT.struct = GLOBAL.outputDefinition
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.struct.value = 666
                 OUT.struct.array[2] = 42
             end)");
@@ -407,16 +408,16 @@ namespace rlogic
             LuaScript* script = otherLogic.createLuaScript(R"(
                 function init()
                     GLOBAL.outputDefinition = {
-                        value = INT,
-                        array = ARRAY(2, INT)
+                        value = Type:Int32(),
+                        array = Type:Array(2, Type:Int32())
                     }
                 end
 
-                function interface()
+                function interface(IN,OUT)
                     OUT.struct = GLOBAL.outputDefinition
                 end
 
-                function run()
+                function run(IN,OUT)
                     OUT.struct.value = 666
                     OUT.struct.array[2] = 42
                 end)", {}, "script");
@@ -449,10 +450,10 @@ namespace rlogic
                 local t = someGlobalVariable
             end
 
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -469,10 +470,10 @@ namespace rlogic
                 thisCausesError = 'bad'
             end
 
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -487,15 +488,33 @@ namespace rlogic
                 GLOBAL = {}
             end
 
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
         EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
             ::testing::HasSubstr(" Trying to override the GLOBAL table in init()! You can only add data, but not overwrite the table!"));
+    }
+
+    TEST_F(ALuaScript_Init_Sandboxing, ReportsErrorWhenTryingToOverrideTypeTable)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function init()
+                Type = {}
+            end
+
+            function interface(IN,OUT)
+            end
+
+            function run(IN,OUT)
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr(" Can't override the Type special table in init()"));
     }
 
     TEST_F(ALuaScript_Init_Sandboxing, ReportsErrorWhenTryingToDeclareInitFunctionTwice)
@@ -507,10 +526,10 @@ namespace rlogic
             function init()
             end
 
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -523,9 +542,9 @@ namespace rlogic
         for (const auto& specialFunction  : std::vector<std::string>{ "init", "run", "interface" })
         {
             LuaScript* script = m_logicEngine.createLuaScript(fmt::format(R"(
-                function interface()
+                function interface(IN,OUT)
                 end
-                function run()
+                function run(IN,OUT)
                 end
 
                 function init()

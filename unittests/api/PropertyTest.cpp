@@ -131,7 +131,7 @@ namespace rlogic::internal
 
     TEST_F(AProperty, CanCheckIfPropertyHasChild)
     {
-        const Property propertyWithChildren(CreateProperty(MakeStruct("IN", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, false));
+        const Property propertyWithChildren(CreateProperty(MakeStruct("", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, false));
         ASSERT_EQ(2u, propertyWithChildren.getChildCount());
 
         EXPECT_FALSE(propertyWithChildren.hasChild("invalidChildName"));
@@ -476,7 +476,7 @@ namespace rlogic::internal
 
     TEST_F(AProperty, CanHaveNestedProperties)
     {
-        Property root(CreateProperty(MakeStruct("IN", {{"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float}}), EPropertySemantics::ScriptInput, false));
+        Property root(CreateProperty(MakeStruct("", {{"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float}}), EPropertySemantics::ScriptInput, false));
 
         ASSERT_EQ(2u, root.getChildCount());
 
@@ -562,7 +562,7 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsChildByName)
     {
-        Property root(CreateProperty(MakeStruct("IN", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, true));
+        Property root(CreateProperty(MakeStruct("", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, true));
 
         const Property* c1 = root.getChild("child1");
         EXPECT_EQ("child1", c1->getName());
@@ -582,7 +582,7 @@ namespace rlogic::internal
 
     TEST_F(AProperty, ReturnsConstChildByName)
     {
-        Property root(CreateProperty(MakeStruct("IN", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, true));
+        Property root(CreateProperty(MakeStruct("", { {"child1", EPropertyType::Int32}, {"child2", EPropertyType::Float} }), EPropertySemantics::ScriptInput, true));
 
         const Property* c1 = root.getChild("child1");
         EXPECT_EQ("child1", c1->getName());

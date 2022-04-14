@@ -298,7 +298,7 @@ namespace rlogic::internal
             assert(wrappedProperty || propertyExtractor);
 
             const EPropertyType propertyType = (wrappedProperty ? wrappedProperty->getWrappedProperty().getType() : propertyExtractor->getRootTypeData().type);
-            if (propertyType == EPropertyType::Array || // ARRAY types can be iterated both in runtime and extraction
+            if (propertyType == EPropertyType::Array || // Array types can be iterated both in runtime and extraction
                 (TypeUtils::IsPrimitiveVectorType(propertyType) && wrappedProperty)) // VEC types can be iterated only in runtime, not during property extraction
             {
                 return std::make_tuple(sol::state_view(s)["rl_next"], std::move(iterableObject), sol::nil);
@@ -347,7 +347,7 @@ namespace rlogic::internal
             sol::make_object(s, field.get().getRootTypeData().name) :
             sol::make_object(s, fieldId + 1);   // Convert to Lua numeric convention (starts at 1)
 
-        // Cast to label, e.g. INT32, FLOAT etc., for primitive types; Otherwise, return the container object for further iteration if needed
+        // Cast to label, e.g. EPropertyType::Int32, EPropertyType:Float etc., for primitive types; Otherwise, return the container object for further iteration if needed
         sol::object value =
             TypeUtils::IsPrimitiveType(fieldType) ?
             sol::make_object(s, static_cast<int>(fieldType)) :

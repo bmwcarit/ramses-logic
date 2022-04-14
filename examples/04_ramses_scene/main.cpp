@@ -36,7 +36,7 @@ struct SceneAndNode
 
 /**
  * Helper method which creates a simple ramses scene. For more ramses
- * examples, check the ramses docs at https://covesa.github.io/ramses
+ * examples, check the ramses docs at https://bmwcarit.github.io/ramses
  */
 SceneAndNode CreateSceneWithTriangle(ramses::RamsesClient& client);
 
@@ -76,12 +76,12 @@ int main(int argc, char* argv[])
      * and rotates around the Z axis slowly based on how much time is passed
      */
     rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
-        function interface()
-            IN.time_msec = INT32
-            OUT.rotationZ = VEC3F
+        function interface(IN,OUT)
+            IN.time_msec = Type:Int32()
+            OUT.rotationZ = Type:Vec3f()
         end
 
-        function run()
+        function run(IN,OUT)
             -- Rotate around Z axis with 100 degrees per second
             OUT.rotationZ = {0, 0, IN.time_msec / 10}
         end

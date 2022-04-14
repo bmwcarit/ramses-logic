@@ -15,7 +15,6 @@
 #include "internals/EPropertySemantics.h"
 #include "internals/ErrorReporting.h"
 #include "generated/AnimationNodeGen.h"
-#include "flatbuffers/flatbuffers.h"
 #include "fmt/format.h"
 #include <cmath>
 
@@ -48,12 +47,8 @@ namespace rlogic::internal
 
     void AnimationNodeImpl::createRootProperties()
     {
-        HierarchicalTypeData inputs = MakeStruct("IN", {
-            {"timeDelta", EPropertyType::Float},   // EInputIdx_TimeDelta
-            {"play", EPropertyType::Bool},         // EInputIdx_Play
-            {"loop", EPropertyType::Bool},         // EInputIdx_Loop
-            {"rewindOnStop", EPropertyType::Bool}, // EInputIdx_RewindOnStop
-            {"timeRange", EPropertyType::Vec2f}    // EInputIdx_TimeRange
+        HierarchicalTypeData inputs = MakeStruct("", {
+            {"progress", EPropertyType::Float},   // EInputIdx_Progress
             });
         if (m_hasChannelDataExposedViaProperties)
         {
@@ -75,8 +70,8 @@ namespace rlogic::internal
         }
         auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::AnimationInput);
 
-        HierarchicalTypeData outputs = MakeStruct("OUT", {
-            {"progress", EPropertyType::Float},    // EPropertyOutputIndex::Progress
+        HierarchicalTypeData outputs = MakeStruct("", {
+            {"duration", EPropertyType::Float},   // EOutputIdx_Duration
             });
         for (const auto& channel : m_channels)
             outputs.children.push_back(MakeType(std::string{ channel.name }, channel.keyframes->getDataType()));
@@ -86,6 +81,9 @@ namespace rlogic::internal
 
         if (m_hasChannelDataExposedViaProperties)
             initAnimationDataPropertyValues();
+
+        // initialize duration property, no need to set every update as it can change only if timestamps are modified
+        getOutputs()->getChild(EOutputIdx_Duration)->set(m_maxChannelDuration);
     }
 
     float AnimationNodeImpl::getMaximumChannelDuration() const
@@ -100,77 +98,27 @@ namespace rlogic::internal
 
     std::optional<LogicNodeRuntimeError> AnimationNodeImpl::update()
     {
-        float timeDelta = *getInputs()->getChild(EInputIdx_TimeDelta)->get<float>();
-        if (timeDelta < 0.f)
-            return LogicNodeRuntimeError{ fmt::format("AnimationNode '{}' failed to update - cannot use negative timeDelta ({})", getName(), timeDelta) };
-
-        const bool play = *getInputs()->getChild(EInputIdx_Play)->get<bool>();
-        if (!play)
-        {
-            if (m_elapsedPlayTime > 0.f && *getInputs()->getChild(EInputIdx_RewindOnStop)->get<bool>())
-            {
-                // rewind, i.e. reset progress and update with zero timeDelta
-                m_elapsedPlayTime = 0.f;
-                timeDelta = 0.f;
-            }
-            else
-            {
-                return std::nullopt;
-            }
-        }
-
         // propagate data from properties if this animation node has channel data properties
         if (m_hasChannelDataExposedViaProperties)
             updateAnimationDataFromProperties();
 
-        // determine duration from time range input property
-        const vec2f userProvidedTimeRange = *getInputs()->getChild(EInputIdx_TimeRange)->get<vec2f>();
-        vec2f timeRange = userProvidedTimeRange;
-        if (timeRange[1] <= 0.f) // end range not set, set to animation duration
-            timeRange[1] = m_maxChannelDuration;
-        if (timeRange[0] < 0.f || timeRange[0] >= timeRange[1])
-        {
-            return LogicNodeRuntimeError{ fmt::format("AnimationNode '{}' failed to update - time range begin must be smaller than end and not negative (given time range [{}, {}])",
-                getName(), userProvidedTimeRange[0], userProvidedTimeRange[1]) };
-        }
-        const float duration = timeRange[1] - timeRange[0];
-
-        const bool loop = *getInputs()->getChild(EInputIdx_Loop)->get<bool>();
-        if (m_elapsedPlayTime >= duration && !loop)
-            return std::nullopt;
-
-        m_elapsedPlayTime += timeDelta;
-
-        if (loop)
-        {
-            // when looping enabled and elapsed time passed total duration,
-            // wrap it around and start from beginning (by calculating a remainder
-            // after dividing by duration)
-            m_elapsedPlayTime = fmodf(m_elapsedPlayTime, duration);
-        }
-
-        // elapsed play time must stay within duration of animation
-        m_elapsedPlayTime = std::min(m_elapsedPlayTime, duration);
-
-        const float progress = m_elapsedPlayTime / duration;
+        const float progress = *getInputs()->getChild(EInputIdx_Progress)->get<float>();
+        const float localAnimationTime = progress * m_maxChannelDuration;
 
         for (size_t i = 0u; i < m_channels.size(); ++i)
-            updateChannel(i, timeRange[0]);
-
-        getOutputs()->getChild(EOutputIdx_Progress)->m_impl->setValue(progress);
+            updateChannel(i, localAnimationTime);
 
         return std::nullopt;
     }
 
-    void AnimationNodeImpl::updateChannel(size_t channelIdx, float beginOffset)
+    void AnimationNodeImpl::updateChannel(size_t channelIdx, float localAnimationTime)
     {
         const auto& channelWorkData = m_channelsWorkData[channelIdx];
         const auto& channel = m_channels[channelIdx];
         const auto& timeStamps = channelWorkData.timestamps;
-        const float elapsedChannelPlayTime = m_elapsedPlayTime + beginOffset;
 
         // find upper/lower timestamp neighbor of elapsed timestamp
-        auto tsUpperIt = std::upper_bound(timeStamps.cbegin(), timeStamps.cend(), elapsedChannelPlayTime);
+        auto tsUpperIt = std::upper_bound(timeStamps.cbegin(), timeStamps.cend(), localAnimationTime);
         const auto tsLowerIt = (tsUpperIt == timeStamps.cbegin() ? timeStamps.cbegin() : tsUpperIt - 1);
         tsUpperIt = (tsUpperIt == timeStamps.cend() ? tsUpperIt - 1 : tsUpperIt);
 
@@ -184,7 +132,7 @@ namespace rlogic::internal
         float interpRatio = 0.f;
         float timeBetweenKeys = *tsUpperIt - *tsLowerIt;
         if (tsUpperIt != tsLowerIt)
-            interpRatio = (elapsedChannelPlayTime - *tsLowerIt) / timeBetweenKeys;
+            interpRatio = (localAnimationTime - *tsLowerIt) / timeBetweenKeys;
         // no clamping needed mathematically but to avoid float precision issues
         interpRatio = std::clamp(interpRatio, 0.f, 1.f);
 
@@ -348,8 +296,7 @@ namespace rlogic::internal
 
         return rlogic_serialization::CreateAnimationNode(
             builder,
-            builder.CreateString(animNode.getName()),
-            animNode.getId(),
+            LogicObjectImpl::Serialize(animNode, builder),
             builder.CreateVector(channelsFB),
             animNode.m_hasChannelDataExposedViaProperties,
             PropertyImpl::Serialize(*animNode.getInputs()->m_impl, builder, serializationMap),
@@ -362,13 +309,15 @@ namespace rlogic::internal
         ErrorReporting& errorReporting,
         DeserializationMap& deserializationMap)
     {
-        if (!animNodeFB.name() || animNodeFB.id() == 0u || !animNodeFB.channels() || !animNodeFB.rootInput() || !animNodeFB.rootOutput())
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(animNodeFB.base(), name, id, userIdHigh, userIdLow, errorReporting) || !animNodeFB.channels() || !animNodeFB.rootInput() || !animNodeFB.rootOutput())
         {
-            errorReporting.add("Fatal error during loading of AnimationNode from serialized data: missing name, id, channels or in/out property data!", nullptr);
+            errorReporting.add("Fatal error during loading of AnimationNode from serialized data: missing name, id, channels or in/out property data!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-
-        const auto name = animNodeFB.name()->string_view();
 
         AnimationChannels channels;
         channels.reserve(animNodeFB.channels()->size());
@@ -378,7 +327,7 @@ namespace rlogic::internal
                 !channelFB->timestamps() ||
                 !channelFB->keyframes())
             {
-                errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}' channel data: missing name, timestamps or keyframes!", name), nullptr);
+                errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}' channel data: missing name, timestamps or keyframes!", name), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
@@ -405,7 +354,7 @@ namespace rlogic::internal
                 channel.interpolationType = EInterpolationType::Cubic_Quaternions;
                 break;
             default:
-                errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}' channel '{}' data: missing or invalid interpolation type!", name, channel.name), nullptr);
+                errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}' channel '{}' data: missing or invalid interpolation type!", name, channel.name), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
@@ -414,7 +363,7 @@ namespace rlogic::internal
                 if (!channelFB->tangentsIn() ||
                     !channelFB->tangentsOut())
                 {
-                    errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}' channel '{}' data: missing tangents!", name, channel.name), nullptr);
+                    errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}' channel '{}' data: missing tangents!", name, channel.name), nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
 
@@ -431,23 +380,20 @@ namespace rlogic::internal
         auto rootInProperty = PropertyImpl::Deserialize(*animNodeFB.rootInput(), EPropertySemantics::AnimationInput, errorReporting, deserializationMap);
         auto rootOutProperty = PropertyImpl::Deserialize(*animNodeFB.rootOutput(), EPropertySemantics::AnimationOutput, errorReporting, deserializationMap);
 
-        auto deserialized = std::make_unique<AnimationNodeImpl>(std::move(channels), hasChannelDataProperties, name, animNodeFB.id());
+        auto deserialized = std::make_unique<AnimationNodeImpl>(std::move(channels), hasChannelDataProperties, name, id);
+        deserialized->setUserId(userIdHigh, userIdLow);
 
-        if (!rootInProperty->getChild(EInputIdx_TimeDelta) || rootInProperty->getChild(EInputIdx_TimeDelta)->getName() != "timeDelta" ||
-            !rootInProperty->getChild(EInputIdx_Play) || rootInProperty->getChild(EInputIdx_Play)->getName() != "play" ||
-            !rootInProperty->getChild(EInputIdx_Loop) || rootInProperty->getChild(EInputIdx_Loop)->getName() != "loop" ||
-            !rootInProperty->getChild(EInputIdx_RewindOnStop) || rootInProperty->getChild(EInputIdx_RewindOnStop)->getName() != "rewindOnStop" ||
-            !rootInProperty->getChild(EInputIdx_TimeRange) || rootInProperty->getChild(EInputIdx_TimeRange)->getName() != "timeRange" ||
-            !rootOutProperty->getChild(EOutputIdx_Progress) || rootOutProperty->getChild(EOutputIdx_Progress)->getName() != "progress" ||
-            rootOutProperty->getChildCount() != deserialized->getChannels().size() + 1)
+        if (!rootInProperty->getChild(EInputIdx_Progress) || rootInProperty->getChild(EInputIdx_Progress)->getName() != "progress" ||
+            rootOutProperty->getChildCount() != deserialized->getChannels().size() + EOutputIdx_ChannelsBegin ||
+            !rootOutProperty->getChild(EOutputIdx_Duration) || rootOutProperty->getChild(EOutputIdx_Duration)->getName() != "duration")
         {
-            errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}': missing or invalid properties!", name), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}': missing or invalid properties!", name), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (hasChannelDataProperties && (!rootInProperty->getChild(EInputIdx_ChannelsData) || rootInProperty->getChild(EInputIdx_ChannelsData)->getName() != "channelsData"))
         {
-            errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}': missing or invalid channels data property!", name), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of AnimationNode '{}': missing or invalid channels data property!", name), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -509,5 +455,7 @@ namespace rlogic::internal
                     keyframes[i] = *keyframesProp->getChild(i)->get<ValueType>();
             }, keyframesVariant);
         }
+
+        getOutputs()->getChild(EOutputIdx_Duration)->set(m_maxChannelDuration);
     }
 }

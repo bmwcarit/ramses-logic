@@ -24,11 +24,11 @@ namespace rlogic
         const int64_t loopCount = state.range(0);
 
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
-                IN.param = INT
-                OUT.param = INT
+            function interface(IN,OUT)
+                IN.param = Type:Int32()
+                OUT.param = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 for i = 0,{},1 do
                     OUT.param = IN.param
                 end
@@ -56,29 +56,29 @@ namespace rlogic
         const int64_t loopCount = state.range(0);
 
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 IN.struct = {{
-                    int = INT,
-                    float = FLOAT,
-                    vec4f = VEC4F,
+                    int = Type:Int32(),
+                    float = Type:Float(),
+                    vec4f = Type:Vec4f(),
                     nested = {{
-                        int = INT,
-                        float = FLOAT,
-                        vec4f = VEC4F
+                        int = Type:Int32(),
+                        float = Type:Float(),
+                        vec4f = Type:Vec4f()
                     }}
                 }}
                 OUT.struct = {{
-                    int = INT,
-                    float = FLOAT,
-                    vec4f = VEC4F,
+                    int = Type:Int32(),
+                    float = Type:Float(),
+                    vec4f = Type:Vec4f(),
                     nested = {{
-                        int = INT,
-                        float = FLOAT,
-                        vec4f = VEC4F
+                        int = Type:Int32(),
+                        float = Type:Float(),
+                        vec4f = Type:Vec4f()
                     }}
                 }}
             end
-            function run()
+            function run(IN,OUT)
                 for i = 0,{},1 do
                     OUT.struct = IN.struct
                 end
@@ -104,11 +104,11 @@ namespace rlogic
         const int64_t loopCount = state.range(0);
 
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
-                IN.array = ARRAY(255, VEC4F)
-                OUT.array = ARRAY(255, VEC4F)
+            function interface(IN,OUT)
+                IN.array = Type:Array(255, Type:Vec4f())
+                OUT.array = Type:Array(255, Type:Vec4f())
             end
-            function run()
+            function run(IN,OUT)
                 for i = 0,{},1 do
                     OUT.array = IN.array
                 end
@@ -142,16 +142,16 @@ namespace rlogic
         constexpr int64_t scriptCount = 100;
 
         const std::string scriptSrc = R"(
-            function interface()
-                IN.dirty_trigger = INT
+            function interface(IN,OUT)
+                IN.dirty_trigger = Type:Int32()
                 IN.lots_of_data = {}
                 OUT.lots_of_data = {}
                 for i = 0,10,1 do
-                    IN.lots_of_data["arr"..tostring(i)] = ARRAY(10, INT)
-                    OUT.lots_of_data["arr"..tostring(i)] = ARRAY(10, INT)
+                    IN.lots_of_data["arr"..tostring(i)] = Type:Array(10, Type:Int32())
+                    OUT.lots_of_data["arr"..tostring(i)] = Type:Array(10, Type:Int32())
                 end
             end
-            function run()
+            function run(IN,OUT)
                 -- heavy data operation (deep copy of struct of arrays)
                 OUT.lots_of_data = IN.lots_of_data
                 -- trigger the dirty mechanism by updating one of the values based on the 'dirty trigger'

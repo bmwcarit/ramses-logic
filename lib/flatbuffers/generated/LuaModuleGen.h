@@ -6,6 +6,8 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LogicObjectGen.h"
+
 namespace rlogic_serialization {
 
 struct LuaModule;
@@ -14,21 +16,24 @@ struct LuaModuleBuilder;
 struct LuaModuleUsage;
 struct LuaModuleUsageBuilder;
 
+inline const flatbuffers::TypeTable *LuaModuleTypeTable();
+
+inline const flatbuffers::TypeTable *LuaModuleUsageTypeTable();
+
 struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LuaModuleBuilder Builder;
   struct Traits;
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_NAME = 4,
-    VT_ID = 6,
-    VT_SOURCE = 8,
-    VT_DEPENDENCIES = 10,
-    VT_STANDARDMODULES = 12
-  };
-  const flatbuffers::String *name() const {
-    return GetPointer<const flatbuffers::String *>(VT_NAME);
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return LuaModuleTypeTable();
   }
-  uint64_t id() const {
-    return GetField<uint64_t>(VT_ID, 0);
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_BASE = 4,
+    VT_SOURCE = 6,
+    VT_DEPENDENCIES = 8,
+    VT_STANDARDMODULES = 10
+  };
+  const rlogic_serialization::LogicObject *base() const {
+    return GetPointer<const rlogic_serialization::LogicObject *>(VT_BASE);
   }
   const flatbuffers::String *source() const {
     return GetPointer<const flatbuffers::String *>(VT_SOURCE);
@@ -41,9 +46,8 @@ struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_NAME) &&
-           verifier.VerifyString(name()) &&
-           VerifyField<uint64_t>(verifier, VT_ID) &&
+           VerifyOffset(verifier, VT_BASE) &&
+           verifier.VerifyTable(base()) &&
            VerifyOffset(verifier, VT_SOURCE) &&
            verifier.VerifyString(source()) &&
            VerifyOffset(verifier, VT_DEPENDENCIES) &&
@@ -59,11 +63,8 @@ struct LuaModuleBuilder {
   typedef LuaModule Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
-  void add_name(flatbuffers::Offset<flatbuffers::String> name) {
-    fbb_.AddOffset(LuaModule::VT_NAME, name);
-  }
-  void add_id(uint64_t id) {
-    fbb_.AddElement<uint64_t>(LuaModule::VT_ID, id, 0);
+  void add_base(flatbuffers::Offset<rlogic_serialization::LogicObject> base) {
+    fbb_.AddOffset(LuaModule::VT_BASE, base);
   }
   void add_source(flatbuffers::Offset<flatbuffers::String> source) {
     fbb_.AddOffset(LuaModule::VT_SOURCE, source);
@@ -88,17 +89,15 @@ struct LuaModuleBuilder {
 
 inline flatbuffers::Offset<LuaModule> CreateLuaModule(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<flatbuffers::String> name = 0,
-    uint64_t id = 0,
+    flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     flatbuffers::Offset<flatbuffers::String> source = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies = 0,
     flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0) {
   LuaModuleBuilder builder_(_fbb);
-  builder_.add_id(id);
   builder_.add_standardModules(standardModules);
   builder_.add_dependencies(dependencies);
   builder_.add_source(source);
-  builder_.add_name(name);
+  builder_.add_base(base);
   return builder_.Finish();
 }
 
@@ -109,19 +108,16 @@ struct LuaModule::Traits {
 
 inline flatbuffers::Offset<LuaModule> CreateLuaModuleDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
-    const char *name = nullptr,
-    uint64_t id = 0,
+    flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     const char *source = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies = nullptr,
     const std::vector<uint8_t> *standardModules = nullptr) {
-  auto name__ = name ? _fbb.CreateString(name) : 0;
   auto source__ = source ? _fbb.CreateString(source) : 0;
   auto dependencies__ = dependencies ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>(*dependencies) : 0;
   auto standardModules__ = standardModules ? _fbb.CreateVector<uint8_t>(*standardModules) : 0;
   return rlogic_serialization::CreateLuaModule(
       _fbb,
-      name__,
-      id,
+      base,
       source__,
       dependencies__,
       standardModules__);
@@ -130,22 +126,24 @@ inline flatbuffers::Offset<LuaModule> CreateLuaModuleDirect(
 struct LuaModuleUsage FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LuaModuleUsageBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return LuaModuleUsageTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
-    VT_MODULE_ = 6
+    VT_MODULEID = 6
   };
   const flatbuffers::String *name() const {
     return GetPointer<const flatbuffers::String *>(VT_NAME);
   }
-  const rlogic_serialization::LuaModule *module_() const {
-    return GetPointer<const rlogic_serialization::LuaModule *>(VT_MODULE_);
+  uint64_t moduleId() const {
+    return GetField<uint64_t>(VT_MODULEID, 0);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_NAME) &&
            verifier.VerifyString(name()) &&
-           VerifyOffset(verifier, VT_MODULE_) &&
-           verifier.VerifyTable(module_()) &&
+           VerifyField<uint64_t>(verifier, VT_MODULEID) &&
            verifier.EndTable();
   }
 };
@@ -157,8 +155,8 @@ struct LuaModuleUsageBuilder {
   void add_name(flatbuffers::Offset<flatbuffers::String> name) {
     fbb_.AddOffset(LuaModuleUsage::VT_NAME, name);
   }
-  void add_module_(flatbuffers::Offset<rlogic_serialization::LuaModule> module_) {
-    fbb_.AddOffset(LuaModuleUsage::VT_MODULE_, module_);
+  void add_moduleId(uint64_t moduleId) {
+    fbb_.AddElement<uint64_t>(LuaModuleUsage::VT_MODULEID, moduleId, 0);
   }
   explicit LuaModuleUsageBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -175,9 +173,9 @@ struct LuaModuleUsageBuilder {
 inline flatbuffers::Offset<LuaModuleUsage> CreateLuaModuleUsage(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> name = 0,
-    flatbuffers::Offset<rlogic_serialization::LuaModule> module_ = 0) {
+    uint64_t moduleId = 0) {
   LuaModuleUsageBuilder builder_(_fbb);
-  builder_.add_module_(module_);
+  builder_.add_moduleId(moduleId);
   builder_.add_name(name);
   return builder_.Finish();
 }
@@ -190,12 +188,50 @@ struct LuaModuleUsage::Traits {
 inline flatbuffers::Offset<LuaModuleUsage> CreateLuaModuleUsageDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *name = nullptr,
-    flatbuffers::Offset<rlogic_serialization::LuaModule> module_ = 0) {
+    uint64_t moduleId = 0) {
   auto name__ = name ? _fbb.CreateString(name) : 0;
   return rlogic_serialization::CreateLuaModuleUsage(
       _fbb,
       name__,
-      module_);
+      moduleId);
+}
+
+inline const flatbuffers::TypeTable *LuaModuleTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_STRING, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 1, 1 },
+    { flatbuffers::ET_UCHAR, 1, -1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::LogicObjectTypeTable,
+    rlogic_serialization::LuaModuleUsageTypeTable
+  };
+  static const char * const names[] = {
+    "base",
+    "source",
+    "dependencies",
+    "standardModules"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *LuaModuleUsageTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_STRING, 0, -1 },
+    { flatbuffers::ET_ULONG, 0, -1 }
+  };
+  static const char * const names[] = {
+    "name",
+    "moduleId"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 2, type_codes, nullptr, nullptr, names
+  };
+  return &tt;
 }
 
 }  // namespace rlogic_serialization

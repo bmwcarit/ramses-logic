@@ -78,9 +78,19 @@ set(SPHINX_SRC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/sphinx)
 set(SPHINX_TARGET_DIR ${CMAKE_BINARY_DIR}/sphinx)
 set(SPHINX_IDX_FILE ${SPHINX_TARGET_DIR}/index.html)
 
-file(GLOB_RECURSE
-    SPHINX_INPUT_LIST
-    ${CMAKE_CURRENT_SOURCE_DIR}/sphinx/*)
+file(GLOB
+    SPHINX_INPUT_LIST_PAGES
+    ${CMAKE_CURRENT_SOURCE_DIR}/sphinx/*.rst
+    ${CMAKE_CURRENT_SOURCE_DIR}/sphinx/*.md
+    )
+
+file(GLOB
+    SPHINX_INPUT_LIST_CLASSES
+    ${CMAKE_CURRENT_SOURCE_DIR}/sphinx/classes/*)
+
+file(GLOB
+    SPHINX_INPUT_LIST_EXAMPLES
+    ${CMAKE_CURRENT_SOURCE_DIR}/sphinx/examples/*)
 
 set(SPHINX_BUILDER "html") # Use 'linkcheck' to check for validity of links
 
@@ -95,7 +105,9 @@ add_custom_command(OUTPUT ${SPHINX_IDX_FILE}
                         ${SPHINX_SRC_FILES} ${SPHINX_TARGET_DIR}
                    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
                    DEPENDS
-                        ${SPHINX_INPUT_LIST}
+                        ${SPHINX_INPUT_LIST_PAGES}
+                        ${SPHINX_INPUT_LIST_CLASSES}
+                        ${SPHINX_INPUT_LIST_EXAMPLES}
                         ${DOXYGEN_STAMP_FILE}
                         ${PROJECT_SOURCE_DIR}/README.md
                         ${PROJECT_SOURCE_DIR}/CONTRIBUTING.rst
@@ -106,7 +118,15 @@ add_custom_command(OUTPUT ${SPHINX_IDX_FILE}
 # add target to create sphinx html
 add_custom_target(rlogic-sphinx ALL
     DEPENDS ${SPHINX_IDX_FILE}
-    SOURCES ${SPHINX_INPUT_LIST} ${SPHINX_SRC_FILES}/conf.py
+    SOURCES
+        ${SPHINX_INPUT_LIST_PAGES}
+        ${SPHINX_INPUT_LIST_CLASSES}
+        ${SPHINX_INPUT_LIST_EXAMPLES}
+        ${SPHINX_SRC_FILES}/conf.py
 )
+
+source_group("pages" FILES ${SPHINX_INPUT_LIST_PAGES})
+source_group("classes" FILES ${SPHINX_INPUT_LIST_CLASSES})
+source_group("examples" FILES ${SPHINX_INPUT_LIST_EXAMPLES})
 
 folderize_target(rlogic-sphinx "doc")

@@ -13,8 +13,8 @@ cmake_minimum_required(VERSION 3.13)
 # General project metadata
 #==========================================================================
 
-set(RLOGIC_VERSION_MAJOR 0)
-set(RLOGIC_VERSION_MINOR 15)
+set(RLOGIC_VERSION_MAJOR 1)
+set(RLOGIC_VERSION_MINOR 0)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
@@ -24,7 +24,7 @@ project(RamsesLogic
     VERSION ${RLOGIC_VERSION}
     DESCRIPTION "A scripting and animation runtime for Ramses based on Lua"
     LANGUAGES CXX
-    HOMEPAGE_URL  "https://github.com/COVESA/ramses-logic"
+    HOMEPAGE_URL  "https://github.com/bmwcarit/ramses-logic"
 )
 
 #==========================================================================

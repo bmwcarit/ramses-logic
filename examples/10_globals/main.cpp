@@ -25,16 +25,16 @@ int main()
     // They are used during the interface definition as well as at runtime
     rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
         function init()
-            GLOBAL.outputType = STRING
+            GLOBAL.outputType = Type:String()
             GLOBAL.outputName = "name"
             GLOBAL.outputValue = "MrAnderson"
         end
 
-        function interface()
+        function interface(IN,OUT)
             OUT[GLOBAL.outputName] = GLOBAL.outputType
         end
 
-        function run()
+        function run(IN,OUT)
             OUT[GLOBAL.outputName] = GLOBAL.outputValue
         end
     )");

@@ -19,11 +19,11 @@ namespace rlogic
     {
     protected:
         const std::string_view m_linkable_script = R"(
-            function interface()
-                IN.input = BOOL
-                OUT.output = BOOL
+            function interface(IN,OUT)
+                IN.input = Type:Bool()
+                OUT.output = Type:Bool()
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
     };

@@ -16,48 +16,48 @@ namespace rlogic
     {
     protected:
         std::string_view m_minimalScript = R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 
         std::string_view m_minimalScriptWithInputs = R"(
-            function interface()
-                IN.speed = INT
-                IN.speed2 = INT64
-                IN.temp = FLOAT
-                IN.name = STRING
-                IN.enabled = BOOL
-                IN.vec2f = VEC2F
-                IN.vec3f = VEC3F
-                IN.vec4f = VEC4F
-                IN.vec2i = VEC2I
-                IN.vec3i = VEC3I
-                IN.vec4i = VEC4I
+            function interface(IN,OUT)
+                IN.speed = Type:Int32()
+                IN.speed2 = Type:Int64()
+                IN.temp = Type:Float()
+                IN.name = Type:String()
+                IN.enabled = Type:Bool()
+                IN.vec2f = Type:Vec2f()
+                IN.vec3f = Type:Vec3f()
+                IN.vec4f = Type:Vec4f()
+                IN.vec2i = Type:Vec2i()
+                IN.vec3i = Type:Vec3i()
+                IN.vec4i = Type:Vec4i()
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 
         std::string_view m_minimalScriptWithOutputs = R"(
-            function interface()
-                OUT.speed = INT
-                OUT.speed2 = INT64
-                OUT.temp = FLOAT
-                OUT.name = STRING
-                OUT.enabled = BOOL
-                OUT.vec2f = VEC2F
-                OUT.vec3f = VEC3F
-                OUT.vec4f = VEC4F
-                OUT.vec2i = VEC2I
-                OUT.vec3i = VEC3I
-                OUT.vec4i = VEC4I
+            function interface(IN,OUT)
+                OUT.speed = Type:Int32()
+                OUT.speed2 = Type:Int64()
+                OUT.temp = Type:Float()
+                OUT.name = Type:String()
+                OUT.enabled = Type:Bool()
+                OUT.vec2f = Type:Vec2f()
+                OUT.vec3f = Type:Vec3f()
+                OUT.vec4f = Type:Vec4f()
+                OUT.vec2i = Type:Vec2i()
+                OUT.vec3i = Type:Vec3i()
+                OUT.vec4i = Type:Vec4i()
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 

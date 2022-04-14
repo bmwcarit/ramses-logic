@@ -36,8 +36,9 @@ namespace rlogic
         * Sets the name of this object.
         *
         * @param name new name of the object
+        * @return true if setting the name was successful, false if the object name can't be changed (e.g. interface objects)
         */
-        RLOGIC_API void setName(std::string_view name);
+        RLOGIC_API bool setName(std::string_view name);
 
         /**
         * Returns the id of this object. Every object gets a unique, immutable id assigned on object creation.
@@ -46,6 +47,26 @@ namespace rlogic
         * @return the id of this object
         */
         [[nodiscard]] RLOGIC_API uint64_t getId() const;
+
+        /**
+        * Set user ID for this object.
+        * User IDs are optional identifiers of logic objects stored as number of up to 128 bits.
+        * User IDs will be logged together with name (#getName) and unique ID (#getId) and are serialized, thus persistent.
+        * Note that user IDs do not have to be unique, it is user's choice and responsibility if uniqueness is desired.
+        * User ID is logged only if other than [0,0] was set and the format is hexadecimal 'highId|lowId' with all digits printed.
+        *
+        * @param highId high 64 bits of user ID to set
+        * @param lowId low 64 bits of user ID to set
+        * @return true if successful, false if failed
+        */
+        RLOGIC_API bool setUserId(uint64_t highId, uint64_t lowId);
+
+        /**
+        * Returns the user ID set using #setUserId.
+        *
+        * @return the user ID [highId, lowId] or [0, 0] if no user ID was set
+        */
+        [[nodiscard]] RLOGIC_API std::pair<uint64_t, uint64_t> getUserId() const;
 
         /**
         * Casts this object to given type.
@@ -76,6 +97,9 @@ namespace rlogic
         * Destructor of #LogicObject
         */
         virtual ~LogicObject() noexcept;
+
+        std::unique_ptr<internal::LogicObjectImpl> m_impl;
+
     protected:
         /**
         * Constructor of #LogicObject. User is not supposed to call this - LogcNodes are created by subclasses
@@ -95,9 +119,6 @@ namespace rlogic
         */
         template <typename T>
         [[nodiscard]] RLOGIC_API T* internalCast();
-
-
-        std::unique_ptr<internal::LogicObjectImpl> m_impl;
     };
 
     template <typename T> const T* LogicObject::as() const

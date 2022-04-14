@@ -625,15 +625,15 @@ namespace rlogic::internal
     TEST_F(ARamsesCameraBinding, PropagatesItsInputsToRamsesPerspectiveCameraOnUpdate_WithLinksInsteadOfSetCall)
     {
         const std::string_view scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.vpProps = {
-                    vpX = INT,
-                    vpY = INT,
-                    vpW = INT,
-                    vpH = INT
+                    vpX = Type:Int32(),
+                    vpY = Type:Int32(),
+                    vpW = Type:Int32(),
+                    vpH = Type:Int32()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.vpProps = {
                     vpX = 5,
                     vpY = 10,
@@ -668,17 +668,17 @@ namespace rlogic::internal
     TEST_F(ARamsesCameraBinding, PropagatesItsInputsToRamsesOrthoCameraOnUpdate_WithLinksInsteadOfSetCall)
     {
         const std::string_view scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.frustProps = {
-                    lP = FLOAT,
-                    rP = FLOAT,
-                    bP = FLOAT,
-                    tP = FLOAT,
-                    nP = FLOAT,
-                    fP = FLOAT
+                    lP = Type:Float(),
+                    rP = Type:Float(),
+                    bP = Type:Float(),
+                    tP = Type:Float(),
+                    nP = Type:Float(),
+                    fP = Type:Float()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.frustProps = {
                     lP = 0.2,
                     rP = 0.3,
@@ -760,9 +760,10 @@ namespace rlogic::internal
         const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
 
         ASSERT_TRUE(serializedBinding.base());
-        ASSERT_TRUE(serializedBinding.base()->name());
-        EXPECT_EQ(serializedBinding.base()->name()->string_view(), "name");
-        EXPECT_EQ(serializedBinding.base()->id(), 1u);
+        ASSERT_TRUE(serializedBinding.base()->base());
+        ASSERT_TRUE(serializedBinding.base()->base()->name());
+        EXPECT_EQ(serializedBinding.base()->base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedBinding.base()->base()->id(), 1u);
 
         ASSERT_TRUE(serializedBinding.base()->rootInput());
         EXPECT_EQ(serializedBinding.base()->rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -779,7 +780,7 @@ namespace rlogic::internal
             EXPECT_EQ(deserializedBinding->getId(), 1u);
             EXPECT_EQ(deserializedBinding->getInputs()->getType(), EPropertyType::Struct);
             EXPECT_EQ(deserializedBinding->getInputs()->m_impl->getPropertySemantics(), EPropertySemantics::BindingInput);
-            EXPECT_EQ(deserializedBinding->getInputs()->getName(), "IN");
+            EXPECT_EQ(deserializedBinding->getInputs()->getName(), "");
             EXPECT_EQ(deserializedBinding->getInputs()->getChildCount(), 2u);
         }
     }
@@ -832,8 +833,9 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                0, // no name!
-                1u
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    0, // no name!
+                    1u)
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
                 m_flatBufferBuilder,
@@ -846,16 +848,18 @@ namespace rlogic::internal
         std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing name!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing name!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of RamsesCameraBinding from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoBindingId)
     {
         {
             auto base = rlogic_serialization::CreateRamsesBinding(m_flatBufferBuilder,
-                0 // no id (id gets checked before name)!
-            );
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    0));
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(m_flatBufferBuilder, base);
             m_flatBufferBuilder.Finish(binding);
         }
@@ -864,8 +868,9 @@ namespace rlogic::internal
         std::unique_ptr<RamsesCameraBindingImpl> deserialized = RamsesCameraBindingImpl::Deserialize(serialized, m_resolverMock, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of RamsesCameraBinding from serialized data: missing id!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing or invalid ID!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of RamsesCameraBinding from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ARamsesCameraBinding_SerializationLifecycle, ErrorWhenNoRootInput)
@@ -873,8 +878,9 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0 // no root input
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
@@ -897,10 +903,11 @@ namespace rlogic::internal
         {
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0,
-                m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
+                m_testUtils.serializeTestProperty("", rlogic_serialization::EPropertyRootType::Struct, false, true) // rootInput with errors
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
                 m_flatBufferBuilder,
@@ -927,10 +934,11 @@ namespace rlogic::internal
             );
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 ramsesRef,
-                m_testUtils.serializeTestProperty("IN")
+                m_testUtils.serializeTestProperty("")
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
                 m_flatBufferBuilder,
@@ -962,10 +970,11 @@ namespace rlogic::internal
             );
             auto base = rlogic_serialization::CreateRamsesBinding(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 ramsesRef,
-                m_testUtils.serializeTestProperty("IN")
+                m_testUtils.serializeTestProperty("")
             );
             auto binding = rlogic_serialization::CreateRamsesCameraBinding(
                 m_flatBufferBuilder,
@@ -1175,12 +1184,7 @@ namespace rlogic::internal
             vpProperties->getChild("offsetY")->set<int32_t>(5);
             vpProperties->getChild("width")->set<int32_t>(6);
             vpProperties->getChild("height")->set<int32_t>(7);
-
-            auto frustum = cameraBinding.getInputs()->getChild("frustum");
-            frustum->getChild("fieldOfView")->set<float>(30.f);
-            frustum->getChild("aspectRatio")->set<float>(640.f / 480.f);
-            frustum->getChild("nearPlane")->set<float>(2.3f);
-            frustum->getChild("farPlane")->set<float>(5.6f);
+            m_logicEngine.update();
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
 
@@ -1200,11 +1204,11 @@ namespace rlogic::internal
             EXPECT_EQ(m_perspectiveCam.getViewportY(), 8);
             EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 1u);
             EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 2u);
-            ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
 
             // Set only one value of viewport struct. Use the same value as the one in cache on purpose!
             // Calling set forces set on ramses regardless of the value used
             m_logicEngine.findByName<RamsesCameraBinding>("CameraBinding")->getInputs()->getChild("viewport")->getChild("offsetX")->set<int32_t>(11);
+            m_logicEngine.update();
             EXPECT_TRUE(m_logicEngine.update());
 
             // vpOffsetX changed, the rest is taken from the initially saved inputs, not what was set on the camera!
@@ -1212,8 +1216,6 @@ namespace rlogic::internal
             EXPECT_EQ(m_perspectiveCam.getViewportY(), 12);
             EXPECT_EQ(m_perspectiveCam.getViewportWidth(), 13u);
             EXPECT_EQ(m_perspectiveCam.getViewportHeight(), 14u);
-            // frustum values will still be default values as there was no set of any value on the frustum struct and thus the update doesn't change the struct
-            ExpectDefaultPerspectiveCameraFrustumValues(m_perspectiveCam);
         }
     }
 
@@ -1229,15 +1231,15 @@ namespace rlogic::internal
 
         {
             const std::string_view scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.frustProps = {
-                    fov = FLOAT,
-                    aR = FLOAT,
-                    nP = FLOAT,
-                    fP = FLOAT
+                    fov = Type:Float(),
+                    aR = Type:Float(),
+                    nP = Type:Float(),
+                    fP = Type:Float()
                 }
             end
-            function run()
+            function run(IN,OUT)
                 OUT.frustProps = {
                     fov = 30.0,
                     aR = 640.0 / 480.0,
@@ -1256,6 +1258,7 @@ namespace rlogic::internal
             ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("nP"), *cameraBinding.getInputs()->getChild("frustum")->getChild("nearPlane")));
             ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fP"), *cameraBinding.getInputs()->getChild("frustum")->getChild("farPlane")));
 
+            m_logicEngine.update();
             EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
         }
 
@@ -1389,10 +1392,10 @@ namespace rlogic::internal
     TEST_F(ARamsesCameraBinding_DataFlow, WithLinks)
     {
         const std::string_view scriptSrc = R"(
-            function interface()
-                OUT.vpOffsetX = INT
+            function interface(IN,OUT)
+                OUT.vpOffsetX = Type:Int32()
             end
-            function run()
+            function run(IN,OUT)
                 OUT.vpOffsetX = 15
             end
         )";

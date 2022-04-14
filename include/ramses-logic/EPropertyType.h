@@ -269,40 +269,40 @@ namespace rlogic
     /**
     * Returns the string representation of a property type. This string corresponds to the syntax
     * that has to be used in the Lua source code used to create scripts with properties with
-    * the corresponding type.
+    * the corresponding type. If a type is declared as Type:T() in Lua, this function will return 'T' as string
     */
     constexpr const char* GetLuaPrimitiveTypeName(EPropertyType type)
     {
         switch (type)
         {
         case EPropertyType::Float:
-            return "FLOAT";
+            return "Float";
         case EPropertyType::Vec2f:
-            return "VEC2F";
+            return "Vec2f";
         case EPropertyType::Vec3f:
-            return "VEC3F";
+            return "Vec3f";
         case EPropertyType::Vec4f:
-            return "VEC4F";
+            return "Vec4f";
         case EPropertyType::Int32:
-            return "INT32";
+            return "Int32";
         case EPropertyType::Int64:
-            return "INT64";
+            return "Int64";
         case EPropertyType::Vec2i:
-            return "VEC2I";
+            return "Vec2i";
         case EPropertyType::Vec3i:
-            return "VEC3I";
+            return "Vec3i";
         case EPropertyType::Vec4i:
-            return "VEC4I";
+            return "Vec4i";
         case EPropertyType::Struct:
-            return "STRUCT";
+            return "Struct";
         case EPropertyType::String:
-            return "STRING";
+            return "String";
         case EPropertyType::Bool:
-            return "BOOL";
+            return "Bool";
         case EPropertyType::Array:
-            return "ARRAY";
+            return "Array";
         }
-        return "STRUCT";
+        return "Struct";
     }
 
     constexpr size_t MaxArrayPropertySize = 255u;

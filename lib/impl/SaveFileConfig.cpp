@@ -42,4 +42,10 @@ namespace rlogic
     {
         return m_impl->setExporterVersion(major, minor, patch, fileFormatVersion);
     }
+
+
+    void SaveFileConfig::setValidationEnabled(bool validationEnabled)
+    {
+        return m_impl->setValidationEnabled(validationEnabled);
+    }
 }

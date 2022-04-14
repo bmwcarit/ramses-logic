@@ -6,6 +6,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "LogicObject.fbs";
 include "DataArray.fbs";
 include "Property.fbs";
 
@@ -32,8 +33,7 @@ table Channel
 
 table AnimationNode
 {
-    name:string;
-    id:uint64;
+    base:LogicObject;
     channels:[Channel];
     channelsAsProperties:bool;
     rootInput:Property;

@@ -18,6 +18,7 @@ Class Index
 
 
     AnimationNode
+    AnimationNodeConfig
     Collection
     DataArray
     Iterator
@@ -27,6 +28,7 @@ Class Index
     LogicObject
     LuaConfig
     LuaModule
+    LuaInterface
     LuaScript
     Property
     RamsesAppearanceBinding
@@ -35,6 +37,19 @@ Class Index
     RamsesNodeBinding
     SaveFileConfig
     TimerNode
+
+
+.. toctree::
+    :maxdepth: 3
+    :caption: API structs
+
+
+    AnimationChannel
+    ErrorData
+    IsPrimitiveProperty
+    PropertyEnumToType
+    PropertyTypeToEnum
+    WarningData
 
 
 .. toctree::
@@ -56,31 +71,14 @@ Class Index
 
 .. toctree::
     :maxdepth: 3
-    :caption: Type Traits
-
-
-    PropertyTypeToEnum
-    PropertyEnumToType
-    IsPrimitiveProperty
-
-
-.. toctree::
-    :maxdepth: 3
-    :caption: Errors
-
-
-    ErrorData
-
-
-.. toctree::
-    :maxdepth: 3
     :caption: Enums
 
 
-    EStandardModule
-    EPropertyType
     EInterpolationType
     ELogMessageType
+    EPropertyType
+    ERotationType
+    EStandardModule
 
 
 

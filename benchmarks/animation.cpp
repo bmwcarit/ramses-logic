@@ -20,18 +20,15 @@ namespace rlogic
 {
     const auto  animationIterations = 100;
 
-    static void RunAnimation(LogicEngine& logicEngine, benchmark::State& state, Property* timeProp)
+    static void RunAnimation(LogicEngine& logicEngine, benchmark::State& state, Property* progressProp)
     {
         while (state.KeepRunning())
         {
-            auto i = animationIterations;
-            while ((i--) != 0)
+            for (int i = 0; i < animationIterations; ++i)
             {
-                timeProp->set(0.015f);
+                progressProp->set(float(i) / animationIterations);
                 if (!logicEngine.update())
-                {
                     state.SkipWithError("failure running update()");
-                }
             }
         }
     }
@@ -68,11 +65,12 @@ namespace rlogic
     static void BM_AnimationScriptLinear(benchmark::State& state)
     {
         const std::string src = fmt::format(R"(
-            function interface()
-                IN.time = FLOAT
-                OUT.value = VEC3F
+            function interface(IN,OUT)
+                IN.time = Type:Float()
+                OUT.value = Type:Vec3f()
             end
-            function run()
+            function run(IN,OUT)
+                local z = 0
                 for i = 0,{},1 do
                     z = 360 * IN.time / 1.5
                     OUT.value = {{0, 0, z}}
@@ -85,11 +83,12 @@ namespace rlogic
     static void BM_AnimationScriptKeyframes(benchmark::State& state)
     {
         const std::string src = fmt::format(R"(
-            function interface()
-                IN.time = FLOAT
-                OUT.value = VEC3F
+            function interface(IN,OUT)
+                IN.time = Type:Float()
+                OUT.value = Type:Vec3f()
             end
-            function run()
+            function run(IN,OUT)
+                local z = 0
                 for i = 0,{},1 do
                     GLOBAL.pos = IN.time
                     if GLOBAL.pos < 0.5 then
@@ -117,12 +116,9 @@ namespace rlogic
         for (int64_t i = 0; i < state.range(0); ++i)
             config.addChannel(channelLinear);
         auto* node = logicEngine.createAnimationNode(config);
+        auto* progressProp = node->getInputs()->getChild("progress");
 
-        node->getInputs()->getChild("play")->set(true);
-        node->getInputs()->getChild("loop")->set(true);
-        auto* timeProp = node->getInputs()->getChild("timeDelta");
-
-        RunAnimation(logicEngine, state, timeProp);
+        RunAnimation(logicEngine, state, progressProp);
     }
 
     static void BM_AnimationKeyframes(benchmark::State& state)
@@ -136,12 +132,9 @@ namespace rlogic
         for (int64_t i = 0; i < state.range(0); ++i)
             config.addChannel(channelLinear);
         auto* node = logicEngine.createAnimationNode(config);
+        auto* progressProp = node->getInputs()->getChild("progress");
 
-        node->getInputs()->getChild("play")->set(true);
-        node->getInputs()->getChild("loop")->set(true);
-        auto* timeProp = node->getInputs()->getChild("timeDelta");
-
-        RunAnimation(logicEngine, state, timeProp);
+        RunAnimation(logicEngine, state, progressProp);
     }
 
     static void BM_AnimationKeyframesCubic(benchmark::State& state)
@@ -157,12 +150,9 @@ namespace rlogic
         for (int64_t i = 0; i < state.range(0); ++i)
             config.addChannel(channelCubic);
         auto* node = logicEngine.createAnimationNode(config);
+        auto* progressProp = node->getInputs()->getChild("progress");
 
-        node->getInputs()->getChild("play")->set(true);
-        node->getInputs()->getChild("loop")->set(true);
-        auto* timeProp = node->getInputs()->getChild("timeDelta");
-
-        RunAnimation(logicEngine, state, timeProp);
+        RunAnimation(logicEngine, state, progressProp);
     }
 
     // Compares animation objects with animations done in lua

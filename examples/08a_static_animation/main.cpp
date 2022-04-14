@@ -39,7 +39,7 @@ struct SceneAndNodes
 
 /**
 * Helper method which creates a simple ramses scene. For more ramses
-* examples, check the ramses docs at https://covesa.github.io/ramses
+* examples, check the ramses docs at https://bmwcarit.github.io/ramses
 */
 SceneAndNodes CreateSceneWithTriangles(ramses::RamsesClient& client);
 
@@ -93,7 +93,7 @@ int main(int argc, char* argv[])
     const rlogic::AnimationChannel stepAnimChannel { "rotationZstep", animTimestamps, animKeyframes, rlogic::EInterpolationType::Step };
 
     /**
-     * Finally, create the animation nodes by passing in the channel data via config
+     * Create the animation nodes by passing in the channel data via config
      */
     rlogic::AnimationNodeConfig animConfigCubic;
     animConfigCubic.addChannel(cubicAnimChannel);
@@ -115,37 +115,77 @@ int main(int argc, char* argv[])
         *nodeBinding2->getInputs()->getChild("rotation"));
 
     /**
-    * We need to provide time information to the animation nodes, the easiest way is to create a TimerNode
-    * and link its 'timeDelta' output to all animation nodes' 'timeDelta' input.
-    * Timer node will internally get a system time ticker on every update, it will calculate a 'timeDelta' (time period since last update)
-    * which is exactly what an animation node needs to advance its animation. See TimerNode API for more use cases.
+    * Create control script which uses simple logic to control the animations' progress
+    */
+    rlogic::LuaConfig scriptConfig;
+    scriptConfig.addStandardModuleDependency(rlogic::EStandardModule::Math);
+    rlogic::LuaScript* controlScript = logicEngine.createLuaScript(R"(
+        function init()
+            GLOBAL.startTick = 0
+        end
+
+        function interface(IN,OUT)
+            IN.ticker = Type:Int64()
+            IN.anim1Duration = Type:Float()
+            IN.anim2Duration = Type:Float()
+
+            OUT.anim1Progress = Type:Float()
+            OUT.anim2Progress = Type:Float()
+        end
+
+        function run(IN,OUT)
+            if GLOBAL.startTick == 0 then
+                GLOBAL.startTick = IN.ticker
+            end
+
+            local elapsedTime = IN.ticker - GLOBAL.startTick
+            -- ticker from TimerNode is in microseconds, our animation duration is in seconds, conversion is needed
+            elapsedTime = elapsedTime / 1000000
+
+            -- play anim1 right away
+            local anim1Progress = elapsedTime / IN.anim1Duration
+            -- play anim2 after anim1
+            local anim2Progress = (elapsedTime - IN.anim1Duration) / IN.anim2Duration
+
+            -- clamp normalized progress
+            OUT.anim1Progress = math.min(math.max(anim1Progress, 0), 1)
+            OUT.anim2Progress = math.min(math.max(anim2Progress, 0), 1)
+        end
+    )", scriptConfig);
+
+    /**
+    * We need to provide time information to the control script, we can either provide system or custom time ticker from application
+    * or we can create a TimerNode which generates system time for us. Note that its 'ticker_us' output is in microseconds, control script needs
+    * to convert it to whatever units are used in the animation timestamps (in this example seconds).
     */
     rlogic::TimerNode* timer = logicEngine.createTimerNode();
     logicEngine.link(
-        *timer->getOutputs()->getChild("timeDelta"),
-        *cubicAnimNode->getInputs()->getChild("timeDelta"));
-    logicEngine.link(
-        *timer->getOutputs()->getChild("timeDelta"),
-        *stepAnimNode->getInputs()->getChild("timeDelta"));
+        *timer->getOutputs()->getChild("ticker_us"),
+        *controlScript->getInputs()->getChild("ticker"));
 
     /**
-     * Start the cubic animation right away.
-     */
-    cubicAnimNode->getInputs()->getChild("play")->set(true);
+    * Set duration of both animations to control script, so it can calculate and manage their progress
+    * Note that we could also link these properties but as this would form a cycle in the dependency graph, it would have to be a weak link
+    * (see #rlogic::LogicEngine::linkWeak). We know that the durations will not change so setting them here once is sufficient.
+    **/
+    controlScript->getInputs()->getChild("anim1Duration")->set(*cubicAnimNode->getOutputs()->getChild("duration")->get<float>());
+    controlScript->getInputs()->getChild("anim2Duration")->set(*stepAnimNode->getOutputs()->getChild("duration")->get<float>());
+
+    /**
+    * And finally, link control script to animation nodes
+    **/
+    logicEngine.link(
+        *controlScript->getOutputs()->getChild("anim1Progress"),
+        *cubicAnimNode->getInputs()->getChild("progress"));
+    logicEngine.link(
+        *controlScript->getOutputs()->getChild("anim2Progress"),
+        *stepAnimNode->getInputs()->getChild("progress"));
 
     /**
      * Simulate an application loop.
      */
     for(int loop = 0; loop < 500; ++loop)
     {
-        /**
-         * Query progress of cubic animation and if finished, trigger play of step animation.
-         * Note that this logic can also be implemented as a simple Lua script plugged
-         * in between 'progress' output of cubic animation and 'play' input of step animation.
-         */
-        if (cubicAnimNode->getOutputs()->getChild("progress")->get<float>() > 0.999f)
-            stepAnimNode->getInputs()->getChild("play")->set(true);
-
         /**
         * Update the LogicEngine. This will apply changes to Ramses scene from any running animation.
         */

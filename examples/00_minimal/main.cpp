@@ -32,11 +32,11 @@ int main()
      * The run function contains the real code, which is executed during runtime
      */
     rlogic::LuaScript* script = logicEngine.createLuaScript(R"(
-        function interface()
-            IN.rotate_x = FLOAT
-            OUT.rotation = VEC3F
+        function interface(IN,OUT)
+            IN.rotate_x = Type:Float()
+            OUT.rotation = Type:Vec3f()
         end
-        function run()
+        function run(IN,OUT)
             OUT.rotation = {IN.rotate_x, 90, 180}
         end
     )");

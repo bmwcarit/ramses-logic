@@ -37,8 +37,9 @@ namespace rlogic::internal
         [[nodiscard]] Property*       getInputs();
         [[nodiscard]] const Property* getInputs() const;
 
-        [[nodiscard]] Property* getOutputs();
-        [[nodiscard]] const Property* getOutputs() const;
+        // Virtual because of LuaInterface
+        [[nodiscard]] virtual Property* getOutputs();
+        [[nodiscard]] virtual const Property* getOutputs() const;
 
         virtual void createRootProperties() = 0;
         virtual std::optional<LogicNodeRuntimeError> update() = 0;

@@ -62,7 +62,7 @@ For example, for ``Ubuntu 18.04 LTS`` these can be installed like this:
             libwayland-dev \
             libgles2-mesa-dev
 
-Refer to the `RAMSES build instructions <https://github.com/COVESA/ramses#building-and-testing>`_ for more details.
+Refer to the `RAMSES build instructions <https://github.com/bmwcarit/ramses#building-and-testing>`_ for more details.
 
 ========================================
 Build options
@@ -167,7 +167,7 @@ things can be enabled using following CMake options:
     * turns clang's link-time optimizations on (details `here <https://llvm.org/docs/LinkTimeOptimization.html>`_)
 
 * -DCMAKE_TOOLCHAIN_FILE=<file>
-    * options: any of the files in `cmake/toolchain <https://github.com/COVESA/ramses-logic/tree/master/cmake/toolchain>`_ or your custom cross-compilation toolchain file
+    * options: any of the files in `cmake/toolchain <https://github.com/bmwcarit/ramses-logic/tree/master/cmake/toolchain>`_ or your custom cross-compilation toolchain file
     * default: not set
     * This is a standard CMake feature. We provide several toolchain files for popular compilers, use them or create your own
 

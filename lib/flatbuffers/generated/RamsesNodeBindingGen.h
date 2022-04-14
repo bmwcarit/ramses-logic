@@ -6,6 +6,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LogicObjectGen.h"
 #include "PropertyGen.h"
 #include "RamsesBindingGen.h"
 #include "RamsesReferenceGen.h"
@@ -15,9 +16,14 @@ namespace rlogic_serialization {
 struct RamsesNodeBinding;
 struct RamsesNodeBindingBuilder;
 
+inline const flatbuffers::TypeTable *RamsesNodeBindingTypeTable();
+
 struct RamsesNodeBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef RamsesNodeBindingBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RamsesNodeBindingTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_BASE = 4,
     VT_ROTATIONTYPE = 6
@@ -73,6 +79,24 @@ struct RamsesNodeBinding::Traits {
   using type = RamsesNodeBinding;
   static auto constexpr Create = CreateRamsesNodeBinding;
 };
+
+inline const flatbuffers::TypeTable *RamsesNodeBindingTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, -1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::RamsesBindingTypeTable
+  };
+  static const char * const names[] = {
+    "base",
+    "rotationType"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
 
 }  // namespace rlogic_serialization
 

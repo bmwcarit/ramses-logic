@@ -6,11 +6,9 @@ Following versions of Logic Engine receive security updates:
 
 | Version   | Supported          |
 | -------   | ------------------ |
-| >= 0.11.x | :white_check_mark: |
-| < 0.11    | :x:                |
+| >= 1.0.0  | :white_check_mark: |
+| < 1.0.0   | :x:                |
 
-The logic engine is in a feature ramp-up. Once we are happy with a version 1.0
-there will be maintenance for older stable versions.
 
 ## Reporting a Vulnerability
 

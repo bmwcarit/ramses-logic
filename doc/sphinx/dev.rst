@@ -87,12 +87,6 @@ Version bump rules generally comply with `semver <https://semver.org/>`_ semanti
 * Changing internal functionality with no user visibility results in a patchfix bump.
 
 .. note::
-    The ``Logic Engine`` is currently in a state of active feature development, thus it has a major version ``0``
-    until we feel we can commit to a stable API and formats. For the time being, minor versions may break existing
-    code if we feel the change provides major benefit to users. That being said, we are very careful to keep code
-    compatible and avoid unnecessary refactoring.
-
-.. note::
     Practical hint for developers: all ``flatbuffer`` fields are by default optional. Adding a new field
     at the end of a table and checking for its existence in code when loading a file makes the file format change by
     default forward-and-backwards compatible.

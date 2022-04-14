@@ -21,9 +21,9 @@ namespace rlogic::internal
             SolState m_solState;
 
             const std::string_view m_valid_empty_script = R"(
-                function interface()
+                function interface(IN,OUT)
                 end
-                function run()
+                function run(IN,OUT)
                 end
             )";
     };
@@ -60,13 +60,7 @@ namespace rlogic::internal
         sol::environment env = m_solState.createEnvironment({}, {});
         ASSERT_TRUE(env.valid());
 
-        EXPECT_FALSE(env["INT"].valid());
-        EXPECT_FALSE(env["FLOAT"].valid());
-        EXPECT_FALSE(env["STRING"].valid());
-        EXPECT_FALSE(env["BOOL"].valid());
-        EXPECT_FALSE(env["ARRAY"].valid());
-        EXPECT_FALSE(env["IN"].valid());
-        EXPECT_FALSE(env["OUT"].valid());
+        EXPECT_FALSE(env["Type"].valid());
     }
 
     TEST_F(ASolState, CreatesCustomMethods)
@@ -83,13 +77,6 @@ namespace rlogic::internal
     protected:
         sol::environment m_env {m_solState.createEnvironment({}, {})};
     };
-
-    // Those are created on-demand in the interface() function and during runtime
-    TEST_F(ASolState_Environment, HasNo_IN_OUT_globals)
-    {
-        EXPECT_FALSE(m_env["IN"].valid());
-        EXPECT_FALSE(m_env["OUT"].valid());
-    }
 
     TEST_F(ASolState_Environment, HidesGlobalStandardModulesByDefault)
     {

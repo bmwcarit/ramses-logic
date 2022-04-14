@@ -522,7 +522,7 @@ namespace rlogic
                 drawNodeContextMenu(obj, LogicViewer::ltnAnimation);
                 if (open)
                 {
-                    ImGui::TextUnformatted(fmt::format("Duration: {}", obj->getDuration()).c_str());
+                    ImGui::TextUnformatted(fmt::format("Duration: {}", *obj->getOutputs()->getChild("duration")->get<float>()).c_str());
                     if (ImGui::TreeNode("Channels"))
                     {
                         for (auto& ch : obj->getChannels())

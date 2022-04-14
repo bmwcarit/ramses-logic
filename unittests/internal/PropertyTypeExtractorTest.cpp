@@ -19,17 +19,11 @@ namespace rlogic::internal
 
         PropertyTypeExtractor::RegisterTypes(env);
 
-        // Environment now has the type symbols (data types, declaration functions)
-        EXPECT_TRUE(env["INT"].valid());
-        EXPECT_TRUE(env["FLOAT"].valid());
-        EXPECT_TRUE(env["VEC3F"].valid());
-        EXPECT_TRUE(env["ARRAY"].valid());
+        // Environment now has the Type symbols (used to declare data types)
+        EXPECT_TRUE(env["Type"].valid());
 
-        // Global lua state doesn't know these symbols
-        EXPECT_FALSE(sol["INT"].valid());
-        EXPECT_FALSE(sol["FLOAT"].valid());
-        EXPECT_FALSE(sol["VEC3F"].valid());
-        EXPECT_FALSE(sol["ARRAY"].valid());
+        // Global lua state doesn't know this symbol
+        EXPECT_FALSE(sol["Type"].valid());
     }
 
     TEST(ThePropertyTypeExtractorGlobalSymbols, UnregisteringSymbolsWillNotKeepAnythingInLuaStack)
@@ -41,18 +35,6 @@ namespace rlogic::internal
         EXPECT_TRUE(lua_gettop(sol.lua_state()) >= 0);
 
         PropertyTypeExtractor::UnregisterTypes(env);
-        EXPECT_TRUE(lua_gettop(sol.lua_state()) == 0);
-    }
-
-    TEST(ThePropertyTypeExtractorGlobalSymbols, UnregisteringSymbolsWillNotKeepAnythingInLuaStack_KeepingConstants)
-    {
-        sol::state sol;
-        sol::environment env(sol, sol::create, sol.globals());
-
-        PropertyTypeExtractor::RegisterTypes(env);
-        EXPECT_TRUE(lua_gettop(sol.lua_state()) >= 0);
-
-        PropertyTypeExtractor::UnregisterTypes(env, true);
         EXPECT_TRUE(lua_gettop(sol.lua_state()) == 0);
     }
 
@@ -101,7 +83,7 @@ namespace rlogic::internal
     TEST_F(APropertyTypeExtractor, ExtractsSinglePrimitiveProperty)
     {
         const HierarchicalTypeData typeInfo = extractTypeInfo(R"(
-            IN.newInt = INT
+            IN.newInt = Type:Int32()
         )");
 
         const HierarchicalTypeData expected  = MakeStruct("IN", {{"newInt", EPropertyType::Int32}});
@@ -112,17 +94,17 @@ namespace rlogic::internal
     TEST_F(APropertyTypeExtractor, ExtractsAllPrimitiveTypes_OrdersByPropertyNameLexicographically)
     {
         const HierarchicalTypeData typeInfo = extractTypeInfo(R"(
-            IN.bool = BOOL
-            IN.string = STRING
-            IN.int32 = INT
-            IN.int64 = INT64
-            IN.vec2i = VEC2I
-            IN.vec3i = VEC3I
-            IN.vec4i = VEC4I
-            IN.float = FLOAT
-            IN.vec2f = VEC2F
-            IN.vec3f = VEC3F
-            IN.vec4f = VEC4F
+            IN.bool = Type:Bool()
+            IN.string = Type:String()
+            IN.int32 = Type:Int32()
+            IN.int64 = Type:Int64()
+            IN.vec2i = Type:Vec2i()
+            IN.vec3i = Type:Vec3i()
+            IN.vec4i = Type:Vec4i()
+            IN.float = Type:Float()
+            IN.vec2f = Type:Vec2f()
+            IN.vec3f = Type:Vec3f()
+            IN.vec4f = Type:Vec4f()
         )");
 
         const HierarchicalTypeData expected = MakeStruct("IN",
@@ -148,10 +130,10 @@ namespace rlogic::internal
     {
         const HierarchicalTypeData typeInfo = extractTypeInfo(R"(
             IN.nested = {
-                int = INT,
-                vec4f = VEC4F,
-                vec2i = VEC2I,
-                bool = BOOL
+                int = Type:Int32(),
+                vec4f = Type:Vec4f(),
+                vec2i = Type:Vec2i(),
+                bool = Type:Bool()
             }
         )");
 
@@ -177,9 +159,9 @@ namespace rlogic::internal
         const HierarchicalTypeData typeInfo = extractTypeInfo(R"(
             IN.nested = {}
             IN.nested.s2 = {}
-            IN.nested.s2.i2 = INT
-            IN.nested.s2.i1 = INT
-            IN.nested.b1 = BOOL
+            IN.nested.s2.i2 = Type:Int32()
+            IN.nested.s2.i1 = Type:Int32()
+            IN.nested.b1 = Type:Bool()
         )");
 
         const HierarchicalTypeData expected {
@@ -223,8 +205,8 @@ namespace rlogic::internal
     {
         const sol::error error = expectErrorDuringTypeExtraction(
             R"(
-                IN.property = INT
-                IN.property = FLOAT
+                IN.property = Type:Int32()
+                IN.property = Type:Float()
             )");
 
         EXPECT_THAT(error.what(), ::testing::HasSubstr("lua: error: Field 'property' already exists! Can't declare the same field twice!"));
@@ -244,13 +226,13 @@ namespace rlogic::internal
 
     TEST_F(APropertyTypeExtractor_Errors, ProducesErrorWhenTryingToCreateInterfaceProperties_WithNonStringIndex)
     {
-        sol::error error = expectErrorDuringTypeExtraction("IN[1] = INT");
+        sol::error error = expectErrorDuringTypeExtraction("IN[1] = Type:Int32()");
         EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type number instead!"));
-        error = expectErrorDuringTypeExtraction("IN[true] = INT");
+        error = expectErrorDuringTypeExtraction("IN[true] = Type:Int32()");
         EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type bool instead!"));
-        error = expectErrorDuringTypeExtraction("IN[{x=5}] = INT");
+        error = expectErrorDuringTypeExtraction("IN[{x=5}] = Type:Int32()");
         EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type table instead!"));
-        error = expectErrorDuringTypeExtraction("IN[nil] = INT");
+        error = expectErrorDuringTypeExtraction("IN[nil] = Type:Int32()");
         EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid index for new field on struct 'IN': Expected a string but got object of type nil instead!"));
     }
 
@@ -266,7 +248,7 @@ namespace rlogic::internal
         for (const auto& statement : wrongStatements)
         {
             const sol::error error = expectErrorDuringTypeExtraction(statement);
-            EXPECT_THAT(error.what(), ::testing::HasSubstr("Field 'bad_type' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"));
+            EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid type of field 'bad_type'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type"));
         }
     }
 
@@ -281,13 +263,13 @@ namespace rlogic::internal
         for (const auto& statement : wrongStatements)
         {
             const sol::error error = expectErrorDuringTypeExtraction(statement);
-            EXPECT_THAT(error.what(), ::testing::HasSubstr("Field 'bad_type' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"));
+            EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid type of field 'bad_type'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type"));
         }
     }
 
     TEST_F(APropertyTypeExtractor_Errors, NoNameProvided_ForNestedProperty)
     {
-        const sol::error error1 = expectErrorDuringTypeExtraction("IN.parent = {INT}");
+        const sol::error error1 = expectErrorDuringTypeExtraction("IN.parent = {Type:Int32()}");
         const sol::error error2 = expectErrorDuringTypeExtraction("IN.parent = {5}");
         EXPECT_THAT(error1.what(), ::testing::HasSubstr("Invalid index for new field on struct 'parent': Expected a string but got object of type number instead!"));
         EXPECT_THAT(error2.what(), ::testing::HasSubstr("Invalid index for new field on struct 'parent': Expected a string but got object of type number instead!"));
@@ -296,13 +278,13 @@ namespace rlogic::internal
     TEST_F(APropertyTypeExtractor_Errors, CorrectNameButWrongTypeProvided_ForNestedProperty)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.no_nested_type = { correct_key = 'but wrong type' }");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("Field 'correct_key' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid type of field 'correct_key'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'string' instead"));
     }
 
     TEST_F(APropertyTypeExtractor_Errors, UserdataAssignedToPropertyCausesError)
     {
         const sol::error error = expectErrorDuringTypeExtraction("IN.very_wrong = IN");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("Field 'very_wrong' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!"));
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid type of field 'very_wrong'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'userdata' instead"));
     }
 
     class APropertyTypeExtractor_Arrays : public APropertyTypeExtractor
@@ -312,7 +294,7 @@ namespace rlogic::internal
 
     TEST_F(APropertyTypeExtractor_Arrays, DeclaresArrayOfPrimitives)
     {
-        const HierarchicalTypeData typeInfo = extractTypeInfo("IN.primArray = ARRAY(3, INT)");
+        const HierarchicalTypeData typeInfo = extractTypeInfo("IN.primArray = Type:Array(3, Type:Int32())");
 
         const HierarchicalTypeData arrayType = MakeArray("primArray", 3, EPropertyType::Int32);
         const HierarchicalTypeData expected({"IN", EPropertyType::Struct}, {arrayType});
@@ -322,9 +304,9 @@ namespace rlogic::internal
 
     TEST_F(APropertyTypeExtractor_Arrays, DeclaresArrayOfStructs)
     {
-        const HierarchicalTypeData typeInfo = extractTypeInfo("IN.structArray = ARRAY(3, {a = INT, b = VEC3F})");
+        const HierarchicalTypeData typeInfo = extractTypeInfo("IN.structArray = Type:Array(3, {a = Type:Int32(), b = Type:Vec3f()})");
 
-        EXPECT_EQ(1u, typeInfo.children.size());
+        ASSERT_EQ(1u, typeInfo.children.size());
         const HierarchicalTypeData& arrayType = typeInfo.children[0];
 
         EXPECT_EQ(arrayType.typeData, TypeData("structArray", EPropertyType::Array));
@@ -332,10 +314,8 @@ namespace rlogic::internal
         for (const auto& arrayField : arrayType.children)
         {
             EXPECT_EQ(arrayField.typeData, TypeData("", EPropertyType::Struct));
-            // Has all defined properties, but no particular ordering
-            // TODO Violin would be probably a lot more robust to just order the fields based on e.g. lexicographic order, than to accept Lua behavior...
             EXPECT_THAT(arrayField.children,
-                ::testing::UnorderedElementsAre(
+                ::testing::ElementsAre(
                     MakeType("a", EPropertyType::Int32),
                     MakeType("b", EPropertyType::Vec3f)
                 )
@@ -348,6 +328,27 @@ namespace rlogic::internal
         EXPECT_EQ(arrayType.children[1], arrayType.children[2]);
     }
 
+    TEST_F(APropertyTypeExtractor_Arrays, DeclaresArrayOfArrays)
+    {
+        const HierarchicalTypeData typeInfo = extractTypeInfo("IN.array2d = Type:Array(3, Type:Array(2, Type:Int32()))");
+
+        ASSERT_EQ(1u, typeInfo.children.size());
+        const HierarchicalTypeData& arrayType = typeInfo.children[0];
+
+        EXPECT_EQ(arrayType.typeData, TypeData("array2d", EPropertyType::Array));
+
+        for (const auto& arrayField : arrayType.children)
+        {
+            EXPECT_EQ(arrayField.typeData, TypeData("", EPropertyType::Array));
+            EXPECT_THAT(arrayField.children,
+                ::testing::ElementsAre(
+                    MakeType("", EPropertyType::Int32),
+                    MakeType("", EPropertyType::Int32)
+                )
+            );
+        }
+    }
+
     class APropertyTypeExtractor_ArrayErrors : public APropertyTypeExtractor_Errors
     {
     protected:
@@ -355,68 +356,61 @@ namespace rlogic::internal
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayDefinedWithoutArguments)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY()");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'nil'"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array()");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'nil'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithFirstArgumentNotANumber)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY('not a number')");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'string'"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array('not a number')");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'string'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithoutTypeArgument)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(5)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with invalid type parameter T!"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(5)");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with invalid type parameter T!"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithInvalidTypeArgument)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(5, 9000)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("Unsupported type id '9000' for array property 'array'!"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(5, 9000)");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid element type T of array field 'array'! Found a value of type T='number' instead of T=Type:<type>() in call array = Type:Array(N, T)!"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithZeroSize)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(0, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with invalid size parameter N=0 (must be in the range [1, 255])!"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(0, Type:Int32())");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with invalid size parameter N=0 (must be in the range [1, 255])!"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithOutOfBoundsSize)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(256, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with invalid size parameter N=256 (must be in the range [1, 255])!"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(256, Type:Int32())");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with invalid size parameter N=256 (must be in the range [1, 255])!"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithNegativeSize)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(-1, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected non-negative number, received '-1'"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(-1, Type:Int32())");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with bad size argument! Error while extracting integer: expected non-negative number, received '-1'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithFloatSize)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(1.5, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(1.5, Type:Int32())");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with bad size argument! Error while extracting integer: implicit rounding (fractional part '0.5' is not negligible)"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithUserDataInsteadOfSize)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(IN, INT)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("ARRAY(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'userdata'"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(IN, Type:Int32())");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Type:Array(N, T) invoked with bad size argument! Error while extracting integer: expected a number, received 'userdata'"));
     }
 
     TEST_F(APropertyTypeExtractor_ArrayErrors, ArrayWithUserDataInsteadOfTypeInfo)
     {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(5, IN)");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("Unsupported type 'userdata' for array property 'array'!"));
-    }
-
-    // TODO Violin but should be - there is no reason not to support them
-    TEST_F(APropertyTypeExtractor_ArrayErrors, MultidimensionalArraysAreNotSupported)
-    {
-        const sol::error error = expectErrorDuringTypeExtraction("IN.array = ARRAY(5, ARRAY(2, FLOAT))");
-        EXPECT_THAT(error.what(), ::testing::HasSubstr("Unsupported type 'userdata' for array property 'array'!"));
+        const sol::error error = expectErrorDuringTypeExtraction("IN.array = Type:Array(5, IN)");
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Invalid element type T of array field 'array'! Found a value of type T='userdata' instead of T=Type:<type>() in call array = Type:Array(N, T)!"));
     }
 }

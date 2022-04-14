@@ -17,13 +17,13 @@ table Version
     v_minor:uint32;
     v_patch:uint32;
     v_string:string;
-    v_fileFormatVersion:uint32 = 0; // default=0 means version was not being exported yet
 }
 
 table Metadata
 {
     metadataString:string;
     exporterVersion: Version;
+    exporterFileVersion: uint32;
 }
 
 table LogicEngine
@@ -37,3 +37,9 @@ table LogicEngine
 }
 
 root_type LogicEngine;
+
+// The identifier ensures a binary file/buffer can be identified as a ramses logic
+// binary file; also, it is versioned so that breaking changes can be handled gracefully
+// by a runtime (bump it every time we do a breaking change on the schema)
+// If we ever reach 99, can use the letters too (e.g. rl99 -> r100)
+file_identifier "rl01";

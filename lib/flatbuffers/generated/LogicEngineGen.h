@@ -10,6 +10,8 @@
 #include "ApiObjectsGen.h"
 #include "DataArrayGen.h"
 #include "LinkGen.h"
+#include "LogicObjectGen.h"
+#include "LuaInterfaceGen.h"
 #include "LuaModuleGen.h"
 #include "LuaScriptGen.h"
 #include "PropertyGen.h"
@@ -31,15 +33,23 @@ struct MetadataBuilder;
 struct LogicEngine;
 struct LogicEngineBuilder;
 
+inline const flatbuffers::TypeTable *VersionTypeTable();
+
+inline const flatbuffers::TypeTable *MetadataTypeTable();
+
+inline const flatbuffers::TypeTable *LogicEngineTypeTable();
+
 struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef VersionBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return VersionTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_V_MAJOR = 4,
     VT_V_MINOR = 6,
     VT_V_PATCH = 8,
-    VT_V_STRING = 10,
-    VT_V_FILEFORMATVERSION = 12
+    VT_V_STRING = 10
   };
   uint32_t v_major() const {
     return GetField<uint32_t>(VT_V_MAJOR, 0);
@@ -53,9 +63,6 @@ struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const flatbuffers::String *v_string() const {
     return GetPointer<const flatbuffers::String *>(VT_V_STRING);
   }
-  uint32_t v_fileFormatVersion() const {
-    return GetField<uint32_t>(VT_V_FILEFORMATVERSION, 0);
-  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint32_t>(verifier, VT_V_MAJOR) &&
@@ -63,7 +70,6 @@ struct Version FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyField<uint32_t>(verifier, VT_V_PATCH) &&
            VerifyOffset(verifier, VT_V_STRING) &&
            verifier.VerifyString(v_string()) &&
-           VerifyField<uint32_t>(verifier, VT_V_FILEFORMATVERSION) &&
            verifier.EndTable();
   }
 };
@@ -84,9 +90,6 @@ struct VersionBuilder {
   void add_v_string(flatbuffers::Offset<flatbuffers::String> v_string) {
     fbb_.AddOffset(Version::VT_V_STRING, v_string);
   }
-  void add_v_fileFormatVersion(uint32_t v_fileFormatVersion) {
-    fbb_.AddElement<uint32_t>(Version::VT_V_FILEFORMATVERSION, v_fileFormatVersion, 0);
-  }
   explicit VersionBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -104,10 +107,8 @@ inline flatbuffers::Offset<Version> CreateVersion(
     uint32_t v_major = 0,
     uint32_t v_minor = 0,
     uint32_t v_patch = 0,
-    flatbuffers::Offset<flatbuffers::String> v_string = 0,
-    uint32_t v_fileFormatVersion = 0) {
+    flatbuffers::Offset<flatbuffers::String> v_string = 0) {
   VersionBuilder builder_(_fbb);
-  builder_.add_v_fileFormatVersion(v_fileFormatVersion);
   builder_.add_v_string(v_string);
   builder_.add_v_patch(v_patch);
   builder_.add_v_minor(v_minor);
@@ -125,24 +126,26 @@ inline flatbuffers::Offset<Version> CreateVersionDirect(
     uint32_t v_major = 0,
     uint32_t v_minor = 0,
     uint32_t v_patch = 0,
-    const char *v_string = nullptr,
-    uint32_t v_fileFormatVersion = 0) {
+    const char *v_string = nullptr) {
   auto v_string__ = v_string ? _fbb.CreateString(v_string) : 0;
   return rlogic_serialization::CreateVersion(
       _fbb,
       v_major,
       v_minor,
       v_patch,
-      v_string__,
-      v_fileFormatVersion);
+      v_string__);
 }
 
 struct Metadata FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef MetadataBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return MetadataTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_METADATASTRING = 4,
-    VT_EXPORTERVERSION = 6
+    VT_EXPORTERVERSION = 6,
+    VT_EXPORTERFILEVERSION = 8
   };
   const flatbuffers::String *metadataString() const {
     return GetPointer<const flatbuffers::String *>(VT_METADATASTRING);
@@ -150,12 +153,16 @@ struct Metadata FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::Version *exporterVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_EXPORTERVERSION);
   }
+  uint32_t exporterFileVersion() const {
+    return GetField<uint32_t>(VT_EXPORTERFILEVERSION, 0);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_METADATASTRING) &&
            verifier.VerifyString(metadataString()) &&
            VerifyOffset(verifier, VT_EXPORTERVERSION) &&
            verifier.VerifyTable(exporterVersion()) &&
+           VerifyField<uint32_t>(verifier, VT_EXPORTERFILEVERSION) &&
            verifier.EndTable();
   }
 };
@@ -169,6 +176,9 @@ struct MetadataBuilder {
   }
   void add_exporterVersion(flatbuffers::Offset<rlogic_serialization::Version> exporterVersion) {
     fbb_.AddOffset(Metadata::VT_EXPORTERVERSION, exporterVersion);
+  }
+  void add_exporterFileVersion(uint32_t exporterFileVersion) {
+    fbb_.AddElement<uint32_t>(Metadata::VT_EXPORTERFILEVERSION, exporterFileVersion, 0);
   }
   explicit MetadataBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -185,8 +195,10 @@ struct MetadataBuilder {
 inline flatbuffers::Offset<Metadata> CreateMetadata(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<flatbuffers::String> metadataString = 0,
-    flatbuffers::Offset<rlogic_serialization::Version> exporterVersion = 0) {
+    flatbuffers::Offset<rlogic_serialization::Version> exporterVersion = 0,
+    uint32_t exporterFileVersion = 0) {
   MetadataBuilder builder_(_fbb);
+  builder_.add_exporterFileVersion(exporterFileVersion);
   builder_.add_exporterVersion(exporterVersion);
   builder_.add_metadataString(metadataString);
   return builder_.Finish();
@@ -200,17 +212,22 @@ struct Metadata::Traits {
 inline flatbuffers::Offset<Metadata> CreateMetadataDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     const char *metadataString = nullptr,
-    flatbuffers::Offset<rlogic_serialization::Version> exporterVersion = 0) {
+    flatbuffers::Offset<rlogic_serialization::Version> exporterVersion = 0,
+    uint32_t exporterFileVersion = 0) {
   auto metadataString__ = metadataString ? _fbb.CreateString(metadataString) : 0;
   return rlogic_serialization::CreateMetadata(
       _fbb,
       metadataString__,
-      exporterVersion);
+      exporterVersion,
+      exporterFileVersion);
 }
 
 struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef LogicEngineBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return LogicEngineTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_RAMSESVERSION = 4,
     VT_RLOGICVERSION = 6,
@@ -292,6 +309,69 @@ struct LogicEngine::Traits {
   static auto constexpr Create = CreateLogicEngine;
 };
 
+inline const flatbuffers::TypeTable *VersionTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_UINT, 0, -1 },
+    { flatbuffers::ET_UINT, 0, -1 },
+    { flatbuffers::ET_UINT, 0, -1 },
+    { flatbuffers::ET_STRING, 0, -1 }
+  };
+  static const char * const names[] = {
+    "v_major",
+    "v_minor",
+    "v_patch",
+    "v_string"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 4, type_codes, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *MetadataTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_STRING, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_UINT, 0, -1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::VersionTypeTable
+  };
+  static const char * const names[] = {
+    "metadataString",
+    "exporterVersion",
+    "exporterFileVersion"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 3, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *LogicEngineTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::VersionTypeTable,
+    rlogic_serialization::ApiObjectsTypeTable,
+    rlogic_serialization::MetadataTypeTable
+  };
+  static const char * const names[] = {
+    "ramsesVersion",
+    "rlogicVersion",
+    "apiObjects",
+    "assetMetedata"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
 inline const rlogic_serialization::LogicEngine *GetLogicEngine(const void *buf) {
   return flatbuffers::GetRoot<rlogic_serialization::LogicEngine>(buf);
 }
@@ -300,26 +380,35 @@ inline const rlogic_serialization::LogicEngine *GetSizePrefixedLogicEngine(const
   return flatbuffers::GetSizePrefixedRoot<rlogic_serialization::LogicEngine>(buf);
 }
 
+inline const char *LogicEngineIdentifier() {
+  return "rl01";
+}
+
+inline bool LogicEngineBufferHasIdentifier(const void *buf) {
+  return flatbuffers::BufferHasIdentifier(
+      buf, LogicEngineIdentifier());
+}
+
 inline bool VerifyLogicEngineBuffer(
     flatbuffers::Verifier &verifier) {
-  return verifier.VerifyBuffer<rlogic_serialization::LogicEngine>(nullptr);
+  return verifier.VerifyBuffer<rlogic_serialization::LogicEngine>(LogicEngineIdentifier());
 }
 
 inline bool VerifySizePrefixedLogicEngineBuffer(
     flatbuffers::Verifier &verifier) {
-  return verifier.VerifySizePrefixedBuffer<rlogic_serialization::LogicEngine>(nullptr);
+  return verifier.VerifySizePrefixedBuffer<rlogic_serialization::LogicEngine>(LogicEngineIdentifier());
 }
 
 inline void FinishLogicEngineBuffer(
     flatbuffers::FlatBufferBuilder &fbb,
     flatbuffers::Offset<rlogic_serialization::LogicEngine> root) {
-  fbb.Finish(root);
+  fbb.Finish(root, LogicEngineIdentifier());
 }
 
 inline void FinishSizePrefixedLogicEngineBuffer(
     flatbuffers::FlatBufferBuilder &fbb,
     flatbuffers::Offset<rlogic_serialization::LogicEngine> root) {
-  fbb.FinishSizePrefixed(root);
+  fbb.FinishSizePrefixed(root, LogicEngineIdentifier());
 }
 
 }  // namespace rlogic_serialization

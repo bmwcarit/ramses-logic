@@ -6,6 +6,8 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LogicObjectGen.h"
+
 namespace rlogic_serialization {
 
 struct floatArr;
@@ -16,6 +18,12 @@ struct intArrBuilder;
 
 struct DataArray;
 struct DataArrayBuilder;
+
+inline const flatbuffers::TypeTable *floatArrTypeTable();
+
+inline const flatbuffers::TypeTable *intArrTypeTable();
+
+inline const flatbuffers::TypeTable *DataArrayTypeTable();
 
 enum class EDataArrayType : uint8_t {
   Float = 0,
@@ -116,6 +124,9 @@ bool VerifyArrayUnionVector(flatbuffers::Verifier &verifier, const flatbuffers::
 struct floatArr FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef floatArrBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return floatArrTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_DATA = 4
   };
@@ -174,6 +185,9 @@ inline flatbuffers::Offset<floatArr> CreatefloatArrDirect(
 struct intArr FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef intArrBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return intArrTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_DATA = 4
   };
@@ -232,18 +246,17 @@ inline flatbuffers::Offset<intArr> CreateintArrDirect(
 struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef DataArrayBuilder Builder;
   struct Traits;
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_NAME = 4,
-    VT_ID = 6,
-    VT_TYPE = 8,
-    VT_DATA_TYPE = 10,
-    VT_DATA = 12
-  };
-  const flatbuffers::String *name() const {
-    return GetPointer<const flatbuffers::String *>(VT_NAME);
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return DataArrayTypeTable();
   }
-  uint64_t id() const {
-    return GetField<uint64_t>(VT_ID, 0);
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_BASE = 4,
+    VT_TYPE = 6,
+    VT_DATA_TYPE = 8,
+    VT_DATA = 10
+  };
+  const rlogic_serialization::LogicObject *base() const {
+    return GetPointer<const rlogic_serialization::LogicObject *>(VT_BASE);
   }
   rlogic_serialization::EDataArrayType type() const {
     return static_cast<rlogic_serialization::EDataArrayType>(GetField<uint8_t>(VT_TYPE, 0));
@@ -263,9 +276,8 @@ struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_NAME) &&
-           verifier.VerifyString(name()) &&
-           VerifyField<uint64_t>(verifier, VT_ID) &&
+           VerifyOffset(verifier, VT_BASE) &&
+           verifier.VerifyTable(base()) &&
            VerifyField<uint8_t>(verifier, VT_TYPE) &&
            VerifyField<uint8_t>(verifier, VT_DATA_TYPE) &&
            VerifyOffset(verifier, VT_DATA) &&
@@ -286,11 +298,8 @@ struct DataArrayBuilder {
   typedef DataArray Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
-  void add_name(flatbuffers::Offset<flatbuffers::String> name) {
-    fbb_.AddOffset(DataArray::VT_NAME, name);
-  }
-  void add_id(uint64_t id) {
-    fbb_.AddElement<uint64_t>(DataArray::VT_ID, id, 0);
+  void add_base(flatbuffers::Offset<rlogic_serialization::LogicObject> base) {
+    fbb_.AddOffset(DataArray::VT_BASE, base);
   }
   void add_type(rlogic_serialization::EDataArrayType type) {
     fbb_.AddElement<uint8_t>(DataArray::VT_TYPE, static_cast<uint8_t>(type), 0);
@@ -315,15 +324,13 @@ struct DataArrayBuilder {
 
 inline flatbuffers::Offset<DataArray> CreateDataArray(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<flatbuffers::String> name = 0,
-    uint64_t id = 0,
+    flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     rlogic_serialization::EDataArrayType type = rlogic_serialization::EDataArrayType::Float,
     rlogic_serialization::ArrayUnion data_type = rlogic_serialization::ArrayUnion::NONE,
     flatbuffers::Offset<void> data = 0) {
   DataArrayBuilder builder_(_fbb);
-  builder_.add_id(id);
   builder_.add_data(data);
-  builder_.add_name(name);
+  builder_.add_base(base);
   builder_.add_data_type(data_type);
   builder_.add_type(type);
   return builder_.Finish();
@@ -333,23 +340,6 @@ struct DataArray::Traits {
   using type = DataArray;
   static auto constexpr Create = CreateDataArray;
 };
-
-inline flatbuffers::Offset<DataArray> CreateDataArrayDirect(
-    flatbuffers::FlatBufferBuilder &_fbb,
-    const char *name = nullptr,
-    uint64_t id = 0,
-    rlogic_serialization::EDataArrayType type = rlogic_serialization::EDataArrayType::Float,
-    rlogic_serialization::ArrayUnion data_type = rlogic_serialization::ArrayUnion::NONE,
-    flatbuffers::Offset<void> data = 0) {
-  auto name__ = name ? _fbb.CreateString(name) : 0;
-  return rlogic_serialization::CreateDataArray(
-      _fbb,
-      name__,
-      id,
-      type,
-      data_type,
-      data);
-}
 
 inline bool VerifyArrayUnion(flatbuffers::Verifier &verifier, const void *obj, ArrayUnion type) {
   switch (type) {
@@ -378,6 +368,107 @@ inline bool VerifyArrayUnionVector(flatbuffers::Verifier &verifier, const flatbu
     }
   }
   return true;
+}
+
+inline const flatbuffers::TypeTable *EDataArrayTypeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::EDataArrayTypeTypeTable
+  };
+  static const char * const names[] = {
+    "Float",
+    "Vec2f",
+    "Vec3f",
+    "Vec4f",
+    "Int32",
+    "Vec2i",
+    "Vec3i",
+    "Vec4i"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_ENUM, 8, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *ArrayUnionTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::floatArrTypeTable,
+    rlogic_serialization::intArrTypeTable
+  };
+  static const char * const names[] = {
+    "NONE",
+    "floatArr",
+    "intArr"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_UNION, 3, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *floatArrTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_FLOAT, 1, -1 }
+  };
+  static const char * const names[] = {
+    "data"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *intArrTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_INT, 1, -1 }
+  };
+  static const char * const names[] = {
+    "data"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, nullptr, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *DataArrayTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 1 },
+    { flatbuffers::ET_UTYPE, 0, 2 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::LogicObjectTypeTable,
+    rlogic_serialization::EDataArrayTypeTypeTable,
+    rlogic_serialization::ArrayUnionTypeTable
+  };
+  static const char * const names[] = {
+    "base",
+    "type",
+    "data_type",
+    "data"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
 }
 
 }  // namespace rlogic_serialization

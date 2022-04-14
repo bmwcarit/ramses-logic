@@ -9,7 +9,8 @@
 #include "internals/PropertyTypeExtractor.h"
 #include "internals/SolHelper.h"
 #include "internals/TypeUtils.h"
-#include "internals/ArrayTypeInfo.h"
+#include "internals/InterfaceTypeInfo.h"
+#include "internals/InterfaceTypeFunctions.h"
 #include "internals/LuaTypeConversions.h"
 
 #include "fmt/format.h"
@@ -79,77 +80,117 @@ namespace rlogic::internal
             sol_helper::throwSolException("Field '{}' already exists! Can't declare the same field twice!", idxAsStr);
         }
 
-        // TODO Violin improve error messages below (more specific errors instead of generic 'wrong type' error)
-        const auto solType = value.get_type();
-        if (solType == sol::type::number)
-        {
-            const auto type = value.as<EPropertyType>();
-            if (TypeUtils::IsValidType(type) && TypeUtils::IsPrimitiveType(type))
-            {
-                m_children.emplace_back(PropertyTypeExtractor{ std::string(idxAsStr), type });
-            }
-            else
-            {
-                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", idxAsStr);
-            }
-        }
-        else if (solType == sol::type::table)
+        // TODO Violin consider if we want to forbid this
+        const std::optional<sol::lua_table> potentiallyTable = LuaTypeConversions::ExtractLuaTable(value);
+        if (potentiallyTable)
         {
             PropertyTypeExtractor structProperty(idxAsStr, EPropertyType::Struct);
-            auto extractedTable = LuaTypeConversions::ExtractLuaTable(value);
-            assert(extractedTable && "Has to be of type table, since we checked the type above");
-            structProperty.extractPropertiesFromTable(*extractedTable);
+            structProperty.extractPropertiesFromTable(*potentiallyTable);
             m_children.emplace_back(std::move(structProperty));
-        }
-        else if (solType == sol::type::userdata)
-        {
-            const sol::optional<ArrayTypeInfo> potentiallyArrayTypeInfo = value.as<sol::optional<ArrayTypeInfo>>();
-            if (potentiallyArrayTypeInfo)
-            {
-                const ArrayTypeInfo& arrayTypeInfo = *potentiallyArrayTypeInfo;
-                const sol::object& arrayType = arrayTypeInfo.arrayType;
-
-                PropertyTypeExtractor arrayProperty(idxAsStr, EPropertyType::Array);
-
-                const sol::type solArrayType = arrayType.get_type();
-                // Handles ARRAY(n, T) where T is a primitive type (int, float etc.)
-                if (solArrayType == sol::type::number)
-                {
-                    const auto type = arrayType.as<EPropertyType>();
-                    if (TypeUtils::IsValidType(type) && TypeUtils::IsPrimitiveType(type))
-                    {
-                        arrayProperty.m_children.resize(arrayTypeInfo.arraySize, PropertyTypeExtractor("", type));
-                    }
-                    else
-                    {
-                        sol_helper::throwSolException("Unsupported type id '{}' for array property '{}'!", static_cast<uint32_t>(type), idxAsStr);
-                    }
-                }
-                // Handles ARRAY(n, T) where T is a complex type (only structs currently supported)
-                else if (solArrayType == sol::type::table)
-                {
-                    PropertyTypeExtractor structInArray("", EPropertyType::Struct);
-                    auto extractedTable = LuaTypeConversions::ExtractLuaTable(arrayType);
-                    assert(extractedTable && "Has to be of type table, since we checked the type above");
-                    structInArray.extractPropertiesFromTable(*extractedTable);
-                    arrayProperty.m_children.resize(arrayTypeInfo.arraySize, structInArray);
-                }
-                // TODO Violin consider whether we should add support for nested arrays. Should be easy to implement, and would be more consistent for users
-                else
-                {
-                    sol_helper::throwSolException("Unsupported type '{}' for array property '{}'!", sol_helper::GetSolTypeName(solArrayType), idxAsStr);
-                }
-
-                m_children.emplace_back(std::move(arrayProperty));
-            }
-            else
-            {
-                sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", idxAsStr);
-            }
         }
         else
         {
-            sol_helper::throwSolException("Field '{}' has invalid type! Only primitive types, arrays and nested tables obeying the same rules are supported!", idxAsStr);
+            const sol::optional<InterfaceTypeInfo> potentiallyTypeInfo = value.as<sol::optional<InterfaceTypeInfo>>();
+
+            if (!potentiallyTypeInfo)
+            {
+                // TODO Violin maybe list all available types here in the error msg?
+                sol_helper::throwSolException("Invalid type of field '{}'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type '{}' instead",
+                    idxAsStr, sol_helper::GetSolTypeName(value.get_type()));
+            }
+
+            addField(idxAsStr, *potentiallyTypeInfo);
+        }
+    }
+
+    void PropertyTypeExtractor::addField(const std::string& name, const InterfaceTypeInfo& typeInfo)
+    {
+        const EPropertyType typeId = typeInfo.typeId;
+
+        if (!TypeUtils::IsValidType(typeId))
+        {
+            // TODO Violin can we sandbox this properly so it can never happen?
+            sol_helper::throwSolException("Internal error: Invalid type id '{}'!", static_cast<int>(typeId));
+        }
+
+        switch (typeId)
+        {
+        case EPropertyType::Float:
+        case EPropertyType::Vec2f:
+        case EPropertyType::Vec3f:
+        case EPropertyType::Vec4f:
+        case EPropertyType::Int32:
+        case EPropertyType::Int64:
+        case EPropertyType::Vec2i:
+        case EPropertyType::Vec3i:
+        case EPropertyType::Vec4i:
+        case EPropertyType::Bool:
+        case EPropertyType::String:
+            m_children.emplace_back(PropertyTypeExtractor{ std::string(name), typeId });
+            break;
+        case EPropertyType::Struct:
+        {
+            const std::optional<sol::lua_table> structFieldsTable = LuaTypeConversions::ExtractLuaTable(typeInfo.complexType);
+            if (!structFieldsTable)
+            {
+                sol_helper::throwSolException("Invalid type of struct field '{}'! Expected Type:Struct(T) Where T is a table with named fields. Found a value of type '{}' instead!",
+                    name, sol_helper::GetSolTypeName(typeInfo.complexType.get_type()));
+            }
+
+            PropertyTypeExtractor structProperty(name, EPropertyType::Struct);
+            structProperty.extractPropertiesFromTable(*structFieldsTable);
+            m_children.emplace_back(std::move(structProperty));
+            break;
+        }
+        case EPropertyType::Array:
+        {
+            sol::optional<InterfaceTypeInfo> potentiallyArrayElementTypeInfo = typeInfo.complexType.as<sol::optional<InterfaceTypeInfo>>();
+
+            // Special case for struct/tables. TODO Violin forbid?
+            if (!potentiallyArrayElementTypeInfo)
+            {
+                const std::optional<sol::lua_table> maybeTable = LuaTypeConversions::ExtractLuaTable(typeInfo.complexType);
+                if (maybeTable)
+                {
+                    potentiallyArrayElementTypeInfo = InterfaceTypeInfo{ EPropertyType::Struct, 0, *maybeTable };
+                }
+            }
+
+            if (!potentiallyArrayElementTypeInfo)
+            {
+                sol_helper::throwSolException("Invalid element type T of array field '{}'! Found a value of type T='{}' instead of T=Type:<type>() in call {} = Type:Array(N, T)!",
+                    name, sol_helper::GetSolTypeName(typeInfo.complexType.get_type()), name);
+            }
+
+            const InterfaceTypeInfo& elementTypeInfo = *potentiallyArrayElementTypeInfo;
+
+            if (!TypeUtils::IsValidType(elementTypeInfo.typeId))
+            {
+                // TODO Violin can we sandbox this properly so it can never happen?
+                sol_helper::throwSolException("Internal error: Invalid type id '{}'!", static_cast<int>(elementTypeInfo.typeId));
+            }
+
+            PropertyTypeExtractor arrayContainer(name, EPropertyType::Array);
+
+            if (TypeUtils::IsPrimitiveType(elementTypeInfo.typeId))
+            {
+                arrayContainer.m_children.resize(typeInfo.arraySize, PropertyTypeExtractor("", elementTypeInfo.typeId));
+            }
+            else
+            {
+                // TODO Violin add tests for nested arrays
+                assert(elementTypeInfo.typeId == EPropertyType::Array || elementTypeInfo.typeId == EPropertyType::Struct);
+
+                // TODO Violin rework this hack to more elegant sol code
+                PropertyTypeExtractor tmp("", EPropertyType::Struct);
+                tmp.addField("", elementTypeInfo);
+
+                arrayContainer.m_children.resize(typeInfo.arraySize, tmp.m_children[0]);
+            }
+
+            m_children.emplace_back(std::move(arrayContainer));
+            break;
+        }
         }
     }
 
@@ -160,83 +201,58 @@ namespace rlogic::internal
 
     void PropertyTypeExtractor::extractPropertiesFromTable(const sol::lua_table& table)
     {
+        // Extra caching of key/pairs needed because of bug in sol/lua
+        // TODO Violin investigate more and report bug upstream
+        std::vector<sol::object> keys;
+        std::vector<sol::object> values;
         for (auto& tableEntry : table)
         {
-            newIndex(tableEntry.first, tableEntry.second);
+            keys.emplace_back(tableEntry.first);
+            values.emplace_back(tableEntry.second);
+        }
+
+        for (size_t i = 0; i < keys.size(); ++i)
+        {
+            newIndex(keys[i], values[i]);
         }
     }
 
-    sol::object PropertyTypeExtractor::CreateArray(sol::this_state state, const sol::object& size, std::optional<sol::object> arrayType)
+    void PropertyTypeExtractor::RegisterTypes(sol::table& environment)
     {
-        const DataOrError<size_t> potentialUInt = LuaTypeConversions::ExtractSpecificType<size_t>(size);
-        if (potentialUInt.hasError())
-        {
-            sol_helper::throwSolException("ARRAY(N, T) invoked with bad size argument! {}", potentialUInt.getError());
-        }
-        // TODO Violin/Sven/Tobias discuss max array size
-        // Putting a "sane" number here, but maybe worth discussing again
-        const size_t arraySize = potentialUInt.getData();
-        if (arraySize == 0u || arraySize > MaxArrayPropertySize)
-        {
-            sol_helper::throwSolException("ARRAY(N, T) invoked with invalid size parameter N={} (must be in the range [1, {}])!", arraySize, MaxArrayPropertySize);
-        }
-        if (!arrayType)
-        {
-            sol_helper::throwSolException("ARRAY(N, T) invoked with invalid type parameter T!");
-        }
-        return sol::object(state, sol::in_place_type<ArrayTypeInfo>, ArrayTypeInfo{arraySize, *arrayType});
-    }
-
-    void PropertyTypeExtractor::RegisterTypes(sol::environment& environment)
-    {
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Float)] = static_cast<int>(EPropertyType::Float);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2f)] = static_cast<int>(EPropertyType::Vec2f);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3f)] = static_cast<int>(EPropertyType::Vec3f);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4f)] = static_cast<int>(EPropertyType::Vec4f);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Int32)] = static_cast<int>(EPropertyType::Int32);
-        environment["INT"] = static_cast<int>(EPropertyType::Int32); // alias name for INT32
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Int64)] = static_cast<int>(EPropertyType::Int64);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2i)] = static_cast<int>(EPropertyType::Vec2i);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3i)] = static_cast<int>(EPropertyType::Vec3i);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4i)] = static_cast<int>(EPropertyType::Vec4i);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::String)] = static_cast<int>(EPropertyType::String);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Bool)] = static_cast<int>(EPropertyType::Bool);
-        environment[GetLuaPrimitiveTypeName(EPropertyType::Struct)] = static_cast<int>(EPropertyType::Struct);
-
         environment.new_usertype<PropertyTypeExtractor>("LuaScriptPropertyExtractor",
             sol::meta_method::new_index, &PropertyTypeExtractor::newIndex,
             sol::meta_method::index, &PropertyTypeExtractor::index);
-        environment.new_usertype<ArrayTypeInfo>("ArrayTypeInfo");
-        environment.set_function(GetLuaPrimitiveTypeName(EPropertyType::Array), &PropertyTypeExtractor::CreateArray);
+        environment.new_usertype<InterfaceTypeInfo>("InterfaceTypeInfo");
+        sol::usertype<InterfaceTypeFunctions> usertypeTypeInfoFuncs = environment.new_usertype<InterfaceTypeFunctions>("Type");
+
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Float)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Float>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Vec2f)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Vec2f>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Vec3f)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Vec3f>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Vec4f)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Vec4f>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Int32)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Int32>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Int64)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Int64>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Vec2i)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Vec2i>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Vec3i)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Vec3i>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Vec4i)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Vec4i>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::String)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::String>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Bool)] = &InterfaceTypeFunctions::CreatePrimitiveType<EPropertyType::Bool>;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Array)] = &InterfaceTypeFunctions::CreateArray;
+        usertypeTypeInfoFuncs[GetLuaPrimitiveTypeName(EPropertyType::Struct)] = &InterfaceTypeFunctions::CreateStruct;
     }
 
-    void PropertyTypeExtractor::UnregisterTypes(sol::environment& environment, bool keepTypeConstants)
+    void PropertyTypeExtractor::UnregisterTypes(sol::table& environment)
     {
-        if (!keepTypeConstants)
-        {
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Float)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2f)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3f)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4f)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Int32)] = sol::lua_nil;
-            environment["INT"] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Int64)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec2i)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec3i)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Vec4i)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::String)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Bool)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Struct)] = sol::lua_nil;
-            environment[GetLuaPrimitiveTypeName(EPropertyType::Array)] = sol::lua_nil;
-        }
-
         auto propertyExtractorUserType = environment.get<sol::metatable>("LuaScriptPropertyExtractor");
         assert(propertyExtractorUserType.valid());
         propertyExtractorUserType.unregister();
 
-        auto arrayUserType = environment.get<sol::metatable>("ArrayTypeInfo");
-        assert(arrayUserType.valid());
-        arrayUserType.unregister();
+        auto typeInfo = environment.get<sol::metatable>("InterfaceTypeInfo");
+        assert(typeInfo.valid());
+        typeInfo.unregister();
+
+        auto usertypeTypeInfoFuncs = environment.get<sol::metatable>("Type");
+        assert(usertypeTypeInfoFuncs.valid());
+        usertypeTypeInfoFuncs.unregister();
     }
 
     HierarchicalTypeData PropertyTypeExtractor::getExtractedTypeData() const

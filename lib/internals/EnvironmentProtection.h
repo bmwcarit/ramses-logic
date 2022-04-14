@@ -16,9 +16,12 @@ namespace rlogic::internal
     {
         None,
         LoadScript,
+        LoadInterface,
         InitFunction,
-        InterfaceFunction,
-        RunFunction
+        InterfaceFunctionInScript,
+        InterfaceFunctionInInterface,
+        RunFunction,
+        Module,
     };
 
     class EnvironmentProtection
@@ -34,14 +37,23 @@ namespace rlogic::internal
         static void protectedNewIndex_LoadScript(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
         [[nodiscard]] static sol::object protectedIndex_LoadScript(const sol::lua_table& tbl, const sol::object& key);
 
+        static void protectedNewIndex_LoadInterface(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
+        [[nodiscard]] static sol::object protectedIndex_LoadInterface(const sol::lua_table& tbl, const sol::object& key);
+
         static void protectedNewIndex_InitializeFunction(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
         [[nodiscard]] static sol::object protectedIndex_InitializeFunction(const sol::lua_table& tbl, const sol::object& key);
 
-        static void protectedNewIndex_InterfaceFunction(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
-        [[nodiscard]] static sol::object protectedIndex_InterfaceFunction(const sol::lua_table& tbl, const sol::object& key);
+        static void protectedNewIndex_InterfaceFunctionInScript(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
+        [[nodiscard]] static sol::object protectedIndex_InterfaceFunctionInScript(const sol::lua_table& tbl, const sol::object& key);
+
+        static void protectedNewIndex_InterfaceFunctionInInterface(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
+        [[nodiscard]] static sol::object protectedIndex_InterfaceFunctionInInterface(const sol::lua_table& tbl, const sol::object& key);
 
         static void protectedNewIndex_RunFunction(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
         [[nodiscard]] static sol::object protectedIndex_RunFunction(const sol::lua_table& tbl, const sol::object& key);
+
+        static void protectedNewIndex_Module(const sol::lua_table& tbl, const sol::object& key, const sol::object& value);
+        [[nodiscard]] static sol::object protectedIndex_Module(const sol::lua_table& tbl, const sol::object& key);
 
         static void EnsureStringKey(const sol::object& key);
     };

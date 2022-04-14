@@ -1,5 +1,67 @@
 # master
 
+# v1.0.0
+
+**General changes**
+
+* Version bump to 1.0!
+    * From now on, any API, ABI or content-breaking change will result in major version bumps
+    * New APIs or non-breaking features will result in minor version bumps
+    * Binary file compatibility is explicitly documented in README.md, as before
+* Not backwards compatible
+    * Binary files need re-export
+* Updated Ramses to 27.0.119
+    * Fixes bugs
+    * Adds custom logger
+
+**Bugfixes**
+
+* Objects created after loading from binary data/file will also receive unique id's
+* Can't overwrite the IN and OUT globals in the interface() function any more
+* RamsesLogic::saveToFile produces the same file content when called twice
+* Mismatching rotation conventions don't cause warnings any more if the rotation values are (0, 0, 0)
+* Modules cost less memory in binary files
+* Bindings are not dirty unless their inputs changed. Fixed wrong warning associated to that.
+* Reading and writing global variables in modules now reports a verbose error
+
+**API Changes**
+
+* !!BREAKING Lua syntax!! Reworked Lua type system
+    * See [LuaScript docs](https://ramses-logic.readthedocs.io/en/latest/classes/LuaScript.html) for details
+    * Replaces "TYPENAME" (all uppercase) with "Type:TypeName()" (in camel case), e.g., "INT32" becomes "Type:Int32()"
+    * We provide a Python migration script you can use to update existing content (tools/migration/migrate_to_v1_0.py)
+    * Int is only available as Int32 or Int64, have to select bit-ness explicitly now (previous INT corresponds to Int32)
+    * IN and OUT global varaibles are now passed as params to run() and interface() functions
+        * IN and OUT are not reserved keywords anymore and do not carry special semantics
+        * Params declared in run() and interface() functions do not have to be called IN and OUT, but they can be. Most importantly
+          the order needs to be maintained, i.e., the 1st param represents inputs and the 2nd param represents outputs
+        * root properties (returned by LogicNode::getInputs/getOutputs) have empty names now, instead of "IN"/"OUT"
+* Possible to create multidimensional arrays, e.g. "IN.matrix3d = Type:Array(3, Type:Array(3, Type:Float()))" will create a 3x3 float matrix
+* ErrorData holds an enum to distinguish the type of errors
+    * Use this to handle specific errors, e.g. file operations or Lua runtime errors, differently
+* Majorly simplified AnimationNode control interface
+    * Removed 'timeDelta', 'play', 'loop', 'rewindOnStop', 'timeRange' inputs and 'progress' output
+    * Instead the animation is now controlled directly by setting its progress via new input 'progress'
+    * Removed AnimationNode::getDuration and added new 'duration' output property instead (due to this channel outputs are shifted by 1 if accessed by index!)
+    * Removed 'timeDelta' output from TimerNode as the time delta concept is not used on rlogic level, but can be done fully on application side if desired
+      (due to this ticker_us output is shifted by 1 if accessed by index!)
+    * Added a new example which demonstrates how to implement an 'animateTo' functionality using Lua script (8b_dynamic_animation)
+* Added LogicEngine::createLuaInterface
+    * Creates a LuaInterface object based on Lua script that implements only  "interface" function, and defines only IN variables.
+    * More information can be found in the [API docs](https://ramses-logic.readthedocs.io/en/latest/classes/LuaInterface.html)
+    * Interfaces have to have a non-empty and unique name
+    * LogicNode::setName() can fail now if the node is a LuaInterface - can't change the name of interface objects
+    * An interface with unlinked outputs issues a warning on validation
+* If validation is enabled and warnings were found, saveToFile will not write files
+    * Override with FileSaveConfig::setValidationEnabled(false) (see section below about LogicEngine::validate())
+
+**Features**
+
+* Added LogicEngine::validate() which collects content warnings and reports them as a list of [WarningData](https://ramses-logic.readthedocs.io/en/latest/classes/WarningData.html)
+    * By default, saveToFile performs validation and issues warning logs for each issue
+    * This behavior can be altered by calling FileSaveConfig::setValidationEnabled(bool)
+* Added possibility to assign and retrieve user IDs to any logic object, see LogicObject::setUserId and LogicObject::getUserId
+
 # v0.15.0
 
 Summary:
@@ -21,7 +83,7 @@ Summary:
 **Bugfixes**
 
 * Type definitions declared in modules also work when the data is not wrapped in a function (example from docs works now)
-    * Fixes https://github.com/COVESA/ramses-logic/issues/39
+    * Fixes https://github.com/bmwcarit/ramses-logic/issues/39
 * Catches error correctly when returning any value from the main Lua script source code
 * Fixed memory leak when re-creating LuaScripts (previously, creating above 1000 scripts caused Lua stack overflow)
 * Correctly catches writing of global variables everywhere except when using the dedicated GLOBAL table

@@ -6,6 +6,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LogicObjectGen.h"
 #include "PropertyGen.h"
 #include "RamsesBindingGen.h"
 #include "RamsesReferenceGen.h"
@@ -17,12 +18,19 @@ struct ResourceId;
 struct RamsesAppearanceBinding;
 struct RamsesAppearanceBindingBuilder;
 
+inline const flatbuffers::TypeTable *ResourceIdTypeTable();
+
+inline const flatbuffers::TypeTable *RamsesAppearanceBindingTypeTable();
+
 FLATBUFFERS_MANUALLY_ALIGNED_STRUCT(8) ResourceId FLATBUFFERS_FINAL_CLASS {
  private:
   uint64_t resourceIdLow_;
   uint64_t resourceIdHigh_;
 
  public:
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return ResourceIdTypeTable();
+  }
   ResourceId() {
     memset(static_cast<void *>(this), 0, sizeof(ResourceId));
   }
@@ -42,6 +50,9 @@ FLATBUFFERS_STRUCT_END(ResourceId, 16);
 struct RamsesAppearanceBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef RamsesAppearanceBindingBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RamsesAppearanceBindingTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_BASE = 4,
     VT_PARENTEFFECTID = 6
@@ -97,6 +108,41 @@ struct RamsesAppearanceBinding::Traits {
   using type = RamsesAppearanceBinding;
   static auto constexpr Create = CreateRamsesAppearanceBinding;
 };
+
+inline const flatbuffers::TypeTable *ResourceIdTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_ULONG, 0, -1 },
+    { flatbuffers::ET_ULONG, 0, -1 }
+  };
+  static const int64_t values[] = { 0, 8, 16 };
+  static const char * const names[] = {
+    "resourceIdLow",
+    "resourceIdHigh"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_STRUCT, 2, type_codes, nullptr, values, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *RamsesAppearanceBindingTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 1 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::RamsesBindingTypeTable,
+    rlogic_serialization::ResourceIdTypeTable
+  };
+  static const char * const names[] = {
+    "base",
+    "parentEffectId"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 2, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
 
 }  // namespace rlogic_serialization
 

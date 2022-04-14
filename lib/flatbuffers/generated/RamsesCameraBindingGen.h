@@ -6,6 +6,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "LogicObjectGen.h"
 #include "PropertyGen.h"
 #include "RamsesBindingGen.h"
 #include "RamsesReferenceGen.h"
@@ -15,9 +16,14 @@ namespace rlogic_serialization {
 struct RamsesCameraBinding;
 struct RamsesCameraBindingBuilder;
 
+inline const flatbuffers::TypeTable *RamsesCameraBindingTypeTable();
+
 struct RamsesCameraBinding FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef RamsesCameraBindingBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return RamsesCameraBindingTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_BASE = 4
   };
@@ -63,6 +69,22 @@ struct RamsesCameraBinding::Traits {
   using type = RamsesCameraBinding;
   static auto constexpr Create = CreateRamsesCameraBinding;
 };
+
+inline const flatbuffers::TypeTable *RamsesCameraBindingTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::RamsesBindingTypeTable
+  };
+  static const char * const names[] = {
+    "base"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 1, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
 
 }  // namespace rlogic_serialization
 

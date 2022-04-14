@@ -13,6 +13,7 @@
 #include "ramses-logic/LogicEngineReport.h"
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
+#include "internals/ValidationResults.h"
 #include "internals/UpdateReport.h"
 #include "internals/LogicNodeUpdateStatistics.h"
 
@@ -42,6 +43,7 @@ namespace rlogic
     class AnimationNodeConfig;
     class TimerNode;
     class LuaScript;
+    class LuaInterface;
     class LuaModule;
     class LogicNode;
     class Property;
@@ -78,6 +80,7 @@ namespace rlogic::internal
 
         // Public API
         LuaScript* createLuaScript(std::string_view source, const LuaConfigImpl& config, std::string_view scriptName);
+        LuaInterface* createLuaInterface(std::string_view source, std::string_view interfaceName);
         LuaModule* createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName);
         bool extractLuaDependencies(std::string_view source, const std::function<void(const std::string&)>& callbackFunc);
         RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
@@ -91,7 +94,9 @@ namespace rlogic::internal
         bool destroy(LogicObject& object);
 
         bool update();
+
         [[nodiscard]] const std::vector<ErrorData>& getErrors() const;
+        const std::vector<WarningData>& validate() const;
 
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
@@ -116,9 +121,8 @@ namespace rlogic::internal
 
     private:
         size_t activateLinksRecursive(PropertyImpl& output);
-        void setTimerNodesAndDependentsDirty();
+        void setTimerNodesDirty();
 
-        bool checkLogicVersionFromFile(std::string_view dataSourceDescription, uint32_t fileVersion);
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
         static void LogAssetMetadata(const rlogic_serialization::Metadata& assetMetadata);
@@ -126,9 +130,11 @@ namespace rlogic::internal
         [[nodiscard]] bool updateNodes(const NodeVector& nodes);
 
         [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription);
+        [[nodiscard]] bool checkFileIdentifierBytes(const std::string& dataSourceDescription, const std::string& fileIdBytes);
 
         std::unique_ptr<ApiObjects> m_apiObjects;
         ErrorReporting m_errors;
+        mutable ValidationResults m_validationResults;
         bool m_nodeDirtyMechanismEnabled = true;
 
         bool m_updateReportEnabled = false;

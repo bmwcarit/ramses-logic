@@ -6,6 +6,7 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "LogicObject.fbs";
 include "Property.fbs";
 include "RamsesReference.fbs";
 
@@ -14,8 +15,7 @@ namespace rlogic_serialization;
 // Carries a reference to ramses object and additional data specific to bindings
 table RamsesBinding
 {
-    name:string;
-    id:uint64;
+    base:LogicObject;
     boundRamsesObject:RamsesReference;
     // TODO Violin don't serialize rootInput, it is redundant! (inputs are uniquely defined by the binding type and reference)
     // Storing property values is furthermore dangerous because they may override ramses values

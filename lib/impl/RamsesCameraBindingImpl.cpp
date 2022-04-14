@@ -58,7 +58,7 @@ namespace rlogic::internal
         }
 
         HierarchicalTypeData cameraBindingInputs(
-            TypeData{"IN", EPropertyType::Struct},
+            TypeData{"", EPropertyType::Struct},
             {
                 MakeStruct("viewport",
                     {
@@ -89,8 +89,7 @@ namespace rlogic::internal
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(cameraBinding.m_ramsesCamera, builder);
 
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
-            builder.CreateString(cameraBinding.getName()),
-            cameraBinding.getId(),
+            LogicObjectImpl::Serialize(cameraBinding, builder),
             ramsesReference,
             // TODO Violin don't serialize these - they carry no useful information and are redundant
             PropertyImpl::Serialize(*cameraBinding.getInputs()->m_impl, builder, serializationMap));
@@ -110,28 +109,23 @@ namespace rlogic::internal
     {
         if (!cameraBinding.base())
         {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing base class info!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing base class info!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        if (cameraBinding.base()->id() == 0u)
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(cameraBinding.base()->base(), name, id, userIdHigh, userIdLow, errorReporting))
         {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing id!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing name and/or ID!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-
-        // TODO Violin make optional - no need to always serialize string if not used
-        if (!cameraBinding.base()->name())
-        {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing name!", nullptr);
-            return nullptr;
-        }
-
-        const std::string_view name = cameraBinding.base()->name()->string_view();
 
         if (!cameraBinding.base()->rootInput())
         {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing root input!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: missing root input!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -143,16 +137,16 @@ namespace rlogic::internal
         }
 
         // TODO Violin don't serialize these inputs -> get rid of the check
-        if (deserializedRootInput->getName() != "IN" || deserializedRootInput->getType() != EPropertyType::Struct)
+        if (deserializedRootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: root input has unexpected name or type!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: root input has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         const auto* boundObject = cameraBinding.base()->boundRamsesObject();
         if (!boundObject)
         {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: no reference to ramses camera!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: no reference to ramses camera!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -167,11 +161,12 @@ namespace rlogic::internal
 
         if (resolvedCamera->getType() != static_cast<int>(boundObject->objectType()))
         {
-            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: loaded type does not match referenced camera type!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesCameraBinding from serialized data: loaded type does not match referenced camera type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        auto binding = std::make_unique<RamsesCameraBindingImpl>(*resolvedCamera, name, cameraBinding.base()->id());
+        auto binding = std::make_unique<RamsesCameraBindingImpl>(*resolvedCamera, name, id);
+        binding->setUserId(userIdHigh, userIdLow);
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         ApplyRamsesValuesToInputProperties(*binding, *resolvedCamera);

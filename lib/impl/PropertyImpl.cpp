@@ -240,7 +240,7 @@ namespace rlogic::internal
         // TODO Violin we can make name optional - e.g. array fields don't need a name, no need to serialize empty strings
         if (!prop.name())
         {
-            errorReporting.add("Fatal error during loading of Property from serialized data: missing name!", nullptr);
+            errorReporting.add("Fatal error during loading of Property from serialized data: missing name!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -248,7 +248,7 @@ namespace rlogic::internal
 
         if (!convertedType)
         {
-            errorReporting.add("Fatal error during loading of Property from serialized data: invalid type!", nullptr);
+            errorReporting.add("Fatal error during loading of Property from serialized data: invalid type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -264,7 +264,7 @@ namespace rlogic::internal
             case rlogic_serialization::PropertyValue::float_s:
                 if (!prop.value_as_float_s())
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value = prop.value_as_float_s()->v();
@@ -274,7 +274,7 @@ namespace rlogic::internal
                 auto vec2fValue = prop.value_as_vec2f_s();
                 if (!vec2fValue)
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value         = vec2f{vec2fValue->x(), vec2fValue->y()};
@@ -285,7 +285,7 @@ namespace rlogic::internal
                 auto vec3fValue = prop.value_as_vec3f_s();
                 if (!vec3fValue)
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value         = vec3f{vec3fValue->x(), vec3fValue->y(), vec3fValue->z()};
@@ -296,7 +296,7 @@ namespace rlogic::internal
                 auto vec4fValue = prop.value_as_vec4f_s();
                 if (!vec4fValue)
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value         = vec4f{vec4fValue->x(), vec4fValue->y(), vec4fValue->z(), vec4fValue->w()};
@@ -305,7 +305,7 @@ namespace rlogic::internal
             case rlogic_serialization::PropertyValue::int32_s:
                 if (!prop.value_as_int32_s())
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value = prop.value_as_int32_s()->v();
@@ -313,7 +313,7 @@ namespace rlogic::internal
             case rlogic_serialization::PropertyValue::int64_s:
                 if (!prop.value_as_int64_s())
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value = prop.value_as_int64_s()->v();
@@ -323,7 +323,7 @@ namespace rlogic::internal
                 auto vec2iValue = prop.value_as_vec2i_s();
                 if (!vec2iValue)
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value         = vec2i{vec2iValue->x(), vec2iValue->y()};
@@ -334,7 +334,7 @@ namespace rlogic::internal
                 auto vec3iValue = prop.value_as_vec3i_s();
                 if (!vec3iValue)
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value         = vec3i{vec3iValue->x(), vec3iValue->y(), vec3iValue->z()};
@@ -345,7 +345,7 @@ namespace rlogic::internal
                 auto vec4iValue = prop.value_as_vec4i_s();
                 if (!vec4iValue)
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value         = vec4i{vec4iValue->x(), vec4iValue->y(), vec4iValue->z(), vec4iValue->w()};
@@ -354,7 +354,7 @@ namespace rlogic::internal
             case rlogic_serialization::PropertyValue::string_s:
                 if (!prop.value_as_string_s())
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value = prop.value_as_string_s()->v()->str();
@@ -362,7 +362,7 @@ namespace rlogic::internal
             case rlogic_serialization::PropertyValue::bool_s:
                 if (!prop.value_as_bool_s())
                 {
-                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: invalid union!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
                 impl->m_value = prop.value_as_bool_s()->v();
@@ -380,7 +380,7 @@ namespace rlogic::internal
 
             if (!prop.children())
             {
-                errorReporting.add("Fatal error during loading of Property from serialized data: complex type has no child type info!", nullptr);
+                errorReporting.add("Fatal error during loading of Property from serialized data: complex type has no child type info!", nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
@@ -389,7 +389,7 @@ namespace rlogic::internal
                 if (!child)
                 {
                     // TODO Violin find ways to unit-test this case
-                    errorReporting.add("Fatal error during loading of Property from serialized data: corrupt child data!", nullptr);
+                    errorReporting.add("Fatal error during loading of Property from serialized data: corrupt child data!", nullptr, EErrorType::BinaryVersionMismatch);
                     return nullptr;
                 }
 
@@ -539,7 +539,9 @@ namespace rlogic::internal
 
         // Marks corresponding node dirty if value changed
         const bool valueChanged = setValue(std::move(value));
-        if (valueChanged || m_semantics == EPropertySemantics::AnimationInput || m_semantics == EPropertySemantics::BindingInput)
+        // TODO Violin possibly remove interface properties from this check, add tests first that interface objects dont need to be set
+        // dirty if their inputs were set
+        if (valueChanged || m_semantics == EPropertySemantics::AnimationInput || m_semantics == EPropertySemantics::BindingInput || m_semantics == EPropertySemantics::Interface)
         {
             m_logicNode->setDirty(true);
         }
@@ -602,12 +604,12 @@ namespace rlogic::internal
 
     bool PropertyImpl::isInput() const
     {
-        return m_semantics == EPropertySemantics::ScriptInput || m_semantics == EPropertySemantics::BindingInput || m_semantics == EPropertySemantics::AnimationInput;
+        return m_semantics == EPropertySemantics::ScriptInput || m_semantics == EPropertySemantics::BindingInput || m_semantics == EPropertySemantics::AnimationInput || m_semantics == EPropertySemantics::Interface;
     }
 
     bool PropertyImpl::isOutput() const
     {
-        return m_semantics == EPropertySemantics::ScriptOutput || m_semantics == EPropertySemantics::AnimationOutput;
+        return m_semantics == EPropertySemantics::ScriptOutput || m_semantics == EPropertySemantics::AnimationOutput || m_semantics == EPropertySemantics::Interface;
     }
 
     EPropertySemantics PropertyImpl::getPropertySemantics() const

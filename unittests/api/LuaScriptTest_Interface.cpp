@@ -23,32 +23,46 @@ namespace rlogic
         ScopedLogContextLevel m_silenceLogs{ ELogMessageType::Off };
     };
 
-    // TODO Violin this can be fixed; fix it!
-    TEST_F(ALuaScript_Interface, DISABLED_GeneratesErrorWhenOverwritingInputsInInterfaceFunction)
+    TEST_F(ALuaScript_Interface, DoesNotGenerateErrorWhenOverwritingInputsInInterfaceFunction)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 IN = {}
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
 
-        ASSERT_EQ(nullptr, script);
+        ASSERT_NE(nullptr, script);
 
-        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Special global symbol 'IN' should not be overwritten with other types in interface() function!!");
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
+    }
+
+    TEST_F(ALuaScript_Interface, DoesNotGenerateErrorWhenOverwritingOutputsInInterfaceFunction)
+    {
+        auto* script = m_logicEngine.createLuaScript(R"(
+            function interface(IN,OUT)
+                OUT = {}
+            end
+
+            function run(IN,OUT)
+            end
+        )");
+
+        ASSERT_NE(nullptr, script);
+
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
     }
 
     TEST_F(ALuaScript_Interface, ProducesErrorsIfARuntimeErrorOccursInInterface)
     {
         auto script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 error("emits error")
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )", WithStdModules({EStandardModule::Base}), "errorInInterface");
 
@@ -98,16 +112,16 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, ReturnsNestedOutputsByIndex_OrderedLexicographically_whenDeclaredOneByOne)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.struct = {}
                 OUT.struct.field3 = {}
-                OUT.struct.field2 = FLOAT
-                OUT.struct.field1 = INT
-                OUT.struct.field3.subfield2 = FLOAT
-                OUT.struct.field3.subfield1 = INT
+                OUT.struct.field2 = Type:Float()
+                OUT.struct.field1 = Type:Int32()
+                OUT.struct.field3.subfield2 = Type:Float()
+                OUT.struct.field3.subfield1 = Type:Int32()
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
 
@@ -144,7 +158,7 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, CanDeclarePropertiesProgramatically)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 OUT.root = {}
                 local lastStruct = OUT.root
                 for i=1,2 do
@@ -153,7 +167,7 @@ namespace rlogic
                 end
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )", WithStdModules({ EStandardModule::Base }));
 
@@ -205,10 +219,10 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, AllowsAccessToWrappedUserdata)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
-                OUT.struct = {a=INT, b={c = INT, d=FLOAT}}
-                OUT.array_struct = ARRAY(3, {a=INT, b=FLOAT})
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
+                OUT.struct = {a=Type:Int32(), b={c = Type:Int32(), d=Type:Float()}}
+                OUT.array_struct = Type:Array(3, {a=Type:Int32(), b=Type:Float()})
 
                 local expectedUserdata = {
                     IN,
@@ -232,7 +246,7 @@ namespace rlogic
                 end
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )", WithStdModules({EStandardModule::Base}));
         ASSERT_NE(nullptr, script);
@@ -241,12 +255,12 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, ReportsErrorWhenAccessingStructByIndex)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                OUT.struct = {a=INT, b={c = INT, d=FLOAT}}
+            function interface(IN,OUT)
+                OUT.struct = {a=Type:Int32(), b={c = Type:Int32(), d=Type:Float()}}
                 local causesError = OUT.struct[1]
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
         ASSERT_EQ(nullptr, script);
@@ -256,12 +270,12 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, ReportsErrorWhenAccessingArrayByString)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
                 local causesError = IN.array_int["causesError"]
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
         ASSERT_EQ(nullptr, script);
@@ -271,12 +285,12 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, ReportsErrorWhenAccessingArrayWithIndexOverflow)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.array_int = ARRAY(2, INT)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
                 local causesError = IN.array_int[3]
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
         ASSERT_EQ(nullptr, script);
@@ -359,16 +373,16 @@ namespace rlogic
     TEST_F(ALuaScript_Interface, AssignsDefaultValuesToArrays)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
-            function interface()
-                IN.array_int = ARRAY(3, INT)
-                IN.array_float = ARRAY(3, FLOAT)
-                IN.array_vec2f = ARRAY(3, VEC2F)
-                OUT.array_int = ARRAY(3, INT)
-                OUT.array_float = ARRAY(3, FLOAT)
-                OUT.array_vec2f = ARRAY(3, VEC2F)
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(3, Type:Int32())
+                IN.array_float = Type:Array(3, Type:Float())
+                IN.array_vec2f = Type:Array(3, Type:Vec2f())
+                OUT.array_int = Type:Array(3, Type:Int32())
+                OUT.array_float = Type:Array(3, Type:Float())
+                OUT.array_vec2f = Type:Array(3, Type:Vec2f())
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )");
 
@@ -396,38 +410,38 @@ namespace rlogic
     {
         std::string_view scriptSrc = R"(
             function init()
-                -- use global variables to store size info from interface() - otherwise no way to transfer data
+                -- use global variables to store size info from interface(IN,OUT) - otherwise no way to transfer data
                 -- outside of interface()!
                 GLOBAL.sizes = {}
             end
-            function interface()
-                IN.unused = INT
+            function interface(IN,OUT)
+                IN.unused = Type:Int32()
                 -- store size of IN with one property
                 GLOBAL.sizes.inputsSizeSingle = rl_len(IN)
-                IN.unused2 = INT
+                IN.unused2 = Type:Int32()
                 -- store size of IN with two properties
                 GLOBAL.sizes.inputsSizeTwo = rl_len(IN)
 
                 -- Create nested output to store (and provide) the sizes of all containers
                 OUT.sizes = {
-                    inputsSizeSingle = INT,
-                    inputsSizeTwo = INT,
-                    outputSizeSingleStruct = INT,
-                    outputSizeNested = INT,
-                    outputSizeArray = INT,
-                    outputSizeArrayElem = INT
+                    inputsSizeSingle = Type:Int32(),
+                    inputsSizeTwo = Type:Int32(),
+                    outputSizeSingleStruct = Type:Int32(),
+                    outputSizeNested = Type:Int32(),
+                    outputSizeArray = Type:Int32(),
+                    outputSizeArrayElem = Type:Int32()
                 }
                 -- Store size of OUT
                 GLOBAL.sizes.outputSizeSingleStruct = rl_len(OUT)
                 -- Store size of OUT.sizes (nested container)
                 GLOBAL.sizes.outputSizeNested = rl_len(OUT.sizes)
 
-                OUT.array = ARRAY(5, {a=INT, b=FLOAT})
+                OUT.array = Type:Array(5, {a=Type:Int32(), b=Type:Float()})
                 GLOBAL.sizes.outputSizeArray = rl_len(OUT.array)
                 GLOBAL.sizes.outputSizeArrayElem = rl_len(OUT.array[1])
             end
 
-            function run()
+            function run(IN,OUT)
                 OUT.sizes = GLOBAL.sizes
             end
         )";
@@ -462,27 +476,27 @@ namespace rlogic
     TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenTryingToReadUnknownGlobals)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 local t = someGlobalVariable
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
         EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
             ::testing::HasSubstr(
-                "Unexpected global access to key 'someGlobalVariable' in interface()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+                "Unexpected global access to key 'someGlobalVariable' in interface()! Only 'GLOBAL' and 'Type' are allowed as a key"));
     }
 
     TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenSettingGlobals)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
                 thisCausesError = 'bad'
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -498,11 +512,11 @@ namespace rlogic
             function init()
             end
 
-            function interface()
+            function interface(IN,OUT)
                 GLOBAL = {}
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -510,16 +524,34 @@ namespace rlogic
             ::testing::HasSubstr("Trying to override the GLOBAL table in interface()! You can only read data, but not overwrite the GLOBAL table!"));
     }
 
+    TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenTryingToOverrideTypesTable)
+    {
+        LuaScript* script = m_logicEngine.createLuaScript(R"(
+            function init()
+            end
+
+            function interface(IN,OUT)
+                Type = {}
+            end
+
+            function run(IN,OUT)
+            end)");
+        ASSERT_EQ(nullptr, script);
+
+        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
+            ::testing::HasSubstr("Can't override the 'Type' symbol in interface()!"));
+    }
+
     TEST_F(ALuaScript_Interface_Sandboxing, ReportsErrorWhenTryingToDeclareInterfaceFunctionTwice)
     {
         LuaScript* script = m_logicEngine.createLuaScript(R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end)");
         ASSERT_EQ(nullptr, script);
 
@@ -534,10 +566,10 @@ namespace rlogic
             LuaScript* script = m_logicEngine.createLuaScript(fmt::format(R"(
                 function init()
                 end
-                function run()
+                function run(IN,OUT)
                 end
 
-                function interface()
+                function interface(IN,OUT)
                     {}()
                 end
             )", specialFunction));
@@ -545,7 +577,7 @@ namespace rlogic
             ASSERT_EQ(nullptr, script);
 
             EXPECT_THAT(m_logicEngine.getErrors()[0].message,
-                ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in interface()! Allowed keys: 'GLOBAL', 'IN', 'OUT'", specialFunction)));
+                ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in interface()! Only 'GLOBAL' and 'Type' are allowed as a key", specialFunction)));
         }
     }
 }

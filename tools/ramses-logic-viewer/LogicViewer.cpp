@@ -104,7 +104,7 @@ namespace rlogic
         return m_logicEngine.loadFromFile(filename, scene);
     }
 
-    LogicViewer::Result LogicViewer::loadLuaFile(const std::string& filename)
+    Result LogicViewer::loadLuaFile(const std::string& filename)
     {
         m_result = Result();
         m_sol = sol::state();
@@ -173,7 +173,7 @@ namespace rlogic
         return m_result;
     }
 
-    LogicViewer::Result LogicViewer::call(const std::string& functionName)
+    Result LogicViewer::call(const std::string& functionName)
     {
         auto result = m_sol[functionName]();
         if (!result.valid())
@@ -184,7 +184,7 @@ namespace rlogic
         return m_result;
     }
 
-    LogicViewer::Result LogicViewer::update()
+    Result LogicViewer::update()
     {
         updateEngine();
         // don't update if there's already an error

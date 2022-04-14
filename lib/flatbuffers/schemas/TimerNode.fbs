@@ -6,14 +6,14 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
+include "LogicObject.fbs";
 include "Property.fbs";
 
 namespace rlogic_serialization;
 
 table TimerNode
 {
-    name:string;
-    id:uint64;
+    base:LogicObject;
     rootInput:Property;
     rootOutput:Property;
 }

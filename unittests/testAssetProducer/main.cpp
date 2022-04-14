@@ -21,6 +21,8 @@
 #include "ramses-client.h"
 #include "ramses-utils.h"
 
+#include <iostream>
+
 ramses::Appearance* createTestAppearance(ramses::Scene& scene)
 {
     const std::string_view vertShader = R"(
@@ -53,7 +55,38 @@ ramses::Appearance* createTestAppearance(ramses::Scene& scene)
 
 int main(int argc, char* argv[])
 {
-    ramses::RamsesFramework ramsesFramework(argc, argv);
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic) bounds are checked
+    const std::vector<const char*> args(argv, argv + argc);
+
+    std::string basePath {"."};
+    std::string ramsesFilename = "testScene.ramses";
+    std::string logicFilename = "testLogic.rlogic";
+
+    if (args.size() == 1u)
+    {
+        //Use defaults
+    }
+    else if (args.size() == 2u)
+    {
+        basePath = args[1];
+    }
+    else if (args.size() == 4u)
+    {
+        basePath = args[1];
+        ramsesFilename = args[2];
+        logicFilename = args[3];
+    }
+    else
+    {
+        std::cerr << "Generator of ramses and ramses logic test content.\n\n"
+            << "Synopsis:\n"
+            << "testAssetProducer\n"
+            << "testAssetProducer <basePath>\n"
+            << "testAssetProducer <basePath> <ramsesFileName> <logicFileName>\n";
+        return 1;
+    }
+
+    ramses::RamsesFramework ramsesFramework;
     ramses::RamsesClient* ramsesClient = ramsesFramework.createClient("");
 
     ramses::Scene* scene = ramsesClient->createScene(ramses::sceneId_t(123u), ramses::SceneConfig(), "");
@@ -61,29 +94,29 @@ int main(int argc, char* argv[])
     rlogic::LogicEngine logicEngine;
 
     rlogic::LuaScript* script1 = logicEngine.createLuaScript(R"(
-        function interface()
-            IN.intInput =      INT
-            IN.int64Input =    INT64
-            IN.vec2iInput =    VEC2I
-            IN.vec3iInput =    VEC3I
-            IN.vec4iInput =    VEC4I
-            IN.floatInput =    FLOAT
-            IN.vec2fInput =    VEC2F
-            IN.vec3fInput =    VEC3F
-            IN.vec4fInput =    VEC4F
-            IN.boolInput  =    BOOL
-            IN.stringInput =   STRING
+        function interface(IN,OUT)
+            IN.intInput =      Type:Int32()
+            IN.int64Input =    Type:Int64()
+            IN.vec2iInput =    Type:Vec2i()
+            IN.vec3iInput =    Type:Vec3i()
+            IN.vec4iInput =    Type:Vec4i()
+            IN.floatInput =    Type:Float()
+            IN.vec2fInput =    Type:Vec2f()
+            IN.vec3fInput =    Type:Vec3f()
+            IN.vec4fInput =    Type:Vec4f()
+            IN.boolInput  =    Type:Bool()
+            IN.stringInput =   Type:String()
             IN.structInput = {
                 nested = {
-                    data1 = STRING,
-                    data2 = INT
+                    data1 = Type:String(),
+                    data2 = Type:Int32()
                 }
             }
-            IN.arrayInput =    ARRAY(9, FLOAT)
-            OUT.floatOutput = FLOAT
-            OUT.nodeTranslation = VEC3F
+            IN.arrayInput =    Type:Array(9, Type:Float())
+            OUT.floatOutput = Type:Float()
+            OUT.nodeTranslation = Type:Vec3f()
         end
-        function run()
+        function run(IN,OUT)
             OUT.floatOutput = IN.floatInput
             OUT.nodeTranslation = {IN.floatInput, 2, 3}
         end
@@ -114,10 +147,10 @@ int main(int argc, char* argv[])
             local mytypes = {}
             function mytypes.camViewport()
                 return {
-                    offsetX = INT,
-                    offsetY = INT,
-                    width = INT,
-                    height = INT
+                    offsetX = Type:Int32(),
+                    offsetY = Type:Int32(),
+                    width = Type:Int32(),
+                    height = Type:Int32()
                 }
             end
             return mytypes
@@ -130,13 +163,13 @@ int main(int argc, char* argv[])
 
     rlogic::LuaScript* script2 = logicEngine.createLuaScript(R"(
         modules("modulemath", "moduletypes")
-        function interface()
-            IN.floatInput = FLOAT
+        function interface(IN,OUT)
+            IN.floatInput = Type:Float()
             OUT.cameraViewport = moduletypes.camViewport()
-            OUT.floatUniform = FLOAT
-            OUT.nestedModulesResult = INT
+            OUT.floatUniform = Type:Float()
+            OUT.nestedModulesResult = Type:Int32()
         end
-        function run()
+        function run(IN,OUT)
             OUT.floatUniform = IN.floatInput + 5.0
             local roundedFloat = math.ceil(IN.floatInput)
             OUT.cameraViewport = {
@@ -181,8 +214,8 @@ int main(int argc, char* argv[])
         return 1;
     }
 
-    logicEngine.saveToFile("testLogic.bin");
-    scene->saveToFile("testScene.bin", false);
+    logicEngine.saveToFile(basePath + "/" + logicFilename);
+    scene->saveToFile((basePath +  "/" + ramsesFilename).c_str(), false);
 
     logicEngine.destroy(*script1);
     logicEngine.destroy(*script2);

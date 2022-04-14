@@ -79,7 +79,7 @@ namespace rlogic::internal
             }
         }
 
-        HierarchicalTypeData bindingInputsType(TypeData{ "IN", EPropertyType::Struct }, bindingInputs);
+        HierarchicalTypeData bindingInputsType(TypeData{ "", EPropertyType::Struct }, bindingInputs);
 
         setRootProperties(
             std::make_unique<Property>(std::make_unique<PropertyImpl>(bindingInputsType, EPropertySemantics::BindingInput)),
@@ -95,8 +95,7 @@ namespace rlogic::internal
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(binding.m_ramsesAppearance, builder);
 
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
-            builder.CreateString(binding.getName()),
-            binding.getId(),
+            LogicObjectImpl::Serialize(binding, builder),
             ramsesReference,
             // TODO Violin don't serialize these - they carry no useful information and are redundant
             PropertyImpl::Serialize(*binding.getInputs()->m_impl, builder, serializationMap));
@@ -122,28 +121,23 @@ namespace rlogic::internal
     {
         if (!appearanceBinding.base())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing base class info!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing base class info!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        if (appearanceBinding.base()->id() == 0u)
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(appearanceBinding.base()->base(), name, id, userIdHigh, userIdLow, errorReporting))
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing id!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name and/or ID!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-
-        // TODO Violin make optional - no need to always serialize string if not used
-        if (!appearanceBinding.base()->name())
-        {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing name!", nullptr);
-            return nullptr;
-        }
-
-        const std::string_view name = appearanceBinding.base()->name()->string_view();
 
         if (!appearanceBinding.base()->rootInput())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing root input!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: missing root input!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -155,16 +149,16 @@ namespace rlogic::internal
         }
 
         // TODO Violin don't serialize these inputs -> get rid of the check
-        if (deserializedRootInput->getName() != "IN" || deserializedRootInput->getType() != EPropertyType::Struct)
+        if (deserializedRootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: root input has unexpected name or type!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: root input has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         const auto* boundObject = appearanceBinding.base()->boundRamsesObject();
         if (!boundObject)
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: no reference to appearance!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: no reference to appearance!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -180,11 +174,12 @@ namespace rlogic::internal
         const ramses::resourceId_t effectResourceId = effect.getResourceId();
         if (effectResourceId.lowPart != appearanceBinding.parentEffectId()->resourceIdLow() || effectResourceId.highPart != appearanceBinding.parentEffectId()->resourceIdHigh())
         {
-            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: effect signature doesn't match after loading!", nullptr);
+            errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: effect signature doesn't match after loading!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        auto binding = std::make_unique<RamsesAppearanceBindingImpl>(*resolvedAppearance, name, appearanceBinding.base()->id());
+        auto binding = std::make_unique<RamsesAppearanceBindingImpl>(*resolvedAppearance, name, id);
+        binding->setUserId(userIdHigh, userIdLow);
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
         return binding;

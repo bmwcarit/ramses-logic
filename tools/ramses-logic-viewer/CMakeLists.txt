@@ -23,10 +23,12 @@ add_executable(ramses-logic-viewer
 target_include_directories(ramses-logic-viewer
     PRIVATE
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
+    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/tools/ramses-logic-utils>
 )
 
 set(RAMSES_LOGIC_VIEWER_LIBS imgui fmt::fmt sol2::sol2 lua::lua)
 
+target_link_libraries(ramses-logic-viewer PRIVATE rlogic::ramses-logic-utils)
 if(TARGET rlogic::ramses-logic)
     target_link_libraries(ramses-logic-viewer PRIVATE rlogic::ramses-logic ${RAMSES_LOGIC_VIEWER_LIBS})
 else()

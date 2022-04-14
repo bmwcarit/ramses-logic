@@ -30,7 +30,7 @@ namespace rlogic::internal
 
         if (channelData.timeStamps->getDataType() != EPropertyType::Float)
         {
-            LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', timestamps must be of type FLOAT.", channelData.name);
+            LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', timestamps must be of type Float.", channelData.name);
             return false;
         }
 

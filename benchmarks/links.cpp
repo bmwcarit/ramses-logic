@@ -24,13 +24,13 @@ namespace rlogic
         const int64_t propertyCount = state.range(0);
 
         const std::string scriptSrc = fmt::format(R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,{},1 do
-                    IN["target"..tostring(i)] = INT
-                    OUT["src"..tostring(i)] = INT
+                    IN["target"..tostring(i)] = Type:Int32()
+                    OUT["src"..tostring(i)] = Type:Int32()
                 end
             end
-            function run()
+            function run(IN,OUT)
             end
         )", propertyCount);
 
@@ -64,13 +64,13 @@ namespace rlogic
         const int64_t scriptCount = state.range(0);
 
         const std::string scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,20,1 do
-                    IN["dest"..tostring(i)] = INT
-                    OUT["src"..tostring(i)] = INT
+                    IN["dest"..tostring(i)] = Type:Int32()
+                    OUT["src"..tostring(i)] = Type:Int32()
                 end
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 

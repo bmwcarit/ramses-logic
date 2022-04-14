@@ -25,13 +25,13 @@ namespace rlogic
         LogicEngine logicEngine;
 
         const std::string scriptSrc = R"(
-            function interface()
+            function interface(IN,OUT)
                 for i = 0,20,1 do
-                    IN["dest"..tostring(i)] = INT
-                    OUT["src"..tostring(i)] = INT
+                    IN["dest"..tostring(i)] = Type:Int32()
+                    OUT["src"..tostring(i)] = Type:Int32()
                 end
             end
-            function run()
+            function run(IN,OUT)
             end
         )";
 

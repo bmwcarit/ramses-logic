@@ -6,8 +6,6 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-add_subdirectory(testAssetProducer)
-
 file(GLOB src
     api/*.cpp
     api/*.h
@@ -47,3 +45,15 @@ folderize_target(ramses-logic-test "ramses-logic")
 
 add_custom_command(TARGET ramses-logic-test PRE_BUILD
                    COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/res/ ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/res/unittests)
+
+# Only enable testAssetProducer if built as top-level project
+if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
+    add_subdirectory(testAssetProducer)
+
+    add_custom_target(RL_REGEN_TEST_ASSETS
+        COMMAND testAssetProducer ${PROJECT_SOURCE_DIR}/unittests/res testScene.ramses testLogic.rlogic
+        )
+    set_property(TARGET RL_REGEN_TEST_ASSETS PROPERTY FOLDER "CMakePredefinedTargets")
+
+    message(STATUS " + RL_REGEN_TEST_ASSETS")
+endif()

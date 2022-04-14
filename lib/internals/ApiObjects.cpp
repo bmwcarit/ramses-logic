@@ -25,6 +25,7 @@
 
 #include "impl/PropertyImpl.h"
 #include "impl/LuaScriptImpl.h"
+#include "impl/LuaInterfaceImpl.h"
 #include "impl/LuaModuleImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesAppearanceBindingImpl.h"
@@ -50,6 +51,7 @@
 
 #include "fmt/format.h"
 #include "TypeUtils.h"
+#include "ValidationResults.h"
 
 namespace rlogic::internal
 {
@@ -63,7 +65,7 @@ namespace rlogic::internal
             if (m_luaModules.cend() == std::find_if(m_luaModules.cbegin(), m_luaModules.cend(),
                 [&module](const auto& m) { return m == module.second; }))
             {
-                errorReporting.add(fmt::format("Failed to map Lua module '{}'! It was created on a different instance of LogicEngine.", module.first), module.second);
+                errorReporting.add(fmt::format("Failed to map Lua module '{}'! It was created on a different instance of LogicEngine.", module.first), module.second, EErrorType::IllegalArgument);
                 return false;
             }
         }
@@ -99,6 +101,45 @@ namespace rlogic::internal
         script->m_impl.createRootProperties();
 
         return script;
+    }
+
+    LuaInterface* ApiObjects::createLuaInterface(
+        std::string_view source,
+        std::string_view interfaceName,
+        ErrorReporting& errorReporting)
+    {
+        std::string nameStr(interfaceName);
+
+        if (nameStr.empty())
+        {
+            errorReporting.add("Can't create interface with empty name!", nullptr, EErrorType::IllegalArgument);
+            return nullptr;
+        }
+
+        const auto interfaceWithSameName = std::find_if(m_interfaces.cbegin(), m_interfaces.cend(), [&](const auto& d) {
+            return d->getName() == nameStr;
+            });
+
+        if (interfaceWithSameName != m_interfaces.cend())
+        {
+            errorReporting.add(fmt::format("Interface object with name '{}' already exists!", interfaceName), *interfaceWithSameName, EErrorType::IllegalArgument);
+            return nullptr;
+        }
+
+        std::optional<LuaCompiledInterface> compiledInterface = LuaCompilationUtils::CompileInterface(
+            *m_solState,
+            std::string{ source },
+            interfaceName,
+            errorReporting);
+
+        if (!compiledInterface)
+            return nullptr;
+
+        std::unique_ptr<LuaInterface> up = std::make_unique<LuaInterface>(std::make_unique<LuaInterfaceImpl>(std::move(*compiledInterface), interfaceName, getNextLogicObjectId()));
+        LuaInterface* intf = up.get();
+        m_interfaces.push_back(intf);
+        registerLogicObject(std::move(up));
+        return intf;
     }
 
     LuaModule* ApiObjects::createLuaModule(
@@ -222,6 +263,10 @@ namespace rlogic::internal
         if (luaScript)
             return destroyInternal(*luaScript, errorReporting);
 
+        auto luaInterface = dynamic_cast<LuaInterface*>(&object);
+        if (luaInterface)
+            return destroyInternal(*luaInterface, errorReporting);
+
         auto luaModule = dynamic_cast<LuaModule*>(&object);
         if (luaModule)
             return destroyInternal(*luaModule, errorReporting);
@@ -250,7 +295,7 @@ namespace rlogic::internal
         if (timer)
             return destroyInternal(*timer, errorReporting);
 
-        errorReporting.add(fmt::format("Tried to destroy object '{}' with unknown type", object.getName()), &object);
+        errorReporting.add(fmt::format("Tried to destroy object '{}' with unknown type", object.getName()), &object, EErrorType::IllegalArgument);
 
         return false;
     }
@@ -262,7 +307,7 @@ namespace rlogic::internal
         });
         if (it == m_dataArrays.cend())
         {
-            errorReporting.add("Can't find data array in logic engine!", &dataArray);
+            errorReporting.add("Can't find data array in logic engine!", &dataArray, EErrorType::IllegalArgument);
             return false;
         }
         for (const auto& animNode : m_animationNodes)
@@ -274,7 +319,7 @@ namespace rlogic::internal
                     channel.tangentsIn == &dataArray ||
                     channel.tangentsOut == &dataArray)
                 {
-                    errorReporting.add(fmt::format("Failed to destroy data array '{}', it is used in animation node '{}' channel '{}'", dataArray.getName(), animNode->getName(), channel.name), &dataArray);
+                    errorReporting.add(fmt::format("Failed to destroy data array '{}', it is used in animation node '{}' channel '{}'", dataArray.getName(), animNode->getName(), channel.name), &dataArray, EErrorType::IllegalArgument);
                     return false;
                 }
             }
@@ -291,12 +336,28 @@ namespace rlogic::internal
             });
         if (scriptIter == m_scripts.end())
         {
-            errorReporting.add("Can't find script in logic engine!", &luaScript);
+            errorReporting.add("Can't find script in logic engine!", &luaScript, EErrorType::IllegalArgument);
             return false;
         }
 
         unregisterLogicObject(luaScript);
         m_scripts.erase(scriptIter);
+        return true;
+    }
+
+    bool ApiObjects::destroyInternal(LuaInterface& luaInterface, ErrorReporting& errorReporting)
+    {
+        auto interfaceIter = find_if(m_interfaces.begin(), m_interfaces.end(), [&](const LuaInterface* intf) {
+            return intf == &luaInterface;
+            });
+        if (interfaceIter == m_interfaces.end())
+        {
+            errorReporting.add("Can't find interface in logic engine!", &luaInterface, EErrorType::IllegalArgument);
+            return false;
+        }
+
+        unregisterLogicObject(luaInterface);
+        m_interfaces.erase(interfaceIter);
         return true;
     }
 
@@ -307,7 +368,7 @@ namespace rlogic::internal
         });
         if (it == m_luaModules.cend())
         {
-            errorReporting.add("Can't find Lua module in logic engine!", &luaModule);
+            errorReporting.add("Can't find Lua module in logic engine!", &luaModule, EErrorType::IllegalArgument);
             return false;
         }
         for (const auto& script : m_scripts)
@@ -316,7 +377,7 @@ namespace rlogic::internal
             {
                 if (moduleInUse.second == &luaModule)
                 {
-                    errorReporting.add(fmt::format("Failed to destroy LuaModule '{}', it is used in LuaScript '{}'", luaModule.getName(), script->getName()), &luaModule);
+                    errorReporting.add(fmt::format("Failed to destroy LuaModule '{}', it is used in LuaScript '{}'", luaModule.getName(), script->getName()), &luaModule, EErrorType::IllegalArgument);
                     return false;
                 }
             }
@@ -336,7 +397,7 @@ namespace rlogic::internal
 
         if (nodeIter == m_ramsesNodeBindings.end())
         {
-            errorReporting.add("Can't find RamsesNodeBinding in logic engine!", &ramsesNodeBinding);
+            errorReporting.add("Can't find RamsesNodeBinding in logic engine!", &ramsesNodeBinding, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -354,7 +415,7 @@ namespace rlogic::internal
 
         if (appearanceIter == m_ramsesAppearanceBindings.end())
         {
-            errorReporting.add("Can't find RamsesAppearanceBinding in logic engine!", &ramsesAppearanceBinding);
+            errorReporting.add("Can't find RamsesAppearanceBinding in logic engine!", &ramsesAppearanceBinding, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -372,7 +433,7 @@ namespace rlogic::internal
 
         if (cameraIter == m_ramsesCameraBindings.end())
         {
-            errorReporting.add("Can't find RamsesCameraBinding in logic engine!", &ramsesCameraBinding);
+            errorReporting.add("Can't find RamsesCameraBinding in logic engine!", &ramsesCameraBinding, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -390,7 +451,7 @@ namespace rlogic::internal
 
         if (nodeIt == m_animationNodes.end())
         {
-            errorReporting.add("Can't find AnimationNode in logic engine!", &node);
+            errorReporting.add("Can't find AnimationNode in logic engine!", &node, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -408,7 +469,7 @@ namespace rlogic::internal
 
         if (nodeIt == m_timerNodes.end())
         {
-            errorReporting.add("Can't find TimerNode in logic engine!", &node);
+            errorReporting.add("Can't find TimerNode in logic engine!", &node, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -465,7 +526,7 @@ namespace rlogic::internal
             if (*sceneId != nodeSceneId)
             {
                 errorReporting.add(fmt::format("Ramses node '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                    node.getName(), nodeSceneId.getValue(), sceneId->getValue()), binding);
+                    node.getName(), nodeSceneId.getValue(), sceneId->getValue()), binding, EErrorType::IllegalArgument);
                 return false;
             }
         }
@@ -482,7 +543,7 @@ namespace rlogic::internal
             if (*sceneId != appearanceSceneId)
             {
                 errorReporting.add(fmt::format("Ramses appearance '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                    appearance.getName(), appearanceSceneId.getValue(), sceneId->getValue()), binding);
+                    appearance.getName(), appearanceSceneId.getValue(), sceneId->getValue()), binding, EErrorType::IllegalArgument);
                 return false;
             }
         }
@@ -499,12 +560,25 @@ namespace rlogic::internal
             if (*sceneId != cameraSceneId)
             {
                 errorReporting.add(fmt::format("Ramses camera '{}' is from scene with id:{} but other objects are from scene with id:{}!",
-                    camera.getName(), cameraSceneId.getValue(), sceneId->getValue()), binding);
+                    camera.getName(), cameraSceneId.getValue(), sceneId->getValue()), binding, EErrorType::IllegalArgument);
                 return false;
             }
         }
 
         return true;
+    }
+
+    void ApiObjects::checkAllInterfaceOutputsLinked(ValidationResults& validationResults) const
+    {
+        for (const auto* intf : m_interfaces)
+        {
+            std::vector<const Property*> unlinkedOutputs;
+            if (!dynamic_cast<const LuaInterfaceImpl&>(intf->m_impl).checkAllOutputsLinked(unlinkedOutputs))
+            {
+                for(const auto* output : unlinkedOutputs)
+                    validationResults.add(::fmt::format("Interface [{}] has unlinked output [{}]", intf->getName(), output->getName()), intf, EWarningType::UnusedContent);
+            }
+        }
     }
 
     template <typename T>
@@ -517,6 +591,10 @@ namespace rlogic::internal
         else if constexpr (std::is_same_v<T, LuaScript>)
         {
             return m_scripts;
+        }
+        else if constexpr (std::is_same_v<T, LuaInterface>)
+        {
+            return m_interfaces;
         }
         else if constexpr (std::is_same_v<T, LuaModule>)
         {
@@ -601,8 +679,8 @@ namespace rlogic::internal
         luaModules.reserve(apiObjects.m_luaModules.size());
         for (const auto& luaModule : apiObjects.m_luaModules)
         {
-            luaModules.push_back(LuaModuleImpl::Serialize(luaModule->m_impl, builder, serializationMap));
-            serializationMap.storeLuaModule(*luaModule, luaModules.back());
+            luaModules.push_back(LuaModuleImpl::Serialize(luaModule->m_impl, builder));
+            serializationMap.storeLuaModule(luaModule->m_impl.getId(), luaModules.back());
         }
 
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> luascripts;
@@ -610,6 +688,13 @@ namespace rlogic::internal
         std::transform(apiObjects.m_scripts.begin(), apiObjects.m_scripts.end(), std::back_inserter(luascripts),
             [&builder, &serializationMap](const std::vector<LuaScript*>::value_type& it) {
                 return LuaScriptImpl::Serialize(it->m_script, builder, serializationMap);
+            });
+
+        std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>> luaInterfaces;
+        luascripts.reserve(apiObjects.m_interfaces.size());
+        std::transform(apiObjects.m_interfaces.cbegin(), apiObjects.m_interfaces.cend(), std::back_inserter(luaInterfaces),
+            [&builder, &serializationMap](const std::vector<LuaInterface*>::value_type& it) {
+                return LuaInterfaceImpl::Serialize(it->m_interface, builder, serializationMap);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> ramsesnodebindings;
@@ -695,13 +780,15 @@ namespace rlogic::internal
             builder,
             builder.CreateVector(luaModules),
             builder.CreateVector(luascripts),
+            builder.CreateVector(luaInterfaces),
             builder.CreateVector(ramsesnodebindings),
             builder.CreateVector(ramsesappearancebindings),
             builder.CreateVector(ramsescamerabindings),
             builder.CreateVector(dataArrays),
             builder.CreateVector(animationNodes),
             builder.CreateVector(timerNodes),
-            builder.CreateVector(links)
+            builder.CreateVector(links),
+            apiObjects.m_lastObjectId
         );
 
         builder.Finish(logicEngine);
@@ -723,61 +810,70 @@ namespace rlogic::internal
 
         if (!apiObjects.luaModules())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing Lua modules container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing Lua modules container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.luaScripts())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing Lua scripts container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing Lua scripts container!", nullptr, EErrorType::BinaryVersionMismatch);
+            return nullptr;
+        }
+
+        if (!apiObjects.luaInterfaces())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing Lua interfaces container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.nodeBindings())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing node bindings container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing node bindings container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.appearanceBindings())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing appearance bindings container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing appearance bindings container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.cameraBindings())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing camera bindings container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing camera bindings container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.links())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing links container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing links container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.dataArrays())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing data arrays container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing data arrays container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.animationNodes())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing animation nodes container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing animation nodes container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!apiObjects.timerNodes())
         {
-            errorReporting.add("Fatal error during loading from serialized data: missing timer nodes container!", nullptr);
+            errorReporting.add("Fatal error during loading from serialized data: missing timer nodes container!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
+
+        deserialized->m_lastObjectId = apiObjects.lastObjectId();
 
         const size_t logicObjectsTotalSize =
             static_cast<size_t>(apiObjects.luaModules()->size()) +
             static_cast<size_t>(apiObjects.luaScripts()->size()) +
+            static_cast<size_t>(apiObjects.luaInterfaces()->size()) +
             static_cast<size_t>(apiObjects.nodeBindings()->size()) +
             static_cast<size_t>(apiObjects.appearanceBindings()->size()) +
             static_cast<size_t>(apiObjects.cameraBindings()->size()) +
@@ -800,7 +896,7 @@ namespace rlogic::internal
             LuaModule*                 luaModule = up.get();
             deserialized->m_luaModules.push_back(luaModule);
             deserialized->registerLogicObject(std::move(up));
-            deserializationMap.storeLuaModule(*module, *deserialized->m_luaModules.back());
+            deserializationMap.storeLuaModule(luaModule->getId(), *deserialized->m_luaModules.back());
         }
 
         const auto& luascripts = *apiObjects.luaScripts();
@@ -817,6 +913,26 @@ namespace rlogic::internal
                 std::unique_ptr<LuaScript> up             = std::make_unique<LuaScript>(std::move(deserializedScript));
                 LuaScript*                 luascript = up.get();
                 deserialized->m_scripts.push_back(luascript);
+                deserialized->registerLogicObject(std::move(up));
+            }
+            else
+            {
+                return nullptr;
+            }
+        }
+
+        const auto& luaInterfaces = *apiObjects.luaInterfaces();
+        deserialized->m_interfaces.reserve(luaInterfaces.size());
+        for (const auto* intf : luaInterfaces)
+        {
+            assert(intf);
+            std::unique_ptr<LuaInterfaceImpl> deserializedInterface = LuaInterfaceImpl::Deserialize(*intf, errorReporting, deserializationMap);
+
+            if (deserializedInterface)
+            {
+                std::unique_ptr<LuaInterface> up = std::make_unique<LuaInterface>(std::move(deserializedInterface));
+                LuaInterface* luaInterface = up.get();
+                deserialized->m_interfaces.push_back(luaInterface);
                 deserialized->registerLogicObject(std::move(up));
             }
             else
@@ -940,13 +1056,13 @@ namespace rlogic::internal
 
             if (!rLink->sourceProperty())
             {
-                errorReporting.add("Fatal error during loading from serialized data: missing link source property!", nullptr);
+                errorReporting.add("Fatal error during loading from serialized data: missing link source property!", nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
             if (!rLink->targetProperty())
             {
-                errorReporting.add("Fatal error during loading from serialized data: missing link target property!", nullptr);
+                errorReporting.add("Fatal error during loading from serialized data: missing link target property!", nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
@@ -968,7 +1084,7 @@ namespace rlogic::internal
                         dataSourceDescription,
                         sourceProp->name()->string_view(),
                         targetProp->name()->string_view()
-                    ), nullptr);
+                    ), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
         }
@@ -981,6 +1097,7 @@ namespace rlogic::internal
         // TODO Violin improve internal management of logic nodes so that we don't have to loop over three
         // different containers below which all call a method on LogicNode
         return std::any_of(m_scripts.cbegin(), m_scripts.cend(), [](const auto& s) { return s->m_impl.isDirty(); })
+            || std::any_of(m_interfaces.cbegin(), m_interfaces.cend(), [](const auto& s) { return s->m_impl.isDirty(); })
             || bindingsDirty();
     }
 
@@ -1013,6 +1130,7 @@ namespace rlogic::internal
 
     template ApiObjectContainer<LogicObject>&             ApiObjects::getApiObjectContainer<LogicObject>();
     template ApiObjectContainer<LuaScript>&               ApiObjects::getApiObjectContainer<LuaScript>();
+    template ApiObjectContainer<LuaInterface>&            ApiObjects::getApiObjectContainer<LuaInterface>();
     template ApiObjectContainer<LuaModule>&               ApiObjects::getApiObjectContainer<LuaModule>();
     template ApiObjectContainer<RamsesNodeBinding>&       ApiObjects::getApiObjectContainer<RamsesNodeBinding>();
     template ApiObjectContainer<RamsesAppearanceBinding>& ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>();
@@ -1023,6 +1141,7 @@ namespace rlogic::internal
 
     template const ApiObjectContainer<LogicObject>&             ApiObjects::getApiObjectContainer<LogicObject>() const;
     template const ApiObjectContainer<LuaScript>&               ApiObjects::getApiObjectContainer<LuaScript>() const;
+    template const ApiObjectContainer<LuaInterface>&            ApiObjects::getApiObjectContainer<LuaInterface>() const;
     template const ApiObjectContainer<LuaModule>&               ApiObjects::getApiObjectContainer<LuaModule>() const;
     template const ApiObjectContainer<RamsesNodeBinding>&       ApiObjects::getApiObjectContainer<RamsesNodeBinding>() const;
     template const ApiObjectContainer<RamsesAppearanceBinding>& ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>() const;

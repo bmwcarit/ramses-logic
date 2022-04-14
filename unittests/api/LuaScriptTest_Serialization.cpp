@@ -32,10 +32,10 @@ namespace rlogic::internal
         }
 
         std::string_view m_minimalScript = R"(
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end
         )";
 
@@ -59,9 +59,10 @@ namespace rlogic::internal
         // Inspect flatbuffers data
         const auto& serializedScript = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
 
-        ASSERT_TRUE(serializedScript.name());
-        EXPECT_EQ(serializedScript.name()->string_view(), "name");
-        EXPECT_EQ(serializedScript.id(), 1u);
+        ASSERT_TRUE(serializedScript.base());
+        ASSERT_TRUE(serializedScript.base()->name());
+        EXPECT_EQ(serializedScript.base()->name()->string_view(), "name");
+        EXPECT_EQ(serializedScript.base()->id(), 1u);
 
         ASSERT_TRUE(serializedScript.rootInput());
         EXPECT_EQ(serializedScript.rootInput()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
@@ -102,8 +103,9 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                0, // no name
-                1u
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    0, // no name
+                    1u)
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -112,8 +114,9 @@ namespace rlogic::internal
         std::unique_ptr<LuaScriptImpl> deserialized = LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing name!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing name!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of LuaScript from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenIdMissing)
@@ -121,7 +124,9 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                0 // no id (id gets checked before name)
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    0) // no id (id gets checked before name)
                 );
             m_flatBufferBuilder.Finish(script);
         }
@@ -130,8 +135,9 @@ namespace rlogic::internal
         std::unique_ptr<LuaScriptImpl> deserialized = LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
 
         EXPECT_FALSE(deserialized);
-        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript from serialized data: missing id!");
+        ASSERT_EQ(2u, this->m_errorReporting.getErrors().size());
+        EXPECT_EQ("Fatal error during loading of LogicObject base from serialized data: missing or invalid ID!", this->m_errorReporting.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading of LuaScript from serialized data: missing name and/or ID!", this->m_errorReporting.getErrors()[1].message);
     }
 
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenLuaSourceCodeMissing)
@@ -139,8 +145,9 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 0 // no source code
             );
             m_flatBufferBuilder.Finish(script);
@@ -159,13 +166,14 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 0, // no user modules
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT")
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -181,13 +189,14 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 0, // no standard modules
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT")
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -203,8 +212,9 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
@@ -226,12 +236,13 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
+                m_testUtils.serializeTestProperty(""),
                 0 // no root output
             );
             m_flatBufferBuilder.Finish(script);
@@ -250,13 +261,14 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN", rlogic_serialization::EPropertyRootType::Struct, true, true), // create root input with errors
-                m_testUtils.serializeTestProperty("OUT")
+                m_testUtils.serializeTestProperty("", rlogic_serialization::EPropertyRootType::Struct, true, true), // create root input with errors
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -274,13 +286,14 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT", rlogic_serialization::EPropertyRootType::Struct, true, true) // create root output with errors
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("", rlogic_serialization::EPropertyRootType::Struct, true, true) // create root output with errors
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -298,21 +311,22 @@ namespace rlogic::internal
         {
             const std::string_view src = R"(
             global="this will cause error"
-            function interface()
+            function interface(IN,OUT)
             end
 
-            function run()
+            function run(IN,OUT)
             end
             )";
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(src),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT")
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -330,13 +344,14 @@ namespace rlogic::internal
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("script"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("script"),
+                    1u),
                 m_flatBufferBuilder.CreateString("this.is.bad.code"),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT") // create root output with errors
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -349,18 +364,91 @@ namespace rlogic::internal
         EXPECT_THAT(m_errorReporting.getErrors()[0].message, ::testing::HasSubstr("Fatal error during loading of LuaScript 'script' from serialized data: failed parsing Lua source code"));
     }
 
+    // Can't happen in normal usage; still, we test this case because we should not rely on correct export during loading
+    TEST_F(ALuaScript_Serialization, ProducesErrorWhenLuaScriptSourceBreaksSandbox_WhenLoaded)
+    {
+        {
+            std::string_view brokenScript = R"(
+                globalVariable = 5 -- breaks sandbox
+
+                function interface(IN,OUT)
+                end
+
+                function run(IN,OUT)
+                end
+            )";
+            auto script = rlogic_serialization::CreateLuaScript(
+                m_flatBufferBuilder,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("script"),
+                    1u),
+                m_flatBufferBuilder.CreateString(brokenScript),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
+            );
+            m_flatBufferBuilder.Finish(script);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaScriptImpl> deserialized = LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_FALSE(deserialized);
+        ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
+        EXPECT_THAT(m_errorReporting.getErrors()[0].message,
+            ::testing::HasSubstr("Declaring global variables is forbidden (exceptions: the functions 'init', 'interface' and 'run')! (found value of type 'number')"));
+    }
+
+    TEST_F(ALuaScript_Serialization, ProducesErrorWhenLuaScriptSourceBreaksSandbox_WhenExecuted)
+    {
+        {
+            std::string_view brokenScript = R"(
+                function interface(IN,OUT)
+                end
+
+                function run(IN,OUT)
+                    globalVariable = 5 -- breaks sandbox
+                end
+            )";
+            auto script = rlogic_serialization::CreateLuaScript(
+                m_flatBufferBuilder,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("script"),
+                    1u),
+                m_flatBufferBuilder.CreateString(brokenScript),
+                m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
+                m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
+            );
+            m_flatBufferBuilder.Finish(script);
+        }
+
+        const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::LuaScript>(m_flatBufferBuilder.GetBufferPointer());
+        std::unique_ptr<LuaScriptImpl> deserialized = LuaScriptImpl::Deserialize(m_solState, serialized, m_errorReporting, m_deserializationMap);
+
+        EXPECT_TRUE(deserialized);
+        auto expectedError = deserialized->update();
+        EXPECT_TRUE(expectedError);
+
+        EXPECT_THAT(expectedError->message,
+            ::testing::HasSubstr("Unexpected global variable definition 'globalVariable' in run()! Use the init() function to declare global data and functions, or use modules!"));
+    }
+
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenLuaScriptSourceHasRuntimeErrors)
     {
         {
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("script"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("script"),
+                    1u),
                 m_flatBufferBuilder.CreateString("error('This is not going to compile')"),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{ static_cast<uint8_t>(EStandardModule::Base) }),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT") // create root output with errors
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("") // create root output with errors
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -380,17 +468,18 @@ namespace rlogic::internal
             const auto dummyModuleUsageFB = rlogic_serialization::CreateLuaModuleUsage(
                 m_flatBufferBuilder,
                 0, // no name
-                m_testUtils.serializeTestModule());
+                0); // Invalid ID
 
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{ dummyModuleUsageFB }),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT")
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -400,7 +489,7 @@ namespace rlogic::internal
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript 'name' module data: missing name or module!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript 'name' module data: missing name!");
     }
 
     TEST_F(ALuaScript_Serialization, ProducesErrorWhenUserModuleHasNoData)
@@ -409,17 +498,18 @@ namespace rlogic::internal
             const auto dummyModuleUsageFB = rlogic_serialization::CreateLuaModuleUsage(
                 m_flatBufferBuilder,
                 m_flatBufferBuilder.CreateString("moduleName"),
-                0); // no module
+                42); // invalid module id
 
             auto script = rlogic_serialization::CreateLuaScript(
                 m_flatBufferBuilder,
-                m_flatBufferBuilder.CreateString("name"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_flatBufferBuilder,
+                    m_flatBufferBuilder.CreateString("name"),
+                    1u),
                 m_flatBufferBuilder.CreateString(m_minimalScript),
                 m_flatBufferBuilder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{ dummyModuleUsageFB }),
                 m_flatBufferBuilder.CreateVector(std::vector<uint8_t>{}),
-                m_testUtils.serializeTestProperty("IN"),
-                m_testUtils.serializeTestProperty("OUT")
+                m_testUtils.serializeTestProperty(""),
+                m_testUtils.serializeTestProperty("")
             );
             m_flatBufferBuilder.Finish(script);
         }
@@ -429,6 +519,6 @@ namespace rlogic::internal
 
         EXPECT_FALSE(deserialized);
         ASSERT_EQ(m_errorReporting.getErrors().size(), 1u);
-        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript 'name' module data: missing name or module!");
+        EXPECT_EQ(m_errorReporting.getErrors()[0].message, "Fatal error during loading of LuaScript 'name' module data: could not resolve dependent module with id=42!");
     }
 }

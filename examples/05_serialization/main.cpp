@@ -111,7 +111,7 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
 {
     /**
      * Boilerplate Ramses code which saves a red triangle scene in a file. For more ramses
-     * examples and details, check the ramses docs at https://covesa.github.io/ramses
+     * examples and details, check the ramses docs at https://bmwcarit.github.io/ramses
      */
     ramses::RamsesFramework ramsesFramework;
     ramses::RamsesClient& client = *ramsesFramework.createClient("example client");
@@ -171,11 +171,6 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
     renderGroup->addMeshNode(*meshNode);
 
     scene->flush();
-    /**
-     * It doesn't matter if we save the Ramses scene first or the logic scene first, as long as the Node we
-     * reference further down has its ID serialized in both files, so that it can be resolved again when loading.
-     */
-    scene->saveToFile(ramsesSceneFile.c_str(), false);
 
     /**
      * Create a temporary LogicEngine instance for creating and saving a simple script which references a ramses Node
@@ -187,12 +182,12 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
      * Create a simple script which sets the rotation values of a node based on simulated time
      */
     rlogic::LuaScript* simpleScript = logicEngine.createLuaScript(R"(
-            function interface()
-                IN.time_msec = INT32
-                OUT.rotationZ = VEC3F
+            function interface(IN,OUT)
+                IN.time_msec = Type:Int32()
+                OUT.rotationZ = Type:Vec3f()
             end
 
-            function run()
+            function run(IN,OUT)
                 -- Rotate around Z axis with 100 degrees per second
                 OUT.rotationZ = {0, 0, IN.time_msec / 10}
             end
@@ -204,7 +199,18 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
     logicEngine.link(*simpleScript->getOutputs()->getChild("rotationZ"), *nodeBinding->getInputs()->getChild("rotation"));
 
     /**
+     * Call update() before saving to ensure the ramses scene is in a state where all settings (in this case, the node's rotation)
+     * have been set once before saving
+     */
+    logicEngine.update();
+
+    /**
      * Save the script, the node binding and their link to a file so that they can be loaded later
      */
     logicEngine.saveToFile(ramsesLogicFile);
+
+    /**
+     * Finally, we save the Ramses scene with the values/data which has been applied by the LogicEngine above
+     */
+    scene->saveToFile(ramsesSceneFile.c_str(), false);
 }

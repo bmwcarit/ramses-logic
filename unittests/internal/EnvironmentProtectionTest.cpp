@@ -42,7 +42,7 @@ namespace rlogic::internal
         const std::vector<EEnvProtectionFlag> protectionFlags = {
             EEnvProtectionFlag::LoadScript,
             EEnvProtectionFlag::InitFunction,
-            EEnvProtectionFlag::InterfaceFunction,
+            EEnvProtectionFlag::InterfaceFunctionInScript,
             EEnvProtectionFlag::RunFunction,
         };
 
@@ -77,10 +77,10 @@ namespace rlogic::internal
             function init()
                 return 5
             end
-            function interface()
+            function interface(IN,OUT)
                 return 6
             end
-            function run()
+            function run(IN,OUT)
                 return 7
             end
         )";
@@ -232,6 +232,129 @@ namespace rlogic::internal
         const int val = getInternalEnvironment()["GLOBAL"]["data"];
         EXPECT_EQ(val, 5);
     }
+
+    class AEnvironmentProtection_LoadInterface : public AEnvironmentProtection
+    {
+    protected:
+        AEnvironmentProtection_LoadInterface()
+        {
+            EnvironmentProtection::SetEnvironmentProtectionLevel(m_protEnv, EEnvProtectionFlag::LoadInterface);
+        }
+    };
+
+    TEST_F(AEnvironmentProtection_LoadInterface, AllowsDeclaringInterfaceFunction)
+    {
+        const std::string_view script = R"(
+            function interface(IN,OUT)
+                return 6
+            end
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_TRUE(result.valid());
+
+        sol::protected_function iface = getInternalEnvironment()["interface"];
+
+        const int ifaceResult = iface();
+        EXPECT_EQ(6, ifaceResult);
+    }
+
+    TEST_F(AEnvironmentProtection_LoadInterface, ForbidsDeclaringUnknownFunctions)
+    {
+        const std::string_view script = R"(
+            function thisIsNotAllowed()
+                return 5
+            end
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Unexpected function name 'thisIsNotAllowed'! Only 'interface' function can be declared!"));
+    }
+
+    TEST_F(AEnvironmentProtection_LoadInterface, CatchesWritingToGlobalsAsError)
+    {
+        const std::string_view script = R"(
+            global="this generates error"
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(), ::testing::HasSubstr("Declaring global variables is forbidden (exception: the 'interface' function)!"));
+    }
+
+    TEST_F(AEnvironmentProtection_LoadInterface, CatchesReadingGlobalsAsError)
+    {
+        const std::string_view script = R"(
+            local t=_G["this generates error"]
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Trying to read global variable 'this generates error' in an interface!"));
+    }
+
+    TEST_F(AEnvironmentProtection_LoadInterface, ForbidsOverwritingInterfaceFunction)
+    {
+        const std::string_view script = R"(
+            function interface(IN,OUT)
+                return 5
+            end
+            function interface(IN,OUT)
+                return 6
+            end
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Function 'interface' can only be declared once!"));
+    }
+
+    TEST_F(AEnvironmentProtection_LoadInterface, ForbidsOverwritingTheGlobalTable)
+    {
+        const std::string_view script = R"(
+            GLOBAL = {}
+        )";
+
+        getInternalEnvironment()["GLOBAL"] = m_solState.createTable();
+        getInternalEnvironment()["GLOBAL"]["data"] = 5;
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Declaring global variables is forbidden (exception: the 'interface' function)! (found value of type 'table')"));
+
+        const int val = getInternalEnvironment()["GLOBAL"]["data"];
+        EXPECT_EQ(val, 5);
+    }
+
     class AEnvironmentProtection_InitFunction: public AEnvironmentProtection
     {
     protected:
@@ -389,16 +512,16 @@ namespace rlogic::internal
         EXPECT_EQ(moreData, 15);
     }
 
-    class AEnvironmentProtection_InterfaceFunction : public AEnvironmentProtection
+    class AEnvironmentProtection_InterfaceFunctionInScript : public AEnvironmentProtection
     {
     protected:
-        AEnvironmentProtection_InterfaceFunction()
+        AEnvironmentProtection_InterfaceFunctionInScript()
         {
-            EnvironmentProtection::SetEnvironmentProtectionLevel(m_protEnv, EEnvProtectionFlag::InterfaceFunction);
+            EnvironmentProtection::SetEnvironmentProtectionLevel(m_protEnv, EEnvProtectionFlag::InterfaceFunctionInScript);
         }
     };
 
-    TEST_F(AEnvironmentProtection_InterfaceFunction, ForbidsDeclaringGlobalFunctions)
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInScript, ForbidsDeclaringGlobalFunctions)
     {
         const std::string_view script = R"(
             function thisIsNotAllowed()
@@ -418,7 +541,7 @@ namespace rlogic::internal
                 "Use the GLOBAL table inside the init() function to declare global data and functions, or use modules!"));
     }
 
-    TEST_F(AEnvironmentProtection_InterfaceFunction, CatchesWritingToGlobalsAsError)
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInScript, CatchesWritingToGlobalsAsError)
     {
         const std::string_view script = R"(
             global="this generates error"
@@ -436,7 +559,7 @@ namespace rlogic::internal
                 "Use the GLOBAL table inside the init() function to declare global data and functions, or use modules!"));
     }
 
-    TEST_F(AEnvironmentProtection_InterfaceFunction, CatchesReadingGlobalsAsError)
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInScript, CatchesReadingGlobalsAsError)
     {
         const std::string_view script = R"(
             local t=_G["this generates error"]
@@ -449,10 +572,10 @@ namespace rlogic::internal
         ASSERT_FALSE(result.valid());
         sol::error error = result;
         EXPECT_THAT(error.what(),
-            ::testing::HasSubstr("Unexpected global access to key 'this generates error' in interface()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+            ::testing::HasSubstr("Unexpected global access to key 'this generates error' in interface()! Only 'GLOBAL' and 'Type' are allowed as a key"));
     }
 
-    TEST_F(AEnvironmentProtection_InterfaceFunction, AllowsReadingPredefinedGlobalsTable)
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInScript, AllowsReadingPredefinedGlobalsTable)
     {
         const std::string_view script = R"(
             return GLOBAL.data
@@ -468,6 +591,81 @@ namespace rlogic::internal
         ASSERT_TRUE(result.valid());
         const int resultData = result;
         EXPECT_EQ(resultData, 5);
+    }
+
+    class AEnvironmentProtection_InterfaceFunctionInInterface : public AEnvironmentProtection
+    {
+    protected:
+        AEnvironmentProtection_InterfaceFunctionInInterface()
+        {
+            EnvironmentProtection::SetEnvironmentProtectionLevel(m_protEnv, EEnvProtectionFlag::InterfaceFunctionInInterface);
+        }
+    };
+
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInInterface, ForbidsDeclaringGlobalFunctions)
+    {
+        const std::string_view script = R"(
+            function thisIsNotAllowed()
+                return 5
+            end
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Unexpected variable definition 'thisIsNotAllowed' in interface()!"));
+    }
+
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInInterface, CatchesWritingToGlobalsAsError)
+    {
+        const std::string_view script = R"(
+            global="this generates error"
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Unexpected variable definition 'global' in interface()!"));
+    }
+
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInInterface, CatchesReadingGlobalsAsError)
+    {
+        const std::string_view script = R"(
+            local t=_G["this generates error"]
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Unexpected global access to key 'this generates error' in interface()!"));
+    }
+
+    TEST_F(AEnvironmentProtection_InterfaceFunctionInInterface, ForbidsReadingPredefinedGlobalsTable)
+    {
+        const std::string_view script = R"(
+            return GLOBAL.data
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Unexpected global access to key 'GLOBAL' in interface()!"));
     }
 
     class AEnvironmentProtection_RunFunction : public AEnvironmentProtection
@@ -526,7 +724,7 @@ namespace rlogic::internal
         ASSERT_FALSE(result.valid());
         sol::error error = result;
         EXPECT_THAT(error.what(),
-            ::testing::HasSubstr("Unexpected global access to key 'this generates error' in run()! Allowed keys: 'GLOBAL', 'IN', 'OUT'"));
+            ::testing::HasSubstr("Unexpected global access to key 'this generates error' in run()! Only 'GLOBAL' is allowed as a key"));
     }
 
     TEST_F(AEnvironmentProtection_RunFunction, AllowsReadingPredefinedGlobalsTable)
@@ -564,5 +762,104 @@ namespace rlogic::internal
         sol::error error = result;
         EXPECT_THAT(error.what(),
             ::testing::HasSubstr("Trying to override the GLOBAL table in run()! You can only read data, but not overwrite the table!"));
+    }
+
+    class AEnvironmentProtection_Module: public AEnvironmentProtection
+    {
+    protected:
+        AEnvironmentProtection_Module()
+        {
+            EnvironmentProtection::SetEnvironmentProtectionLevel(m_protEnv, EEnvProtectionFlag::Module);
+        }
+    };
+
+    TEST_F(AEnvironmentProtection_Module, ForbidsDeclaringGlobalFunctions)
+    {
+        const std::string_view script = R"(
+            function thisIsNotAllowed()
+                return 5
+            end
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Declaring global variables is forbidden in modules! (found value of type 'function' assigned to variable 'thisIsNotAllowed')"));
+    }
+
+    TEST_F(AEnvironmentProtection_Module, CatchesWritingToGlobalsAsError)
+    {
+        const std::string_view script = R"(
+            global="this generates error"
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Declaring global variables is forbidden in modules! (found value of type 'string' assigned to variable 'global')"));
+    }
+
+    TEST_F(AEnvironmentProtection_Module, CatchesReadingGlobalsAsError)
+    {
+        const std::string_view script = R"(
+            local t=_G["this generates error"]
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Trying to read global variable 'this generates error' in module! This can cause undefined behavior and is forbidden!"));
+    }
+
+    // This never happens in practice, because modules live in different environment than the
+    // script which has the GLOBAL table. Still, this test makes sure that even if the symbol leaked
+    // somehow, it's still not accessible in the module
+    TEST_F(AEnvironmentProtection_Module, DoesNotAllowReadingPredefinedGlobalsTable)
+    {
+        const std::string_view script = R"(
+            return GLOBAL.data
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        getInternalEnvironment()["GLOBAL"] = m_solState.createTable();
+        getInternalEnvironment()["GLOBAL"]["data"] = 5;
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_TRUE(result.valid());
+        const int resultData = result;
+        EXPECT_EQ(resultData, 5);
+    }
+
+    TEST_F(AEnvironmentProtection_Module, ForbidsOverwritingTypeTable)
+    {
+        const std::string_view script = R"(
+            Type = {}
+        )";
+
+        sol::protected_function loadedScript = m_solState.loadScript(script, "test script");
+        m_protEnv.set_on(loadedScript);
+
+        getInternalEnvironment()["Type"] = m_solState.createTable();
+        getInternalEnvironment()["Type"]["Int"] = [](){return 5;};
+
+        sol::protected_function_result result = loadedScript();
+        ASSERT_FALSE(result.valid());
+        sol::error error = result;
+        EXPECT_THAT(error.what(),
+            ::testing::HasSubstr("Special global 'Type' symbol should not be overwritten in modules!"));
     }
 }

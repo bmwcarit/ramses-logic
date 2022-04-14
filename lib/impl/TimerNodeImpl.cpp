@@ -23,13 +23,12 @@ namespace rlogic::internal
 
     void TimerNodeImpl::createRootProperties()
     {
-        HierarchicalTypeData inputs = MakeStruct("IN", {
+        HierarchicalTypeData inputs = MakeStruct("", {
             {"ticker_us", EPropertyType::Int64}
             });
         auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::ScriptInput);
 
-        HierarchicalTypeData outputs = MakeStruct("OUT", {
-            {"timeDelta", EPropertyType::Float},
+        HierarchicalTypeData outputs = MakeStruct("", {
             {"ticker_us", EPropertyType::Int64}
             });
         auto outputsImpl = std::make_unique<PropertyImpl>(std::move(outputs), EPropertySemantics::ScriptOutput);
@@ -40,44 +39,18 @@ namespace rlogic::internal
     std::optional<LogicNodeRuntimeError> TimerNodeImpl::update()
     {
         const int64_t ticker = *getInputs()->getChild(0u)->get<int64_t>();
-        if (ticker < 0)
-            return LogicNodeRuntimeError{ fmt::format("TimerNode '{}' failed to update - cannot use negative ticker ({})", getName(), ticker) };
 
-        int64_t outTimeDelta_us = 0;
         int64_t outTicker_us = 0;
-
         if (ticker == 0) // built-in ticker using system clock
         {
-            const auto nowTS = std::chrono::steady_clock::now();
-            if (!m_lastTimePoint)
-                m_lastTimePoint = nowTS;
-
-            assert(nowTS >= *m_lastTimePoint);
-            const auto timeDelta = std::chrono::duration_cast<std::chrono::microseconds>(nowTS - *m_lastTimePoint);
-            outTimeDelta_us = static_cast<int64_t>(timeDelta.count());
-            outTicker_us = std::chrono::duration_cast<std::chrono::microseconds>(nowTS.time_since_epoch()).count();
-            m_lastTimePoint = nowTS;
+            outTicker_us = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now().time_since_epoch()).count();
         }
         else // user provided ticker
         {
-            if (!m_lastTick)
-                m_lastTick = ticker;
-            if (ticker < m_lastTick)
-                return LogicNodeRuntimeError{ fmt::format("TimerNode '{}' failed to update - ticker must be monotonically increasing (lastTick={} newTick={})", getName(), *m_lastTick, ticker) };
-
-            outTimeDelta_us = ticker - *m_lastTick;
             outTicker_us = ticker;
-            m_lastTick = ticker;
         }
 
-        // Calculate time delta in double and and narrow to float for output.
-        // Safe double representation of ticker can be assumed - user input is checked for same range due to Lua using doubles
-        // and system clock will not generate higher value for few centuries.
-        assert(outTimeDelta_us < static_cast<int64_t>(1LLU << 53u));
-        const auto outTimeDelta = static_cast<float>(1e-6 * static_cast<double>(outTimeDelta_us));
-
-        getOutputs()->getChild(0u)->m_impl->setValue(outTimeDelta);
-        getOutputs()->getChild(1u)->m_impl->setValue(outTicker_us);
+        getOutputs()->getChild(0u)->m_impl->setValue(outTicker_us);
 
         return std::nullopt;
     }
@@ -87,13 +60,28 @@ namespace rlogic::internal
         flatbuffers::FlatBufferBuilder& builder,
         SerializationMap& serializationMap)
     {
-        return rlogic_serialization::CreateTimerNode(
+        // Timer nodes require special serialization logic. We don't want to store system time
+        // in the files (this makes their content undeterministic). Instead, we write zeroes, and
+        // cache the current values and restore them again after serialization is done
+
+        // 1. Cache current output values
+        const PropertyValue outTickerTmp = timerNode.getOutputs()->getChild(0u)->m_impl->getValue();
+
+        // 2. Set to 0
+        timerNode.getOutputs()->getChild(0u)->m_impl->setValue(int64_t(0));
+
+        // 3. Serialize
+        auto timerNodeOffset = rlogic_serialization::CreateTimerNode(
             builder,
-            builder.CreateString(timerNode.getName()),
-            timerNode.getId(),
+            LogicObjectImpl::Serialize(timerNode, builder),
             PropertyImpl::Serialize(*timerNode.getInputs()->m_impl, builder, serializationMap),
             PropertyImpl::Serialize(*timerNode.getOutputs()->m_impl, builder, serializationMap)
         );
+
+        // 4. Restore values
+        timerNode.getOutputs()->getChild(0u)->m_impl->setValue(outTickerTmp);
+
+        return timerNodeOffset;
     }
 
     std::unique_ptr<TimerNodeImpl> TimerNodeImpl::Deserialize(
@@ -101,25 +89,28 @@ namespace rlogic::internal
         ErrorReporting& errorReporting,
         DeserializationMap& deserializationMap)
     {
-        if (!timerNodeFB.name() || timerNodeFB.id() == 0u || !timerNodeFB.rootInput() || !timerNodeFB.rootOutput())
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(timerNodeFB.base(), name, id, userIdHigh, userIdLow, errorReporting) || !timerNodeFB.rootInput() || !timerNodeFB.rootOutput())
         {
-            errorReporting.add("Fatal error during loading of TimerNode from serialized data: missing name, id or in/out property data!", nullptr);
+            errorReporting.add("Fatal error during loading of TimerNode from serialized data: missing name, id or in/out property data!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        const auto name = timerNodeFB.name()->string_view();
-        auto deserialized = std::make_unique<TimerNodeImpl>(name, timerNodeFB.id());
+        auto deserialized = std::make_unique<TimerNodeImpl>(name, id);
+        deserialized->setUserId(userIdHigh, userIdLow);
 
         // deserialize and overwrite constructor generated properties
         auto rootInProperty = PropertyImpl::Deserialize(*timerNodeFB.rootInput(), EPropertySemantics::ScriptInput, errorReporting, deserializationMap);
         auto rootOutProperty = PropertyImpl::Deserialize(*timerNodeFB.rootOutput(), EPropertySemantics::ScriptOutput, errorReporting, deserializationMap);
         if (rootInProperty->getChildCount() != 1u ||
-            rootOutProperty->getChildCount() != 2u ||
+            rootOutProperty->getChildCount() != 1u ||
             !rootInProperty->getChild(0u) || rootInProperty->getChild(0u)->getName() != "ticker_us" ||
-            !rootOutProperty->getChild(0u) || rootOutProperty->getChild(0u)->getName() != "timeDelta" ||
-            !rootOutProperty->getChild(1u) || rootOutProperty->getChild(1u)->getName() != "ticker_us")
+            !rootOutProperty->getChild(0u) || rootOutProperty->getChild(0u)->getName() != "ticker_us")
         {
-            errorReporting.add(fmt::format("Fatal error during loading of TimerNode '{}': missing or invalid properties!", name), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of TimerNode '{}': missing or invalid properties!", name), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
         deserialized->setRootProperties(std::make_unique<Property>(std::move(rootInProperty)), std::make_unique<Property>(std::move(rootOutProperty)));

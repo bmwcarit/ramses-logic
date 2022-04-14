@@ -14,7 +14,7 @@
 
 namespace rlogic::internal
 {
-    struct ArrayTypeInfo;
+    struct InterfaceTypeInfo;
 
     class PropertyTypeExtractor
     {
@@ -33,11 +33,10 @@ namespace rlogic::internal
         // Lua overloads
         [[nodiscard]] std::reference_wrapper<PropertyTypeExtractor> index(const sol::object& propertyIndex);
         void newIndex(const sol::object& idx, const sol::object& value);
-        [[nodiscard]] static sol::object CreateArray(sol::this_state state, const sol::object& size, std::optional<sol::object> arrayType);
 
-        // Register symbols for type extraction to sol environment
-        static void RegisterTypes(sol::environment& environment);
-        static void UnregisterTypes(sol::environment& environment, bool keepTypeConstants = false);
+        // Register symbols for type extraction to sol protected environment
+        static void RegisterTypes(sol::table& environment);
+        static void UnregisterTypes(sol::table& environment);
 
     private:
         TypeData m_typeData;
@@ -48,5 +47,6 @@ namespace rlogic::internal
 
         ChildProperties::iterator findChild(const std::string_view name);
         void extractPropertiesFromTable(const sol::lua_table& table);
+        void addField(const std::string& name, const InterfaceTypeInfo& typeInfo);
     };
 }

@@ -16,7 +16,6 @@
 #include "internals/WrappedLuaProperty.h"
 #include "internals/SolHelper.h"
 #include "internals/ErrorReporting.h"
-#include "internals/FileFormatVersions.h"
 #include "internals/PropertyTypeExtractor.h"
 #include "internals/EnvironmentProtection.h"
 
@@ -36,12 +35,6 @@ namespace rlogic::internal
         , m_stdModules(std::move(compiledScript.source.stdModules))
     {
         setRootProperties(std::move(compiledScript.rootInput), std::move(compiledScript.rootOutput));
-
-        sol::environment env = sol::get_environment(m_runFunction);
-        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
-
-        internalEnv["IN"] = std::ref(m_wrappedRootInput);
-        internalEnv["OUT"] = std::ref(m_wrappedRootOutput);
     }
 
     void LuaScriptImpl::createRootProperties()
@@ -61,7 +54,7 @@ namespace rlogic::internal
             userModules.push_back(
                 rlogic_serialization::CreateLuaModuleUsage(builder,
                     builder.CreateString(module.first),
-                    serializationMap.resolveLuaModuleOffset(*module.second)));
+                    module.second->getId()));
         }
 
         std::vector<uint8_t> stdModules;
@@ -72,8 +65,7 @@ namespace rlogic::internal
         }
 
         auto script = rlogic_serialization::CreateLuaScript(builder,
-            builder.CreateString(luaScript.getName()),
-            luaScript.getId(),
+            LogicObjectImpl::Serialize(luaScript, builder),
             builder.CreateString(luaScript.m_source),
             builder.CreateVector(userModules),
             builder.CreateVector(stdModules),
@@ -91,31 +83,26 @@ namespace rlogic::internal
         ErrorReporting& errorReporting,
         DeserializationMap& deserializationMap)
     {
-        if (luaScript.id() == 0u)
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(luaScript.base(), name, id, userIdHigh, userIdLow, errorReporting))
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing id!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing name and/or ID!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-
-        // TODO Violin make optional - no need to always serialize string if not used
-        if (!luaScript.name())
-        {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing name!", nullptr);
-            return nullptr;
-        }
-
-        const std::string_view name = luaScript.name()->string_view();
 
         if (!luaScript.luaSourceCode())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
         std::string sourceCode = luaScript.luaSourceCode()->str();
 
         if (!luaScript.rootInput())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root input!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root input!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -127,7 +114,7 @@ namespace rlogic::internal
 
         if (!luaScript.rootOutput())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root output!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing root output!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -137,15 +124,15 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        if (rootInput->getName() != "IN" || rootInput->getType() != EPropertyType::Struct)
+        if (rootInput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root input has unexpected name or type!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root input has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        if (rootOutput->getName() != "OUT" || rootOutput->getType() != EPropertyType::Struct)
+        if (rootOutput->getType() != EPropertyType::Struct)
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root output has unexpected name or type!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: root output has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -154,31 +141,38 @@ namespace rlogic::internal
         if (!load_result.valid())
         {
             sol::error error = load_result;
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed parsing Lua source code:\n{}", name, error.what()), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed parsing Lua source code:\n{}", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!luaScript.userModules())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing user module dependencies!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing user module dependencies!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
         ModuleMapping userModules;
         userModules.reserve(luaScript.userModules()->size());
         for (const auto* module : *luaScript.userModules())
         {
-            if (!module->name() || !module->module_())
+            if (!module->name())
             {
-                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: missing name or module!", name), nullptr);
+                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: missing name!", name), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
-            const LuaModule& moduleUsed = deserializationMap.resolveLuaModule(*module->module_());
-            userModules.emplace(module->name()->str(), &moduleUsed);
+            const LuaModule* moduleUsed = deserializationMap.resolveLuaModule(module->moduleId());
+
+            if (!moduleUsed)
+            {
+                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: could not resolve dependent module with id={}!", name, module->moduleId()), nullptr, EErrorType::BinaryVersionMismatch);
+                return nullptr;
+            }
+
+            userModules.emplace(module->name()->str(), moduleUsed);
         }
 
         if (!luaScript.standardModules())
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing standard module dependencies!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing standard module dependencies!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
         StandardModules stdModules;
@@ -201,7 +195,7 @@ namespace rlogic::internal
         if (!main_result.valid())
         {
             sol::error error = main_result;
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed executing script:\n{}!", name, error.what()), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed executing script:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -211,18 +205,18 @@ namespace rlogic::internal
         if (init.valid())
         {
             // in order to support interface definitions in globals we need to register the symbols for init section
-            PropertyTypeExtractor::RegisterTypes(env);
+            PropertyTypeExtractor::RegisterTypes(internalEnv);
             sol::protected_function_result initResult {};
             {
                 ScopedEnvironmentProtection p(env, EEnvProtectionFlag::InitFunction);
                 initResult = init();
             }
-            PropertyTypeExtractor::UnregisterTypes(env);
+            PropertyTypeExtractor::UnregisterTypes(internalEnv);
 
             if (!initResult.valid())
             {
                 sol::error error = initResult;
-                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed initializing script:\n{}!", name, error.what()), nullptr);
+                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed initializing script:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
         }
@@ -231,7 +225,7 @@ namespace rlogic::internal
 
         if (!run.valid())
         {
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: scripts contains no run() function!", name), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: scripts contains no run() function!", name), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -240,7 +234,7 @@ namespace rlogic::internal
 
         EnvironmentProtection::SetEnvironmentProtectionLevel(env, EEnvProtectionFlag::RunFunction);
 
-        return std::make_unique<LuaScriptImpl>(
+        auto deserialized = std::make_unique<LuaScriptImpl>(
             LuaCompiledScript{
                 LuaSource{
                     std::move(sourceCode),
@@ -252,12 +246,16 @@ namespace rlogic::internal
                 std::move(inputs),
                 std::move(outputs)
             },
-            name, luaScript.id());
+            name, id);
+
+        deserialized->setUserId(userIdHigh, userIdLow);
+
+        return deserialized;
     }
 
     std::optional<LogicNodeRuntimeError> LuaScriptImpl::update()
     {
-        sol::protected_function_result result = m_runFunction();
+        sol::protected_function_result result = m_runFunction(std::ref(m_wrappedRootInput), std::ref(m_wrappedRootOutput));
 
         if (!result.valid())
         {

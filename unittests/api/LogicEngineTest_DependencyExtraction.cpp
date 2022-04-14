@@ -38,10 +38,10 @@ namespace rlogic
     {
         constexpr std::string_view src = R"(
                 modules("foo", "bar")
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -52,10 +52,10 @@ namespace rlogic
     TEST_F(ALogicEngine_DependencyExtraction, extractsEmptyModulesIfModulesNotSpecifiedInSource)
     {
         constexpr std::string_view src = R"(
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -67,10 +67,10 @@ namespace rlogic
     {
         constexpr std::string_view src = R"(
                 modules()
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -82,10 +82,10 @@ namespace rlogic
     {
         constexpr std::string_view src = R"(
                 modules("foo", 5, "bar")
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -97,10 +97,10 @@ namespace rlogic
     {
         constexpr std::string_view src = R"(
                 modules("foo",
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -115,10 +115,10 @@ namespace rlogic
 
                 foo.bla(bar.bla)  -- ILLEGAL
 
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -133,10 +133,10 @@ namespace rlogic
 
                 modules("foo", "bar")  -- modules should be declared before code
 
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
             )";
@@ -156,11 +156,11 @@ namespace rlogic
     {
         constexpr std::string_view src = R"(
                 modules("foo", "bar")
-                function interface()
-                    bla.bla = INT
+                function interface(IN,OUT)
+                    bla.bla = Type:Int32()
                 end
                 modules("foo2", "bar2")
-                function run()
+                function run(IN,OUT)
                     bla.bla = bla
                 end
                 modules("foo3", "bar3")

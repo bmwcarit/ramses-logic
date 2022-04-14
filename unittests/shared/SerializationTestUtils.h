@@ -9,6 +9,7 @@
 #pragma once
 
 #include "generated/LuaScriptGen.h"
+#include "generated/LuaInterfaceGen.h"
 #include "generated/PropertyGen.h"
 
 namespace rlogic::internal
@@ -62,16 +63,26 @@ namespace rlogic::internal
         {
             return rlogic_serialization::CreateLuaScript(
                 m_builder,
-                0, // no name -> causes errors
-                1u
+                0 // no base -> causes errors
+            );
+        }
+
+        flatbuffers::Offset<rlogic_serialization::LuaInterface> serializeTestInterfaceWithError()
+        {
+            return rlogic_serialization::CreateLuaInterface(
+                m_builder,
+                rlogic_serialization::CreateLogicObject(m_builder,
+                    m_builder.CreateString(""), // empty name -> causes errors
+                    1u)
             );
         }
 
         flatbuffers::Offset<rlogic_serialization::LuaModule> serializeTestModule(bool withError = false)
         {
             return rlogic_serialization::CreateLuaModule(m_builder,
-                withError ? 0 : m_builder.CreateString("moduleName"),
-                1u,
+                rlogic_serialization::CreateLogicObject(m_builder,
+                    withError ? 0 : m_builder.CreateString("moduleName"),
+                    1u),
                 m_builder.CreateString("{}"),
                 m_builder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_builder.CreateVector(std::vector<uint8_t>{})

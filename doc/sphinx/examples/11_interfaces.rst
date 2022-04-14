@@ -1,6 +1,6 @@
 ..
     -------------------------------------------------------------------------
-    Copyright (C) 2020 BMW AG
+    Copyright (C) 2022 BMW AG
     -------------------------------------------------------------------------
     This Source Code Form is subject to the terms of the Mozilla Public
     License, v. 2.0. If a copy of the MPL was not distributed with this
@@ -11,9 +11,9 @@
 .. highlight:: cpp
 
 ================================
-Animation example
+Interfaces example
 ================================
 
-.. literalinclude:: ../../../examples/08_animation/main.cpp
-    :start-after: #include <vector>
+.. literalinclude:: ../../../examples/11_interfaces/main.cpp
+    :start-after: #include <cassert>
     :end-before: return 0;

@@ -87,6 +87,11 @@ namespace rlogic
         return m_impl->createLuaScript(source, *config.m_impl, scriptName);
     }
 
+    LuaInterface* LogicEngine::createLuaInterface(std::string_view source, std::string_view interfaceName)
+    {
+        return m_impl->createLuaInterface(source, interfaceName);
+    }
+
     LuaModule* LogicEngine::createLuaModule(std::string_view source, const LuaConfig& config, std::string_view moduleName)
     {
         return m_impl->createLuaModule(source, *config.m_impl, moduleName);
@@ -137,6 +142,11 @@ namespace rlogic
     const std::vector<ErrorData>& LogicEngine::getErrors() const
     {
         return m_impl->getErrors();
+    }
+
+    const std::vector<WarningData>& LogicEngine::validate() const
+    {
+        return m_impl->validate();
     }
 
     bool LogicEngine::update()

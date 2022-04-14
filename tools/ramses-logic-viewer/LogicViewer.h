@@ -12,6 +12,7 @@
 #include "UpdateReportSummary.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LogicEngine.h"
+#include "Result.h"
 #include <string>
 #include <chrono>
 
@@ -45,29 +46,6 @@ namespace rlogic
         static const char* const ltnViewInputs;
         static const char* const ltnViewName;
         static const char* const ltnViewDescription;
-
-        class Result
-        {
-        public:
-            Result() = default;
-
-            explicit Result(std::string msg)
-                : m_message(std::move(msg))
-            {
-            }
-
-            [[nodiscard]] bool ok() const
-            {
-                return m_message.empty();
-            }
-
-            [[nodiscard]] const std::string& getMessage() const
-            {
-                return m_message;
-            }
-        private:
-            std::string m_message;
-        };
 
         class View
         {
@@ -190,7 +168,7 @@ namespace rlogic
         return m_logicFilename;
     }
 
-    inline const LogicViewer::Result& LogicViewer::getLastResult() const
+    inline const Result& LogicViewer::getLastResult() const
     {
         return m_result;
     }

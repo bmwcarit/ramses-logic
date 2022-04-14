@@ -19,7 +19,7 @@ namespace rlogic::internal
     public:
 
         void clear();
-        void add(std::string errorMessage, const LogicObject* logicObject);
+        void add(std::string errorMessage, const LogicObject* logicObject, EErrorType type);
 
         [[nodiscard]] const std::vector<rlogic::ErrorData>& getErrors() const;
 

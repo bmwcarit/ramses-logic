@@ -72,9 +72,9 @@ namespace rlogic::internal
             ExpectArrayDataProperty(*keyframesProp, keyframes);
         }
 
-        void advanceAnimationAndExpectValues(AnimationNode& animNode, float timeDelta, float expectedValue)
+        void advanceAnimationAndExpectValues(AnimationNode& animNode, float progress, float expectedValue)
         {
-            EXPECT_TRUE(animNode.getInputs()->getChild("timeDelta")->set(timeDelta));
+            EXPECT_TRUE(animNode.getInputs()->getChild("progress")->set(progress));
             EXPECT_TRUE(m_logicEngine.update());
             const auto val = *animNode.getOutputs()->getChild("channel")->get<float>();
             EXPECT_FLOAT_EQ(expectedValue, val);
@@ -92,9 +92,9 @@ namespace rlogic::internal
         const auto animNode = createAnimationNodeWithDataProperties({ channel1, channel2 }, "animNode");
 
         const auto rootIn = animNode->getInputs();
-        EXPECT_EQ("IN", rootIn->getName());
-        ASSERT_EQ(6u, rootIn->getChildCount());
-        const auto channelsData = rootIn->getChild(5u);
+        EXPECT_EQ("", rootIn->getName());
+        ASSERT_EQ(2u, rootIn->getChildCount());
+        const auto channelsData = rootIn->getChild(1u);
         EXPECT_EQ("channelsData", channelsData->getName());
         EXPECT_EQ(EPropertyType::Struct, channelsData->getType());
 
@@ -113,59 +113,54 @@ namespace rlogic::internal
     {
         const auto animNode = createAnimationNodeWithDataProperties({ { "channel", m_dataFloat1, m_dataFloat2, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         // keyframes (0/0, 1/10, 2/20)
         advanceAnimationAndExpectValues(*animNode, 0.0f, 0.f);
-        advanceAnimationAndExpectValues(*animNode, 0.1f, 1.f); // time 0.1
-        advanceAnimationAndExpectValues(*animNode, 0.4f, 5.f); // time 0.5
+        advanceAnimationAndExpectValues(*animNode, 0.05f, 1.f); // time 0.1
+        advanceAnimationAndExpectValues(*animNode, 0.25f, 5.f); // time 0.5
 
         // modify 2nd keyframe -> keyframes (0/0, 1/30, 2/20)
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(1u)->set(30.f);
         // will jump to newly interpolated value
-        advanceAnimationAndExpectValues(*animNode, 0.0f, 15.f); // time 0.5
+        advanceAnimationAndExpectValues(*animNode, 0.25f, 15.f); // time 0.5
         // arrive to 2nd keyframe with new value
         advanceAnimationAndExpectValues(*animNode, 0.5f, 30.f); // time 1.0
 
         // modify 2nd keyframe again -> keyframes (0/0, 1/100, 2/20)
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(1u)->set(100.f);
         // jump to new value right after update, no time change applied
-        advanceAnimationAndExpectValues(*animNode, 0.f, 100.f); // time 1.0
+        advanceAnimationAndExpectValues(*animNode, 0.5f, 100.f); // time 1.0
 
         // modify 1st keyframe -> keyframes (0/-1000, 1/100, 2/20)
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(0u)->set(-1000.f);
         // has no effect as we are pass that keyframe
-        advanceAnimationAndExpectValues(*animNode, 0.f, 100.f); // time 1.0
+        advanceAnimationAndExpectValues(*animNode, 0.5f, 100.f); // time 1.0
 
         // modify last keyframe -> keyframes (0/-1000, 1/100, 2/200)
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(2u)->set(200.f);
         // has no effect yet we are at 2nd keyframe
-        advanceAnimationAndExpectValues(*animNode, 0.f, 100.f); // time 1.0
-        // last keyframe with new value in effect when progressing
-        advanceAnimationAndExpectValues(*animNode, 0.5f, 150.f); // time 1.5
-        advanceAnimationAndExpectValues(*animNode, 0.5f, 200.f); // time 2.0
-
-        // now loop and test all the new values (0/-1000, 1/100, 2/200)
-        animNode->getInputs()->getChild("loop")->set(true);
-        advanceAnimationAndExpectValues(*animNode, 0.0f, -1000.f); // time 0.0
-        advanceAnimationAndExpectValues(*animNode, 0.5f, -450.f); // time 0.5
         advanceAnimationAndExpectValues(*animNode, 0.5f, 100.f); // time 1.0
-        advanceAnimationAndExpectValues(*animNode, 0.5f, 150.f); // time 1.5
-        advanceAnimationAndExpectValues(*animNode, 0.5f, -1000.f); // loops back to time 0.0
+        // last keyframe with new value in effect when progressing
+        advanceAnimationAndExpectValues(*animNode, 0.75f, 150.f); // time 1.5
+        advanceAnimationAndExpectValues(*animNode, 1.f, 200.f); // time 2.0
+
+        // now jump around and test all the new values (0/-1000, 1/100, 2/200)
+        advanceAnimationAndExpectValues(*animNode, 0.0f, -1000.f); // time 0.0
+        advanceAnimationAndExpectValues(*animNode, 1.0f, 200.f); // time 2.0
+        advanceAnimationAndExpectValues(*animNode, 0.25f, -450.f); // time 0.5
+        advanceAnimationAndExpectValues(*animNode, 0.75f, 150.f); // time 1.5
+        advanceAnimationAndExpectValues(*animNode, 0.5f, 100.f); // time 1.0
     }
 
     TEST_F(AnAnimationNodeWithDataProperties, AnimatesToNewKeyframeSmoothlyByModifyingBothKeyframesAndTimestamps)
     {
         const auto animNode = createAnimationNodeWithDataProperties({ { "channel", m_dataFloat1, m_dataFloat2, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         // keyframes (0/0, 1/10, 2/20)
         // for simplicity test will move only between 2 keys in the [1/10, 2/20] range
-        advanceAnimationAndExpectValues(*animNode, 1.0f, 10.f);
+        advanceAnimationAndExpectValues(*animNode, 0.5f, 10.f); // time 1.0
 
         // progress towards 20
-        advanceAnimationAndExpectValues(*animNode, 0.2f, 12.f); // time 1.2
+        advanceAnimationAndExpectValues(*animNode, 0.6f, 12.f); // time 1.2
 
         // new value target 1000
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(2u)->set(1000.f);
@@ -176,11 +171,11 @@ namespace rlogic::internal
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("timestamps")->getChild(1u)->set(currTime);
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(1u)->set(currValue);
         // we modified both previous and next keyframes plus previous timestamp, update with no progress will give same value as before
-        advanceAnimationAndExpectValues(*animNode, 0.0f, currValue); // time 1.2
+        advanceAnimationAndExpectValues(*animNode, 0.6f, currValue); // time 1.2
         // now progress to new target 1000
-        advanceAnimationAndExpectValues(*animNode, 0.05f, 73.749947f); // time 1.25
-        advanceAnimationAndExpectValues(*animNode, 0.05f, 135.49989f); // time 1.3
-        advanceAnimationAndExpectValues(*animNode, 0.1f, 259.f); // time 1.4
+        advanceAnimationAndExpectValues(*animNode, 0.625f, 73.749947f); // time 1.25
+        advanceAnimationAndExpectValues(*animNode, 0.65f, 135.49989f); // time 1.3
+        advanceAnimationAndExpectValues(*animNode, 0.7f, 259.f); // time 1.4
 
         // repeat the same again in the middle of ongoing animation -> new value target -1000
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(2u)->set(-1000.f);
@@ -188,39 +183,37 @@ namespace rlogic::internal
         const float currValue2 = 259.f;
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("timestamps")->getChild(1u)->set(currTime2);
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(1u)->set(currValue2);
-        advanceAnimationAndExpectValues(*animNode, 0.0f, currValue2); // time 1.4
+        advanceAnimationAndExpectValues(*animNode, 0.7f, currValue2); // time 1.4
         // now progress to new target -1000
-        advanceAnimationAndExpectValues(*animNode, 0.1f, 49.166626f); // time 1.5
-        advanceAnimationAndExpectValues(*animNode, 0.1f, -160.66675f); // time 1.6
-        advanceAnimationAndExpectValues(*animNode, 0.2f, -580.3335f); // time 1.8
-        advanceAnimationAndExpectValues(*animNode, 0.2f, -1000.f); // time 2.0
+        advanceAnimationAndExpectValues(*animNode, 0.75f, 49.166626f); // time 1.5
+        advanceAnimationAndExpectValues(*animNode, 0.8f, -160.66675f); // time 1.6
+        advanceAnimationAndExpectValues(*animNode, 0.9f, -580.3335f); // time 1.8
+        advanceAnimationAndExpectValues(*animNode, 1.0f, -1000.f); // time 2.0
     }
 
     TEST_F(AnAnimationNodeWithDataProperties, ModifyingLastTimestampExtendsWholeAnimation)
     {
         const auto animNode = createAnimationNodeWithDataProperties({ { "channel", m_dataFloat1, m_dataFloat2, EInterpolationType::Linear } });
 
-        animNode->getInputs()->getChild("play")->set(true);
-
         // keyframes (0/0, 1/10, 2/20)
         // jump right at the end
-        advanceAnimationAndExpectValues(*animNode, 2.0f, 20.f); // time 2
+        advanceAnimationAndExpectValues(*animNode, 1.0f, 20.f); // time 2
 
         // modify last timestamp and keyframe to extend animation -> keyframes (0/0, 1/10, 50/1000)
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("timestamps")->getChild(2u)->set(50.f);
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(2u)->set(1000.f);
         // will jump to newly interpolated value because animation progress is suddenly before its last keyframe
-        advanceAnimationAndExpectValues(*animNode, 0.0f, 30.204081f); // time 2
-        advanceAnimationAndExpectValues(*animNode, 48.f, 1000.f); // time 50
-        EXPECT_FLOAT_EQ(50.f, animNode->getDuration());
+        advanceAnimationAndExpectValues(*animNode, 0.04f, 30.204081f); // time 2
+        advanceAnimationAndExpectValues(*animNode, 1.f, 1000.f); // time 50
+        EXPECT_FLOAT_EQ(50.f, *animNode->getOutputs()->getChild("duration")->get<float>());
 
         // extend again -> keyframes (0/0, 1/10, 100/2000)
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("timestamps")->getChild(2u)->set(100.f);
         animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(2u)->set(2000.f);
         // will jump to newly interpolated value because animation progress is suddenly before its last keyframe
-        advanceAnimationAndExpectValues(*animNode, 0.0f, 994.94946f); // time 50
-        advanceAnimationAndExpectValues(*animNode, 50.f, 2000.f); // time 100
-        EXPECT_FLOAT_EQ(100.f, animNode->getDuration());
+        advanceAnimationAndExpectValues(*animNode, 0.5f, 994.94946f); // time 50
+        advanceAnimationAndExpectValues(*animNode, 1.f, 2000.f); // time 100
+        EXPECT_FLOAT_EQ(100.f, *animNode->getOutputs()->getChild("duration")->get<float>());
     }
 
     TEST_F(AnAnimationNodeWithDataProperties, ModifyingKeyframeNorTimestampDoesNotAffectChannelDataRetrievedViaGetter)
@@ -268,12 +261,12 @@ namespace rlogic::internal
         ASSERT_TRUE(data1 && data2 && animNode);
 
         EXPECT_EQ("animNode", animNode->getName());
-        EXPECT_FLOAT_EQ(20.f, animNode->getDuration());
+        EXPECT_FLOAT_EQ(20.f, *animNode->getOutputs()->getChild("duration")->get<float>());
 
         const auto rootIn = animNode->getInputs();
-        EXPECT_EQ("IN", rootIn->getName());
-        ASSERT_EQ(6u, rootIn->getChildCount());
-        const auto channelsData = rootIn->getChild(5u);
+        EXPECT_EQ("", rootIn->getName());
+        ASSERT_EQ(2u, rootIn->getChildCount());
+        const auto channelsData = rootIn->getChild(1u);
         EXPECT_EQ("channelsData", channelsData->getName());
         EXPECT_EQ(EPropertyType::Struct, channelsData->getType());
 
@@ -314,6 +307,7 @@ namespace rlogic::internal
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("logic_animNodes.bin"));
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
+        EXPECT_TRUE(m_logicEngine.update());
 
         const auto data1 = m_logicEngine.findByName<DataArray>("data1");
         const auto data2 = m_logicEngine.findByName<DataArray>("data2");
@@ -321,12 +315,12 @@ namespace rlogic::internal
         ASSERT_TRUE(data1 && data2 && animNode);
 
         EXPECT_EQ("animNode", animNode->getName());
-        EXPECT_FLOAT_EQ(2.f, animNode->getDuration());
+        EXPECT_FLOAT_EQ(2.f, *animNode->getOutputs()->getChild("duration")->get<float>());
 
         const auto rootIn = animNode->getInputs();
-        EXPECT_EQ("IN", rootIn->getName());
-        ASSERT_EQ(6u, rootIn->getChildCount());
-        const auto channelsData = rootIn->getChild(5u);
+        EXPECT_EQ("", rootIn->getName());
+        ASSERT_EQ(2u, rootIn->getChildCount());
+        const auto channelsData = rootIn->getChild(1u);
         EXPECT_EQ("channelsData", channelsData->getName());
         EXPECT_EQ(EPropertyType::Struct, channelsData->getType());
 

@@ -23,10 +23,10 @@ int main()
      * Giving a name to the script helps identify the source of the issue
      */
     rlogic::LuaScript* faultyScript = logicEngine.createLuaScript(R"(
-        function interface()
+        function interface(IN,OUT)
             this.does.not.compile
         end
-        function run()
+        function run(IN,OUT)
         end
     )");
 

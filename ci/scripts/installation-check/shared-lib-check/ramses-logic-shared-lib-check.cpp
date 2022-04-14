@@ -20,12 +20,12 @@ int main()
     std::cout << "Start ramses-logic-shared-lib-check\n";
     rlogic::LogicEngine logicEngine;
     logicEngine.createLuaScript(R"(
-        function interface()
-            IN.int = INT
-            OUT.float = FLOAT
+        function interface(IN,OUT)
+            IN.int = Type:Int32()
+            OUT.float = Type:Float()
         end
 
-        function run()
+        function run(IN,OUT)
             OUT.float = IN.int + 0.5
         end
     )", {}, "aScript");

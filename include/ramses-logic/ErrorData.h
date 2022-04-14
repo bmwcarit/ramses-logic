@@ -15,6 +15,20 @@ namespace rlogic
     class LogicObject;
 
     /**
+     * #EErrorType helps distinguish between different types of errors in #rlogic::ErrorData
+     */
+    enum class EErrorType : int
+    {
+        BinaryDataAccessError,  ///< Error during attempts to read or write files, non-existing paths, or data corruption (truncation, bit flips etc)
+        BinaryVersionMismatch,  ///< The binary data was created with an incompatible version of the runtime(s) - either logic or ramses
+        ContentStateError,      ///< The logic engine content is in an invalid state
+        RuntimeError,           ///< There was an error during update(), e.g. a RamsesBinding failed to pass its values to Ramses, or Lua script's run() failed
+        IllegalArgument,        ///< A call to the Ramses Logic API with missing arguments or incorrect values provided by user code
+        LuaSyntaxError,         ///< Lua syntax error, e.g. when creating scripts from syntactically incorrect Lua source code
+        Other,                  ///< Error does not fit in any of the above clusters
+    };
+
+    /**
      * Holds information about an error which occured during #rlogic::LogicEngine API calls
      */
     struct ErrorData
@@ -26,7 +40,12 @@ namespace rlogic
         std::string message;
 
         /**
-         * The #rlogic::LogicObject which caused the error. Can be nullptr if the error was not originating from a specific object.
+         * Semantic type of the error
+        */
+        EErrorType type;
+
+        /**
+         * The #rlogic::LogicObject which caused the issue. Can be nullptr if the issue was not originating from a specific object.
          */
         const LogicObject* object;
     };

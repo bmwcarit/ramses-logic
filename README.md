@@ -1,7 +1,7 @@
 # Introduction
 
 
-[![build status](https://github.com/COVESA/ramses-logic/workflows/CMake/badge.svg?branch=master)](https://github.com/COVESA/ramses-logic/actions?query=branch%3Amaster) [![docs status](https://readthedocs.org/projects/ramses-logic/badge/?style=flat)](https://ramses-logic.readthedocs.io/en/latest/)
+[![build status](https://github.com/bmwcarit/ramses-logic/workflows/CMake/badge.svg?branch=master)](https://github.com/bmwcarit/ramses-logic/actions?query=branch%3Amaster) [![docs status](https://readthedocs.org/projects/ramses-logic/badge/?style=flat)](https://ramses-logic.readthedocs.io/en/latest/)
 
 `RAMSES logic` extends the [RAMSES rendering ecosystem](https://ramses-sdk.readthedocs.io/) with scripting support based on
 [Lua](https://github.com/lua/lua). `RAMSES` is designed to be minimalistic and closely aligned to OpenGL, which can be a
@@ -16,7 +16,7 @@ You can find the full documentation of `RAMSES logic` [here](https://ramses-logi
 Clone RAMSES logic along with its dependencies:
 
 ```bash
-$ git clone https://github.com/COVESA/ramses-logic <path>
+$ git clone https://github.com/bmwcarit/ramses-logic <path>
 $ cd <path>
 $ git submodule update --init --recursive
 ```
@@ -34,6 +34,7 @@ Prefer to learn by example? Have a look at our [self-contained example snippets]
 
 |Logic    | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
 |---------|-------------------------------|------------------------------------|------------------------------|
+|1.0.0    | 27.0.119                      | 27.0.102                           | >= 1.0.0                     |
 |0.15.0   | 27.0.116                      | 27.0.102                           | >= 0.15.0                    |
 |0.14.2   | 27.0.115                      | 27.0.102                           | >= 0.13.0                    |
 |0.14.1   | 27.0.114                      | 27.0.102                           | >= 0.13.0                    |
@@ -62,12 +63,14 @@ regarding Ramses and its dependencies.
 In addition to Ramses, the Ramses Logic Engine has following dependencies,
 listed alongside their licenses here:
 
+* Ramses (MPL 2.0)
 * Lua (MIT)
 * Sol (MIT)
 * Flatbuffers (Apache-2.0)
 * Fmtlib (MIT)
 * Googletest (BSD-3-Clause)
 * Google Benchmark (Apache-2.0)
+* ImGui (MIT)
 
 All of the above dependencies are referenced as Git submodules pointing to their original
 repository. Hence, no modifications are made by Ramses Logic.

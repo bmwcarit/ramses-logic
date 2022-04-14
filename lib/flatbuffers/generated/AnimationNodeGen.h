@@ -7,6 +7,7 @@
 #include "flatbuffers/flatbuffers.h"
 
 #include "DataArrayGen.h"
+#include "LogicObjectGen.h"
 #include "PropertyGen.h"
 
 namespace rlogic_serialization {
@@ -16,6 +17,10 @@ struct ChannelBuilder;
 
 struct AnimationNode;
 struct AnimationNodeBuilder;
+
+inline const flatbuffers::TypeTable *ChannelTypeTable();
+
+inline const flatbuffers::TypeTable *AnimationNodeTypeTable();
 
 enum class EInterpolationType : uint8_t {
   Step = 0,
@@ -59,6 +64,9 @@ inline const char *EnumNameEInterpolationType(EInterpolationType e) {
 struct Channel FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef ChannelBuilder Builder;
   struct Traits;
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return ChannelTypeTable();
+  }
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
     VT_NAME = 4,
     VT_TIMESTAMPS = 6,
@@ -181,19 +189,18 @@ inline flatbuffers::Offset<Channel> CreateChannelDirect(
 struct AnimationNode FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef AnimationNodeBuilder Builder;
   struct Traits;
-  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
-    VT_NAME = 4,
-    VT_ID = 6,
-    VT_CHANNELS = 8,
-    VT_CHANNELSASPROPERTIES = 10,
-    VT_ROOTINPUT = 12,
-    VT_ROOTOUTPUT = 14
-  };
-  const flatbuffers::String *name() const {
-    return GetPointer<const flatbuffers::String *>(VT_NAME);
+  static const flatbuffers::TypeTable *MiniReflectTypeTable() {
+    return AnimationNodeTypeTable();
   }
-  uint64_t id() const {
-    return GetField<uint64_t>(VT_ID, 0);
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_BASE = 4,
+    VT_CHANNELS = 6,
+    VT_CHANNELSASPROPERTIES = 8,
+    VT_ROOTINPUT = 10,
+    VT_ROOTOUTPUT = 12
+  };
+  const rlogic_serialization::LogicObject *base() const {
+    return GetPointer<const rlogic_serialization::LogicObject *>(VT_BASE);
   }
   const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>> *channels() const {
     return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>> *>(VT_CHANNELS);
@@ -209,9 +216,8 @@ struct AnimationNode FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
-           VerifyOffset(verifier, VT_NAME) &&
-           verifier.VerifyString(name()) &&
-           VerifyField<uint64_t>(verifier, VT_ID) &&
+           VerifyOffset(verifier, VT_BASE) &&
+           verifier.VerifyTable(base()) &&
            VerifyOffset(verifier, VT_CHANNELS) &&
            verifier.VerifyVector(channels()) &&
            verifier.VerifyVectorOfTables(channels()) &&
@@ -228,11 +234,8 @@ struct AnimationNodeBuilder {
   typedef AnimationNode Table;
   flatbuffers::FlatBufferBuilder &fbb_;
   flatbuffers::uoffset_t start_;
-  void add_name(flatbuffers::Offset<flatbuffers::String> name) {
-    fbb_.AddOffset(AnimationNode::VT_NAME, name);
-  }
-  void add_id(uint64_t id) {
-    fbb_.AddElement<uint64_t>(AnimationNode::VT_ID, id, 0);
+  void add_base(flatbuffers::Offset<rlogic_serialization::LogicObject> base) {
+    fbb_.AddOffset(AnimationNode::VT_BASE, base);
   }
   void add_channels(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>>> channels) {
     fbb_.AddOffset(AnimationNode::VT_CHANNELS, channels);
@@ -260,18 +263,16 @@ struct AnimationNodeBuilder {
 
 inline flatbuffers::Offset<AnimationNode> CreateAnimationNode(
     flatbuffers::FlatBufferBuilder &_fbb,
-    flatbuffers::Offset<flatbuffers::String> name = 0,
-    uint64_t id = 0,
+    flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::Channel>>> channels = 0,
     bool channelsAsProperties = false,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
   AnimationNodeBuilder builder_(_fbb);
-  builder_.add_id(id);
   builder_.add_rootOutput(rootOutput);
   builder_.add_rootInput(rootInput);
   builder_.add_channels(channels);
-  builder_.add_name(name);
+  builder_.add_base(base);
   builder_.add_channelsAsProperties(channelsAsProperties);
   return builder_.Finish();
 }
@@ -283,22 +284,96 @@ struct AnimationNode::Traits {
 
 inline flatbuffers::Offset<AnimationNode> CreateAnimationNodeDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
-    const char *name = nullptr,
-    uint64_t id = 0,
+    flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     const std::vector<flatbuffers::Offset<rlogic_serialization::Channel>> *channels = nullptr,
     bool channelsAsProperties = false,
     flatbuffers::Offset<rlogic_serialization::Property> rootInput = 0,
     flatbuffers::Offset<rlogic_serialization::Property> rootOutput = 0) {
-  auto name__ = name ? _fbb.CreateString(name) : 0;
   auto channels__ = channels ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::Channel>>(*channels) : 0;
   return rlogic_serialization::CreateAnimationNode(
       _fbb,
-      name__,
-      id,
+      base,
       channels__,
       channelsAsProperties,
       rootInput,
       rootOutput);
+}
+
+inline const flatbuffers::TypeTable *EInterpolationTypeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::EInterpolationTypeTypeTable
+  };
+  static const char * const names[] = {
+    "Step",
+    "Linear",
+    "Cubic",
+    "Linear_Quaternions",
+    "Cubic_Quaternions"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_ENUM, 5, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *ChannelTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_STRING, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 1 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 0, 0 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::DataArrayTypeTable,
+    rlogic_serialization::EInterpolationTypeTypeTable
+  };
+  static const char * const names[] = {
+    "name",
+    "timestamps",
+    "keyframes",
+    "interpolationType",
+    "tangentsIn",
+    "tangentsOut"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 6, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
+}
+
+inline const flatbuffers::TypeTable *AnimationNodeTypeTable() {
+  static const flatbuffers::TypeCode type_codes[] = {
+    { flatbuffers::ET_SEQUENCE, 0, 0 },
+    { flatbuffers::ET_SEQUENCE, 1, 1 },
+    { flatbuffers::ET_BOOL, 0, -1 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 },
+    { flatbuffers::ET_SEQUENCE, 0, 2 }
+  };
+  static const flatbuffers::TypeFunction type_refs[] = {
+    rlogic_serialization::LogicObjectTypeTable,
+    rlogic_serialization::ChannelTypeTable,
+    rlogic_serialization::PropertyTypeTable
+  };
+  static const char * const names[] = {
+    "base",
+    "channels",
+    "channelsAsProperties",
+    "rootInput",
+    "rootOutput"
+  };
+  static const flatbuffers::TypeTable tt = {
+    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, names
+  };
+  return &tt;
 }
 
 }  // namespace rlogic_serialization

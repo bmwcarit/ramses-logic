@@ -28,7 +28,7 @@ namespace rlogic::internal
     {
         if (PropertyTypeToEnum<T>::TYPE != m_dataType)
         {
-            LOG_ERROR("DataArray::getData failed, correct template that matches stored data type must be used.");
+            LOG_ERROR("DataArray::getData failed for '{}', correct template that matches stored data type must be used.", getIdentificationString());
             return nullptr;
         }
 
@@ -120,8 +120,7 @@ namespace rlogic::internal
 
         auto animDataFB = rlogic_serialization::CreateDataArray(
             builder,
-            builder.CreateString(data.getName()),
-            data.getId(),
+            LogicObjectImpl::Serialize(data, builder),
             arrayType,
             unionType,
             dataOffset
@@ -135,14 +134,14 @@ namespace rlogic::internal
     {
         if (!data.data_as<fbArrayT>() || !data.data_as<fbArrayT>()->data())
         {
-            errorReporting.add("Fatal error during loading of DataArray from serialized data: unexpected data type!", nullptr);
+            errorReporting.add("Fatal error during loading of DataArray from serialized data: unexpected data type!", nullptr, EErrorType::BinaryVersionMismatch);
             return false;
         }
         const auto fbVec = data.data_as<fbArrayT>()->data();
         static_assert(std::is_arithmetic_v<fbT>, "wrong base type used");
         if (fbVec->size() % getNumElements<T>() != 0)
         {
-            errorReporting.add("Fatal error during loading of DataArray from serialized data: unexpected data size!", nullptr);
+            errorReporting.add("Fatal error during loading of DataArray from serialized data: unexpected data size!", nullptr, EErrorType::BinaryVersionMismatch);
             return false;
         }
 
@@ -163,20 +162,17 @@ namespace rlogic::internal
 
     std::unique_ptr<DataArrayImpl> DataArrayImpl::Deserialize(const rlogic_serialization::DataArray& data, ErrorReporting& errorReporting)
     {
-        if (data.id() == 0u)
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(data.base(), name, id, userIdHigh, userIdLow, errorReporting))
         {
-            errorReporting.add("Fatal error during loading of DataArray from serialized data: missing id!", nullptr);
+            errorReporting.add("Fatal error during loading of DataArray from serialized data: missing name and/or ID!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        if (!data.name())
-        {
-            errorReporting.add("Fatal error during loading of DataArray from serialized data: missing name!", nullptr);
-            return nullptr;
-        }
-
-        const auto name = data.name()->string_view();
-
+        std::unique_ptr<DataArrayImpl> deserialized;
         switch (data.type())
         {
         case rlogic_serialization::EDataArrayType::Float:
@@ -185,28 +181,31 @@ namespace rlogic::internal
                 return nullptr;
             const auto& fbData = *data.data_as<rlogic_serialization::floatArr>()->data();
             auto dataVec = std::vector<float>{ fbData.cbegin(), fbData.cend() };
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         case rlogic_serialization::EDataArrayType::Vec2f:
         {
             if (!checkFlatbufferVectorValidity<vec2f, float, rlogic_serialization::floatArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec2f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
         }
         case rlogic_serialization::EDataArrayType::Vec3f:
         {
             if (!checkFlatbufferVectorValidity<vec3f, float, rlogic_serialization::floatArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec3f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         case rlogic_serialization::EDataArrayType::Vec4f:
         {
             if (!checkFlatbufferVectorValidity<vec4f, float, rlogic_serialization::floatArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec4f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         case rlogic_serialization::EDataArrayType::Int32:
         {
@@ -214,33 +213,41 @@ namespace rlogic::internal
                 return nullptr;
             const auto& fbData = *data.data_as<rlogic_serialization::intArr>()->data();
             auto dataVec = std::vector<int32_t>{ fbData.cbegin(), fbData.cend() };
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         case rlogic_serialization::EDataArrayType::Vec2i:
         {
             if (!checkFlatbufferVectorValidity<vec2i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec2i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         case rlogic_serialization::EDataArrayType::Vec3i:
         {
             if (!checkFlatbufferVectorValidity<vec3i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec3i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         case rlogic_serialization::EDataArrayType::Vec4i:
         {
             if (!checkFlatbufferVectorValidity<vec4i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
                 return nullptr;
             auto dataVec = unflattenIntoArrayOfVec<vec4i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
-            return std::make_unique<DataArrayImpl>(std::move(dataVec), name, data.id());
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
         }
         default:
-            errorReporting.add(fmt::format("Fatal error during loading of DataArray from serialized data: unsupported or corrupt data type '{}'!", data.type()), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of DataArray from serialized data: unsupported or corrupt data type '{}'!", data.type()), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
+
+        deserialized->setUserId(userIdHigh, userIdLow);
+
+        return deserialized;
     }
 
     size_t DataArrayImpl::getNumElements() const

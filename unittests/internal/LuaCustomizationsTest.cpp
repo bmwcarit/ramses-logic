@@ -186,7 +186,7 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
             assert(rl_len(S) == 0)
-            S.newField = INT
+            S.newField = Type:Int32()
             assert(rl_len(S) == 1)
         )");
     }
@@ -195,9 +195,9 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
-            S.array1 = ARRAY(3, FLOAT)
+            S.array1 = Type:Array(3, Type:Float())
             assert(rl_len(S.array1) == 3)
-            S.array2 = ARRAY(2, {a = INT, b = FLOAT})
+            S.array2 = Type:Array(2, {a = Type:Int32(), b = Type:Float()})
             assert(rl_len(S.array2) == 2)
         )");
     }
@@ -220,21 +220,21 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.v = INT32
+            S.v = Type:Int32()
             print(rl_len(S.v))
-        )", "rl_len() called on an unsupported type 'INT32'");
+        )", "rl_len() called on an unsupported type 'Int32'");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.vec = VEC2I
+            S.vec = Type:Vec2i()
             print(rl_len(S.vec))
-        )", "rl_len() called on an unsupported type 'VEC2I'");
+        )", "rl_len() called on an unsupported type 'Vec2i'");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.s = STRING
+            S.s = Type:String()
             print(rl_len(S.s))
-        )", "rl_len() called on an unsupported type 'STRING'");
+        )", "rl_len() called on an unsupported type 'String'");
     }
 
     class TheLuaCustomizations_Next : public TheLuaCustomizations
@@ -261,15 +261,13 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
-            S.field1 = INT
-            S.field2 = FLOAT
+            S.field1 = Type:Int32()
+            S.field2 = Type:Float()
 
             k,v = rl_next(S)
             assert(k == 'field1')
-            assert(v == INT)
             k,v = rl_next(S, 'field1')
             assert(k == 'field2')
-            assert(v == FLOAT)
             k,v = rl_next(S, 'field2')
             assert(k == nil)
             assert(v == nil)
@@ -280,14 +278,12 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
-            S.array1 = ARRAY(2, FLOAT)
+            S.array1 = Type:Array(2, Type:Float())
 
             k,v = rl_next(S.array1)
             assert(k == 1)
-            assert(v == FLOAT)
             k,v = rl_next(S.array1, 1)
             assert(k == 2)
-            assert(v == FLOAT)
             k,v = rl_next(S.array1, 2)
             assert(k == nil)
             assert(v == nil)
@@ -468,7 +464,7 @@ namespace rlogic::internal
     TEST_F(TheLuaCustomizations_Next, ReportsErrorsWhenBadArrayIndexGiven_DuringInterfaceExtraction)
     {
         createTestStruct("S", EWrappedType::Extractor);
-        expectNoErrors_WithEnv("S.array = ARRAY(2, FLOAT)");
+        expectNoErrors_WithEnv("S.array = Type:Array(2, Type:Float())");
 
         expectError_WithEnv("rl_next(S.array, 0)", "lua: error: Invalid key value '0' for rl_next(). Expected a number in the range [1, 2]!");
         expectError_WithEnv("rl_next(S.array, 3)", "lua: error: Invalid key value '3' for rl_next(). Expected a number in the range [1, 2]!");
@@ -490,7 +486,7 @@ namespace rlogic::internal
     TEST_F(TheLuaCustomizations_Next, ReportsErrorsWhenBadStructsIndexGivenToCustomRlNextFunction_DuringInterfaceExtraction)
     {
         createTestStruct("S", EWrappedType::Extractor);
-        expectNoErrors_WithEnv("S.field = INT");
+        expectNoErrors_WithEnv("S.field = Type:Int32()");
         expectError_WithEnv("rl_next(S, 0)", "lua: error: Invalid key to rl_next(): Expected a string but got object of type number instead!");
         expectError_WithEnv("rl_next(S, 1)", "lua: error: Invalid key to rl_next(): Expected a string but got object of type number instead!");
         expectError_WithEnv("rl_next(S, {})", "lua: error: Invalid key to rl_next(): Expected a string but got object of type table instead!");
@@ -508,7 +504,7 @@ namespace rlogic::internal
     TEST_F(TheLuaCustomizations_Next, ReportsErrorsForUnexistingPropertyInStruct_DuringInterfaceExtraction)
     {
         createTestStruct("S", EWrappedType::Extractor);
-        expectNoErrors_WithEnv("S.field = INT");
+        expectNoErrors_WithEnv("S.field = Type:Int32()");
         expectError_WithEnv("rl_next(S, 'no such field')", "lua: error: Could not find field named 'no such field' in struct object 'S'");
     }
 
@@ -516,21 +512,21 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.v = INT32
+            S.v = Type:Int32()
             rl_next(S.v)
-        )", "rl_next() called on an unsupported type 'INT32'");
+        )", "rl_next() called on an unsupported type 'Int32'");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.vec = VEC2I
+            S.vec = Type:Vec2i()
             rl_next(S.vec)
-        )", "rl_next() called on an unsupported type 'VEC2I'");
+        )", "rl_next() called on an unsupported type 'Vec2i'");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.s = STRING
+            S.s = Type:String()
             rl_next(S.s)
-        )", "rl_next() called on an unsupported type 'STRING'");
+        )", "rl_next() called on an unsupported type 'String'");
     }
 
     TEST_F(TheLuaCustomizations_Next, WorksForWriteProtectedModules)
@@ -696,8 +692,8 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
             -- Define some test fields
-            S.field1 = INT
-            S.field2 = STRING
+            S.field1 = Type:Int32()
+            S.field2 = Type:String()
 
             local keys = ""
             local values = ""
@@ -706,7 +702,7 @@ namespace rlogic::internal
                 values = values .. tostring(v) .. ","
             end
             assert(keys == 'field1,field2,')
-            assert(values == '4,10,')   -- The IDs of the type labels INT/STRING
+            assert(values == '4,10,')   -- The IDs of the type labels Type:Int32()/Type:String()
         )");
     }
 
@@ -715,7 +711,7 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
             -- Define some test fields
-            S.array = ARRAY(2, BOOL)
+            S.array = Type:Array(2, Type:Bool())
 
             local keys = ""
             local values = ""
@@ -724,7 +720,7 @@ namespace rlogic::internal
                 values = values .. tostring(v) .. ","
             end
             assert(keys == '1,2,')
-            assert(values == '11,11,') -- 11 is the enum value behind BOOL
+            assert(values == '11,11,') -- 11 is the enum value behind Type:Bool()
         )");
     }
 
@@ -733,7 +729,7 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
             -- Define some test fields
-            S.array = ARRAY(2, {a=INT, b=FLOAT})
+            S.array = Type:Array(2, {a=Type:Int32(), b=Type:Float()})
 
             local keys = ""
             local values = ""
@@ -800,30 +796,30 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.v = INT32
+            S.v = Type:Int32()
             for k,v in rl_pairs(S.v) do
                 keys = keys .. tostring(k) .. ","
                 values = values .. tostring(v) .. ","
             end
-        )", "rl_next() called on an unsupported type 'INT32'");
+        )", "rl_next() called on an unsupported type 'Int32'");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.vec = VEC2I
+            S.vec = Type:Vec2i()
             for k,v in rl_pairs(S.vec) do
                 keys = keys .. tostring(k) .. ","
                 values = values .. tostring(v) .. ","
             end
-        )", "rl_next() called on an unsupported type 'VEC2I'");
+        )", "rl_next() called on an unsupported type 'Vec2i'");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.s = STRING
+            S.s = Type:String()
             for k,v in rl_pairs(S.s) do
                 keys = keys .. tostring(k) .. ","
                 values = values .. tostring(v) .. ","
             end
-        )", "rl_next() called on an unsupported type 'STRING'");
+        )", "rl_next() called on an unsupported type 'String'");
     }
 
 
@@ -926,7 +922,7 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
             -- Define some test fields
-            S.array = ARRAY(3, INT64)
+            S.array = Type:Array(3, Type:Int64())
 
             local keys = ""
             local values = ""
@@ -937,7 +933,7 @@ namespace rlogic::internal
             print(keys)
             print(values)
             assert(keys == '1,2,3,')
-            assert(values == '5,5,5,') -- 5 is the enum value behind INT64
+            assert(values == '5,5,5,') -- 5 is the enum value behind Type:Int64()
         )");
     }
 
@@ -946,7 +942,7 @@ namespace rlogic::internal
         createTestStruct("S", EWrappedType::Extractor);
         expectNoErrors_WithEnv(R"(
             -- Define some test fields
-            S.array = ARRAY(2, {a=INT, b=FLOAT})
+            S.array = Type:Array(2, {a=Type:Int32(), b=Type:Float()})
 
             local keys = ""
             for k,v in rl_ipairs(S.array) do
@@ -994,13 +990,13 @@ namespace rlogic::internal
     TEST_F(TheLuaCustomizations_IPairs, ReportsErrorWhenUsedOnStruct_DuringRuntime)
     {
         createTestStruct("S", EWrappedType::RuntimeProperty);
-        expectError("rl_ipairs(S)", "rl_ipairs() called on an unsupported type 'STRUCT'. Use only with array-like built-in types or modules!");
+        expectError("rl_ipairs(S)", "rl_ipairs() called on an unsupported type 'Struct'. Use only with array-like built-in types or modules!");
     }
 
     TEST_F(TheLuaCustomizations_IPairs, ReportsErrorWhenUsedOnStruct_DuringInterfaceExtraction)
     {
         createTestStruct("S", EWrappedType::Extractor);
-        expectError_WithEnv("rl_ipairs(S)", "rl_ipairs() called on an unsupported type 'STRUCT'. Use only with array-like built-in types or modules!");
+        expectError_WithEnv("rl_ipairs(S)", "rl_ipairs() called on an unsupported type 'Struct'. Use only with array-like built-in types or modules!");
     }
 
     TEST_F(TheLuaCustomizations_IPairs, ReportsErrorWhenUsedOnNotUserdataTypes_DuringRuntime)
@@ -1015,29 +1011,29 @@ namespace rlogic::internal
     {
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.v = INT32
+            S.v = Type:Int32()
             for k,v in rl_ipairs(S.v) do
                 keys = keys .. tostring(k) .. ","
                 values = values .. tostring(v) .. ","
             end
-        )", "rl_ipairs() called on an unsupported type 'INT32'. Use only with array-like built-in types or modules!");
+        )", "rl_ipairs() called on an unsupported type 'Int32'. Use only with array-like built-in types or modules!");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.vec = VEC2I
+            S.vec = Type:Vec2i()
             for k,v in rl_ipairs(S.vec) do
                 keys = keys .. tostring(k) .. ","
                 values = values .. tostring(v) .. ","
             end
-        )", "rl_ipairs() called on an unsupported type 'VEC2I'. Use only with array-like built-in types or modules!");
+        )", "rl_ipairs() called on an unsupported type 'Vec2i'. Use only with array-like built-in types or modules!");
 
         createTestStruct("S", EWrappedType::Extractor);
         expectError_WithEnv(R"(
-            S.s = STRING
+            S.s = Type:String()
             for k,v in rl_ipairs(S.s) do
                 keys = keys .. tostring(k) .. ","
                 values = values .. tostring(v) .. ","
             end
-        )", "rl_ipairs() called on an unsupported type 'STRING'. Use only with array-like built-in types or modules!");
+        )", "rl_ipairs() called on an unsupported type 'String'. Use only with array-like built-in types or modules!");
     }
 }

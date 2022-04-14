@@ -17,7 +17,6 @@
 #include "internals/ErrorReporting.h"
 #include "internals/DeserializationMap.h"
 #include "internals/SerializationMap.h"
-#include "internals/FileFormatVersions.h"
 #include <fmt/format.h>
 
 namespace rlogic::internal
@@ -42,7 +41,7 @@ namespace rlogic::internal
         return m_module;
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap)
+    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder)
     {
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> modulesFB;
         modulesFB.reserve(module.m_dependencies.size());
@@ -51,7 +50,7 @@ namespace rlogic::internal
             modulesFB.push_back(
                 rlogic_serialization::CreateLuaModuleUsage(builder,
                     builder.CreateString(dependency.first),
-                    serializationMap.resolveLuaModuleOffset(*dependency.second)));
+                    dependency.second->getId()));
         }
 
         std::vector<uint8_t> stdModules;
@@ -62,8 +61,7 @@ namespace rlogic::internal
         }
 
         return rlogic_serialization::CreateLuaModule(builder,
-            builder.CreateString(module.getName()),
-            module.getId(),
+            LogicObjectImpl::Serialize(module, builder),
             builder.CreateString(module.getSourceCode()),
             builder.CreateVector(modulesFB),
             builder.CreateVector(stdModules)
@@ -76,31 +74,28 @@ namespace rlogic::internal
         ErrorReporting& errorReporting,
         DeserializationMap& deserializationMap)
     {
-        if (!module.name())
+        std::string name;
+        uint64_t id = 0u;
+        uint64_t userIdHigh = 0u;
+        uint64_t userIdLow = 0u;
+        if (!LogicObjectImpl::Deserialize(module.base(), name, id, userIdHigh, userIdLow, errorReporting))
         {
-            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing name!", nullptr);
-            return nullptr;
-        }
-
-        if (module.id() == 0u)
-        {
-            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing id!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing name and/or ID!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!module.source())
         {
-            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing source code!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing source code!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
         if (!module.dependencies())
         {
-            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing dependencies!", nullptr);
+            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing dependencies!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        const std::string_view name = module.name()->string_view();
         std::string source = module.source()->str();
 
         StandardModules stdModules;
@@ -114,25 +109,36 @@ namespace rlogic::internal
         modulesUsed.reserve(module.dependencies()->size());
         for (const auto* mod : *module.dependencies())
         {
-            if (!mod->name() || !mod->module_())
+            if (!mod->name())
             {
-                errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' module data: missing name or module!", name), nullptr);
+                errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' module data: missing name!", name), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
-            const LuaModule& moduleUsed = deserializationMap.resolveLuaModule(*mod->module_());
-            modulesUsed.emplace(mod->name()->str(), &moduleUsed);
+            const LuaModule* moduleUsed = deserializationMap.resolveLuaModule(mod->moduleId());
+
+            if (!moduleUsed)
+            {
+                errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' module data: could not resolve dependent module with id={}!", name, mod->moduleId()), nullptr, EErrorType::BinaryVersionMismatch);
+                return nullptr;
+            }
+
+            modulesUsed.emplace(mod->name()->str(), moduleUsed);
         }
 
         std::optional<LuaCompiledModule> compiledModule = LuaCompilationUtils::CompileModule(solState, modulesUsed, stdModules, source, name, errorReporting);
         if (!compiledModule)
         {
-            errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' from serialized data: failed parsing Lua module source code.", name), nullptr);
+            errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' from serialized data: failed parsing Lua module source code.", name), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
-        return std::make_unique<LuaModuleImpl>(
+        auto deserialized = std::make_unique<LuaModuleImpl>(
             std::move(*compiledModule),
-            name, module.id());
+            name, id);
+
+        deserialized->setUserId(userIdHigh, userIdLow);
+
+        return deserialized;
     }
 
     const ModuleMapping& LuaModuleImpl::getDependencies() const

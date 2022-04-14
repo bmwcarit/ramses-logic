@@ -33,33 +33,39 @@ namespace rlogic
     * A LuaScript can be created from Lua source code which must fulfill following requirements:
     *
     * - valid Lua 5.1 syntax
-    * - contains two global functions - interface() and run() with no parameters and no return values
-    * - declares its inputs and outputs in the interface() function, and its logic in the run() function
-    * - the interface() function declares zero or more inputs and outputs to the IN and OUT global symbols
+    * - contains two global functions - interface(IN,OUT) and run(IN,OUT) with exactly two parameters (for inputs and outputs respectively) and no return values
+    * - declares its inputs and outputs in the interface(IN,OUT) function, and its logic in the run(IN,OUT) function - you can use different names than IN/OUT
+    * - the interface(IN,OUT) function declares zero or more inputs and outputs to the IN and OUT variables passed to the function
     * - inputs and outputs are declared like this:
     *   \code{.lua}
-    *       function interface()
-    *           IN.input_name = TYPE
-    *           OUT.output_name = TYPE
+    *       function interface(IN,OUT)
+    *           IN.input_name = Type:T()
+    *           OUT.output_name = Type:T()
     *       end
     *   \endcode
-    * - TYPE is one of [INT32|INT64|FLOAT|BOOL|STRING|VEC2F|VEC3F|VEC4F|VEC2I|VEC3I|VEC4I], or...
-    * - TYPE can be also a Lua table with nested properties, obeying the same rules as above, or...
-    * - TYPE can be an array declaration of the form ARRAY(n, T) where:
+    * - T is one of [Int32|Int64|Float|Bool|String|Vec2f|Vec3f|Vec4f|Vec2i|Vec3i|Vec4i|Struct|Array]
+    * - For T=Struct:
+    *       - The first and only argument to the function must be a table
+    *       - The table keys must be strings, and the table values must be again declared with Type:T()
+    * - For T=Array, the function declaration is of the form Type:Array(n, E) where:
     *     - n is a positive integer
-    *     - T obeys the same rules as TYPE, except T can not be an ARRAY itself
-    *     - T can be a struct, i.e. arrays of structs are supported
+    *     - E must be declared with Type:T()
+    *     - E can be a Type:Struct(), i.e. arrays of structs are supported
     * - Each property must have a name (string) - other types like number, bool etc. are not supported as keys
-    * - TYPE can also be defined in a module, see #rlogic::LuaModule for details
-    * - the run() function only accesses the IN and OUT global symbols and the properties defined by it
+    * - T can also be defined in a module, see #rlogic::LuaModule for details
+    * - as a convenience abbreviation, you can use {...} instead of Type:Struct({...}) to declare structs
+    * - You can optionally declare an init() function with no parameters
+    *       - init() is allowed to write data or functions to a predefined GLOBAL table
+    *       - init() will be executed exactly once after loading the script (also when loading from binaries)
+    *       - the data from GLOBAL will be available to the interface() and run() functions
+    *       - no other global data can be read or written in any of the functions or in the global scope of the script
+    * - you may declare module dependencies using the modules() function
+    *       - modules() accepts a vararg of strings for each module
+    *       - the string provided will be the name under which the module will be available in other functions
+    *       - See also #rlogic::LuaModule for more info on modules and their syntax
     *
     * Violating any of these requirements will result in errors, which can be obtained by calling
     * #rlogic::LogicEngine::getErrors().
-    * The LuaScript object encapsulates a Lua environment (see official Lua docs) which strips all
-    * global table entries after the script is loaded to the Lua state, and leaves only the run()
-    * function.
-    * Note that none of the TYPE labels should be used in user code (outside of run() at least)
-    * for other than interface definition purposes, see #rlogic::LuaModule for details.
     *
     * See also the full documentation at https://ramses-logic.readthedocs.io/en/latest/api.html for more details on Lua and
     * its interaction with C++.

@@ -572,12 +572,9 @@ namespace rlogic::internal
     {
         for (const auto* intf : m_interfaces)
         {
-            std::vector<const Property*> unlinkedOutputs;
-            if (!dynamic_cast<const LuaInterfaceImpl&>(intf->m_impl).checkAllOutputsLinked(unlinkedOutputs))
-            {
-                for(const auto* output : unlinkedOutputs)
-                    validationResults.add(::fmt::format("Interface [{}] has unlinked output [{}]", intf->getName(), output->getName()), intf, EWarningType::UnusedContent);
-            }
+            std::vector<const Property*> unlinkedProperties = intf->m_interface.collectUnlinkedProperties();
+            for (const auto* output : unlinkedProperties)
+                validationResults.add(::fmt::format("Interface [{}] has unlinked output [{}]", intf->getName(), output->getName()), intf, EWarningType::UnusedContent);
         }
     }
 

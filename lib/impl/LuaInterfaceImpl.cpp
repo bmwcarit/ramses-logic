@@ -86,11 +86,9 @@ namespace rlogic::internal
         return deserialized;
     }
 
-    bool LuaInterfaceImpl::checkAllOutputsLinked(std::vector<const Property*>& unlinkedOutputsOut) const
+    std::vector<const Property*> LuaInterfaceImpl::collectUnlinkedProperties() const
     {
-        assert(unlinkedOutputsOut.empty());
-
-        auto collectLeafNodes = [](auto* root) {
+        auto collectLeafProperties = [](auto* root) {
 
             std::vector<const Property*> result;
 
@@ -117,17 +115,13 @@ namespace rlogic::internal
             return result;
         };
 
-        const std::vector<const Property*> outputNodes = collectLeafNodes(getOutputs());
+        std::vector<const Property*> outputProperties = collectLeafProperties(getOutputs());
 
-        for (const auto* node : outputNodes)
-        {
-            if (!node->isLinked())
-            {
-                unlinkedOutputsOut.push_back(node);
-            }
-        }
+        // filter for unlinked properties by removing linked ones
+        auto it = std::remove_if(outputProperties.begin(), outputProperties.end(), [](const auto* node) { return node->isLinked(); });
+        outputProperties.erase(it, outputProperties.end());
 
-        return unlinkedOutputsOut.empty();
+        return outputProperties;
     }
 
     std::optional<LogicNodeRuntimeError> LuaInterfaceImpl::update()

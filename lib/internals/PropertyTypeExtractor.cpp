@@ -81,25 +81,27 @@ namespace rlogic::internal
         }
 
         // TODO Violin consider if we want to forbid this
-        const std::optional<sol::lua_table> potentiallyTable = LuaTypeConversions::ExtractLuaTable(value);
-        if (potentiallyTable)
+        if (value.get_type() == sol::type::table)
         {
+            const std::optional<sol::lua_table> potentiallyTable = LuaTypeConversions::ExtractLuaTable(value);
+            assert (potentiallyTable);
             PropertyTypeExtractor structProperty(idxAsStr, EPropertyType::Struct);
             structProperty.extractPropertiesFromTable(*potentiallyTable);
             m_children.emplace_back(std::move(structProperty));
         }
         else
         {
-            const sol::optional<InterfaceTypeInfo> potentiallyTypeInfo = value.as<sol::optional<InterfaceTypeInfo>>();
-
-            if (!potentiallyTypeInfo)
+            if (value.is<InterfaceTypeInfo>())
+            {
+                const InterfaceTypeInfo& typeInfo = value.as<const InterfaceTypeInfo&>();
+                addField(idxAsStr, typeInfo);
+            }
+            else
             {
                 // TODO Violin maybe list all available types here in the error msg?
                 sol_helper::throwSolException("Invalid type of field '{}'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type '{}' instead",
                     idxAsStr, sol_helper::GetSolTypeName(value.get_type()));
             }
-
-            addField(idxAsStr, *potentiallyTypeInfo);
         }
     }
 
@@ -201,19 +203,9 @@ namespace rlogic::internal
 
     void PropertyTypeExtractor::extractPropertiesFromTable(const sol::lua_table& table)
     {
-        // Extra caching of key/pairs needed because of bug in sol/lua
-        // TODO Violin investigate more and report bug upstream
-        std::vector<sol::object> keys;
-        std::vector<sol::object> values;
-        for (auto& tableEntry : table)
+        for (const auto& tableEntry : table)
         {
-            keys.emplace_back(tableEntry.first);
-            values.emplace_back(tableEntry.second);
-        }
-
-        for (size_t i = 0; i < keys.size(); ++i)
-        {
-            newIndex(keys[i], values[i]);
+            newIndex(tableEntry.first, tableEntry.second);
         }
     }
 

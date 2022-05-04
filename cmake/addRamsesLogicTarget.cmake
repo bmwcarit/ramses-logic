@@ -19,7 +19,7 @@ function(add_ramses_logic_target TARGET_NAME LIB_TYPE)
         # no special additional properties for static lib required"
     elseif(${LIB_TYPE} STREQUAL "SHARED")
         set_target_properties(${TARGET_NAME} PROPERTIES
-            SOVERSION ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
+            SOVERSION ${PROJECT_VERSION_MAJOR}
         )
         if (NOT ramses-logic_DISABLE_SYMBOL_VISIBILITY)
             target_compile_definitions(${TARGET_NAME} PUBLIC RLOGIC_LINK_SHARED_IMPORT=1)

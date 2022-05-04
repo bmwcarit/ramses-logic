@@ -21,7 +21,7 @@ namespace rlogic::internal
         }
         else
         {
-            LOG_ERROR(errorMessage);
+            LOG_ERROR("{}", errorMessage);
         }
 
         m_errors.emplace_back(ErrorData{ std::move(errorMessage), type, logicObject });

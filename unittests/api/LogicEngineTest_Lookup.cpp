@@ -32,6 +32,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
+        const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LuaModule>("luaModule"));
         EXPECT_EQ(script, m_logicEngine.findByName<LuaScript>("script"));
@@ -41,6 +42,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, m_logicEngine.findByName<DataArray>("dataarray"));
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("animNode"));
         EXPECT_EQ(timerNode, m_logicEngine.findByName<TimerNode>("timerNode"));
+        EXPECT_EQ(intf, m_logicEngine.findByName<LuaInterface>("intf"));
 
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LogicObject>("luaModule"));
         EXPECT_EQ(script, m_logicEngine.findByName<LogicObject>("script"));
@@ -50,6 +52,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, m_logicEngine.findByName<LogicObject>("dataarray"));
         EXPECT_EQ(animNode, m_logicEngine.findByName<LogicObject>("animNode"));
         EXPECT_EQ(timerNode, m_logicEngine.findByName<LogicObject>("timerNode"));
+        EXPECT_EQ(intf, m_logicEngine.findByName<LogicObject>("intf"));
 
         auto it = m_logicEngine.getCollection<LogicObject>().cbegin();
         EXPECT_EQ(*it++, luaModule);
@@ -60,6 +63,7 @@ namespace rlogic
         EXPECT_EQ(*it++, dataArray);
         EXPECT_EQ(*it++, animNode);
         EXPECT_EQ(*it++, timerNode);
+        EXPECT_EQ(*it++, intf);
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_Const)
@@ -72,6 +76,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
+        const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         const LogicEngine& immutableLogicEngine = m_logicEngine;
         EXPECT_EQ(luaModule, immutableLogicEngine.findByName<LuaModule>("luaModule"));
@@ -82,6 +87,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, immutableLogicEngine.findByName<DataArray>("dataarray"));
         EXPECT_EQ(animNode, immutableLogicEngine.findByName<AnimationNode>("animNode"));
         EXPECT_EQ(timerNode, immutableLogicEngine.findByName<TimerNode>("timerNode"));
+        EXPECT_EQ(intf, immutableLogicEngine.findByName<LuaInterface>("intf"));
 
         EXPECT_EQ(luaModule, immutableLogicEngine.findByName<LogicObject>("luaModule"));
         EXPECT_EQ(script, immutableLogicEngine.findByName<LogicObject>("script"));
@@ -91,6 +97,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, immutableLogicEngine.findByName<LogicObject>("dataarray"));
         EXPECT_EQ(animNode, immutableLogicEngine.findByName<LogicObject>("animNode"));
         EXPECT_EQ(timerNode, immutableLogicEngine.findByName<LogicObject>("timerNode"));
+        EXPECT_EQ(intf, immutableLogicEngine.findByName<LogicObject>("intf"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CanBeUsedWithRealType)
@@ -103,6 +110,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
+        m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         const auto* luaModuleFound         = m_logicEngine.findByName<LogicObject>("luaModule")->as<LuaModule>();
         const auto* luaScriptFound         = m_logicEngine.findByName<LogicObject>("script")->as<LuaScript>();
@@ -112,6 +120,7 @@ namespace rlogic
         const auto* dataArrayFound         = m_logicEngine.findByName<LogicObject>("dataarray")->as<DataArray>();
         const auto* animNodeFound          = m_logicEngine.findByName<LogicObject>("animNode")->as<AnimationNode>();
         const auto* timerNodeFound         = m_logicEngine.findByName<LogicObject>("timerNode")->as<TimerNode>();
+        const auto* intfFound              = m_logicEngine.findByName<LogicObject>("intf")->as<LuaInterface>();
 
         ASSERT_NE(nullptr, luaModuleFound);
         ASSERT_NE(nullptr, luaScriptFound);
@@ -121,6 +130,7 @@ namespace rlogic
         ASSERT_NE(nullptr, dataArrayFound);
         ASSERT_NE(nullptr, animNodeFound);
         ASSERT_NE(nullptr, timerNodeFound);
+        ASSERT_NE(nullptr, intfFound);
 
         EXPECT_EQ(luaModuleFound->getName(), "luaModule");
         EXPECT_EQ(luaScriptFound->getName(), "script");
@@ -130,6 +140,7 @@ namespace rlogic
         EXPECT_EQ(dataArrayFound->getName(), "dataarray");
         EXPECT_EQ(animNodeFound->getName(), "animNode");
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
+        EXPECT_EQ(intfFound->getName(), "intf");
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CanBeUsedAsRealType_Const)
@@ -142,6 +153,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
+        m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         const LogicEngine& immutableLogicEngine   = m_logicEngine;
         const auto*        luaModuleFound         = immutableLogicEngine.findByName<LogicObject>("luaModule")->as<LuaModule>();
@@ -152,6 +164,7 @@ namespace rlogic
         const auto*        dataArrayFound         = immutableLogicEngine.findByName<LogicObject>("dataarray")->as<DataArray>();
         const auto*        animNodeFound          = immutableLogicEngine.findByName<LogicObject>("animNode")->as<AnimationNode>();
         const auto*        timerNodeFound         = immutableLogicEngine.findByName<LogicObject>("timerNode")->as<TimerNode>();
+        const auto*        intfFound              = immutableLogicEngine.findByName<LogicObject>("intf")->as<LuaInterface>();
 
         ASSERT_NE(nullptr, luaModuleFound);
         ASSERT_NE(nullptr, luaScriptFound);
@@ -161,6 +174,7 @@ namespace rlogic
         ASSERT_NE(nullptr, dataArrayFound);
         ASSERT_NE(nullptr, animNodeFound);
         ASSERT_NE(nullptr, timerNodeFound);
+        ASSERT_NE(nullptr, intfFound);
 
         EXPECT_EQ(luaModuleFound->getName(), "luaModule");
         EXPECT_EQ(luaScriptFound->getName(), "script");
@@ -170,6 +184,7 @@ namespace rlogic
         EXPECT_EQ(dataArrayFound->getName(), "dataarray");
         EXPECT_EQ(animNodeFound->getName(), "animNode");
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
+        EXPECT_EQ(intfFound->getName(), "intf");
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId)
@@ -182,6 +197,7 @@ namespace rlogic
         const auto               dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         const auto               animNode          = createAnimationNode(dataArray);
         const auto               timerNode         = m_logicEngine.createTimerNode("timerNode");
+        const auto               intf              = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         EXPECT_EQ(luaModule, m_logicEngine.findLogicObjectById(1u));
         EXPECT_EQ(script, m_logicEngine.findLogicObjectById(2u));
@@ -191,6 +207,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, m_logicEngine.findLogicObjectById(6u));
         EXPECT_EQ(animNode, m_logicEngine.findLogicObjectById(7u));
         EXPECT_EQ(timerNode, m_logicEngine.findLogicObjectById(8u));
+        EXPECT_EQ(intf, m_logicEngine.findLogicObjectById(9u));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId_Const)
@@ -203,6 +220,7 @@ namespace rlogic
         const auto               dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         const auto               animNode          = createAnimationNode(dataArray);
         const auto               timerNode         = m_logicEngine.createTimerNode("timerNode");
+        const auto               intf              = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         const LogicEngine& immutableLogicEngine = m_logicEngine;
         EXPECT_EQ(luaModule, immutableLogicEngine.findLogicObjectById(1u));
@@ -213,6 +231,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, immutableLogicEngine.findLogicObjectById(6u));
         EXPECT_EQ(animNode, immutableLogicEngine.findLogicObjectById(7u));
         EXPECT_EQ(timerNode, immutableLogicEngine.findLogicObjectById(8u));
+        EXPECT_EQ(intf, immutableLogicEngine.findLogicObjectById(9u));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId_CanBeUsedWithRealType)
@@ -225,6 +244,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
+        m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         const auto* luaModuleFound         = m_logicEngine.findLogicObjectById(1u)->as<LuaModule>();
         const auto* luaScriptFound         = m_logicEngine.findLogicObjectById(2u)->as<LuaScript>();
@@ -234,6 +254,7 @@ namespace rlogic
         const auto* dataArrayFound         = m_logicEngine.findLogicObjectById(6u)->as<DataArray>();
         const auto* animNodeFound          = m_logicEngine.findLogicObjectById(7u)->as<AnimationNode>();
         const auto* timerNodeFound         = m_logicEngine.findLogicObjectById(8u)->as<TimerNode>();
+        const auto* intfFound              = m_logicEngine.findLogicObjectById(9u)->as<LuaInterface>();
 
         ASSERT_NE(nullptr, luaModuleFound);
         ASSERT_NE(nullptr, luaScriptFound);
@@ -243,6 +264,7 @@ namespace rlogic
         ASSERT_NE(nullptr, dataArrayFound);
         ASSERT_NE(nullptr, animNodeFound);
         ASSERT_NE(nullptr, timerNodeFound);
+        ASSERT_NE(nullptr, intfFound);
 
         EXPECT_EQ(luaModuleFound->getName(), "luaModule");
         EXPECT_EQ(luaScriptFound->getName(), "script");
@@ -252,6 +274,7 @@ namespace rlogic
         EXPECT_EQ(dataArrayFound->getName(), "dataarray");
         EXPECT_EQ(animNodeFound->getName(), "animNode");
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
+        EXPECT_EQ(intfFound->getName(), "intf");
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId_CanBeUsedAsRealType_Const)
@@ -264,6 +287,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
+        m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         const LogicEngine& immutableLogicEngine   = m_logicEngine;
         const auto*        luaModuleFound         = immutableLogicEngine.findLogicObjectById(1u)->as<LuaModule>();
@@ -274,6 +298,7 @@ namespace rlogic
         const auto*        dataArrayFound         = immutableLogicEngine.findLogicObjectById(6u)->as<DataArray>();
         const auto*        animNodeFound          = immutableLogicEngine.findLogicObjectById(7u)->as<AnimationNode>();
         const auto*        timerNodeFound         = immutableLogicEngine.findLogicObjectById(8u)->as<TimerNode>();
+        const auto*        intfFound              = immutableLogicEngine.findLogicObjectById(9u)->as<LuaInterface>();
 
         ASSERT_NE(nullptr, luaModuleFound);
         ASSERT_NE(nullptr, luaScriptFound);
@@ -283,6 +308,7 @@ namespace rlogic
         ASSERT_NE(nullptr, dataArrayFound);
         ASSERT_NE(nullptr, animNodeFound);
         ASSERT_NE(nullptr, timerNodeFound);
+        ASSERT_NE(nullptr, intfFound);
 
         EXPECT_EQ(luaModuleFound->getName(), "luaModule");
         EXPECT_EQ(luaScriptFound->getName(), "script");
@@ -292,6 +318,7 @@ namespace rlogic
         EXPECT_EQ(dataArrayFound->getName(), "dataarray");
         EXPECT_EQ(animNodeFound->getName(), "animNode");
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
+        EXPECT_EQ(intfFound->getName(), "intf");
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CutsNameAtNullTermination)
@@ -310,6 +337,7 @@ namespace rlogic
         auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         auto animNode = createAnimationNode(dataArray);
         auto timerNode = m_logicEngine.createTimerNode("timerNode");
+        auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         // Rename
         luaModule->setName("L");
@@ -320,6 +348,7 @@ namespace rlogic
         dataArray->setName("DA");
         animNode->setName("AN");
         timerNode->setName("TN");
+        intf->setName("I");
 
         // Can't find by old name
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("luaModule"));
@@ -330,6 +359,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<DataArray>("dataarray"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("animNode"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<TimerNode>("timerNode"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaInterface>("intf"));
 
         // Found by new name
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LuaModule>("L"));
@@ -340,6 +370,7 @@ namespace rlogic
         EXPECT_EQ(dataArray, m_logicEngine.findByName<DataArray>("DA"));
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("AN"));
         EXPECT_EQ(timerNode, m_logicEngine.findByName<TimerNode>("TN"));
+        EXPECT_EQ(intf, m_logicEngine.findByName<LuaInterface>("I"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyIfTypeMatches)
@@ -352,6 +383,7 @@ namespace rlogic
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
+        m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
 
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("dataarray"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaScript>("nodebinding"));
@@ -362,6 +394,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<DataArray>("appbinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("dataarray"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("timerNode"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<TimerNode>("intf"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyStringMatchesExactly)

@@ -998,7 +998,8 @@ namespace rlogic::internal
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("arrayInput"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getOutputs()->getChild("floatOutput"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getOutputs()->getChild("nodeTranslation"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("floatInput"));
+            ASSERT_NE(nullptr, logicEngine.findByName<LuaScript>("script2"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getInputs()->getChild("floatInput"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetX"));
             EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetY"));
@@ -1017,9 +1018,11 @@ namespace rlogic::internal
             EXPECT_NE(nullptr, logicEngine.findByName<RamsesCameraBinding>("camerabinding"));
             EXPECT_NE(nullptr, logicEngine.findByName<RamsesAppearanceBinding>("appearancebinding"));
             EXPECT_NE(nullptr, logicEngine.findByName<DataArray>("dataarray"));
+            const auto intf = logicEngine.findByName<LuaInterface>("intf");
+            ASSERT_NE(nullptr, intf);
 
-            // Can set new value and update()
-            logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("floatInput")->set<float>(42.5f);
+            // Can set new value via interface and update()
+            intf->getInputs()->getChild("struct")->getChild("floatInput")->set<float>(42.5f);
             EXPECT_TRUE(logicEngine.update());
 
             // Values on Ramses are updated according to expectations

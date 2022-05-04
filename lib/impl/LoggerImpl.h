@@ -72,8 +72,11 @@ namespace rlogic::internal
         LoggerImpl& operator=(const LoggerImpl& other) = delete;
         LoggerImpl& operator=(LoggerImpl&& other) = delete;
 
-        template<typename ...ARGS>
-        void log(ELogMessageType messageType, const ARGS&... args);
+        template <size_t N, typename... ARGS>
+        // NOLINTNEXTLINE(modernize-avoid-c-arrays) need type representing string literals
+        void log(ELogMessageType messageType, const char(&fmtString)[N], const ARGS&... args);
+        template <typename... ARGS>
+        void log(ELogMessageType messageType, std::string_view fmtString, const ARGS&... args);
 
         void setLogVerbosityLimit(ELogMessageType verbosityLimit);
         [[nodiscard]] ELogMessageType getLogVerbosityLimit() const;
@@ -99,8 +102,13 @@ namespace rlogic::internal
 
     };
 
-    template <typename... ARGS>
-    inline void LoggerImpl::log(ELogMessageType messageType, const ARGS&... args)
+    // Note: we are forcing here format string to be literal to avoid issues.
+    // Otherwise a generated string could potentially contain content from user application
+    // (e.g. name, script code, malicious or invalid file) which if passed
+    // to Fmt directly as format string could cause undesired behavior (e.g. if contains curly brackets).
+    template <size_t N, typename... ARGS>
+    // NOLINTNEXTLINE(modernize-avoid-c-arrays) need type representing string literals
+    inline void LoggerImpl::log(ELogMessageType messageType, const char(&fmtString)[N], const ARGS&... args)
     {
         // Early exit if log level exceeded, or no logger configured
         if (logMessageExceedsVerbosityLimit(messageType) || (!m_defaultLogging && !m_logHandler))
@@ -108,7 +116,7 @@ namespace rlogic::internal
             return;
         }
 
-        const std::string formattedMessage = fmt::format(args...);
+        const std::string formattedMessage = fmt::format(fmtString, args...);
         if (m_defaultLogging)
         {
             PrintLogMessage(messageType, formattedMessage);
@@ -117,6 +125,17 @@ namespace rlogic::internal
         {
             m_logHandler(messageType, formattedMessage);
         }
+    }
+
+    // workaround to make static assert below dependent on template argument
+    template <typename... ARGS>
+    struct TemplatedFalse : std::false_type {};
+
+    template <typename... ARGS>
+    void LoggerImpl::log(ELogMessageType /*messageType*/, std::string_view /*fmtString*/, const ARGS&... /*args*/)
+    {
+        // See comment above for reasons
+        static_assert(TemplatedFalse<ARGS...>::value, "Always use literal as format string when logging, e.g. 'LOG_ERROR(\"{}\", errorMsg)'");
     }
 
     inline void LoggerImpl::PrintLogMessage(ELogMessageType messageType, const std::string& message)

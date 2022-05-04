@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "gmock/gmock.h"
+#include "WithTempDirectory.h"
 
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
@@ -46,10 +47,6 @@ namespace rlogic::internal
         )";
 
         LogicEngine m_logicEngine;
-        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
-        SerializationTestUtils m_testUtils{ m_flatBufferBuilder };
-        SerializationMap m_serializationMap;
-        DeserializationMap m_deserializationMap;
     };
 
     TEST_F(ALuaInterface, CanCompileLuaInterface)
@@ -378,77 +375,6 @@ namespace rlogic::internal
         }
     }
 
-    TEST_F(ALuaInterface, CanSerializeAndDeserializeLuaInterface)
-    {
-        // Serialize
-        {
-            LuaInterface* intf = createTestInterface(m_minimalInterface, "intf name");
-            LuaScript* inputsScript = m_logicEngine.createLuaScript(R"LUA_SCRIPT(
-            function interface(IN,OUT)
-
-                IN.param1 = Type:Int32()
-                IN.param2 = Type:Float()
-
-            end
-
-            function run(IN,OUT)
-            end
-            )LUA_SCRIPT", {});
-
-            m_logicEngine.link(*intf->getOutputs()->getChild(0), *inputsScript->getInputs()->getChild(0));
-            m_logicEngine.link(*intf->getOutputs()->getChild(1), *inputsScript->getInputs()->getChild(1));
-
-            (void)LuaInterfaceImpl::Serialize(dynamic_cast<LuaInterfaceImpl&>(intf->m_impl), m_flatBufferBuilder, m_serializationMap);
-        }
-
-        const auto& serializedScript = *flatbuffers::GetRoot<rlogic_serialization::LuaInterface>(m_flatBufferBuilder.GetBufferPointer());
-
-        ASSERT_TRUE(serializedScript.base());
-        ASSERT_TRUE(serializedScript.base()->name());
-        EXPECT_EQ(serializedScript.base()->name()->string_view(), "intf name");
-        EXPECT_EQ(serializedScript.base()->id(), 1u);
-
-        ASSERT_TRUE(serializedScript.rootProperty());
-        EXPECT_EQ(serializedScript.rootProperty()->rootType(), rlogic_serialization::EPropertyRootType::Struct);
-        ASSERT_TRUE(serializedScript.rootProperty()->children());
-        EXPECT_EQ(serializedScript.rootProperty()->children()->size(), 2u);
-
-        // Deserialize
-        {
-            ErrorReporting errorReporting;
-            std::unique_ptr<LuaInterfaceImpl> deserializedScript = LuaInterfaceImpl::Deserialize(serializedScript, errorReporting, m_deserializationMap);
-
-            ASSERT_TRUE(deserializedScript);
-            EXPECT_TRUE(errorReporting.getErrors().empty());
-
-            EXPECT_EQ(deserializedScript->getName(), "intf name");
-            EXPECT_EQ(deserializedScript->getId(), 1u);
-        }
-    }
-
-    TEST_F(ALuaInterface, CanSerializeLuaInterfaceIfInputsAreNotLinked)
-    {
-        LuaInterface* intf = createTestInterface(m_minimalInterface, "intf name");
-
-        LuaScript* inputsScript = m_logicEngine.createLuaScript(R"LUA_SCRIPT(
-        function interface(IN,OUT)
-
-            IN.param1 = Type:Int32()
-            IN.param2 = Type:Float()
-
-        end
-
-        function run(IN,OUT)
-        end
-        )LUA_SCRIPT", {});
-
-        m_logicEngine.link(*intf->getOutputs()->getChild(0), *inputsScript->getInputs()->getChild(0));
-        m_logicEngine.link(*intf->getOutputs()->getChild(1), *inputsScript->getInputs()->getChild(1));
-
-        auto serializationResult = LuaInterfaceImpl::Serialize(dynamic_cast<LuaInterfaceImpl&>(intf->m_impl), m_flatBufferBuilder, m_serializationMap);
-        EXPECT_FALSE(serializationResult.IsNull());
-    }
-
     TEST_F(ALuaInterface, CanCreateInterfaceWithComplexTypes)
     {
         const std::string_view interfaceScript = R"(
@@ -519,14 +445,13 @@ namespace rlogic::internal
             end
         )", "intf name");
 
-        const auto& intfImpl = dynamic_cast<const LuaInterfaceImpl&>(intf->m_impl);
+        const auto& intfImpl = intf->m_interface;
 
         const auto* output1 = intf->getOutputs()->getChild(0);
         const auto* output21 = intf->getOutputs()->getChild(1)->getChild(0);
         const auto* output22 = intf->getOutputs()->getChild(1)->getChild(1);
 
-        std::vector<const Property*> unlinkedOutputs;
-        EXPECT_FALSE(intfImpl.checkAllOutputsLinked(unlinkedOutputs));
+        auto unlinkedOutputs = intfImpl.collectUnlinkedProperties();
         EXPECT_THAT(unlinkedOutputs, ::testing::UnorderedElementsAre(output1, output21, output22));
 
         LuaScript* inputsScript = m_logicEngine.createLuaScript(R"LUA_SCRIPT(
@@ -544,19 +469,153 @@ namespace rlogic::internal
 
         //link 1 output
         m_logicEngine.link(*output1, *inputsScript->getInputs()->getChild(0));
-        unlinkedOutputs.clear();
-        EXPECT_FALSE(intfImpl.checkAllOutputsLinked(unlinkedOutputs));
+        unlinkedOutputs = intfImpl.collectUnlinkedProperties();
         EXPECT_THAT(unlinkedOutputs, ::testing::UnorderedElementsAre(output21, output22));
 
         //link 2nd output
         m_logicEngine.link(*output21, *inputsScript->getInputs()->getChild(1));
-        unlinkedOutputs.clear();
-        EXPECT_FALSE(intfImpl.checkAllOutputsLinked(unlinkedOutputs));
+        unlinkedOutputs = intfImpl.collectUnlinkedProperties();
         EXPECT_THAT(unlinkedOutputs, ::testing::UnorderedElementsAre(output22));
 
         m_logicEngine.link(*output22, *inputsScript->getInputs()->getChild(2));
-        unlinkedOutputs.clear();
-        EXPECT_TRUE(intfImpl.checkAllOutputsLinked(unlinkedOutputs));
+        unlinkedOutputs = intfImpl.collectUnlinkedProperties();
         EXPECT_TRUE(unlinkedOutputs.empty());
+    }
+
+    class ALuaInterface_Serialization : public ALuaInterface
+    {
+    protected:
+        enum class ESerializationIssue
+        {
+            AllValid,
+            NameIdMissing,
+            EmptyName,
+            RootMissing,
+            RootNotStruct
+        };
+
+        std::unique_ptr<LuaInterfaceImpl> deserializeSerializedDataWithIssue(ESerializationIssue issue)
+        {
+            {
+                HierarchicalTypeData inputs = (issue == ESerializationIssue::RootNotStruct ? MakeType("", EPropertyType::Bool) : MakeStruct("", {}));
+                auto inputsImpl = std::make_unique<PropertyImpl>(std::move(inputs), EPropertySemantics::Interface);
+
+                const std::string_view name = (issue == ESerializationIssue::EmptyName ? "" : "intf");
+                auto intf = rlogic_serialization::CreateLuaInterface(m_flatBufferBuilder,
+                    issue == ESerializationIssue::NameIdMissing ? 0 : rlogic_serialization::CreateLogicObject(m_flatBufferBuilder, m_flatBufferBuilder.CreateString(name), 1u, 0u, 0u),
+                    issue == ESerializationIssue::RootMissing ? 0 : PropertyImpl::Serialize(*inputsImpl, m_flatBufferBuilder, m_serializationMap)
+                );
+                m_flatBufferBuilder.Finish(intf);
+            }
+
+            const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::LuaInterface>(m_flatBufferBuilder.GetBufferPointer());
+            return LuaInterfaceImpl::Deserialize(serialized, m_errorReporting, m_deserializationMap);
+        }
+
+        flatbuffers::FlatBufferBuilder m_flatBufferBuilder;
+        SerializationTestUtils m_testUtils{ m_flatBufferBuilder };
+        SerializationMap m_serializationMap;
+        DeserializationMap m_deserializationMap;
+        ErrorReporting m_errorReporting;
+    };
+
+    TEST_F(ALuaInterface_Serialization, CanSerializeAndDeserializeLuaInterface)
+    {
+        WithTempDirectory tempDirectory;
+
+        // Serialize
+        {
+            LogicEngine otherEngine;
+            const LuaScript* inputsScript = otherEngine.createLuaScript(R"LUA_SCRIPT(
+                function interface(IN,OUT)
+                    IN.param1 = Type:Int32()
+                    IN.param2 = { x = Type:Float(), y = Type:Array(2, Type:String()) }
+                end
+
+                function run(IN,OUT)
+                end
+                )LUA_SCRIPT", {});
+
+            const LuaInterface* intf = otherEngine.createLuaInterface(R"(
+                function interface(inout)
+                    inout.param1 = Type:Int32()
+                    inout.param2 = { x = Type:Float(), y = Type:Array(2, Type:String()) }
+                end
+                )", "intf");
+
+            otherEngine.link(*intf->getOutputs()->getChild("param1"), *inputsScript->getInputs()->getChild("param1"));
+            otherEngine.link(*intf->getOutputs()->getChild("param2")->getChild("x"), *inputsScript->getInputs()->getChild("param2")->getChild("x"));
+            otherEngine.link(*intf->getOutputs()->getChild("param2")->getChild("y")->getChild(0u), *inputsScript->getInputs()->getChild("param2")->getChild("y")->getChild(0u));
+            otherEngine.link(*intf->getOutputs()->getChild("param2")->getChild("y")->getChild(1u), *inputsScript->getInputs()->getChild("param2")->getChild("y")->getChild(1u));
+
+            ASSERT_TRUE(otherEngine.saveToFile("interface.rlogic"));
+        }
+
+        EXPECT_TRUE(m_logicEngine.loadFromFile("interface.rlogic"));
+        const auto loadedIntf = m_logicEngine.findByName<LuaInterface>("intf");
+        ASSERT_NE(nullptr, loadedIntf);
+
+        EXPECT_EQ(2u, loadedIntf->getId());
+        EXPECT_EQ(loadedIntf->getInputs(), loadedIntf->getOutputs());
+        ASSERT_EQ(2u, loadedIntf->getInputs()->getChildCount());
+        const auto param1 = loadedIntf->getInputs()->getChild("param1");
+        ASSERT_NE(nullptr, param1);
+        EXPECT_EQ(EPropertyType::Int32, param1->getType());
+
+        const auto param2 = loadedIntf->getInputs()->getChild("param2");
+        ASSERT_NE(nullptr, param2);
+        EXPECT_EQ(EPropertyType::Struct, param2->getType());
+        ASSERT_EQ(2u, param2->getChildCount());
+
+        const auto param2x = param2->getChild("x");
+        ASSERT_NE(nullptr, param2x);
+        EXPECT_EQ(EPropertyType::Float, param2x->getType());
+
+        const auto param2y = param2->getChild("y");
+        ASSERT_NE(nullptr, param2y);
+        EXPECT_EQ(EPropertyType::Array, param2y->getType());
+        ASSERT_EQ(2u, param2y->getChildCount());
+        EXPECT_EQ(EPropertyType::String, param2y->getChild(0u)->getType());
+        EXPECT_EQ(EPropertyType::String, param2y->getChild(1u)->getType());
+    }
+
+    TEST_F(ALuaInterface_Serialization, FailsToSaveToFileIfInterfaceOutputsNotLinked)
+    {
+        createTestInterface(m_minimalInterface, "intf name");
+        EXPECT_FALSE(m_logicEngine.saveToFile("interface.rlogic"));
+    }
+
+    TEST_F(ALuaInterface_Serialization, CanSerializeWithNoIssue)
+    {
+        EXPECT_TRUE(deserializeSerializedDataWithIssue(ALuaInterface_Serialization::ESerializationIssue::AllValid));
+        EXPECT_TRUE(m_errorReporting.getErrors().empty());
+    }
+
+    TEST_F(ALuaInterface_Serialization, FailsDeserializationIfEssentialDataMissing)
+    {
+        EXPECT_FALSE(deserializeSerializedDataWithIssue(ALuaInterface_Serialization::ESerializationIssue::NameIdMissing));
+        ASSERT_FALSE(m_errorReporting.getErrors().empty());
+        EXPECT_EQ("Fatal error during loading of LuaInterface from serialized data: missing name and/or ID!", m_errorReporting.getErrors().back().message);
+    }
+
+    TEST_F(ALuaInterface_Serialization, FailsDeserializationIfNameEmpty)
+    {
+        EXPECT_FALSE(deserializeSerializedDataWithIssue(ALuaInterface_Serialization::ESerializationIssue::EmptyName));
+        ASSERT_FALSE(m_errorReporting.getErrors().empty());
+        EXPECT_EQ("Fatal error during loading of LuaInterface from serialized data: empty name!", m_errorReporting.getErrors().back().message);
+    }
+
+    TEST_F(ALuaInterface_Serialization, FailsDeserializationIfRootPropertyMissing)
+    {
+        EXPECT_FALSE(deserializeSerializedDataWithIssue(ALuaInterface_Serialization::ESerializationIssue::RootMissing));
+        ASSERT_FALSE(m_errorReporting.getErrors().empty());
+        EXPECT_EQ("Fatal error during loading of LuaInterface from serialized data: missing root property!", m_errorReporting.getErrors().back().message);
+    }
+
+    TEST_F(ALuaInterface_Serialization, FailsDeserializationIfRootNotStructType)
+    {
+        EXPECT_FALSE(deserializeSerializedDataWithIssue(ALuaInterface_Serialization::ESerializationIssue::RootNotStruct));
+        ASSERT_FALSE(m_errorReporting.getErrors().empty());
+        EXPECT_EQ("Fatal error during loading of LuaScript from serialized data: root property has unexpected type!", m_errorReporting.getErrors().back().message);
     }
 }

@@ -21,7 +21,7 @@ namespace rlogic::internal
         }
         else
         {
-            LOG_WARN(warningMessage);
+            LOG_WARN("{}", warningMessage);
         }
 
         m_warnings.emplace_back(WarningData{ std::move(warningMessage), type, logicObject });

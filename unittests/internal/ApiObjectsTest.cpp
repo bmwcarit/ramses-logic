@@ -519,15 +519,9 @@ namespace rlogic::internal
     TEST_F(AnApiObjects, ProvidesNonEmptyInterfaceCollection_WhenInterfacesWereCreated)
     {
         const LuaInterface* intf = createInterface();
-        ApiObjectContainer<LuaInterface>& interfaces = m_apiObjects.getApiObjectContainer<LuaInterface>();
-
-        EXPECT_EQ(*interfaces.begin(), intf);
-        EXPECT_EQ(*interfaces.cbegin(), intf);
-
-        EXPECT_NE(interfaces.begin(), interfaces.end());
-        EXPECT_NE(interfaces.cbegin(), interfaces.cend());
-
-        EXPECT_EQ(intf, *interfaces.begin());
+        EXPECT_THAT(m_apiObjects.getApiObjectContainer<LuaInterface>(), ::testing::ElementsAre(intf));
+        const auto& constApiObjects = m_apiObjects;
+        EXPECT_THAT(constApiObjects.getApiObjectContainer<LuaInterface>(), ::testing::ElementsAre(intf));
     }
 
     TEST_F(AnApiObjects, ProvidesNonEmptyNodeBindingsCollection_WhenNodeBindingsWereCreated)

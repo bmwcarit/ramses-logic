@@ -566,4 +566,22 @@ namespace rlogic
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"endlessRun\"]:5: 'end' expected (to close 'function' at line 4) near '<eof>'"));
     }
 
+    TEST_F(ALuaScript_Syntax, ProducesErrorMessageCorrectlyNotConflictingWithFmtFormatSyntax)
+    {
+        auto* script = m_logicEngine.createLuaScript(R"(
+            function interface(IN,OUT)
+            end
+            function run(IN,OUT)
+                local coalaModule = {}
+                coalaModule.coalaStruct = {
+                    oink1
+                    oink2
+                }
+            end
+        )", {}, "missingComma");
+
+        ASSERT_EQ(nullptr, script);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'}' expected (to close '{'"));
+    }
 }

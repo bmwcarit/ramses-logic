@@ -33,7 +33,7 @@ table LogicEngine
     rlogicVersion:Version (required);
     // Data objects
     apiObjects:ApiObjects;
-    assetMetedata: Metadata;
+    assetMetadata: Metadata;
 }
 
 root_type LogicEngine;

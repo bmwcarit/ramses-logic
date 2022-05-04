@@ -10,6 +10,7 @@
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
@@ -182,6 +183,11 @@ int main(int argc, char* argv[])
         end
     )", config, "script2");
 
+    const auto intf = logicEngine.createLuaInterface(R"(
+        function interface(inout)
+            inout.struct = { floatInput = Type:Float() }
+        end)", "intf");
+
     ramses::Node* node = { scene->createNode("test node") };
     ramses::OrthographicCamera* camera = { scene->createOrthographicCamera("test camera") };
     ramses::Appearance* appearance = { createTestAppearance(*scene) };
@@ -198,6 +204,7 @@ int main(int argc, char* argv[])
     logicEngine.createAnimationNode(animConfig, "animNodeWithDataProperties");
     logicEngine.createTimerNode("timerNode");
 
+    logicEngine.link(*intf->getOutputs()->getChild("struct")->getChild("floatInput"), *script1->getInputs()->getChild("floatInput"));
     logicEngine.link(*script1->getOutputs()->getChild("floatOutput"), *script2->getInputs()->getChild("floatInput"));
     logicEngine.link(*script1->getOutputs()->getChild("nodeTranslation"), *nodeBinding->getInputs()->getChild("translation"));
     logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"), *camBinding->getInputs()->getChild("viewport")->getChild("offsetX"));

@@ -21,7 +21,7 @@ find_path(ramses-logic_INCLUDE_DIR ramses-logic/LogicEngine.h
 # Correct handling of shared lib versions on Linux, no version on other platforms (most notably Windows)
 if (CMAKE_SYSTEM_NAME MATCHES "Linux")
     find_library(ramses-logic_LIBRARY
-        NAMES "libramses-logic.so.@RLOGIC_VERSION_MAJOR@.@RLOGIC_VERSION_MINOR@"
+        NAMES "libramses-logic.so.@RLOGIC_VERSION_MAJOR@"
         HINTS @PACKAGE_RLOGIC_INSTALL_LIBRARY_PATH@
     )
 else ()

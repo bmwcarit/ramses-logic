@@ -436,7 +436,7 @@ namespace rlogic::internal
         if (!scriptFuncResult.valid())
         {
             const sol::error error = scriptFuncResult;
-            LOG_DEBUG(fmt::format("Lua runtime error while extracting module dependencies, this is ignored for the actual extraction but might affect its result:\n{}", error.what()));
+            LOG_DEBUG("Lua runtime error while extracting module dependencies, this is ignored for the actual extraction but might affect its result:\n{}", error.what());
         }
 
         if (!success)

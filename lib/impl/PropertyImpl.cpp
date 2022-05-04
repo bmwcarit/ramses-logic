@@ -500,19 +500,19 @@ namespace rlogic::internal
     {
         if (m_semantics == EPropertySemantics::ScriptOutput)
         {
-            LOG_ERROR(fmt::format("Cannot set property '{}' which is an output.", m_typeData.name));
+            LOG_ERROR("Cannot set property '{}' which is an output.", m_typeData.name);
             return false;
         }
 
         if (m_incomingLink.property != nullptr)
         {
-            LOG_ERROR(fmt::format("Property '{}' is currently linked (to property '{}'). Unlink it first before setting its value!", m_typeData.name, m_incomingLink.property->getName()));
+            LOG_ERROR("Property '{}' is currently linked (to property '{}'). Unlink it first before setting its value!", m_typeData.name, m_incomingLink.property->getName());
             return false;
         }
 
         if (!TypeUtils::IsPrimitiveType(m_typeData.type))
         {
-            LOG_ERROR(fmt::format("Property '{}' is not a primitive type, can't set its value directly!", m_typeData.name));
+            LOG_ERROR("Property '{}' is not a primitive type, can't set its value directly!", m_typeData.name);
             return false;
         }
 

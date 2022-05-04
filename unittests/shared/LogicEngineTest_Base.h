@@ -16,6 +16,7 @@
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
@@ -77,6 +78,12 @@ namespace rlogic
                 print(a+b)
             end
             return mymath
+        )";
+
+        const std::string_view m_interfaceSourceCode = R"(
+            function interface(inout_params)
+                inout_params.translation_x = Type:Int32()
+            end
         )";
 
         void recreate(bool skipAppearance = false)

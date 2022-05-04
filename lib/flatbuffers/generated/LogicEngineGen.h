@@ -232,7 +232,7 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_RAMSESVERSION = 4,
     VT_RLOGICVERSION = 6,
     VT_APIOBJECTS = 8,
-    VT_ASSETMETEDATA = 10
+    VT_ASSETMETADATA = 10
   };
   const rlogic_serialization::Version *ramsesVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RAMSESVERSION);
@@ -243,8 +243,8 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::ApiObjects *apiObjects() const {
     return GetPointer<const rlogic_serialization::ApiObjects *>(VT_APIOBJECTS);
   }
-  const rlogic_serialization::Metadata *assetMetedata() const {
-    return GetPointer<const rlogic_serialization::Metadata *>(VT_ASSETMETEDATA);
+  const rlogic_serialization::Metadata *assetMetadata() const {
+    return GetPointer<const rlogic_serialization::Metadata *>(VT_ASSETMETADATA);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -254,8 +254,8 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyTable(rlogicVersion()) &&
            VerifyOffset(verifier, VT_APIOBJECTS) &&
            verifier.VerifyTable(apiObjects()) &&
-           VerifyOffset(verifier, VT_ASSETMETEDATA) &&
-           verifier.VerifyTable(assetMetedata()) &&
+           VerifyOffset(verifier, VT_ASSETMETADATA) &&
+           verifier.VerifyTable(assetMetadata()) &&
            verifier.EndTable();
   }
 };
@@ -273,8 +273,8 @@ struct LogicEngineBuilder {
   void add_apiObjects(flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects) {
     fbb_.AddOffset(LogicEngine::VT_APIOBJECTS, apiObjects);
   }
-  void add_assetMetedata(flatbuffers::Offset<rlogic_serialization::Metadata> assetMetedata) {
-    fbb_.AddOffset(LogicEngine::VT_ASSETMETEDATA, assetMetedata);
+  void add_assetMetadata(flatbuffers::Offset<rlogic_serialization::Metadata> assetMetadata) {
+    fbb_.AddOffset(LogicEngine::VT_ASSETMETADATA, assetMetadata);
   }
   explicit LogicEngineBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
@@ -295,9 +295,9 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
     flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
     flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects = 0,
-    flatbuffers::Offset<rlogic_serialization::Metadata> assetMetedata = 0) {
+    flatbuffers::Offset<rlogic_serialization::Metadata> assetMetadata = 0) {
   LogicEngineBuilder builder_(_fbb);
-  builder_.add_assetMetedata(assetMetedata);
+  builder_.add_assetMetadata(assetMetadata);
   builder_.add_apiObjects(apiObjects);
   builder_.add_rlogicVersion(rlogicVersion);
   builder_.add_ramsesVersion(ramsesVersion);
@@ -364,7 +364,7 @@ inline const flatbuffers::TypeTable *LogicEngineTypeTable() {
     "ramsesVersion",
     "rlogicVersion",
     "apiObjects",
-    "assetMetedata"
+    "assetMetadata"
   };
   static const flatbuffers::TypeTable tt = {
     flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names

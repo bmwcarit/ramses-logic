@@ -1,5 +1,13 @@
 # master
 
+# v1.0.1
+
+**Bugfixes**
+
+* Fixes exotic crash when creating complex nested interfaces
+* LuaInterface objects can be retrieved via LogicEngine::findByName, LogicEngine::findLogicObjectById and can be cast using LogicObject::as<T>()
+* Fixed assert when logging a script error which contains curly braces conflicting with internal Fmt formatter
+
 # v1.0.0
 
 **General changes**

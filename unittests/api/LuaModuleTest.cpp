@@ -117,6 +117,22 @@ namespace rlogic::internal
         EXPECT_EQ(m_moduleSourceCode, module->m_impl.getSourceCode());
     }
 
+    TEST_F(ALuaModule, ProducesErrorMessageCorrectlyNotConflictingWithFmtFormatSyntax)
+    {
+        auto* module = m_logicEngine.createLuaModule(R"(
+            local coalaModule = {}
+            coalaModule.coalaStruct = {
+                oink1
+                oink2
+            }
+            return coalaModule
+        )", {}, "missingComma");
+
+        ASSERT_EQ(nullptr, module);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'}' expected (to close '{'"));
+    }
+
     class ALuaModule_SerializationLifecycle : public ALuaModule
     {
     protected:

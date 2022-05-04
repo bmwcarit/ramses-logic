@@ -670,6 +670,7 @@ namespace rlogic
             std::is_same_v<T, LogicObject> ||
             std::is_same_v<T, LuaScript> ||
             std::is_same_v<T, LuaModule> ||
+            std::is_same_v<T, LuaInterface> ||
             std::is_same_v<T, RamsesNodeBinding> ||
             std::is_same_v<T, RamsesAppearanceBinding> ||
             std::is_same_v<T, RamsesCameraBinding> ||

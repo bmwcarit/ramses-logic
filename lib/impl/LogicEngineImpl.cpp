@@ -415,9 +415,9 @@ namespace rlogic::internal
             return false;
         }
 
-        if (logicEngine->assetMetedata())
+        if (logicEngine->assetMetadata())
         {
-            LogAssetMetadata(*logicEngine->assetMetedata());
+            LogAssetMetadata(*logicEngine->assetMetadata());
         }
 
         RamsesObjectResolver ramsesResolver(m_errors, scene);

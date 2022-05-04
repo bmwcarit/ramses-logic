@@ -10,6 +10,7 @@
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/LuaModule.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
@@ -212,6 +213,7 @@ namespace rlogic
     template RLOGIC_API Collection<LogicObject>             LogicEngine::getLogicObjectsInternal<LogicObject>() const;
     template RLOGIC_API Collection<LuaScript>               LogicEngine::getLogicObjectsInternal<LuaScript>() const;
     template RLOGIC_API Collection<LuaModule>               LogicEngine::getLogicObjectsInternal<LuaModule>() const;
+    template RLOGIC_API Collection<LuaInterface>            LogicEngine::getLogicObjectsInternal<LuaInterface>() const;
     template RLOGIC_API Collection<RamsesNodeBinding>       LogicEngine::getLogicObjectsInternal<RamsesNodeBinding>() const;
     template RLOGIC_API Collection<RamsesAppearanceBinding> LogicEngine::getLogicObjectsInternal<RamsesAppearanceBinding>() const;
     template RLOGIC_API Collection<RamsesCameraBinding>     LogicEngine::getLogicObjectsInternal<RamsesCameraBinding>() const;
@@ -222,6 +224,7 @@ namespace rlogic
     template RLOGIC_API const LogicObject*             LogicEngine::findLogicObjectInternal<LogicObject>(std::string_view) const;
     template RLOGIC_API const LuaScript*               LogicEngine::findLogicObjectInternal<LuaScript>(std::string_view) const;
     template RLOGIC_API const LuaModule*               LogicEngine::findLogicObjectInternal<LuaModule>(std::string_view) const;
+    template RLOGIC_API const LuaInterface*            LogicEngine::findLogicObjectInternal<LuaInterface>(std::string_view) const;
     template RLOGIC_API const RamsesNodeBinding*       LogicEngine::findLogicObjectInternal<RamsesNodeBinding>(std::string_view) const;
     template RLOGIC_API const RamsesAppearanceBinding* LogicEngine::findLogicObjectInternal<RamsesAppearanceBinding>(std::string_view) const;
     template RLOGIC_API const RamsesCameraBinding*     LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view) const;
@@ -232,6 +235,7 @@ namespace rlogic
     template RLOGIC_API LogicObject*             LogicEngine::findLogicObjectInternal<LogicObject>(std::string_view);
     template RLOGIC_API LuaScript*               LogicEngine::findLogicObjectInternal<LuaScript>(std::string_view);
     template RLOGIC_API LuaModule*               LogicEngine::findLogicObjectInternal<LuaModule>(std::string_view);
+    template RLOGIC_API LuaInterface*            LogicEngine::findLogicObjectInternal<LuaInterface>(std::string_view);
     template RLOGIC_API RamsesNodeBinding*       LogicEngine::findLogicObjectInternal<RamsesNodeBinding>(std::string_view);
     template RLOGIC_API RamsesAppearanceBinding* LogicEngine::findLogicObjectInternal<RamsesAppearanceBinding>(std::string_view);
     template RLOGIC_API RamsesCameraBinding*     LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view);

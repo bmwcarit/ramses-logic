@@ -76,6 +76,77 @@ namespace rlogic
             "\t[string \"errorInInterface\"]:3: in function <[string \"errorInInterface\"]:2>");
     }
 
+    TEST_F(ALuaScript_Interface, DeclaresStruct_WithExplicitTypeSyntax)
+    {
+        std::string_view explicitStructSyntax = R"(
+            function interface(IN,OUT)
+                IN.struct = Type:Struct({})
+            end
+
+            function run(IN,OUT)
+            end
+        )";
+
+        LuaScript* script = m_logicEngine.createLuaScript(explicitStructSyntax);
+
+        auto inputs = script->getInputs();
+
+        ASSERT_EQ(1u, inputs->getChildCount());
+        EXPECT_EQ("struct", inputs->getChild(0)->getName());
+        EXPECT_EQ(EPropertyType::Struct, inputs->getChild(0)->getType());
+        ASSERT_EQ(0u, inputs->getChild(0)->getChildCount());
+    }
+
+    TEST_F(ALuaScript_Interface, DeclaresNestedStruct_WithExplicitTypeSyntax)
+    {
+        std::string_view explicitStructSyntax = R"(
+            function interface(IN,OUT)
+                IN.struct = Type:Struct({
+                    nested = Type:Struct({subnested = Type:Float()})
+                })
+            end
+
+            function run(IN,OUT)
+            end
+        )";
+
+        LuaScript* script = m_logicEngine.createLuaScript(explicitStructSyntax);
+
+        auto inputs = script->getInputs();
+        ASSERT_EQ(1u, inputs->getChildCount());
+
+        auto str = inputs->getChild(0);
+        EXPECT_EQ(EPropertyType::Struct, str->getType());
+        EXPECT_EQ("struct", str->getName());
+        ASSERT_EQ(1u, str->getChildCount());
+
+        auto nested = str->getChild(0);
+        EXPECT_EQ(EPropertyType::Struct, nested->getType());
+        EXPECT_EQ("nested", nested->getName());
+        ASSERT_EQ(1u, nested->getChildCount());
+
+        auto subnested = nested->getChild(0);
+        EXPECT_EQ(EPropertyType::Float, subnested->getType());
+        EXPECT_EQ("subnested", subnested->getName());
+        ASSERT_EQ(0u, subnested->getChildCount());
+    }
+
+    TEST_F(ALuaScript_Interface, ReportsError_WhenDeclaredStructWithExplicitTypeWithoutArgument)
+    {
+        std::string_view explicitStructSyntax = R"(
+            function interface(IN,OUT)
+                IN.struct = Type:Struct()
+            end
+
+            function run(IN,OUT)
+            end
+        )";
+
+        LuaScript* script = m_logicEngine.createLuaScript(explicitStructSyntax);
+        ASSERT_EQ(nullptr, script);
+        EXPECT_THAT(m_logicEngine.getErrors().back().message, ::testing::HasSubstr("Type:Struct(T) invoked with invalid type parameter T!"));
+    }
+
     TEST_F(ALuaScript_Interface, ReturnsItsTopLevelOutputsByIndex_OrderedLexicographically)
     {
         auto* script = m_logicEngine.createLuaScript(m_minimalScriptWithOutputs);
@@ -580,4 +651,65 @@ namespace rlogic
                 ::testing::HasSubstr(fmt::format("Unexpected global access to key '{}' in interface()! Only 'GLOBAL' and 'Type' are allowed as a key", specialFunction)));
         }
     }
+
+    // Don't modify this test - it captures specific behavior related to a bug with Ramses Logic 1.0 after reworking the type system
+    // Need to keep as confidence test to safeguard against regressions
+    TEST_F(ALuaScript_Interface, Bugfix_Confidence_HandlesComplexTypeDeclarationWithNestedStructs)
+    {
+        rlogic::LogicEngine logicEngine;
+
+        std::string scriptText = R"(
+            function interface(IN,OUT)
+                local craneGimbal = {
+                    cam_Translation = Type:Vec3f(),
+                    POS_ORIGIN_Translation = Type:Vec3f(),
+                    PITCH_Rotation = Type:Vec3f(),
+                    YAW_Rotation = Type:Vec3f()
+                }
+
+                local viewport = {
+                    offsetX = Type:Int32(),
+                    offsetY = Type:Int32(),
+                    width = Type:Int32(),
+                    height = Type:Int32()
+                }
+
+                local frustum_persp = {
+                    nearPlane = Type:Float(),
+                    farPlane =  Type:Float(),
+                    fieldOfView = Type:Float(),
+                    aspectRatio = Type:Float()
+                }
+
+                local frustum_ortho = {
+                    nearPlane = Type:Float(),
+                    farPlane =  Type:Float(),
+                    leftPlane = Type:Float(),
+                    rightPlane = Type:Float(),
+                    bottomPlane = Type:Float(),
+                    topPlane = Type:Float()
+                }
+
+                OUT.CameraSettings = {
+                    CraneGimbal = craneGimbal,
+                    CraneGimbal_R = craneGimbal,
+                    scene_camera = {
+                        Viewport = viewport,
+                        Frustum = frustum_persp,
+                    },
+                    ui_camera = {
+                        Frustum = frustum_ortho,
+                        Viewport = viewport,
+                        translation = Type:Vec3f(),
+                    }
+                }
+            end
+            function run(IN,OUT)
+            end
+        )";
+
+        auto* script = logicEngine.createLuaScript(scriptText);
+        ASSERT_TRUE(script != nullptr);
+    }
+
 }

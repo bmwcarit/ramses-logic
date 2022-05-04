@@ -9,6 +9,7 @@
 #include "ramses-logic/LogicObject.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
@@ -68,6 +69,7 @@ namespace rlogic
     template RLOGIC_API const RamsesBinding*           LogicObject::internalCast() const;
     template RLOGIC_API const LuaModule*               LogicObject::internalCast() const;
     template RLOGIC_API const LuaScript*               LogicObject::internalCast() const;
+    template RLOGIC_API const LuaInterface*            LogicObject::internalCast() const;
     template RLOGIC_API const RamsesNodeBinding*       LogicObject::internalCast() const;
     template RLOGIC_API const RamsesAppearanceBinding* LogicObject::internalCast() const;
     template RLOGIC_API const RamsesCameraBinding*     LogicObject::internalCast() const;
@@ -80,6 +82,7 @@ namespace rlogic
     template RLOGIC_API RamsesBinding*           LogicObject::internalCast();
     template RLOGIC_API LuaModule*               LogicObject::internalCast();
     template RLOGIC_API LuaScript*               LogicObject::internalCast();
+    template RLOGIC_API LuaInterface*            LogicObject::internalCast();
     template RLOGIC_API RamsesNodeBinding*       LogicObject::internalCast();
     template RLOGIC_API RamsesAppearanceBinding* LogicObject::internalCast();
     template RLOGIC_API RamsesCameraBinding*     LogicObject::internalCast();

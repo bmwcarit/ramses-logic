@@ -63,6 +63,6 @@ namespace rlogic::internal
         std::optional<LogicNodeRuntimeError> update() override;
         void createRootProperties() final;
 
-        [[nodiscard]] bool checkAllOutputsLinked(std::vector<const Property*>& unlinkedOutputsOut) const;
+        [[nodiscard]] std::vector<const Property*> collectUnlinkedProperties() const;
     };
 }

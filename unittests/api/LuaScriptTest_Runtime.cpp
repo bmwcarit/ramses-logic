@@ -665,6 +665,107 @@ namespace rlogic
         EXPECT_FLOAT_EQ(0.3f, *out_array_float->getChild(2)->get<float>());
     }
 
+    TEST_F(ALuaScript_Runtime, AssignsNestedTableToMultidimensionalArrays)
+    {
+        std::string_view scriptWithMultiDimArrays = R"(
+            function interface(IN,OUT)
+                OUT.array2d = Type:Array(2, Type:Array(2, Type:Int32()))
+            end
+
+            function run(IN,OUT)
+                OUT.array2d = {
+                    {1,2}, {3, 4},
+                }
+            end
+        )";
+
+        auto* script = m_logicEngine.createLuaScript(scriptWithMultiDimArrays);
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        auto array2DOut = script->getOutputs()->getChild("array2d");
+
+        int32_t value = 1;
+        for (int32_t i = 0; i < 2; ++i)
+        {
+            for (int32_t j = 0; j < 2; ++j)
+            {
+                EXPECT_EQ(value, *array2DOut->getChild(i)->getChild(j)->get<int32_t>());
+                ++value;
+            }
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, AssignsInputValuesToMultidimensionalArrays)
+    {
+        std::string_view scriptWithMultiDimArrays = R"(
+            function interface(IN,OUT)
+                local arrayType = Type:Array(2, Type:Array(2, Type:Array(2, Type:Int32())))
+                IN.array3d = arrayType
+                OUT.array3d = arrayType
+            end
+
+            function run(IN,OUT)
+                OUT.array3d = IN.array3d
+            end
+        )";
+
+        auto* script = m_logicEngine.createLuaScript(scriptWithMultiDimArrays);
+
+        auto array3DIn = script->getInputs()->getChild("array3d");
+
+        for (int32_t i = 0; i < 2; ++i)
+        {
+            for (int32_t j = 0; j < 2; ++j)
+            {
+                for (int32_t k = 0; k < 2; ++k)
+                {
+                    array3DIn->getChild(i)->getChild(j)->getChild(k)->set<int32_t>(i * j * k);
+                }
+            }
+        }
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        auto array3DOut = script->getOutputs()->getChild("array3d");
+
+        for (int32_t i = 0; i < 2; ++i)
+        {
+            for (int32_t j = 0; j < 2; ++j)
+            {
+                for (int32_t k = 0; k < 2; ++k)
+                {
+                    EXPECT_EQ(i * j * k, *array3DOut->getChild(i)->getChild(j)->getChild(k)->get<int32_t>());
+                }
+            }
+        }
+    }
+
+    TEST_F(ALuaScript_Runtime, AssignsDataToMultidimensionalArraysWithStructs_FromExampleInDocs)
+    {
+        std::string_view scriptSrc = R"(
+            function interface(IN, OUT)
+                local coalaStruct = Type:Struct({name = Type:String()})
+                -- 100 x 100 array (2 dimensions), element type is a struct
+                OUT.coala_army = Type:Array(100, Type:Array(100, coalaStruct))
+            end
+
+            function run(IN, OUT)
+                for i,row in rl_ipairs(OUT.coala_army) do
+                    for j,coala in rl_ipairs(row) do
+                        coala.name = "soldier " .. tostring(i) .. "-" .. tostring(j)
+                    end
+                end
+            end
+        )";
+
+        auto* script = m_logicEngine.createLuaScript(scriptSrc, WithStdModules({EStandardModule::Base}));
+
+        ASSERT_NE(nullptr, script);
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_EQ("soldier 8-7", *script->getOutputs()->getChild("coala_army")->getChild(7)->getChild(6)->getChild("name")->get<std::string>());
+    }
+
     // TODO Violin refactor other tests which test 'unexpected type' to also list all invalid types like this one
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAccessingArrayWithNonIntegerIndex)
     {

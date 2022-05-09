@@ -1,5 +1,12 @@
 # master
 
+# v1.0.2
+
+**Bugfixes**
+
+* Fixes more crashes with large interface objects
+* Produces CMake error if compiled with Clang++ < 10.0.0 (older versions don't support C++17 fully)
+
 # v1.0.1
 
 **Bugfixes**

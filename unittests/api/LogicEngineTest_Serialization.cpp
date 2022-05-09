@@ -834,7 +834,7 @@ namespace rlogic::internal
         EXPECT_FALSE(m_logicEngine.loadFromFile("temp.bin"));
         auto errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Tried loading a binary data which doesn't a Ramses Logic! Expected file bytes 4-5 to be 'rl', but found 'xy' instead")));
+        EXPECT_THAT(errors[0].message, ::testing::HasSubstr(fmt::format("Tried loading a binary data which doesn't store Ramses Logic content! Expected file bytes 4-5 to be 'rl', but found 'xy' instead")));
     }
 
     TEST_F(ALogicEngine_Serialization_Compatibility, ProducesErrorIfDeserilizedFromIncompatibleFileVersion)

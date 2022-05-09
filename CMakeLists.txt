@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(RLOGIC_VERSION_MAJOR 1)
 set(RLOGIC_VERSION_MINOR 0)
-set(RLOGIC_VERSION_PATCH 1)
+set(RLOGIC_VERSION_PATCH 2)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -140,8 +140,15 @@ file(GLOB internal_headers      lib/internals/*.h)
 file(GLOB flatbuf_gen_headers   lib/flatbuffers/generated/*.h)
 file(GLOB flatbuf_schemas       lib/flatbuffers/schemas/*.fbs)
 
-file(GLOB impl_src      lib/impl/*.cpp)
-file(GLOB internals_src lib/internals/*.cpp)
+file(GLOB impl_src              lib/impl/*.cpp)
+file(GLOB internals_src         lib/internals/*.cpp)
+
+# Attach sol headers to ramses-logic-obj to be able to navigate/debug with them
+# Workaround for MSVC (ignores interface targets otherwise if not attached to a non-interface target)
+file(GLOB sol_headers
+    external/sol/include/sol/*.hpp
+    external/sol/include/sol/compatibility/*
+    )
 
 add_library(ramses-logic-obj OBJECT)
 
@@ -154,17 +161,20 @@ target_sources(ramses-logic-obj
         ${internals_src}
         ${flatbuf_gen_headers}
         ${flatbuf_schemas}
+        ${sol_headers}
 )
 
-# Not obvious, but this is the only robust way to add files to a VS project with CMake
+# This is the only robust way to add files to a VS project with CMake
 # without having them treated as source files
 set_source_files_properties(${flatbuf_gen_headers} PROPERTIES HEADER_FILE_ONLY TRUE)
 set_source_files_properties(${flatbuf_schemas} PROPERTIES HEADER_FILE_ONLY TRUE)
+set_source_files_properties(${sol_headers} PROPERTIES HEADER_FILE_ONLY TRUE)
 
 source_group("Header Files" FILES ${public_headers})
 source_group("Header Files\\internals\\impl" FILES ${impl_headers})
 source_group("Header Files\\internals" FILES ${internal_headers})
 source_group("Header Files\\generated" FILES ${flatbuf_gen_headers})
+source_group("Header Files\\sol" FILES ${sol_headers})
 source_group("Source Files\\impl" FILES ${impl_src})
 source_group("Source Files\\internals" FILES ${internals_src})
 source_group("FlatbufSchemas" FILES ${flatbuf_schemas})

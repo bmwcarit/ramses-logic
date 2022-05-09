@@ -138,7 +138,17 @@ if(NOT TARGET sol2)
     add_subdirectory(sol EXCLUDE_FROM_ALL)
 
     # Ensure sol is expecting c++ compiled lua
-    target_compile_definitions(sol2 INTERFACE SOL_USING_CXX_LUA=1 SOL_EXCEPTIONS_ALWAYS_UNSAFE=1 SOL_SAFE_NUMERICS=1)
+    target_compile_definitions(sol2 INTERFACE
+        # we compile lua with c++, make sol not use extern C etc
+        SOL_USING_CXX_LUA=1
+        # catch and redirect exception to user handler func instead of
+        # prapagating them directly through lua
+        SOL_EXCEPTIONS_ALWAYS_UNSAFE=1
+        # check if types are numbers before using them as numbers
+        SOL_SAFE_NUMERICS=1
+        # ensure sol calls luaL_checkstack to avoid stack overflows
+        SOL_SAFE_STACK_CHECK=1
+    )
 endif()
 
 ################################################

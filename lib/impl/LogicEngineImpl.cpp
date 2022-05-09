@@ -334,7 +334,7 @@ namespace rlogic::internal
         const std::string expected(rlogic_serialization::LogicEngineIdentifier());
         if (expected.substr(0, 2) != fileIdBytes.substr(0, 2))
         {
-            m_errors.add(fmt::format("{}: Tried loading a binary data which doesn't a Ramses Logic! Expected file bytes 4-5 to be '{}', but found '{}' instead",
+            m_errors.add(fmt::format("{}: Tried loading a binary data which doesn't store Ramses Logic content! Expected file bytes 4-5 to be '{}', but found '{}' instead",
                 dataSourceDescription,
                 expected.substr(0, 2),
                 fileIdBytes.substr(0, 2)

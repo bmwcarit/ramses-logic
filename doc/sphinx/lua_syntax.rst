@@ -145,6 +145,25 @@ Here is another example, this time with arrays:
 In the example above, ``IN.bamboo_coordinates`` is an input array of 10 elements, each of type ``Vec3f``. ``OUT.located_bamboo`` is an output
 array with a `Struct` type - each of the 10 elements has a ``position`` and a ``not_eaten_yet`` property.
 
+You can mix and match array and struct containers in various ways. For example you can also declare multi-
+dimensional arrays like this:
+
+.. code-block:: lua
+
+    function interface(IN, OUT)
+        local coalaStruct = Type:Struct({name = Type:String()})
+        -- 100 x 100 array (2 dimensions), element type is a struct
+        OUT.coala_army = Type:Array(100, Type:Array(100, coalaStruct))
+    end
+
+    function run(IN, OUT)
+        for i,row in rl_ipairs(OUT.coala_army) do
+            for j,coala in rl_ipairs(row) do
+                coala.name = "soldier " .. tostring(i) .. "-" .. tostring(j)
+            end
+        end
+    end
+
 Even though the ``IN`` and ``OUT`` objects are used by both ``interface()`` and ``run()`` functions,
 they have different semantics in each function. The ``interface`` function only **declares** the interface
 of the script, thus properties declared there can **only have a type**, they don't have a **value** yet -

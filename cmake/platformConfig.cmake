@@ -91,6 +91,10 @@ ENDIF()
 
 # clang specific
 IF("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 10.0)
+        message(FATAL_ERROR "Clang versions prior 10.0 are not supported")
+    endif()
+
     ADD_FLAGS(RLOGIC_C_CXX_FLAGS "-Wimplicit-fallthrough")
 
     #  do not optimize debug build at all (-Og is wrong on clang)

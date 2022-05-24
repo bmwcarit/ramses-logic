@@ -1,5 +1,22 @@
 # master
 
+# v1.0.3
+
+** General Changes**
+
+* ramses-logic-viewer: added support for lua interfaces
+
+**API Changes**
+
+* Added rlogic::Property::hasIncomingLink()
+* Added rlogic::Property::hasOutgoingLink()
+
+**Bugfixes**
+
+* Remove subtle behavior differences in Lua script between Debug/Release builds
+* Fixed API documentation for rlogic::Property::isLinked()
+* ramses-logic-viewer: fixed property access in lua configuration file
+
 # v1.0.2
 
 **Bugfixes**
@@ -459,7 +476,7 @@ all binary content when switching to v0.5.0!
 **Semantic changes**
 
 * Changed behavior of `RamsesBinding`. See
-  [binding docs](https://ramses-logic.readthedocs.io/en/latest/api.html#linking-scripts-to-ramses-scenes) for details.
+  [binding docs](https://ramses-logic.readthedocs.io/en/v1.0.0/api.html#linking-logic-nodes-to-ramses-scenes) for details.
   See [data flow docs](https://ramses-logic.readthedocs.io/en/latest/api.html#data-flow) for general overview
   how data flow works in the logic engine.
 

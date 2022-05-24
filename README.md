@@ -71,6 +71,7 @@ listed alongside their licenses here:
 * Googletest (BSD-3-Clause)
 * Google Benchmark (Apache-2.0)
 * ImGui (MIT)
+* CLI11 (BSD-3-Clause)
 
 All of the above dependencies are referenced as Git submodules pointing to their original
 repository. Hence, no modifications are made by Ramses Logic.

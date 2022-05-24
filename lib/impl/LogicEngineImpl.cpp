@@ -420,9 +420,11 @@ namespace rlogic::internal
             LogAssetMetadata(*logicEngine->assetMetadata());
         }
 
-        RamsesObjectResolver ramsesResolver(m_errors, scene);
+        std::unique_ptr<IRamsesObjectResolver> ramsesResolver;
+        if (scene != nullptr)
+            ramsesResolver = std::make_unique<RamsesObjectResolver>(m_errors, *scene);
 
-        std::unique_ptr<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*logicEngine->apiObjects(), ramsesResolver, dataSourceDescription, m_errors);
+        std::unique_ptr<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*logicEngine->apiObjects(), ramsesResolver.get(), dataSourceDescription, m_errors);
 
         if (!deserializedObjects)
         {

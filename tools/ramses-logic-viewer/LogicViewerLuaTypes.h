@@ -89,7 +89,7 @@ namespace rlogic
         sol::object get(sol::stack_object key, sol::this_state L);
         NodeListIterator<T> iterator();
 
-        LogicNode* find(const std::string& key);
+        LogicNode* find(std::string_view key);
         Collection<T> collection();
 
         LogicEngine& m_logicEngine;

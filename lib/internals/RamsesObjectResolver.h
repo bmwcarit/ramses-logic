@@ -8,31 +8,46 @@
 
 #pragma once
 
-#include "internals/IRamsesObjectResolver.h"
+#include "ramses-framework-api/RamsesFrameworkTypes.h"
+#include <string>
 
 namespace ramses
 {
     class SceneObject;
+    class Scene;
+    class Node;
+    class Appearance;
+    class Camera;
 }
 
 namespace rlogic::internal
 {
     class ErrorReporting;
 
-    class RamsesObjectResolver : public IRamsesObjectResolver
+    class IRamsesObjectResolver
     {
     public:
-        explicit RamsesObjectResolver(ErrorReporting& errorReporting, ramses::Scene* scene);
+        virtual ~IRamsesObjectResolver() = default;
 
-        // TODO Violin remove duplications between these methods
+        [[nodiscard]] virtual ramses::Node* findRamsesNodeInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
+        [[nodiscard]] virtual ramses::Appearance* findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
+        [[nodiscard]] virtual ramses::Camera* findRamsesCameraInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
+    };
+
+    class RamsesObjectResolver final : public IRamsesObjectResolver
+    {
+    public:
+        explicit RamsesObjectResolver(ErrorReporting& errorReporting, ramses::Scene& scene);
+
         [[nodiscard]] ramses::Node* findRamsesNodeInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
         [[nodiscard]] ramses::Appearance* findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
         [[nodiscard]] ramses::Camera* findRamsesCameraInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
 
     private:
-        ErrorReporting& m_errors;
-        ramses::Scene* m_scene;
+        template <typename T>
+        [[nodiscard]] T* findRamsesObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const;
 
-        [[nodiscard]] ramses::SceneObject* findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const;
+        ErrorReporting& m_errors;
+        ramses::Scene& m_scene;
     };
 }

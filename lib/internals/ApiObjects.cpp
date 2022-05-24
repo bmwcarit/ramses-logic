@@ -795,7 +795,7 @@ namespace rlogic::internal
 
     std::unique_ptr<ApiObjects> ApiObjects::Deserialize(
         const rlogic_serialization::ApiObjects& apiObjects,
-        const IRamsesObjectResolver& ramsesResolver,
+        const IRamsesObjectResolver* ramsesResolver,
         const std::string& dataSourceDescription,
         ErrorReporting& errorReporting)
     {
@@ -938,12 +938,24 @@ namespace rlogic::internal
             }
         }
 
+        if (apiObjects.nodeBindings()->size() != 0u ||
+            apiObjects.appearanceBindings()->size() != 0u ||
+            apiObjects.cameraBindings()->size() != 0u)
+        {
+            if (ramsesResolver == nullptr)
+            {
+                errorReporting.add("Fatal error during loading from file! File contains references to Ramses objects but no Ramses scene was provided!", nullptr, EErrorType::BinaryVersionMismatch);
+                return nullptr;
+            }
+        }
+
         const auto& ramsesNodeBindings = *apiObjects.nodeBindings();
         deserialized->m_ramsesNodeBindings.reserve(ramsesNodeBindings.size());
         for (const auto* binding : ramsesNodeBindings)
         {
-            assert (binding);
-            std::unique_ptr<RamsesNodeBindingImpl> deserializedBinding = RamsesNodeBindingImpl::Deserialize(*binding, ramsesResolver, errorReporting, deserializationMap);
+            assert(binding);
+            assert(ramsesResolver);
+            std::unique_ptr<RamsesNodeBindingImpl> deserializedBinding = RamsesNodeBindingImpl::Deserialize(*binding, *ramsesResolver, errorReporting, deserializationMap);
 
             if (deserializedBinding)
             {
@@ -963,7 +975,8 @@ namespace rlogic::internal
         for (const auto* binding : ramsesAppearanceBindings)
         {
             assert(binding);
-            std::unique_ptr<RamsesAppearanceBindingImpl> deserializedBinding = RamsesAppearanceBindingImpl::Deserialize(*binding, ramsesResolver, errorReporting, deserializationMap);
+            assert(ramsesResolver);
+            std::unique_ptr<RamsesAppearanceBindingImpl> deserializedBinding = RamsesAppearanceBindingImpl::Deserialize(*binding, *ramsesResolver, errorReporting, deserializationMap);
 
             if (deserializedBinding)
             {
@@ -983,7 +996,8 @@ namespace rlogic::internal
         for (const auto* binding : ramsesCameraBindings)
         {
             assert(binding);
-            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(*binding, ramsesResolver, errorReporting, deserializationMap);
+            assert(ramsesResolver);
+            std::unique_ptr<RamsesCameraBindingImpl> deserializedBinding = RamsesCameraBindingImpl::Deserialize(*binding, *ramsesResolver, errorReporting, deserializationMap);
 
             if (deserializedBinding)
             {

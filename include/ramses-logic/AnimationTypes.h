@@ -23,7 +23,7 @@ namespace rlogic
     {
         Step,               ///< Switches the value in the middle between two keyframe values
         Linear,             ///< Interpolates using linear function
-        Cubic,              ///< Interpolates using cubic function, see https://github.com/KhronosGroup/glTF/tree/master/specification/2.0?ts=4#appendix-c-spline-interpolation
+        Cubic,              ///< Interpolates using cubic function, see https://www.khronos.org/registry/glTF/specs/2.0/glTF-2.0.html#interpolation-cubic
         Linear_Quaternions, ///< Linear interpolation for vec4f values which are normalized for use as Quaternions after interpolation
         Cubic_Quaternions,  ///< Cubic interpolation for vec4f values which are normalized for use as Quaternions after interpolation
     };

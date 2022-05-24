@@ -21,96 +21,54 @@
 
 namespace rlogic::internal
 {
-    RamsesObjectResolver::RamsesObjectResolver(ErrorReporting& errorReporting, ramses::Scene* scene)
+    RamsesObjectResolver::RamsesObjectResolver(ErrorReporting& errorReporting, ramses::Scene& scene)
         : m_errors(errorReporting)
         , m_scene(scene)
     {
     }
 
-    ramses::SceneObject* RamsesObjectResolver::findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
-    {
-        if (nullptr == m_scene)
-        {
-            m_errors.add(
-                fmt::format("Fatal error during loading from file! Serialized Ramses Logic object '{}' points to a Ramses object (id: {}), but no Ramses scene was provided to resolve the Ramses object!",
-                            logicNodeName,
-                            objectId.getValue()
-                    ), nullptr, EErrorType::ContentStateError);
-            return nullptr;
-        }
-
-        ramses::SceneObject* sceneObject = m_scene->findObjectById(objectId);
-
-        if (nullptr == sceneObject)
-        {
-            m_errors.add(
-                fmt::format("Fatal error during loading from file! Serialized Ramses Logic object '{}' points to a Ramses object (id: {}) which couldn't be found in the provided scene!",
-                            logicNodeName,
-                            objectId.getValue()
-                ), nullptr, EErrorType::ContentStateError);
-            return nullptr;
-        }
-
-        return sceneObject;
-    }
-
     ramses::Node* RamsesObjectResolver::findRamsesNodeInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
     {
-        ramses::SceneObject* sceneObject = findRamsesSceneObjectInScene(logicNodeName, objectId);
-
-        if (nullptr == sceneObject)
-        {
-            return nullptr;
-        }
-
-        auto* ramsesNode = ramses::RamsesUtils::TryConvert<ramses::Node>(*sceneObject);
-
-        if (nullptr == ramsesNode)
-        {
-            m_errors.add("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!", nullptr, EErrorType::ContentStateError);
-            return nullptr;
-        }
-
-        return ramsesNode;
+        return findRamsesObjectInScene<ramses::Node>(logicNodeName, objectId);
     }
 
     ramses::Appearance* RamsesObjectResolver::findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
     {
-        ramses::SceneObject* sceneObject = findRamsesSceneObjectInScene(logicNodeName, objectId);
-
-        if (nullptr == sceneObject)
-        {
-            return nullptr;
-        }
-
-        auto* ramsesAppearance = ramses::RamsesUtils::TryConvert<ramses::Appearance>(*sceneObject);
-
-        if (nullptr == ramsesAppearance)
-        {
-            m_errors.add("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!", nullptr, EErrorType::ContentStateError);
-            return nullptr;
-        }
-
-        return ramsesAppearance;
+        return findRamsesObjectInScene<ramses::Appearance>(logicNodeName, objectId);
     }
 
     ramses::Camera* RamsesObjectResolver::findRamsesCameraInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
     {
-        ramses::SceneObject* sceneObject = findRamsesSceneObjectInScene(logicNodeName, objectId);
-
-        if (nullptr == sceneObject)
-        {
-            return nullptr;
-        }
-
-        auto* ramsesCamera = ramses::RamsesUtils::TryConvert<ramses::Camera>(*sceneObject);
-
-        if (nullptr == ramsesCamera)
-        {
-            m_errors.add("Fatal error during loading from file! Camera binding points to a Ramses scene object which is not of type 'Camera'!", nullptr, EErrorType::ContentStateError);
-            return nullptr;
-        }
-
-        return ramsesCamera;
+        return findRamsesObjectInScene<ramses::Camera>(logicNodeName, objectId);
     }
+
+    template <typename T>
+    T* RamsesObjectResolver::findRamsesObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
+    {
+        ramses::SceneObject* sceneObject = m_scene.findObjectById(objectId);
+
+        if (sceneObject == nullptr)
+        {
+            m_errors.add(
+                fmt::format("Fatal error during loading from file! Serialized Ramses Logic object '{}' points to a Ramses object (id: {}) which couldn't be found in the provided scene!",
+                    logicNodeName, objectId.getValue()),
+                nullptr, EErrorType::ContentStateError);
+            return nullptr;
+        }
+
+        T* concreteObject = ramses::RamsesUtils::TryConvert<T>(*sceneObject);
+        if (concreteObject == nullptr)
+        {
+            m_errors.add(fmt::format("Fatal error during loading from file! Ramses binding '{}' points to a Ramses scene object (id: {}) which is not of the same type!",
+                logicNodeName, objectId.getValue()),
+                nullptr, EErrorType::ContentStateError);
+            return nullptr;
+        }
+
+        return concreteObject;
+    }
+
+    template ramses::Node* RamsesObjectResolver::findRamsesObjectInScene<ramses::Node>(std::string_view, ramses::sceneObjectId_t) const;
+    template ramses::Appearance* RamsesObjectResolver::findRamsesObjectInScene<ramses::Appearance>(std::string_view, ramses::sceneObjectId_t) const;
+    template ramses::Camera* RamsesObjectResolver::findRamsesObjectInScene<ramses::Camera>(std::string_view, ramses::sceneObjectId_t) const;
 }

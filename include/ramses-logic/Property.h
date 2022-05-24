@@ -124,19 +124,40 @@ namespace rlogic
         * Attention! We recommend always specifying the template argument T explicitly, and don't rely on the compiler's
         * type deduction! If T is not one of the supported types, a static_assert will be triggered!
         *
+        * #set() will report an error if the Property is linked. Use #hasIncomingLink() to check in advance.
+        *
         * @param value the value to set for this Property
         * @return true if setting the \p value was successful, false otherwise.
         */
         template <typename T> bool set(T value);
 
         /**
-        * Checks if an input property is linked to an output property of another node. Setting values of linked inputs will result in errors,
-        * use this to check an input is not linked before setting it.
-        * Calling this method for properties which are not inputs will report an error and return false.
+        * Checks if this property is linked to a property of another node.
+        *
+        * Property can be either on inputs side or outputs side of a node (or both in case of #rlogic::LuaInterface),
+        * which defines what type of link is applicable - an incoming or outgoing.
+        * This query checks for any links, regardless of data flow direction.
+        * See #hasIncomingLink() #hasOutgoingLink() for dedicated checks
+        *
+        * @return true if the property is linked, false otherwise.
+        */
+        [[nodiscard]] RLOGIC_API bool isLinked() const;
+
+        /**
+        * Checks if there is any incoming link to this property, i.e. data is flowing to it from another node's property.
+        * There can be only one incoming link per input property.
         *
         * @return true if the property is an input and is linked, false otherwise.
         */
-        [[nodiscard]] RLOGIC_API bool isLinked() const;
+        [[nodiscard]] RLOGIC_API bool hasIncomingLink() const;
+
+        /**
+        * Checks if there is any outgoing link from this property, i.e. data is flowing from it to another node's property.
+        * There can be multiple outgoing links per output property.
+        *
+        * @return true if the property is an output and is linked, false otherwise.
+        */
+        [[nodiscard]] RLOGIC_API bool hasOutgoingLink() const;
 
         /**
         * Constructor of Property. User is not supposed to call this - properties are created by other factory classes

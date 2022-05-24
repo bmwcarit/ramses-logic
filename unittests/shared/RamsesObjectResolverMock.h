@@ -10,7 +10,7 @@
 
 #include "gmock/gmock.h"
 
-#include "internals/IRamsesObjectResolver.h"
+#include "internals/RamsesObjectResolver.h"
 
 namespace rlogic::internal
 {

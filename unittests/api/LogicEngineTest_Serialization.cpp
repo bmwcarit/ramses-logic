@@ -965,10 +965,10 @@ namespace rlogic::internal
         EXPECT_EQ(18u, obj->getUserId().second);
     }
 
+    // This test will always break on incompatible file format changes. See instructions how to fix below
+    // Run the RL_REGEN_TEST_ASSETS target to re-create the test files used in this test
     TEST(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine)
     {
-        // Execute the testAssetProducer in /testAssetProducer to re-export with newer version on file breaking changes
-        // Then copy the resulting testLogic.bin and testScene.bin to unittests/res folder
         {
             // Load and update works
             RamsesTestSetup ramses;

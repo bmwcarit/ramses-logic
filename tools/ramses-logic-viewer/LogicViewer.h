@@ -29,6 +29,7 @@ namespace rlogic
         // global tokens
         static const char* const ltnModule;
         static const char* const ltnScript;
+        static const char* const ltnInterface;
         static const char* const ltnAnimation;
         static const char* const ltnTimer;
         static const char* const ltnNode;
@@ -39,6 +40,8 @@ namespace rlogic
         static const char* const ltnLink;
         static const char* const ltnUnlink;
         static const char* const ltnUpdate;
+        static const char* const ltnIN;
+        static const char* const ltnOUT;
         // property type
         static const char* const ltnPropertyValue;
         // view type

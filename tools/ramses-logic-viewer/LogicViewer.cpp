@@ -15,6 +15,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Property.h"
 #include "fmt/format.h"
 #include "internals/SolHelper.h"
@@ -54,6 +55,7 @@ namespace rlogic
     {
         explicit LogicWrapper(LogicEngine& logicEngine, sol::state& sol)
             : views(sol.create_table())
+            , interfaces(logicEngine)
             , scripts(logicEngine)
             , animations(logicEngine)
             , timers(logicEngine)
@@ -65,6 +67,7 @@ namespace rlogic
 
         sol::table views;
 
+        NodeListWrapper<LuaInterface> interfaces;
         NodeListWrapper<LuaScript> scripts;
         NodeListWrapper<AnimationNode> animations;
         NodeListWrapper<TimerNode> timers;
@@ -75,6 +78,7 @@ namespace rlogic
 
     const char* const LogicViewer::ltnModule     = "rlogic";
     const char* const LogicViewer::ltnScript     = "scripts";
+    const char* const LogicViewer::ltnInterface  = "interfaces";
     const char* const LogicViewer::ltnAnimation  = "animationNodes";
     const char* const LogicViewer::ltnTimer      = "timerNodes";
     const char* const LogicViewer::ltnNode       = "nodeBindings";
@@ -85,6 +89,8 @@ namespace rlogic
     const char* const LogicViewer::ltnLink       = "link";
     const char* const LogicViewer::ltnUnlink     = "unlink";
     const char* const LogicViewer::ltnUpdate     = "update";
+    const char* const LogicViewer::ltnIN         = "IN";
+    const char* const LogicViewer::ltnOUT        = "OUT";
 
     const char* const LogicViewer::ltnPropertyValue   = "value";
     const char* const LogicViewer::ltnViewUpdate      = "update";
@@ -110,6 +116,7 @@ namespace rlogic
         m_sol = sol::state();
         m_sol.open_libraries(sol::lib::base, sol::lib::string, sol::lib::math, sol::lib::table, sol::lib::debug);
         m_sol.set_exception_handler(&solExceptionHandler);
+        registerNodeListType<LuaInterface>(m_sol, "Interfaces");
         registerNodeListType<LuaScript>(m_sol, "LuaScripts");
         registerNodeListType<AnimationNode>(m_sol, "AnimationNodes");
         registerNodeListType<TimerNode>(m_sol, "TimerNodes");
@@ -134,6 +141,8 @@ namespace rlogic
         m_sol.new_usertype<LogicWrapper>(
             "RamsesLogic",
             sol::no_constructor,
+            ltnInterface,
+            sol::readonly(&LogicWrapper::interfaces),
             ltnScript,
             sol::readonly(&LogicWrapper::scripts),
             ltnAnimation,
@@ -163,19 +172,31 @@ namespace rlogic
         m_sol[ltnModule] = LogicWrapper(m_logicEngine, m_sol);
 
         m_luaFilename  = filename;
-        auto result = m_sol.script_file(filename);
-        if (!result.valid())
+        auto loadResult = m_sol.load_file(filename);
+        if (!loadResult.valid())
         {
-            sol::error err = result;
+            sol::error err = loadResult;
             std::cerr << err.what() << std::endl;
             m_result = Result(err.what());
+        }
+        else
+        {
+            sol::protected_function mainFunction = loadResult;
+            auto mainResult = mainFunction();
+            if (!mainResult.valid())
+            {
+                sol::error err = mainResult;
+                std::cerr << err.what() << std::endl;
+                m_result = Result(err.what());
+            }
         }
         return m_result;
     }
 
     Result LogicViewer::call(const std::string& functionName)
     {
-        auto result = m_sol[functionName]();
+        sol::protected_function protectedFunction = m_sol[functionName];
+        auto result = protectedFunction();
         if (!result.valid())
         {
             sol::error err = result;
@@ -195,7 +216,7 @@ namespace rlogic
             {
                 const auto elapsed   = std::chrono::steady_clock::now() - m_startTime;
                 const auto millisecs = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-                sol::optional<sol::function> func = (*view)[ltnViewUpdate];
+                sol::optional<sol::protected_function> func = (*view)[ltnViewUpdate];
                 if (func)
                 {
                     auto result = (*func)(millisecs);

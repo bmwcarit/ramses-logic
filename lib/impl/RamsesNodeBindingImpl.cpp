@@ -16,7 +16,7 @@
 #include "impl/LoggerImpl.h"
 
 #include "internals/ErrorReporting.h"
-#include "internals/IRamsesObjectResolver.h"
+#include "internals/RamsesObjectResolver.h"
 #include "internals/RotationUtils.h"
 
 #include "generated/RamsesNodeBindingGen.h"

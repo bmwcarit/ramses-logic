@@ -46,6 +46,7 @@ namespace rlogic
         void drawWindow();
         void drawMenuBar();
         void drawCurrentView();
+        void drawInterfaces();
         void drawScripts();
         void drawAnimationNodes();
         void drawTimerNodes();
@@ -90,20 +91,22 @@ namespace rlogic
             bool showWindow         = true;
             bool showOutputs        = true;
             bool showLinkedInputs   = true;
+            bool showInterfaces     = true;
             bool showScripts        = false;
             bool showAnimationNodes = false;
             bool showTimerNodes     = false;
             bool showDataArrays     = false;
             bool showRamsesBindings = false;
             bool showUpdateReport   = true;
+
             bool luaPreferObjectIds   = false;
             bool luaPreferIdentifiers = false;
 
             bool operator==(const Settings& rhs) const {
-                return showWindow == rhs.showWindow && showOutputs == rhs.showOutputs && showLinkedInputs == rhs.showLinkedInputs && showScripts == rhs.showScripts &&
-                       showAnimationNodes == rhs.showAnimationNodes && showTimerNodes == rhs.showTimerNodes && showDataArrays == rhs.showDataArrays &&
-                       showRamsesBindings == rhs.showRamsesBindings && showUpdateReport == rhs.showUpdateReport && luaPreferObjectIds == rhs.luaPreferObjectIds &&
-                       luaPreferIdentifiers == rhs.luaPreferIdentifiers;
+                return showWindow == rhs.showWindow && showOutputs == rhs.showOutputs && showLinkedInputs == rhs.showLinkedInputs && showInterfaces == rhs.showInterfaces &&
+                       showScripts == rhs.showScripts && showAnimationNodes == rhs.showAnimationNodes && showTimerNodes == rhs.showTimerNodes &&
+                       showDataArrays == rhs.showDataArrays && showRamsesBindings == rhs.showRamsesBindings && showUpdateReport == rhs.showUpdateReport &&
+                       luaPreferObjectIds == rhs.luaPreferObjectIds && luaPreferIdentifiers == rhs.luaPreferIdentifiers;
             }
 
             bool operator!=(const Settings& rhs) const {

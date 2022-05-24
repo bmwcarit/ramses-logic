@@ -62,8 +62,6 @@ For example, for ``Ubuntu 18.04 LTS`` these can be installed like this:
             libwayland-dev \
             libgles2-mesa-dev
 
-Refer to the `RAMSES build instructions <https://github.com/bmwcarit/ramses#building-and-testing>`_ for more details.
-
 ========================================
 Build options
 ========================================

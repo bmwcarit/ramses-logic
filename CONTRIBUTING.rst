@@ -235,15 +235,6 @@ without further changes:
  The following subchapters explain how to execute these builds.
 
 -----------------------------------------------------------------
-Testing Linux builds with Docker
------------------------------------------------------------------
-
-You can build and start the docker container for building by following the
-`build instructions for Docker <https://ramses-logic.readthedocs.io/en/latest/build.html#building-in-docker-windows-or-linux>`_. The possible builds
-and options are listed when executing the build.sh script in the container
-without any parameters.
-
------------------------------------------------------------------
 Testing Windows builds locally
 -----------------------------------------------------------------
 

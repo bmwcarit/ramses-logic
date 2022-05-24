@@ -11,6 +11,7 @@
 #include "ramses-client-api/Scene.h"
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
@@ -19,6 +20,7 @@
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/Property.h"
 #include "internals/StdFilesystemWrapper.h"
+#include "fmt/format.h"
 
 #ifndef _MSC_VER
 #pragma GCC diagnostic push
@@ -350,6 +352,11 @@ namespace rlogic
         drawMenuBar();
         drawCurrentView();
 
+        if (m_settings.showInterfaces)
+        {
+            drawInterfaces();
+        }
+
         if (m_settings.showScripts)
         {
             drawScripts();
@@ -403,6 +410,7 @@ namespace rlogic
             {
                 drawMenuItemShowWindow();
                 ImGui::Separator();
+                ImGui::MenuItem("Show Interfaces", nullptr, &m_settings.showInterfaces);
                 ImGui::MenuItem("Show Scripts", nullptr, &m_settings.showScripts);
                 ImGui::MenuItem("Show Animation Nodes", nullptr, &m_settings.showAnimationNodes);
                 ImGui::MenuItem("Show Timer Nodes", nullptr, &m_settings.showTimerNodes);
@@ -494,6 +502,32 @@ namespace rlogic
             {
                 const bool open = DrawTreeNode(script);
                 drawNodeContextMenu(script, LogicViewer::ltnScript);
+                if (open)
+                {
+                    drawNode(script);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
+    void LogicViewerGui::drawInterfaces()
+    {
+        const bool openInterfaces = ImGui::CollapsingHeader("Interfaces");
+        if (ImGui::BeginPopupContextItem("InterfacesContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all Interface inputs"))
+            {
+                copyInputs(LogicViewer::ltnInterface, m_logicEngine.getCollection<LuaInterface>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openInterfaces)
+        {
+            for (auto* script : m_logicEngine.getCollection<LuaInterface>())
+            {
+                const bool open = DrawTreeNode(script);
+                drawNodeContextMenu(script, LogicViewer::ltnInterface);
                 if (open)
                 {
                     drawNode(script);
@@ -803,7 +837,7 @@ namespace rlogic
         auto* in = obj->getInputs();
         const auto* out = obj->getOutputs();
         ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-        if (TreeNode(in, in->getName()))
+        if (TreeNode(in, std::string_view("Inputs")))
         {
             for (size_t i = 0; i < in->getChildCount(); ++i)
             {
@@ -814,7 +848,7 @@ namespace rlogic
         if (out != nullptr && m_settings.showOutputs)
         {
             ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-            if (TreeNode(out, out->getName()))
+            if (TreeNode(out, std::string_view("Outputs")))
             {
                 for (size_t i = 0; i < out->getChildCount(); ++i)
                 {
@@ -827,7 +861,7 @@ namespace rlogic
 
     void LogicViewerGui::drawProperty(rlogic::Property* prop, size_t index)
     {
-        const bool  isLinked = prop->isLinked();
+        const bool isLinked = prop->hasIncomingLink();
         if (isLinked && !m_settings.showLinkedInputs)
             return;
 
@@ -1117,12 +1151,17 @@ namespace rlogic
             prefix = fmt::format("{}[\"{}\"]", joinedPath, obj->getName());
         }
         PathVector propertyPath;
-        logProperty(obj->getInputs(), prefix, propertyPath);
+        propertyPath.push_back(LogicViewer::ltnIN);
+        auto prop = obj->getInputs();
+        for (size_t i = 0U; i < prop->getChildCount(); ++i)
+        {
+            logProperty(prop->getChild(i), prefix, propertyPath);
+        }
     }
 
     void LogicViewerGui::logProperty(rlogic::Property* prop, const std::string& prefix, PathVector& path)
     {
-        if (prop->isLinked())
+        if (prop->hasIncomingLink())
             return;
 
         path.push_back(prop->getName());
@@ -1210,6 +1249,10 @@ namespace rlogic
         {
             gui->m_settings.showWindow = (flag != 0);
         }
+        else if (IniReadFlag(line, "ShowInterfaces=%d", &flag))
+        {
+            gui->m_settings.showInterfaces = (flag != 0);
+        }
         else if (IniReadFlag(line, "ShowScripts=%d", &flag))
         {
             gui->m_settings.showScripts = (flag != 0);
@@ -1261,6 +1304,8 @@ namespace rlogic
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowWindow=%d\n", gui->m_settings.showWindow ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+        buf->appendf("ShowInterfaces=%d\n", gui->m_settings.showInterfaces ? 1 : 0);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowScripts=%d\n", gui->m_settings.showScripts ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("ShowAnimationNodes=%d\n", gui->m_settings.showAnimationNodes ? 1 : 0);
@@ -1291,7 +1336,28 @@ namespace rlogic
         PathVector path;
         std::string name = std::string("    ") + LogicViewer::ltnModule + "." + LogicViewer::ltnScript;
         path.push_back(name);
+        LogText("    --Interfaces\n");
+        for (auto* script : m_logicEngine.getCollection<LuaInterface>())
+        {
+            logInputs(script, path);
+        }
+        LogText("    --Scripts\n");
         for (auto* script : m_logicEngine.getCollection<LuaScript>())
+        {
+            logInputs(script, path);
+        }
+        LogText("    --Node bindings\n");
+        for (auto* script : m_logicEngine.getCollection<RamsesNodeBinding>())
+        {
+            logInputs(script, path);
+        }
+        LogText("    --Appearance bindings\n");
+        for (auto* script : m_logicEngine.getCollection<RamsesAppearanceBinding>())
+        {
+            logInputs(script, path);
+        }
+        LogText("    --Camera bindings\n");
+        for (auto* script : m_logicEngine.getCollection<RamsesCameraBinding>())
         {
             logInputs(script, path);
         }

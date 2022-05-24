@@ -84,6 +84,8 @@ namespace rlogic::internal
         [[nodiscard]] bool isOutput() const;
         [[nodiscard]] EPropertySemantics getPropertySemantics() const;
         [[nodiscard]] bool isLinked() const;
+        [[nodiscard]] bool hasIncomingLink() const;
+        [[nodiscard]] bool hasOutgoingLink() const;
 
         [[nodiscard]] Property* getChild(size_t index);
         [[nodiscard]] Property* getChild(std::string_view name);

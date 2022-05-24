@@ -148,6 +148,8 @@ if(NOT TARGET sol2)
         SOL_SAFE_NUMERICS=1
         # ensure sol calls luaL_checkstack to avoid stack overflows
         SOL_SAFE_STACK_CHECK=1
+        # Make sure Debug flags are equivalent to Release flags in terms of behavior
+        SOL_IN_DEBUG_DETECTED=0
     )
 endif()
 
@@ -190,6 +192,20 @@ if (NOT TARGET fmt)
     add_subdirectory(fmt)
     folderize_target(fmt "external")
 endif()
+
+################################################
+################     cli11    ##################
+################################################
+
+if (ramses-logic_BUILD_TOOLS AND NOT TARGET CLI11::CLI11)
+    ensure_submodule_exists(cli11)
+
+    add_subdirectory(cli11)
+endif()
+
+################################################
+################     imgui      ##################
+################################################
 
 if(ramses-logic_BUILD_TOOLS AND NOT TARGET imgui)
     ensure_submodule_exists(imgui)

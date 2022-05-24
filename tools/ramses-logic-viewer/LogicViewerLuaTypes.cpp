@@ -7,9 +7,11 @@
 //  -------------------------------------------------------------------------
 
 #include "LogicViewerLuaTypes.h"
+#include "LogicViewer.h"
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LogicNode.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
@@ -218,14 +220,14 @@ namespace rlogic
         if (strKey)
         {
             auto* inputs = m_logicNode.getInputs();
-            if ((inputs != nullptr) && (strKey == inputs->getName()))
+            if ((inputs != nullptr) && (strKey == LogicViewer::ltnIN))
             {
                 retval = sol::object(L, sol::in_place, PropertyWrapper(*inputs));
             }
             else
             {
                 auto* outputs = m_logicNode.getOutputs();
-                if ((outputs != nullptr) && (strKey == outputs->getName()))
+                if ((outputs != nullptr) && (strKey == LogicViewer::ltnOUT))
                 {
                     retval = sol::object(L, sol::in_place, ConstPropertyWrapper(*outputs));
                 }
@@ -273,40 +275,10 @@ namespace rlogic
         return sol::object(L, sol::in_place, sol::lua_nil);
     }
 
-    template <>
-    LogicNode* NodeListWrapper<LuaScript>::find(const std::string& key)
+    template <class T>
+    LogicNode* NodeListWrapper<T>::find(std::string_view key)
     {
-        return m_logicEngine.findByName<LuaScript>(key);
-    }
-
-    template <>
-    LogicNode* NodeListWrapper<AnimationNode>::find(const std::string& key)
-    {
-        return m_logicEngine.findByName<AnimationNode>(key);
-    }
-
-    template <>
-    LogicNode* NodeListWrapper<TimerNode>::find(const std::string& key)
-    {
-        return m_logicEngine.findByName<TimerNode>(key);
-    }
-
-    template <>
-    LogicNode* NodeListWrapper<RamsesNodeBinding>::find(const std::string& key)
-    {
-        return m_logicEngine.findByName<RamsesNodeBinding>(key);
-    }
-
-    template <>
-    LogicNode* NodeListWrapper<RamsesAppearanceBinding>::find(const std::string& key)
-    {
-        return m_logicEngine.findByName<RamsesAppearanceBinding>(key);
-    }
-
-    template <>
-    LogicNode* NodeListWrapper<RamsesCameraBinding>::find(const std::string& key)
-    {
-        return m_logicEngine.findByName<RamsesCameraBinding>(key);
+        return m_logicEngine.findByName<T>(key);
     }
 
     template <class T>
@@ -324,6 +296,7 @@ namespace rlogic
     template struct NodeListWrapper<AnimationNode>;
     template struct NodeListWrapper<TimerNode>;
     template struct NodeListWrapper<LuaScript>;
+    template struct NodeListWrapper<LuaInterface>;
     template struct NodeListWrapper<RamsesNodeBinding>;
     template struct NodeListWrapper<RamsesAppearanceBinding>;
     template struct NodeListWrapper<RamsesCameraBinding>;

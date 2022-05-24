@@ -25,6 +25,17 @@
 #include <thread>
 #include "internals/StdFilesystemWrapper.h"
 
+namespace
+{
+    const int ErrorRamsesClient   = 1;
+    const int ErrorRamsesRenderer = 2;
+    const int ErrorSceneControl   = 3;
+    const int ErrorLoadScene      = 4;
+    const int ErrorLoadLogic      = 5;
+    const int ErrorLoadLua        = 6;
+    const int ErrorNoDisplay      = 7;
+} // namespace
+
 
 bool getPreferredSize(const ramses::Scene& scene, uint32_t& width, uint32_t& height)
 {
@@ -65,7 +76,7 @@ int main(int argc, char* argv[])
     if (!client)
     {
         std::cerr << "Could not create ramses client" << std::endl;
-        return 1;
+        return ErrorRamsesClient;
     }
 
     ramses::RendererConfig  rendererConfig(argc, argv);
@@ -73,14 +84,14 @@ int main(int argc, char* argv[])
     if (!renderer)
     {
         std::cerr << "Could not create ramses renderer" << std::endl;
-        return 2;
+        return ErrorRamsesRenderer;
     }
 
     ramses::RendererSceneControl* sceneControl = renderer->getSceneControlAPI();
     if (!sceneControl)
     {
         std::cerr << "Could not create scene Control" << std::endl;
-        return 3;
+        return ErrorSceneControl;
     }
     renderer->startThread();
     framework.connect();
@@ -89,7 +100,7 @@ int main(int argc, char* argv[])
     if (!scene)
     {
         std::cerr << "Failed to load scene: " << args.sceneFile << std::endl;
-        return 4;
+        return ErrorLoadScene;
     }
     scene->publish();
     scene->flush();
@@ -113,12 +124,17 @@ int main(int argc, char* argv[])
     int32_t    winX = 0;
     int32_t    winY = 0;
     displayConfig.getWindowRectangle(winX, winY, width, height);
-    ramses::ImguiClientHelper imguiHelper(*client, width, height, guiSceneId);
+    rlogic::ImguiClientHelper imguiHelper(*client, width, height, guiSceneId);
     imguiHelper.setRenderer(renderer);
 
     const ramses::displayId_t display = renderer->createDisplay(displayConfig);
     imguiHelper.setDisplayId(display);
     renderer->flush();
+
+    if (!imguiHelper.waitForDisplay(display))
+    {
+        return ErrorNoDisplay;
+    }
 
     std::unique_ptr<ISceneSetup> sceneSetup;
     if (args.noOffscreen)
@@ -152,7 +168,7 @@ int main(int argc, char* argv[])
     if (!viewer.loadRamsesLogic(args.logicFile, scene))
     {
         std::cerr << "Failed to load logic file: " << args.logicFile << std::endl;
-        return 5;
+        return ErrorLoadLogic;
     }
 
     rlogic::LogicViewerGui gui(viewer);
@@ -171,7 +187,7 @@ int main(int argc, char* argv[])
         if (!loadStatus.ok())
         {
             std::cerr << loadStatus.getMessage() << std::endl;
-            return 6;
+            return ErrorLoadLua;
         }
     }
     else

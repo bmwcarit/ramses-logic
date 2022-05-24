@@ -627,6 +627,16 @@ namespace rlogic::internal
         return (m_incomingLink.property != nullptr) || !m_outgoingLinks.empty();
     }
 
+    bool PropertyImpl::hasIncomingLink() const
+    {
+        return (m_incomingLink.property != nullptr);
+    }
+
+    bool PropertyImpl::hasOutgoingLink() const
+    {
+        return !m_outgoingLinks.empty();
+    }
+
     const PropertyImpl::Link& PropertyImpl::getIncomingLink() const
     {
         assert(isInput());

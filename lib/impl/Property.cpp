@@ -97,10 +97,18 @@ namespace rlogic
     template RLOGIC_API bool Property::setInternal<std::string>(std::string /*value*/);
     template RLOGIC_API bool Property::setInternal<bool>(bool /*value*/);
 
-
     bool Property::isLinked() const
     {
         return m_impl->isLinked();
     }
 
+    bool Property::hasIncomingLink() const
+    {
+        return m_impl->hasIncomingLink();
+    }
+
+    bool Property::hasOutgoingLink() const
+    {
+        return m_impl->hasOutgoingLink();
+    }
 }

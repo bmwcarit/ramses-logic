@@ -25,7 +25,7 @@ namespace rlogic::internal
         RamsesTestSetup m_ramsesTestSetup;
         ramses::Scene* m_scene { m_ramsesTestSetup.createScene() };
         ErrorReporting m_errors;
-        RamsesObjectResolver m_resolver {m_errors, m_scene};
+        RamsesObjectResolver m_resolver {m_errors, *m_scene};
     };
 
     TEST_F(ARamsesObjectResolver, FindsSceneNodeByItsId)
@@ -47,16 +47,6 @@ namespace rlogic::internal
         ramses::Camera* camera = m_scene->createPerspectiveCamera();
         EXPECT_EQ(camera, m_resolver.findRamsesCameraInScene("some logic node", camera->getSceneObjectId()));
         EXPECT_TRUE(m_errors.getErrors().empty());
-    }
-
-    TEST_F(ARamsesObjectResolver, ReportsErrorWhenSceneIsNull)
-    {
-        ramses::sceneObjectId_t fakeObjectId {42};
-
-        RamsesObjectResolver resolverNoScene{ m_errors, nullptr };
-        EXPECT_FALSE(resolverNoScene.findRamsesNodeInScene("some logic node", fakeObjectId));
-        EXPECT_EQ(1u, m_errors.getErrors().size());
-        EXPECT_EQ("Fatal error during loading from file! Serialized Ramses Logic object 'some logic node' points to a Ramses object (id: 42), but no Ramses scene was provided to resolve the Ramses object!", m_errors.getErrors()[0].message);
     }
 
     TEST_F(ARamsesObjectResolver, ReportsErrorWhenNodeWithGivenIdDoesNotExist)
@@ -92,7 +82,7 @@ namespace rlogic::internal
 
         EXPECT_FALSE(m_resolver.findRamsesNodeInScene("some logic node", appearance.getSceneObjectId()));
         ASSERT_EQ(1u, m_errors.getErrors().size());
-        EXPECT_EQ("Fatal error during loading from file! Node binding points to a Ramses scene object which is not of type 'Node'!", m_errors.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading from file! Ramses binding 'some logic node' points to a Ramses scene object (id: 2) which is not of the same type!", m_errors.getErrors()[0].message);
     }
 
     TEST_F(ARamsesObjectResolver, ReportsErrorWhenResolvedObjectExists_ButIsNotCamera)
@@ -101,7 +91,7 @@ namespace rlogic::internal
 
         EXPECT_FALSE(m_resolver.findRamsesCameraInScene("some logic node", node->getSceneObjectId()));
         ASSERT_EQ(1u, m_errors.getErrors().size());
-        EXPECT_EQ("Fatal error during loading from file! Camera binding points to a Ramses scene object which is not of type 'Camera'!", m_errors.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading from file! Ramses binding 'some logic node' points to a Ramses scene object (id: 1) which is not of the same type!", m_errors.getErrors()[0].message);
     }
 
     TEST_F(ARamsesObjectResolver, ReportsErrorWhenResolvedObjectExists_ButIsNotAppearance)
@@ -110,7 +100,7 @@ namespace rlogic::internal
 
         EXPECT_FALSE(m_resolver.findRamsesAppearanceInScene("some logic node", node->getSceneObjectId()));
         ASSERT_EQ(1u, m_errors.getErrors().size());
-        EXPECT_EQ("Fatal error during loading from file! Appearance binding points to a Ramses scene object which is not of type 'Appearance'!", m_errors.getErrors()[0].message);
+        EXPECT_EQ("Fatal error during loading from file! Ramses binding 'some logic node' points to a Ramses scene object (id: 1) which is not of the same type!", m_errors.getErrors()[0].message);
     }
 
     // Special case (ramses Camera is also a Node) - test that it works as expected when resolved by Id

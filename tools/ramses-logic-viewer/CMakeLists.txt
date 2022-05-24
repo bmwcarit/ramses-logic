@@ -9,6 +9,7 @@
 add_executable(ramses-logic-viewer
     main.cpp
     ImguiClientHelper.h
+    ImguiClientHelper.cpp
     LogicViewer.h
     LogicViewer.cpp
     LogicViewerGui.h

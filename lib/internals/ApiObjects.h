@@ -86,7 +86,7 @@ namespace rlogic::internal
         static flatbuffers::Offset<rlogic_serialization::ApiObjects> Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder);
         static std::unique_ptr<ApiObjects> Deserialize(
             const rlogic_serialization::ApiObjects& apiObjects,
-            const IRamsesObjectResolver& ramsesResolver,
+            const IRamsesObjectResolver* ramsesResolver,
             const std::string& dataSourceDescription,
             ErrorReporting& errorReporting);
 

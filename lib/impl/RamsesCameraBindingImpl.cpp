@@ -20,7 +20,7 @@
 
 #include "internals/RamsesHelper.h"
 #include "internals/ErrorReporting.h"
-#include "internals/IRamsesObjectResolver.h"
+#include "internals/RamsesObjectResolver.h"
 
 #include "generated/RamsesCameraBindingGen.h"
 

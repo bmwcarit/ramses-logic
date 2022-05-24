@@ -944,7 +944,7 @@ namespace rlogic::internal
             EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesNode.bin"));
             auto errors = m_logicEngine.getErrors();
             ASSERT_EQ(errors.size(), 1u);
-            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! Serialized Ramses Logic object 'NodeBinding' points to a Ramses object (id: 1), but no Ramses scene was provided to resolve the Ramses object!");
+            EXPECT_EQ(errors[0].message, "Fatal error during loading from file! File contains references to Ramses objects but no Ramses scene was provided!");
         }
     }
 

@@ -68,12 +68,9 @@ namespace rlogic
 
         ASSERT_EQ(nullptr, script);
         EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
-            "[errorInInterface] Error while loading script. Lua stack trace:\n"
-            "[string \"errorInInterface\"]:3: emits error\n"
-            "stack traceback:\n"
-            "\t[C]: in function 'error'\n"
-            "\t[string \"errorInInterface\"]:3: in function <[string \"errorInInterface\"]:2>");
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::AllOf(
+            ::testing::HasSubstr("[errorInInterface] Error while loading script. Lua stack trace:"),
+            ::testing::HasSubstr("[C]: in function 'error'")));
     }
 
     TEST_F(ALuaScript_Interface, DeclaresStruct_WithExplicitTypeSyntax)

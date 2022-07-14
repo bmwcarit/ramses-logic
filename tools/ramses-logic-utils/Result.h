@@ -8,6 +8,7 @@
 #pragma once
 
 #include <string>
+#include <ostream>
 
 namespace rlogic
 {
@@ -34,7 +35,23 @@ namespace rlogic
             return m_message;
         }
 
+        [[nodiscard]] bool operator==(const Result& rhs) const
+        {
+            return rhs.m_message == m_message;
+        }
+
+        [[nodiscard]] bool operator!=(const Result& rhs) const
+        {
+            return !(rhs == *this);
+        }
+
     private:
         std::string m_message;
     };
+
+    inline std::ostream& operator<<(std::ostream& os, const Result& result)
+    {
+        os << result.getMessage();
+        return os;
+    }
 }

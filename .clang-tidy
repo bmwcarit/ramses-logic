@@ -222,7 +222,8 @@ Checks:
     cppcoreguidelines-pro-type-union-access,
     cppcoreguidelines-pro-type-vararg,
     cppcoreguidelines-slicing,
-    cppcoreguidelines-special-member-functions,
+    # Google test templated tests TEST_P macros break this rule
+    #cppcoreguidelines-special-member-functions,
     cppcoreguidelines-avoid-non-const-global-variables,
 
     # We are not using Darwin

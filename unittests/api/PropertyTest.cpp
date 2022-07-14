@@ -1003,8 +1003,6 @@ namespace rlogic::internal
         EXPECT_EQ(this->m_errorReporting.getErrors()[0].message, "Fatal error during loading of Property from serialized data: invalid type!");
     }
 
-    // TODO Violin restructure tests and move in fixtures for better readibility
-
     TEST_F(AProperty, DoesNotSetLogicNodeToDirtyIfValueIsNotChanged)
     {
         auto int32Property  = CreateInputProperty(EPropertyType::Int32);

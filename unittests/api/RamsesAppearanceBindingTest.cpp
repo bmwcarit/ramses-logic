@@ -845,12 +845,13 @@ namespace rlogic::internal
 
     TEST_F(ARamsesAppearanceBinding_WithRamses_AndFiles, ProducesErrorIfAppearanceHasDifferentEffectThanSerializedAppearanceBinding)
     {
-        auto* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
+        auto& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
+        auto* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(appearance, "AppearanceBinding");
 
         ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
 
         // Simulate that a difference appearance with the same ID was created, but with different inputs
-        recreate(true);
+        recreate();
         createTestAppearance(createTestEffect(m_vertShader_allTypes, m_fragShader_trivial));
 
         expectErrorWhenLoadingFile("logic.bin",

@@ -535,11 +535,11 @@ namespace rlogic::internal
         ErrorReporting errors;
 
         // Compile test module
-        std::optional<LuaCompiledModule> mod = LuaCompilationUtils::CompileModule(solState, {}, {}, R"(
+        std::optional<LuaCompiledModule> mod = LuaCompilationUtils::CompileModuleOrImportPrecompiled(solState, {}, {}, R"(
             local mod = {}
             mod.mytable = {nested = {a = 42}}
             return mod
-            )", "", errors);
+            )", "", errors, {}, EFeatureLevel_01);
         ASSERT_TRUE(errors.getErrors().empty());
 
         sol::load_result loadResult = solState.loadScript(R"(
@@ -750,12 +750,12 @@ namespace rlogic::internal
         ErrorReporting errors;
 
         // Compile test module
-        std::optional<LuaCompiledModule> mod = LuaCompilationUtils::CompileModule(solState, {}, {}, R"(
+        std::optional<LuaCompiledModule> mod = LuaCompilationUtils::CompileModuleOrImportPrecompiled(solState, {}, {}, R"(
             local mod = {}
             mod.mytable = {
                 nested = {a = 11, b = 12}}
             return mod
-            )", "", errors);
+            )", "", errors, {}, EFeatureLevel_01);
         ASSERT_TRUE(errors.getErrors().empty());
 
         sol::load_result loadResult = solState.loadScript(R"(
@@ -959,12 +959,12 @@ namespace rlogic::internal
         ErrorReporting errors;
 
         // Compile test module
-        std::optional<LuaCompiledModule> mod = LuaCompilationUtils::CompileModule(solState, {}, {}, R"(
+        std::optional<LuaCompiledModule> mod = LuaCompilationUtils::CompileModuleOrImportPrecompiled(solState, {}, {}, R"(
             local mod = {}
             mod.mytable = {
                 nested = {[1] = 11, [2] = 12}}
             return mod
-            )", "", errors);
+            )", "", errors, {}, EFeatureLevel_01);
         ASSERT_TRUE(errors.getErrors().empty());
 
         // Check that iterating over custom indexed table works and the order is the same (ascending by numeric index)

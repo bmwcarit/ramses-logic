@@ -11,11 +11,13 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/AnimationNodeConfig.h"
 
 #include "impl/LogicNodeImpl.h"
 
+#include "FeatureLevelTestValues.h"
 #include "WithTempDirectory.h"
 
 #include <fstream>
@@ -23,34 +25,44 @@
 namespace rlogic
 {
     // There are more specific "create/destroy" tests in ApiObjects unit tests!
-    class ALogicEngine_Factory : public ALogicEngine
+    class ALogicEngine_Factory : public ALogicEngineBase, public ::testing::TestWithParam<EFeatureLevel>
     {
+    public:
+        ALogicEngine_Factory() : ALogicEngineBase{ GetParam() }
+        {
+        }
+
     protected:
         WithTempDirectory tempFolder;
     };
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorWhenCreatingEmptyScript)
+    INSTANTIATE_TEST_SUITE_P(
+        ALogicEngine_FactoryTests,
+        ALogicEngine_Factory,
+        rlogic::internal::GetFeatureLevelTestValues());
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingEmptyScript)
     {
         const LuaScript* script = m_logicEngine.createLuaScript("");
         ASSERT_EQ(nullptr, script);
         EXPECT_FALSE(m_logicEngine.getErrors().empty());
     }
 
-    TEST_F(ALogicEngine_Factory, CreatesScriptFromValidLuaWithoutErrors)
+    TEST_P(ALogicEngine_Factory, CreatesScriptFromValidLuaWithoutErrors)
     {
         const LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script);
         ASSERT_TRUE(nullptr != script);
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
-    TEST_F(ALogicEngine_Factory, DestroysScriptWithoutErrors)
+    TEST_P(ALogicEngine_Factory, DestroysScriptWithoutErrors)
     {
         LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script);
         ASSERT_TRUE(script);
         ASSERT_TRUE(m_logicEngine.destroy(*script));
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingScriptFromAnotherEngineInstance)
+    TEST_P(ALogicEngine_Factory, ProducesErrorsWhenDestroyingScriptFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
         auto script = otherLogicEngine.createLuaScript(m_valid_empty_script);
@@ -60,7 +72,7 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find script in logic engine!");
     }
 
-    TEST_F(ALogicEngine_Factory, CreatesLuaModule)
+    TEST_P(ALogicEngine_Factory, CreatesLuaModule)
     {
         const auto module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "mymodule");
         ASSERT_NE(nullptr, module);
@@ -74,19 +86,19 @@ namespace rlogic
         EXPECT_EQ(module, constLogicEngine.findByName<LuaModule>("mymodule"));
     }
 
-    TEST_F(ALogicEngine_Factory, AllowsCreatingLuaModuleWithEmptyName)
+    TEST_P(ALogicEngine_Factory, AllowsCreatingLuaModuleWithEmptyName)
     {
         EXPECT_NE(nullptr, m_logicEngine.createLuaModule(m_moduleSourceCode, {}, ""));
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
-    TEST_F(ALogicEngine_Factory, AllowsCreatingLuaModuleWithNameContainingNonAlphanumericChars)
+    TEST_P(ALogicEngine_Factory, AllowsCreatingLuaModuleWithNameContainingNonAlphanumericChars)
     {
         EXPECT_NE(nullptr, m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "!@#$"));
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
-    TEST_F(ALogicEngine_Factory, AllowsCreatingLuaModuleWithDupliciteNameEvenIfSourceDiffers)
+    TEST_P(ALogicEngine_Factory, AllowsCreatingLuaModuleWithDupliciteNameEvenIfSourceDiffers)
     {
         ASSERT_TRUE(m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "mymodule"));
         // same name and same source is OK
@@ -96,7 +108,7 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.createLuaModule("return {}", {}, "mymodule"));
     }
 
-    TEST_F(ALogicEngine_Factory, CanDestroyLuaModule)
+    TEST_P(ALogicEngine_Factory, CanDestroyLuaModule)
     {
         LuaModule* module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "mymodule");
         ASSERT_NE(nullptr, module);
@@ -105,7 +117,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.findByName<LuaModule>("mymodule"));
     }
 
-    TEST_F(ALogicEngine_Factory, FailsToDestroyLuaModuleIfFromOtherLogicInstance)
+    TEST_P(ALogicEngine_Factory, FailsToDestroyLuaModuleIfFromOtherLogicInstance)
     {
         LogicEngine otherLogic;
         LuaModule* module = otherLogic.createLuaModule(m_moduleSourceCode);
@@ -116,7 +128,7 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors().front().message, "Can't find Lua module in logic engine!");
     }
 
-    TEST_F(ALogicEngine_Factory, FailsToDestroyLuaModuleIfUsedInLuaScript)
+    TEST_P(ALogicEngine_Factory, FailsToDestroyLuaModuleIfUsedInLuaScript)
     {
         LuaModule* module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "mymodule");
         ASSERT_NE(nullptr, module);
@@ -135,7 +147,7 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors().front().message, "Failed to destroy LuaModule 'mymodule', it is used in LuaScript 'script'");
     }
 
-    TEST_F(ALogicEngine_Factory, CanDestroyModuleAfterItIsNotUsedAnymore)
+    TEST_P(ALogicEngine_Factory, CanDestroyModuleAfterItIsNotUsedAnymore)
     {
         LuaModule* module = m_logicEngine.createLuaModule(m_moduleSourceCode);
         ASSERT_NE(nullptr, module);
@@ -155,7 +167,7 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.destroy(*module));
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorWhenCreatingLuaScriptUsingModuleFromAnotherLogicInstance)
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingLuaScriptUsingModuleFromAnotherLogicInstance)
     {
         LogicEngine other;
         const auto module = other.createLuaModule(m_moduleSourceCode);
@@ -167,7 +179,7 @@ namespace rlogic
             "Failed to map Lua module 'name'! It was created on a different instance of LogicEngine.");
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorWhenCreatingLuaModuleUsingModuleFromAnotherLogicInstance)
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingLuaModuleUsingModuleFromAnotherLogicInstance)
     {
         LogicEngine other;
         const auto module = other.createLuaModule(m_moduleSourceCode);
@@ -181,7 +193,7 @@ namespace rlogic
             "Failed to map Lua module 'name'! It was created on a different instance of LogicEngine.");
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesNodeBindingFromAnotherEngineInstance)
+    TEST_P(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesNodeBindingFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
 
@@ -192,7 +204,7 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesNodeBinding in logic engine!");
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesAppearanceBindingFromAnotherEngineInstance)
+    TEST_P(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesAppearanceBindingFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
         auto binding = otherLogicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
@@ -202,14 +214,14 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesAppearanceBinding in logic engine!");
     }
 
-    TEST_F(ALogicEngine_Factory, DestroysRamsesCameraBindingWithoutErrors)
+    TEST_P(ALogicEngine_Factory, DestroysRamsesCameraBindingWithoutErrors)
     {
         auto binding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
         ASSERT_TRUE(binding);
         ASSERT_TRUE(m_logicEngine.destroy(*binding));
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesCameraBindingFromAnotherEngineInstance)
+    TEST_P(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesCameraBindingFromAnotherEngineInstance)
     {
         LogicEngine otherLogicEngine;
         auto binding = otherLogicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
@@ -219,7 +231,76 @@ namespace rlogic
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesCameraBinding in logic engine!");
     }
 
-    TEST_F(ALogicEngine_Factory, RenamesObjectsAfterCreation)
+    TEST_P(ALogicEngine_Factory, DestroysRamsesRenderPassBindingWithoutErrors)
+    {
+        if (GetParam() < EFeatureLevel_02)
+            GTEST_SKIP();
+
+        auto binding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
+        ASSERT_TRUE(binding);
+        ASSERT_TRUE(m_logicEngine.destroy(*binding));
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesRenderPassBindingFromAnotherEngineInstance)
+    {
+        if (GetParam() < EFeatureLevel_02)
+            GTEST_SKIP();
+
+        LogicEngine otherLogicEngine{ GetParam() };
+        auto binding = otherLogicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
+        ASSERT_TRUE(binding);
+        ASSERT_FALSE(m_logicEngine.destroy(*binding));
+        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Can't find RamsesRenderPassBinding in logic engine!");
+    }
+
+    TEST_P(ALogicEngine_Factory, FailsToCreateRamsesRenderPassBindingOnFeatureLevel01)
+    {
+        if (GetParam() >= EFeatureLevel_02)
+            GTEST_SKIP();
+
+        const auto binding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
+        EXPECT_FALSE(binding);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesRenderPassBinding, feature level 02 is required, feature level in this runtime set to 01.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingAnchorPointAndNodeOrCameraFromAnotherInstance)
+    {
+        if (GetParam() < EFeatureLevel_02)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera);
+
+        LogicEngine otherEngine;
+        const auto nodeBindingOther = otherEngine.createRamsesNodeBinding(*m_node);
+        const auto cameraBindingOther = otherEngine.createRamsesCameraBinding(*m_camera);
+
+        EXPECT_EQ(nullptr, m_logicEngine.createAnchorPoint(*nodeBindingOther, *cameraBinding, "anchor"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Failed to create AnchorPoint 'anchor': provided Ramses node binding and/or camera binding were not found in this logic instance.");
+
+        EXPECT_EQ(nullptr, m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBindingOther, "anchor"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Failed to create AnchorPoint 'anchor': provided Ramses node binding and/or camera binding were not found in this logic instance.");
+    }
+
+    TEST_P(ALogicEngine_Factory, FailsToCreateAnchorPointOnFeatureLevel01)
+    {
+        if (GetParam() >= EFeatureLevel_02)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera);
+
+        const auto anchorPoint = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        EXPECT_FALSE(anchorPoint);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create AnchorPoint, feature level 02 is required, feature level in this runtime set to 01.");
+    }
+
+    TEST_P(ALogicEngine_Factory, RenamesObjectsAfterCreation)
     {
         auto script = m_logicEngine.createLuaScript(m_valid_empty_script);
         auto ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
@@ -235,9 +316,16 @@ namespace rlogic
         EXPECT_EQ("same name twice", ramsesNodeBinding->getName());
         EXPECT_EQ("", ramsesAppearanceBinding->getName());
         EXPECT_EQ("", ramsesCameraBinding->getName());
+
+        if (GetParam() >= EFeatureLevel_02)
+        {
+            auto ramsesRenderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
+            ramsesRenderPassBinding->setName("");
+            EXPECT_EQ("", ramsesRenderPassBinding->getName());
+        }
     }
 
-    TEST_F(ALogicEngine_Factory, CanCastObjectsToValidTypes)
+    TEST_P(ALogicEngine_Factory, CanCastObjectsToValidTypes)
     {
         LogicObject* luaModule         = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
         LogicObject* luaScript         = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
@@ -265,6 +353,13 @@ namespace rlogic
         EXPECT_FALSE(dataArray->as<LuaScript>());
         EXPECT_FALSE(animNode->as<LuaModule>());
 
+        if (GetParam() >= EFeatureLevel_02)
+        {
+            LogicObject* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
+            EXPECT_TRUE(renderPassBinding->as<RamsesRenderPassBinding>());
+            EXPECT_FALSE(renderPassBinding->as<RamsesCameraBinding>());
+        }
+
         //cast obj -> node -> binding -> appearanceBinding
         auto* nodeCastFromObject = appearanceBinding->as<LogicNode>();
         EXPECT_TRUE(nodeCastFromObject);
@@ -289,7 +384,7 @@ namespace rlogic
         EXPECT_TRUE(anNodeCastFromObject->as<LogicObject>());
     }
 
-    TEST_F(ALogicEngine_Factory, CanCastObjectsToValidTypes_Const)
+    TEST_P(ALogicEngine_Factory, CanCastObjectsToValidTypes_Const)
     {
         m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
         m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
@@ -326,6 +421,14 @@ namespace rlogic
         EXPECT_FALSE(dataArrayConst->as<LuaScript>());
         EXPECT_FALSE(animNodeConst->as<LuaModule>());
 
+        if (GetParam() >= EFeatureLevel_02)
+        {
+            m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "renderPass");
+            const auto* renderPassBindingConst = immutableLogicEngine.findByName<LogicObject>("renderPass");
+            EXPECT_TRUE(renderPassBindingConst->as<RamsesRenderPassBinding>());
+            EXPECT_FALSE(renderPassBindingConst->as<LuaInterface>());
+        }
+
         // cast obj -> node -> binding -> appearanceBinding
         const auto* nodeCastFromObject = appearanceBindingConst->as<LogicNode>();
         EXPECT_TRUE(nodeCastFromObject);
@@ -350,7 +453,7 @@ namespace rlogic
         EXPECT_TRUE(anNodeCastFromObject->as<LogicObject>());
     }
 
-    TEST_F(ALogicEngine_Factory, ProducesErrorIfWrongObjectTypeIsDestroyed)
+    TEST_P(ALogicEngine_Factory, ProducesErrorIfWrongObjectTypeIsDestroyed)
     {
         struct UnknownObjectImpl: internal::LogicNodeImpl
         {
@@ -378,18 +481,25 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "Tried to destroy object 'name' with unknown type");
     }
 
-    TEST_F(ALogicEngine_Factory, CanBeMoved)
+    TEST_P(ALogicEngine_Factory, CanBeMoved)
     {
         LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "Script");
         RamsesNodeBinding* ramsesNodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         RamsesAppearanceBinding* appBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
         RamsesCameraBinding* camBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
+        const RamsesRenderPassBinding* rpBinding = nullptr;
+        if (GetParam() >= EFeatureLevel_02)
+            rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "RenderPass");
 
         LogicEngine movedLogicEngine(std::move(m_logicEngine));
         EXPECT_EQ(script, movedLogicEngine.findByName<LuaScript>("Script"));
         EXPECT_EQ(ramsesNodeBinding, movedLogicEngine.findByName<RamsesNodeBinding>("NodeBinding"));
         EXPECT_EQ(appBinding, movedLogicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding"));
         EXPECT_EQ(camBinding, movedLogicEngine.findByName<RamsesCameraBinding>("CameraBinding"));
+        if (GetParam() >= EFeatureLevel_02)
+        {
+            EXPECT_EQ(rpBinding, movedLogicEngine.findByName<RamsesRenderPassBinding>("RenderPass"));
+        }
 
         movedLogicEngine.update();
 
@@ -400,6 +510,10 @@ namespace rlogic
         EXPECT_EQ(ramsesNodeBinding, moveAssignedLogicEngine.findByName<RamsesNodeBinding>("NodeBinding"));
         EXPECT_EQ(appBinding, moveAssignedLogicEngine.findByName<RamsesAppearanceBinding>("AppearanceBinding"));
         EXPECT_EQ(camBinding, moveAssignedLogicEngine.findByName<RamsesCameraBinding>("CameraBinding"));
+        if (GetParam() >= EFeatureLevel_02)
+        {
+            EXPECT_EQ(rpBinding, moveAssignedLogicEngine.findByName<RamsesRenderPassBinding>("RenderPass"));
+        }
 
         moveAssignedLogicEngine.update();
     }

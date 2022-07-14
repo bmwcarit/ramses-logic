@@ -1,8 +1,40 @@
 # master
 
+# v1.1.0
+
+**General Changes**
+
+* Upgrade ramses from 27.0.119 to 27.0.121 (patchfix)
+* LuaInterface will not fail to be created if it does not have a unique name anymore,
+  however validation (LogicEngine::validate) will produce warning if two or more interfaces share same name
+* ramses-logic-viewer: improved command line interface
+    * new `--help` message and error handling
+    * renamed `--multi-sample` to `--msaa`
+    * added `--write-config` option to save default lua configuration
+    * added `--log-level-console` option. Enable error log level by default
+
+**API Changes**
+
+* Added new constructor for LogicEngine where a feature level can be specified, see LogicEngine::LogicEngine(EFeatureLevel) and EFeatureLevel for details
+* Added static LogicEngine::GetFeatureLevelFromFile which can parse a rlogic file and detect its feature level without having to instantiate LogicEngine first.
+
+**Bugfixes**
+
+* ramses-logic-viewer: use 1-based indices for accessing children of Array properties in lua configuration (previous versions used 0-based indices)
+* ramses-logic-viewer: fixed content of default lua configuration file
+
+**Features**
+
+* Added new Feature Level 02 with following features:
+    * Added rlogic::AnchorPoint to help tracking a 3D node in 2D coordinates
+    * Added rlogic::RamsesRenderPassBinding allowing control of ramses::RenderPass states from logic nodes
+    * Added 'enabled' input property to RamsesNodeBinding to be able to control also 3rd state of Ramses Node visibility mode to turn it Off (in addition to Visible/Invisible).
+    * Lua scripts and modules are serialized as pre-compiled binaries instead of source code.
+    * Added LogicEngine::createRamsesCameraBindingWithFrustumPlanes which allows also perspective camera binding to have a full set of frustum planes properties
+
 # v1.0.3
 
-** General Changes**
+**General Changes**
 
 * ramses-logic-viewer: added support for lua interfaces
 

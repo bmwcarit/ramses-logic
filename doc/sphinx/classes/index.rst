@@ -35,8 +35,10 @@ Class Index
     RamsesBinding
     RamsesCameraBinding
     RamsesNodeBinding
+    RamsesRenderPassBinding
     SaveFileConfig
     TimerNode
+    AnchorPoint
 
 
 .. toctree::
@@ -79,6 +81,7 @@ Class Index
     EPropertyType
     ERotationType
     EStandardModule
+    EFeatureLevel
 
 
 

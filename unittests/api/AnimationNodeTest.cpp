@@ -113,7 +113,6 @@ namespace rlogic::internal
             true)  // with animation data exposed as properties
     );
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, IsCreated)
     {
         const AnimationChannel channel{ "channel", m_dataFloat, m_dataVec2 };
@@ -127,7 +126,6 @@ namespace rlogic::internal
         EXPECT_EQ(channels, animNode->getChannels());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, IsDestroyed)
     {
         const auto animNode = createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
@@ -136,7 +134,6 @@ namespace rlogic::internal
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("animNode"));
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, FailsToBeDestroyedIfFromOtherLogicInstance)
     {
         auto animNode = createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
@@ -147,7 +144,6 @@ namespace rlogic::internal
         EXPECT_EQ("Can't find AnimationNode in logic engine!", otherEngine.getErrors().front().message);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, ChangesName)
     {
         const auto animNode = createAnimationNode({ { "channel", m_dataFloat, m_dataVec2 } }, "animNode");
@@ -158,7 +154,6 @@ namespace rlogic::internal
         EXPECT_TRUE(m_logicEngine.getErrors().empty());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, CanContainVariousAnimationChannels)
     {
         const auto timeStamps1 = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f });
@@ -183,7 +178,6 @@ namespace rlogic::internal
         EXPECT_EQ(channels, animNode->getChannels());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, HasFixedProperties)
     {
         const AnimationChannel channel{ "channel", m_dataFloat, m_dataVec2 };
@@ -206,7 +200,6 @@ namespace rlogic::internal
         EXPECT_EQ(EPropertyType::Float, rootOut->getChild("duration")->getType());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, HasPropertiesMatchingChannels)
     {
         const AnimationChannel channel1{ "channel1", m_dataFloat, m_dataFloat };
@@ -221,7 +214,6 @@ namespace rlogic::internal
         EXPECT_EQ(EPropertyType::Vec4f, rootOut->getChild(2u)->getType());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, DeterminesDurationFromHighestTimestamp)
     {
         const auto timeStamps1 = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f });
@@ -233,14 +225,12 @@ namespace rlogic::internal
         EXPECT_FLOAT_EQ(6.f, *animNode2->getOutputs()->getChild("duration")->get<float>());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, FailsToBeCreatedWithNoChannels)
     {
         EXPECT_EQ(nullptr, createAnimationNode({}, "animNode"));
         EXPECT_EQ("Failed to create AnimationNode 'animNode': must provide at least one channel.", m_logicEngine.getErrors().front().message);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, FailsToBeCreatedIfDataArrayFromOtherLogicInstance)
     {
         LogicEngine otherInstance;
@@ -256,7 +246,6 @@ namespace rlogic::internal
         EXPECT_EQ("Failed to create AnimationNode 'animNode': tangents were not found in this logic instance.", m_logicEngine.getErrors().front().message);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, CanBeSerializedAndDeserialized)
     {
         WithTempDirectory tempDir;
@@ -357,7 +346,6 @@ namespace rlogic::internal
         EXPECT_EQ("channel1", rootOut2->getChild(4u)->getName());
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, WillSerializeAnimationIncludingProgress)
     {
         WithTempDirectory tempDir;
@@ -397,7 +385,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<int32_t>(*animNode, 1.f,   20);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, CanHandleProgressOutOfNormalizedRange)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -411,7 +398,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<float>(*animNode, 999.f, 20.f);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_step_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -424,7 +410,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 1.f, 20.f }); // no change pass end of animation
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_step_vec2i)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -437,7 +422,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // no change pass end of animation
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -452,7 +436,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2i)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -467,7 +450,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_quaternions)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
@@ -480,7 +462,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -502,7 +483,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues_twoChannels(*animNode, 100.f, { 1.f, 20.f }, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
@@ -518,7 +498,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions_withTangents)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
@@ -535,7 +514,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec4f>(*animNode, 100.f, { 0, 0, 1, 0 }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_vec2i)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -554,7 +532,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, InterpolatedValueBeforeFirstTimestampIsFirstKeyframe)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f });
@@ -568,7 +545,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2f>(*animNode, 100.f, { 2.f, 30.f }); // stays at last keyframe after animation end
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, CanJumpAnywhereInAnimation)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -584,7 +560,6 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues(*animNode, 0.75f, 17.5f);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, GivesStableResultsWithExtremelySmallTimestamps)
     {
         constexpr float Eps = std::numeric_limits<float>::epsilon();
@@ -612,7 +587,6 @@ namespace rlogic::internal
         EXPECT_FLOAT_EQ(2.f, lastValue);
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode, CanBeCreatedWithMoreThanMaximumArraySizeKeyframesIfNotExposedViaProperties)
     {
         std::vector<float> vecDataExceeding;
@@ -731,7 +705,6 @@ namespace rlogic::internal
         AnAnimationNode_SerializationLifecycle,
         ::testing::Values(false, true));
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfEssentialDataMissing)
     {
         EXPECT_TRUE(deserializeSerializedDataWithIssue(AnAnimationNode_SerializationLifecycle::ESerializationIssue::AllValid));
@@ -746,7 +719,6 @@ namespace rlogic::internal
         }
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfChannelDataMissing)
     {
         for (const auto issue : { ESerializationIssue::ChannelTimestampsMissing, ESerializationIssue::ChannelKeyframesMissing })
@@ -758,7 +730,6 @@ namespace rlogic::internal
         }
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfTangentsMissing)
     {
         for (const auto issue : { ESerializationIssue::ChannelTangentsInMissing, ESerializationIssue::ChannelTangentsOutMissing })
@@ -770,7 +741,6 @@ namespace rlogic::internal
         }
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidInterpolationType)
     {
         EXPECT_FALSE(deserializeSerializedDataWithIssue(ESerializationIssue::InvalidInterpolationType));
@@ -779,7 +749,6 @@ namespace rlogic::internal
         m_errorReporting.clear();
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidOrMissingProperties)
     {
         for (const auto issue : { ESerializationIssue::PropertyInMissing, ESerializationIssue::PropertyOutMissing, ESerializationIssue::PropertyInWrongName, ESerializationIssue::PropertyOutWrongName })
@@ -791,7 +760,6 @@ namespace rlogic::internal
         }
     }
 
-    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions) TEST_P defines copy ctor/assign but not dtor
     TEST_P(AnAnimationNode_SerializationLifecycle, FailsDeserializationIfInvalidChannelsData)
     {
         EXPECT_FALSE(deserializeSerializedDataWithIssue(ESerializationIssue::PropertyChannelsDataInvalid));

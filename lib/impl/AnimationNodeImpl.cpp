@@ -286,21 +286,24 @@ namespace rlogic::internal
             channelsFB.push_back(rlogic_serialization::CreateChannel(
                 builder,
                 builder.CreateString(channel.name),
-                serializationMap.resolveDataArrayOffset(*channel.timeStamps),
-                serializationMap.resolveDataArrayOffset(*channel.keyframes),
+                serializationMap.resolveDataArrayOffset(channel.timeStamps->getId()),
+                serializationMap.resolveDataArrayOffset(channel.keyframes->getId()),
                 interpTypeFB,
-                channel.tangentsIn ? serializationMap.resolveDataArrayOffset(*channel.tangentsIn) : 0,
-                channel.tangentsOut ? serializationMap.resolveDataArrayOffset(*channel.tangentsOut) : 0
+                channel.tangentsIn ? serializationMap.resolveDataArrayOffset(channel.tangentsIn->getId()) : 0,
+                channel.tangentsOut ? serializationMap.resolveDataArrayOffset(channel.tangentsOut->getId()) : 0
                 ));
         }
 
+        const auto logicObject = LogicObjectImpl::Serialize(animNode, builder);
+        const auto inputPropertyObject = PropertyImpl::Serialize(*animNode.getInputs()->m_impl, builder, serializationMap);
+        const auto ouputPropertyObject = PropertyImpl::Serialize(*animNode.getOutputs()->m_impl, builder, serializationMap);
         return rlogic_serialization::CreateAnimationNode(
             builder,
-            LogicObjectImpl::Serialize(animNode, builder),
+            logicObject,
             builder.CreateVector(channelsFB),
             animNode.m_hasChannelDataExposedViaProperties,
-            PropertyImpl::Serialize(*animNode.getInputs()->m_impl, builder, serializationMap),
-            PropertyImpl::Serialize(*animNode.getOutputs()->m_impl, builder, serializationMap)
+            inputPropertyObject,
+            ouputPropertyObject
         );
     }
 

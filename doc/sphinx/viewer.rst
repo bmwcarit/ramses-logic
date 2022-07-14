@@ -35,7 +35,7 @@ It also provides a GUI to inspect the displayed scene.
   For auto-detection the file extensions `rlogic` and `lua` are expected.
 * If no ``<luafile>`` is found, the viewer will show the scene and propose to store a default configuration.
 * Display size is auto-detected based on the first camera viewport found in the scene.
-  This can be overridden by the options :option:`ramses-logic-viewer -w` and :option:`ramses-logic-viewer -h`.
+  This can be overridden by the options :option:`ramses-logic-viewer --width` and :option:`ramses-logic-viewer --height`.
 
 The tool's intended use-cases are primarily:
 
@@ -60,13 +60,26 @@ Options
    Calls the given <luafunction> defined in ``<luafile>`` and exits. This can be e.g. used to run a test case
    and/or to make a screenshot
 
-.. option:: -w WIDTH
+.. option:: --width WIDTH
 
    overrides the auto-detected display width
 
-.. option:: -h HEIGHT
+.. option:: --height HEIGHT
 
    overrides the auto-detected display height
+
+.. option:: --msaa SAMPLES
+
+   Instructs the renderer to apply multisampling (Valid values: 1, 2, 4, 8)
+
+.. option:: --write-config [filename]
+
+   Writes the default lua configuration to the given filename. If the filename is omitted, the viewer will use
+   the ``<logicfile>``'s name with lua extension.
+
+.. option:: --log-level-console [off|fatal|error|warn|info|debug|trace]
+
+   Sets the log level for console messages. `error` is used by default.
 
 .. _lua_configuration_api:
 

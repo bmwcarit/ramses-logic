@@ -34,24 +34,6 @@ namespace rlogic
     protected:
     };
 
-    // TODO Violin this can be fixed. Fix it!
-    TEST_F(ALuaScript_Runtime, DISABLED_GeneratesErrorWhenOverwritingInputsInRunFunction)
-    {
-        auto* script = m_logicEngine.createLuaScript(R"(
-            function interface(IN,OUT)
-            end
-
-            function run(IN,OUT)
-                IN = {}
-            end
-        )");
-
-        ASSERT_EQ(nullptr, script);
-
-        EXPECT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Special global symbol 'IN' should not be overwritten with other types in run(IN,OUT) function!!"));
-    }
-
     TEST_F(ALuaScript_Runtime, ReportsErrorWhenAssigningVectorComponentsIndividually)
     {
         m_logicEngine.createLuaScript(R"(
@@ -575,40 +557,44 @@ namespace rlogic
         EXPECT_EQ(0, *field2->get<int32_t>());
     }
 
-    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenNestedSubStructDoesNotMatch)
+    TEST_F(ALuaScript_Runtime, ProducesErrorWhenAssigningNestedProperties_WhenNestedSubStructDoesNotMatch_AndInterruptsAssignment)
     {
         auto* script = m_logicEngine.createLuaScript(R"(
             function interface(IN,OUT)
                 OUT.data = {
-                    field1 = Type:Int32(),
-                    field2 = Type:Int32(),
-                    nested = {
+                    a_fieldBefore = Type:Int32(),
+                    b_nested = {
                         field = Type:Int32()
-                    }
+                    },
+                    c_fieldAfter = Type:Int32(),
                 }
             end
             function run(IN,OUT)
                 OUT.data = {
-                    field1 = 5,
-                    field2 = 5,
-                    nested = {
+                    a_fieldBefore = 4,
+                    b_nested = {
                         wrong_field = 5
-                    }
+                    },
+                    c_fieldAfter = 6,
                 }
             end
         )");
 
         auto outputs = script->getOutputs();
-        auto nestedfield = outputs->getChild("data")->getChild("nested")->getChild("field");
+        auto fieldBefore = outputs->getChild("data")->getChild("a_fieldBefore");
+        auto nestedfield = outputs->getChild("data")->getChild("b_nested")->getChild("field");
+        auto fieldAfter = outputs->getChild("data")->getChild("c_fieldAfter");
 
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Unexpected property 'wrong_field' while assigning values to struct 'nested'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Unexpected property 'wrong_field' while assigning values to struct 'b_nested'"));
 
-        // TODO Violin don't assign other fields on type mismatch - and re-enable this check that values were not updated
-        //EXPECT_EQ(0, *field1->get<int32_t>());
-        //EXPECT_EQ(0, *field2->get<int32_t>());
+        // Assigned, because it was ordered alphabetically before the erroneous field
+        EXPECT_EQ(4, *fieldBefore->get<int32_t>());
+        // Had error -> keeps old value
         EXPECT_EQ(0, *nestedfield->get<int32_t>());
+        // Ordered alphabetically after error field -> also keeps old value
+        EXPECT_EQ(0, *fieldAfter->get<int32_t>());
     }
 
     TEST_F(ALuaScript_Runtime, AssignsValuesToArrays)
@@ -766,7 +752,6 @@ namespace rlogic
         EXPECT_EQ("soldier 8-7", *script->getOutputs()->getChild("coala_army")->getChild(7)->getChild(6)->getChild("name")->get<std::string>());
     }
 
-    // TODO Violin refactor other tests which test 'unexpected type' to also list all invalid types like this one
     TEST_F(ALuaScript_Runtime, ProducesErrorWhenAccessingArrayWithNonIntegerIndex)
     {
         const std::string_view scriptTemplate = (R"(
@@ -1007,7 +992,8 @@ namespace rlogic
             {"OUT.array_int64 = {1, true}", "Assigning bool to 'Int64' output ''"},
             {"OUT.array_int64 = {nil, 1, 3}", "Error during assignment of array property 'array_int64'! Expected a value at index 1"},
             {"OUT.array_int64 = {1, nil, 3}", "Error during assignment of array property 'array_int64'! Expected a value at index 2"},
-            // TODO Violin the messages below are a bit misleading now ... They could contain info which array field failed to be assigned. Need to refactor the code and fix them
+            // TODO Violin Improve error messages to contain info which array field failed to be assigned
+            // currently we report empty string which is the name of array elements) - not easy to understand by TA
             {"OUT.array_string = {'somestring', 2}", "Assigning number to 'String' output ''"},
             {"OUT.array_string = {'somestring', {}}", "Assigning table to 'String' output ''"},
             {"OUT.array_string = {'somestring', OUT.array_int}", "Can't assign property 'array_int' (type Array) to property '' (type String)"},

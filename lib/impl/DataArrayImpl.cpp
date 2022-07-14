@@ -118,9 +118,10 @@ namespace rlogic::internal
             break;
         }
 
+        const auto logicObject = LogicObjectImpl::Serialize(data, builder);
         auto animDataFB = rlogic_serialization::CreateDataArray(
             builder,
-            LogicObjectImpl::Serialize(data, builder),
+            logicObject,
             arrayType,
             unionType,
             dataOffset

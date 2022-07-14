@@ -97,8 +97,6 @@ you should never set the ``visibility`` property of a Binding object, instead se
     We strongly discourage setting values to ``Ramses`` objects and to ``Ramses Logic`` bindings in the same update cycle
     for the same property to avoid unexpected behavior. At any given time, use one *or* the other, not both mechanisms to set values!
 
-.. todo: Violin this behavior is still a bit inconsistent... Maybe we should change this to: scripts and bindings are not executed after load, unless an input is set before. This would be much more consistent!
-
 The ``Logic Engine`` can be also serialized and deserialized into binary files for fast loading.
 The above data flow rules still apply as if all the scripts and binding objects were just created. The first call to
 :func:`rlogic::LogicEngine::update` after loading from file will execute all scripts. Binding values will only be passed further to ``Ramses``
@@ -465,14 +463,30 @@ the contents loaded from the file. This implies that all objects created prior l
 will be pointing to invalid memory locations. We advise designing your object lifecycles around this and immediately dispose
 such pointers after loading from file.
 
-.. warning::
-
-    In case of error during loading the :class:`rlogic::LogicEngine` may be left in an inconsistent state. In the future we may implement
-    graceful handling of deserialization errors, but for now we suggest discarding a :class:`rlogic::LogicEngine` object which failed to load.
-
 --------------------------------------------------
 File compatibility
 --------------------------------------------------
+
+Starting with version ``1.1.0``, the ``Logic Engine`` supports ``feature levels`` which ensure that
+you can use a newer version of the library but keep your assets to the older version. This allows integrating
+fixes and supporting multiple versions of the content toolchain at the same time. This mechanism is called
+``feature toggle`` in other projects and essentially enables trying out new features and rolling back if
+they prove to be unstable and need more work.
+
+How does it work? The Logic Engine provides an enum :enum:`rligic::EFeatureLevel` which represents the different
+feature levels introduced since the last major version of the lib. For example, Ramses Logic 1.0 and 1.1 provide two
+different feature levels each (``1`` and ``2``). You can use ``1`` or ``2`` selectively if you use version 1.1 of the library,
+or you can use
+only ``1`` if you use version 1.0. You can select at runtime which version to use by specifying a value
+in the overloaded constructor of the class :func:`rlogic::LogicEngine::LogicEngine`. You can also check which version
+is used in a binary file by using :func:`rlogic::LogicEngine::GetFeatureLevelFromFile`. Note that to load a file you must
+always use the exact feature level that was used to export the file, otherwise the loading will fail.
+
+For more details on the available feature levels and how to use them, see :enum:`rlogic::EFeatureLevel`.
+
+-----------------------------------------------------------
+File compatibility (prior version 1.1 and feature levels)
+-----------------------------------------------------------
 
 Since version ``0.7.0``, Ramses Logic binary files are backwards compatible.
 This means that a newer version of the runtime can be used to load an older binary file, unless the file format version

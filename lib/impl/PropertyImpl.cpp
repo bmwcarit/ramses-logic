@@ -218,10 +218,13 @@ namespace rlogic::internal
             break;
         }
 
+        const auto fbName = builder.CreateString(prop.m_typeData.name);
+        const auto fbChildrenVec = builder.CreateVector(child_vector);
+
         auto propertyFB = rlogic_serialization::CreateProperty(builder,
-            builder.CreateString(prop.m_typeData.name),
+            fbName,
             propertyRootType,
-            builder.CreateVector(child_vector),
+            fbChildrenVec,
             valueType,
             valueOffset
         );

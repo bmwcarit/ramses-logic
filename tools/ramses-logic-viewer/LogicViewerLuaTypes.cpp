@@ -17,6 +17,8 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/AnchorPoint.h"
 #include "ramses-logic/Property.h"
 #include "internals/SolHelper.h"
 #include "fmt/format.h"
@@ -139,7 +141,12 @@ namespace rlogic
                 auto intKey = key.as<sol::optional<int>>();
                 if (intKey)
                 {
-                    child = prop.getChild(static_cast<size_t>(*intKey));
+                    // expect 1-based index by lua convention
+                    auto intKeyValue = static_cast<size_t>(*intKey);
+                    if (intKeyValue != 0u)
+                    {
+                        child = prop.getChild(intKeyValue - 1u);
+                    }
                 }
             }
             if (child)
@@ -300,5 +307,7 @@ namespace rlogic
     template struct NodeListWrapper<RamsesNodeBinding>;
     template struct NodeListWrapper<RamsesAppearanceBinding>;
     template struct NodeListWrapper<RamsesCameraBinding>;
+    template struct NodeListWrapper<RamsesRenderPassBinding>;
+    template struct NodeListWrapper<AnchorPoint>;
 } // namespace rlogic
 

@@ -11,6 +11,7 @@
 #include "impl/LogicObjectImpl.h"
 #include "internals/LuaCompilationUtils.h"
 #include "internals/SolWrapper.h"
+#include "ramses-logic/EFeatureLevel.h"
 #include <string>
 
 namespace rlogic_serialization
@@ -41,22 +42,25 @@ namespace rlogic::internal
     public:
         LuaModuleImpl(LuaCompiledModule module, std::string_view name, uint64_t id);
 
-        [[nodiscard]] std::string_view getSourceCode() const;
         [[nodiscard]] const sol::table& getModule() const;
         [[nodiscard]] const ModuleMapping& getDependencies() const;
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LuaModule> Serialize(
             const LuaModuleImpl& module,
-            flatbuffers::FlatBufferBuilder& builder);
+            flatbuffers::FlatBufferBuilder& builder,
+            EFeatureLevel featureLevel,
+            SerializationMap& serializationMap);
 
         [[nodiscard]] static std::unique_ptr<LuaModuleImpl> Deserialize(
             SolState& solState,
             const rlogic_serialization::LuaModule& module,
             ErrorReporting& errorReporting,
-            DeserializationMap& deserializationMap);
+            DeserializationMap& deserializationMap,
+            EFeatureLevel featureLevel);
 
     private:
         std::string m_sourceCode;
+        sol::bytecode m_byteCode;
         sol::table m_module;
         ModuleMapping m_dependencies;
         StandardModules m_stdModules;

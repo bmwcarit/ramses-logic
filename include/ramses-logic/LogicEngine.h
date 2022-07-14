@@ -11,6 +11,7 @@
 #include "ramses-logic/APIExport.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/Collection.h"
+#include "ramses-logic/EFeatureLevel.h"
 #include "ramses-logic/EPropertyType.h"
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/ErrorData.h"
@@ -28,6 +29,7 @@ namespace ramses
     class Node;
     class Appearance;
     class Camera;
+    class RenderPass;
 }
 
 namespace rlogic::internal
@@ -45,10 +47,12 @@ namespace rlogic
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
+    class RamsesRenderPassBinding;
     class DataArray;
     class AnimationNode;
     class AnimationNodeConfig;
     class TimerNode;
+    class AnchorPoint;
     enum class ELogMessageType;
 
     /**
@@ -65,13 +69,35 @@ namespace rlogic
     public:
         /**
         * Constructor of #LogicEngine.
+        * When using this constructor, the #LogicEngine feature level will be set to the base (#rlogic::EFeatureLevel_01),
+        * therefore do not use this constructor if there are other feature levels (see #rlogic::EFeatureLevel)
+        * that should be accessible, see additional constructor #LogicEngine(EFeatureLevel) for details.
         */
         RLOGIC_API LogicEngine() noexcept;
+
+        /**
+        * Constructor of #LogicEngine with a feature level specified.
+        * See #rlogic::EFeatureLevel for more details what features are available.
+        *
+        * @param featureLevel Feature level to activate in this #LogicEngine instance. A feature level always includes
+        *                     a previous feature level if any, e.g. a feature level released after base level will contain
+        *                     all features from base level, however base level will include only base level features
+        *                     and none from a newer feature level.
+        */
+        RLOGIC_API explicit LogicEngine(EFeatureLevel featureLevel) noexcept;
 
         /**
         * Destructor of #LogicEngine
         */
         RLOGIC_API ~LogicEngine() noexcept;
+
+        /**
+        * Returns the feature level this #LogicEngine instance was configured to use when created.
+        * See #LogicEngine(EFeatureLevel) and #rlogic::EFeatureLevel for more details.
+        *
+        * @return feature level this #LogicEngine instance was configured to use
+        */
+        [[nodiscard]] RLOGIC_API EFeatureLevel getFeatureLevel() const;
 
         /**
         * Returns an iterable #rlogic::Collection of all instances of \c T created by this #LogicEngine.
@@ -136,8 +162,10 @@ namespace rlogic
         /**
         * Creates a new Lua interface from a source string. Refer to the #rlogic::LuaInterface class
         * for requirements which Lua interface must fulfill in order to be added to the #LogicEngine.
-        * Note: interfaces must have a non-empty name which is unique among other interfaces
-        * (there can't be two interface objects with the same name in the same #LogicEngine instance).
+        * Note: interfaces must have a non-empty name.
+        * #rlogic::LuaInterface can be created with any non-empty name but if two or more instances
+        * share same name there will be a warning during validation (#validate) as it is advised
+        * for every Lua interface to have a unique name for clear identification from application logic.
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
@@ -253,6 +281,38 @@ namespace rlogic
         RLOGIC_API RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name ="");
 
         /**
+         * Same as #createRamsesCameraBinding but the created #rlogic::RamsesCameraBinding will have an input property
+         * for each frustum plane also for perspective camera. See #rlogic::RamsesCameraBinding for details.
+         * Note that ramses::OrthographicCamera binding will always have frustum planes as properties whether #createRamsesCameraBinding
+         * or #createRamsesCameraBindingWithFrustumPlanes is used to create it.
+         * #rlogic::RamsesCameraBinding with frustum planes can only be created with #rlogic::EFeatureLevel_02 enabled,
+         * see #LogicEngine(EFeatureLevel).
+         *
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param ramsesCamera the ramses::Camera object to control with the binding.
+         * @param name a name for the the new #rlogic::RamsesCameraBinding.
+         * @return a pointer to the created object or nullptr if
+         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
+         */
+        RLOGIC_API RamsesCameraBinding* createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name ="");
+
+        /**
+         * Creates a new #rlogic::RamsesRenderPassBinding which can be used to set the properties of a ramses::RenderPass object.
+         * #rlogic::RamsesRenderPassBinding can only be created with #rlogic::EFeatureLevel_02 enabled, see #LogicEngine(EFeatureLevel).
+         *
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param ramsesRenderPass the ramses::RenderPass object to control with the binding.
+         * @param name a name for the the new #rlogic::RamsesRenderPassBinding.
+         * @return a pointer to the created object or nullptr if
+         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
+         */
+        RLOGIC_API RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name ="");
+
+        /**
         * Creates a new #rlogic::DataArray to store data which can be used with animations.
         * Provided data must not be empty otherwise creation will fail.
         * See #rlogic::CanPropertyTypeBeStoredInDataArray and #rlogic::PropertyTypeToEnum
@@ -296,6 +356,22 @@ namespace rlogic
         RLOGIC_API TimerNode* createTimerNode(std::string_view name = "");
 
         /**
+        * Creates a new #rlogic::AnchorPoint that can be used to calculate projected coordinates of given ramses::Node when viewed using given ramses::Camera.
+        * See #rlogic::AnchorPoint for more details and usage of this special purpose logic node.
+        * #rlogic::AnchorPoint can only be created with #rlogic::EFeatureLevel_02 enabled, see #LogicEngine(EFeatureLevel).
+        *
+        * Attention! This method clears all previous errors! See also docs of #getErrors()
+        *
+        * @param nodeBinding binding referencing ramses::Node to use for model transformation when calculating projected coordinates.
+        * @param cameraBinding binding referencing ramses::Camera to use for view and projection transformation when calculating projected coordinates.
+        * @param name a name for the the new #rlogic::AnchorPoint.
+        * @return a pointer to the created object or nullptr if
+        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+        * The #rlogic::AnchorPoint can be destroyed by calling the #destroy method
+        */
+        RLOGIC_API AnchorPoint* createAnchorPoint(RamsesNodeBinding& nodeBinding, RamsesCameraBinding& cameraBinding, std::string_view name ="");
+
+        /**
          * Updates all #rlogic::LogicNode's which were created by this #LogicEngine instance.
          * The order in which #rlogic::LogicNode's are executed is determined by the links created
          * between them (see #link and #unlink). #rlogic::LogicNode's which don't have any links
@@ -330,6 +406,9 @@ namespace rlogic
         * The report data is generated only if previously enabled using #enableUpdateReport and is empty otherwise.
         * The data is only relevant for the last #update and is overwritten during next #update.
         * Note that if #update fails the report contents are undefined.
+        *
+        * Attention! The #rlogic::LogicEngineReport is returned by value and owns all the reported data.
+        *            Make sure to keep the object as long as its data is referenced.
         *
         * @return collected statistics from last #update.
         */
@@ -563,6 +642,15 @@ namespace rlogic
         RLOGIC_API bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
 
         /**
+        * Attempts to parse feature level from a Ramses Logic file.
+        *
+        * @param[in] filename file path to Ramses Logic file
+        * @param[out] detectedFeatureLevel feature level detected in given file (valid only if parsing successful!)
+        * @return true if parsing was successful, false otherwise.
+        */
+        [[nodiscard]] RLOGIC_API static bool GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel);
+
+        /**
         * Copy Constructor of LogicEngine is deleted because logic engines hold named resources and are not supposed to be copied
         *
         * @param other logic engine to copy from
@@ -674,9 +762,11 @@ namespace rlogic
             std::is_same_v<T, RamsesNodeBinding> ||
             std::is_same_v<T, RamsesAppearanceBinding> ||
             std::is_same_v<T, RamsesCameraBinding> ||
+            std::is_same_v<T, RamsesRenderPassBinding> ||
             std::is_same_v<T, DataArray> ||
             std::is_same_v<T, AnimationNode> ||
-            std::is_same_v<T, TimerNode>,
+            std::is_same_v<T, TimerNode> ||
+            std::is_same_v<T, AnchorPoint>,
             "Attempting to retrieve invalid type of object.");
     }
 }

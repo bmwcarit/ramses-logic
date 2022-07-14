@@ -14,9 +14,11 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
+#include "ramses-logic/AnchorPoint.h"
 
 #include "impl/LogicEngineImpl.h"
 #include "impl/LuaConfigImpl.h"
@@ -27,11 +29,21 @@
 namespace rlogic
 {
     LogicEngine::LogicEngine() noexcept
-        : m_impl(std::make_unique<internal::LogicEngineImpl>())
+        : m_impl(std::make_unique<internal::LogicEngineImpl>(EFeatureLevel::EFeatureLevel_01))
+    {
+    }
+
+    LogicEngine::LogicEngine(EFeatureLevel featureLevel) noexcept
+        : m_impl(std::make_unique<internal::LogicEngineImpl>(featureLevel))
     {
     }
 
     LogicEngine::~LogicEngine() noexcept = default;
+
+    EFeatureLevel LogicEngine::getFeatureLevel() const
+    {
+        return m_impl->getFeatureLevel();
+    }
 
     LogicEngine::LogicEngine(LogicEngine&& other) noexcept = default;
 
@@ -123,6 +135,16 @@ namespace rlogic
         return m_impl->createRamsesCameraBinding(ramsesCamera, name);
     }
 
+    RamsesCameraBinding* LogicEngine::createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name)
+    {
+        return m_impl->createRamsesCameraBindingWithFrustumPlanes(ramsesCamera, name);
+    }
+
+    RamsesRenderPassBinding* LogicEngine::createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name)
+    {
+        return m_impl->createRamsesRenderPassBinding(ramsesRenderPass, name);
+    }
+
     template <typename T>
     DataArray* LogicEngine::createDataArrayInternal(const std::vector<T>& data, std::string_view name)
     {
@@ -138,6 +160,11 @@ namespace rlogic
     TimerNode* LogicEngine::createTimerNode(std::string_view name)
     {
         return m_impl->createTimerNode(name);
+    }
+
+    AnchorPoint* LogicEngine::createAnchorPoint(RamsesNodeBinding& nodeBinding, RamsesCameraBinding& cameraBinding, std::string_view name)
+    {
+        return m_impl->createAnchorPoint(nodeBinding, cameraBinding, name);
     }
 
     const std::vector<ErrorData>& LogicEngine::getErrors() const
@@ -185,6 +212,11 @@ namespace rlogic
         return m_impl->loadFromBuffer(rawBuffer, bufferSize, ramsesScene, enableMemoryVerification);
     }
 
+    bool LogicEngine::GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel)
+    {
+        return internal::LogicEngineImpl::GetFeatureLevelFromFile(filename, detectedFeatureLevel);
+    }
+
     bool LogicEngine::saveToFile(std::string_view filename, const SaveFileConfig& config)
     {
         return m_impl->saveToFile(filename, *config.m_impl);
@@ -217,9 +249,11 @@ namespace rlogic
     template RLOGIC_API Collection<RamsesNodeBinding>       LogicEngine::getLogicObjectsInternal<RamsesNodeBinding>() const;
     template RLOGIC_API Collection<RamsesAppearanceBinding> LogicEngine::getLogicObjectsInternal<RamsesAppearanceBinding>() const;
     template RLOGIC_API Collection<RamsesCameraBinding>     LogicEngine::getLogicObjectsInternal<RamsesCameraBinding>() const;
+    template RLOGIC_API Collection<RamsesRenderPassBinding> LogicEngine::getLogicObjectsInternal<RamsesRenderPassBinding>() const;
     template RLOGIC_API Collection<DataArray>               LogicEngine::getLogicObjectsInternal<DataArray>() const;
     template RLOGIC_API Collection<AnimationNode>           LogicEngine::getLogicObjectsInternal<AnimationNode>() const;
     template RLOGIC_API Collection<TimerNode>               LogicEngine::getLogicObjectsInternal<TimerNode>() const;
+    template RLOGIC_API Collection<AnchorPoint>             LogicEngine::getLogicObjectsInternal<AnchorPoint>() const;
 
     template RLOGIC_API const LogicObject*             LogicEngine::findLogicObjectInternal<LogicObject>(std::string_view) const;
     template RLOGIC_API const LuaScript*               LogicEngine::findLogicObjectInternal<LuaScript>(std::string_view) const;
@@ -228,9 +262,11 @@ namespace rlogic
     template RLOGIC_API const RamsesNodeBinding*       LogicEngine::findLogicObjectInternal<RamsesNodeBinding>(std::string_view) const;
     template RLOGIC_API const RamsesAppearanceBinding* LogicEngine::findLogicObjectInternal<RamsesAppearanceBinding>(std::string_view) const;
     template RLOGIC_API const RamsesCameraBinding*     LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view) const;
+    template RLOGIC_API const RamsesRenderPassBinding* LogicEngine::findLogicObjectInternal<RamsesRenderPassBinding>(std::string_view) const;
     template RLOGIC_API const DataArray*               LogicEngine::findLogicObjectInternal<DataArray>(std::string_view) const;
     template RLOGIC_API const AnimationNode*           LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view) const;
     template RLOGIC_API const TimerNode*               LogicEngine::findLogicObjectInternal<TimerNode>(std::string_view) const;
+    template RLOGIC_API const AnchorPoint*             LogicEngine::findLogicObjectInternal<AnchorPoint>(std::string_view) const;
 
     template RLOGIC_API LogicObject*             LogicEngine::findLogicObjectInternal<LogicObject>(std::string_view);
     template RLOGIC_API LuaScript*               LogicEngine::findLogicObjectInternal<LuaScript>(std::string_view);
@@ -239,9 +275,11 @@ namespace rlogic
     template RLOGIC_API RamsesNodeBinding*       LogicEngine::findLogicObjectInternal<RamsesNodeBinding>(std::string_view);
     template RLOGIC_API RamsesAppearanceBinding* LogicEngine::findLogicObjectInternal<RamsesAppearanceBinding>(std::string_view);
     template RLOGIC_API RamsesCameraBinding*     LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view);
+    template RLOGIC_API RamsesRenderPassBinding* LogicEngine::findLogicObjectInternal<RamsesRenderPassBinding>(std::string_view);
     template RLOGIC_API DataArray*               LogicEngine::findLogicObjectInternal<DataArray>(std::string_view);
     template RLOGIC_API AnimationNode*           LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view);
     template RLOGIC_API TimerNode*               LogicEngine::findLogicObjectInternal<TimerNode>(std::string_view);
+    template RLOGIC_API AnchorPoint*             LogicEngine::findLogicObjectInternal<AnchorPoint>(std::string_view);
 
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<float>(const std::vector<float>&, std::string_view);
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec2f>(const std::vector<vec2f>&, std::string_view);

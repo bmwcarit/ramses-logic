@@ -11,7 +11,10 @@
 #include "ramses-framework-api/RamsesVersion.h"
 #include "ramses-logic/LogicNode.h"
 #include "ramses-logic/DataArray.h"
+#include "ramses-logic/RamsesNodeBinding.h"
+#include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/TimerNode.h"
+#include "ramses-logic/AnchorPoint.h"
 #include "ramses-logic/AnimationNodeConfig.h"
 
 #include "impl/LogicNodeImpl.h"
@@ -35,11 +38,23 @@
 #include <fstream>
 #include <streambuf>
 
+namespace
+{
+    const char* const fileIdFeatureLevel01         = "rl01";
+    const char* const fileIdFeatureLevel02orHigher = "rl02";
+} // namespace
+
 namespace rlogic::internal
 {
-    LogicEngineImpl::LogicEngineImpl()
-        : m_apiObjects(std::make_unique<ApiObjects>())
+    LogicEngineImpl::LogicEngineImpl(EFeatureLevel featureLevel)
+        : m_apiObjects{ std::make_unique<ApiObjects>(featureLevel) }
+        , m_featureLevel{ featureLevel }
     {
+        if (m_featureLevel != EFeatureLevel_01 && m_featureLevel != EFeatureLevel_02)
+        {
+            LOG_ERROR("Unrecognized feature level '0{}' provided, falling back to feature level 01", m_featureLevel);
+            m_featureLevel = EFeatureLevel_01;
+        }
     }
 
     LogicEngineImpl::~LogicEngineImpl() noexcept = default;
@@ -90,7 +105,31 @@ namespace rlogic::internal
     RamsesCameraBinding* LogicEngineImpl::createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name)
     {
         m_errors.clear();
-        return m_apiObjects->createRamsesCameraBinding(ramsesCamera, name);
+        return m_apiObjects->createRamsesCameraBinding(ramsesCamera, false, name);
+    }
+
+    RamsesCameraBinding* LogicEngineImpl::createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name)
+    {
+        m_errors.clear();
+        if (m_featureLevel < EFeatureLevel_02)
+        {
+            m_errors.add(fmt::format("Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        return m_apiObjects->createRamsesCameraBinding(ramsesCamera, true, name);
+    }
+
+    RamsesRenderPassBinding* LogicEngineImpl::createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name)
+    {
+        m_errors.clear();
+        if (m_featureLevel < EFeatureLevel_02)
+        {
+            m_errors.add(fmt::format("Cannot create RamsesRenderPassBinding, feature level 02 is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        return m_apiObjects->createRamsesRenderPassBinding(ramsesRenderPass, name);
     }
 
     template <typename T>
@@ -150,6 +189,27 @@ namespace rlogic::internal
         return m_apiObjects->createTimerNode(name);
     }
 
+    AnchorPoint* LogicEngineImpl::createAnchorPoint(RamsesNodeBinding& nodeBinding, RamsesCameraBinding& cameraBinding, std::string_view name)
+    {
+        m_errors.clear();
+        if (m_featureLevel < EFeatureLevel_02)
+        {
+            m_errors.add(fmt::format("Cannot create AnchorPoint, feature level 02 is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        const auto& nodeBindings = m_apiObjects->getApiObjectContainer<RamsesNodeBinding>();
+        const auto& cameraBindings = m_apiObjects->getApiObjectContainer<RamsesCameraBinding>();
+        if (std::find(nodeBindings.cbegin(), nodeBindings.cend(), &nodeBinding) == nodeBindings.cend() ||
+            std::find(cameraBindings.cbegin(), cameraBindings.cend(), &cameraBinding) == cameraBindings.cend())
+        {
+            m_errors.add(fmt::format("Failed to create AnchorPoint '{}': provided Ramses node binding and/or camera binding were not found in this logic instance.", name), nullptr, EErrorType::IllegalArgument);
+            return nullptr;
+        }
+
+        return m_apiObjects->createAnchorPoint(nodeBinding.m_nodeBinding, cameraBinding.m_cameraBinding, name);
+    }
+
     bool LogicEngineImpl::destroy(LogicObject& object)
     {
         m_errors.clear();
@@ -159,6 +219,11 @@ namespace rlogic::internal
     bool LogicEngineImpl::isLinked(const LogicNode& logicNode) const
     {
         return m_apiObjects->getLogicNodeDependencies().isLinked(logicNode.m_impl);
+    }
+
+    EFeatureLevel LogicEngineImpl::getFeatureLevel() const
+    {
+        return m_featureLevel;
     }
 
     size_t LogicEngineImpl::activateLinksRecursive(PropertyImpl& output)
@@ -217,8 +282,8 @@ namespace rlogic::internal
         if (m_updateReportEnabled)
             m_updateReport.sectionFinished(UpdateReport::ETimingSection::TopologySort);
 
-        // force dirty all timer nodes and their dependents so they update their tickers
-        setTimerNodesDirty();
+        // force dirty all timer nodes and anchor points
+        setNodeToBeAlwaysUpdatedDirty();
 
         const bool success = updateNodes(*sortedNodes);
 
@@ -278,13 +343,14 @@ namespace rlogic::internal
         return true;
     }
 
-    void LogicEngineImpl::setTimerNodesDirty()
+    void LogicEngineImpl::setNodeToBeAlwaysUpdatedDirty()
     {
+        // force timer nodes dirty so they can update their ticker
         for (TimerNode* timerNode : m_apiObjects->getApiObjectContainer<TimerNode>())
-        {
-            // force set timer node itself dirty so it can update its ticker
             timerNode->m_impl.setDirty(true);
-        }
+        // force anchor points dirty because they depend on set of ramses states which cannot be monitored
+        for (AnchorPoint* anchorPoint : m_apiObjects->getApiObjectContainer<AnchorPoint>())
+            anchorPoint->m_impl.setDirty(true);
     }
 
     const std::vector<ErrorData>& LogicEngineImpl::getErrors() const
@@ -295,12 +361,11 @@ namespace rlogic::internal
     const std::vector<WarningData>& LogicEngineImpl::validate() const
     {
         m_validationResults.clear();
-        if (m_apiObjects->bindingsDirty())
-        {
-            m_validationResults.add("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", nullptr, EWarningType::UnsafeDataState);
-        }
 
-        m_apiObjects->checkAllInterfaceOutputsLinked(m_validationResults);
+        if (m_apiObjects->bindingsDirty())
+            m_validationResults.add("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", nullptr, EWarningType::UnsafeDataState);
+
+        m_apiObjects->validateInterfaces(m_validationResults);
 
         return m_validationResults.getWarnings();
     }
@@ -331,7 +396,7 @@ namespace rlogic::internal
 
     bool LogicEngineImpl::checkFileIdentifierBytes(const std::string& dataSourceDescription, const std::string& fileIdBytes)
     {
-        const std::string expected(rlogic_serialization::LogicEngineIdentifier());
+        const std::string expected = getFileIdentifierMatchingFeatureLevel();
         if (expected.substr(0, 2) != fileIdBytes.substr(0, 2))
         {
             m_errors.add(fmt::format("{}: Tried loading a binary data which doesn't store Ramses Logic content! Expected file bytes 4-5 to be '{}', but found '{}' instead",
@@ -339,6 +404,23 @@ namespace rlogic::internal
                 expected.substr(0, 2),
                 fileIdBytes.substr(0, 2)
             ), nullptr, EErrorType::BinaryDataAccessError);
+            return false;
+        }
+
+        // print dedicated error messages for feature level 1 mismatch
+        // feature level 02 introduced a file id change (but future feature levels will not)
+
+        if ((fileIdBytes == fileIdFeatureLevel01) && (m_featureLevel != EFeatureLevel_01))
+        {
+            m_errors.add(fmt::format("{}: Feature level mismatch! Loaded file with feature level {} but LogicEngine was instantiated with feature level {}",
+                dataSourceDescription, EFeatureLevel_01, m_featureLevel), nullptr, EErrorType::BinaryVersionMismatch);
+            return false;
+        }
+
+        if ((fileIdBytes == fileIdFeatureLevel02orHigher) && (m_featureLevel == EFeatureLevel_01))
+        {
+            m_errors.add(fmt::format("{}: Feature level mismatch! Loaded file with feature level >={} but LogicEngine was instantiated with feature level {}",
+                dataSourceDescription, EFeatureLevel_02, m_featureLevel), nullptr, EErrorType::BinaryVersionMismatch);
             return false;
         }
 
@@ -355,8 +437,19 @@ namespace rlogic::internal
         return true;
     }
 
-    // TODO Violin consider handling errors gracefully, e.g. don't change state when error occurs
-    // Idea: collect data, and only move() in the end when everything was loaded correctly
+    const char* LogicEngineImpl::getFileIdentifierMatchingFeatureLevel() const
+    {
+        // Solution (workaround) to make sure that previously released rlogic 1.x.x library will fail to load exported binary
+        // with any other than the base 01 feature level. Feature level 02 has its own file identifier which can be read
+        // only by rlogic version that supports it.
+        // TODO remove this with new major release, feature levels are stored in schema and checked when loading,
+        // no need to use file identifier for it.
+
+        assert(std::string(rlogic_serialization::LogicEngineIdentifier()) == fileIdFeatureLevel01);
+        assert(m_featureLevel == EFeatureLevel_01 || m_featureLevel == EFeatureLevel_02);
+        return m_featureLevel == EFeatureLevel_01 ? rlogic_serialization::LogicEngineIdentifier() : fileIdFeatureLevel02orHigher;
+    }
+
     bool LogicEngineImpl::loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription)
     {
         m_errors.clear();
@@ -379,7 +472,7 @@ namespace rlogic::internal
         if (enableMemoryVerification)
         {
             flatbuffers::Verifier bufferVerifier(uint8Data, byteSize);
-            const bool bufferOK = rlogic_serialization::VerifyLogicEngineBuffer(bufferVerifier);
+            const bool bufferOK = bufferVerifier.VerifyBuffer<rlogic_serialization::LogicEngine>(getFileIdentifierMatchingFeatureLevel());
 
             if (!bufferOK)
             {
@@ -409,6 +502,14 @@ namespace rlogic::internal
             return false;
         }
 
+        const auto featureLevel = static_cast<EFeatureLevel>(logicEngine->featureLevel());
+        if (featureLevel != m_featureLevel)
+        {
+            m_errors.add(fmt::format("Feature level mismatch while loading {}! Loaded file with feature level {} but LogicEngine was instantiated with feature level {}",
+                dataSourceDescription, featureLevel, m_featureLevel), nullptr, EErrorType::BinaryVersionMismatch);
+            return false;
+        }
+
         if (nullptr == logicEngine->apiObjects())
         {
             m_errors.add(fmt::format("Fatal error while loading {}: doesn't contain API objects!", dataSourceDescription), nullptr, EErrorType::BinaryVersionMismatch);
@@ -424,7 +525,7 @@ namespace rlogic::internal
         if (scene != nullptr)
             ramsesResolver = std::make_unique<RamsesObjectResolver>(m_errors, *scene);
 
-        std::unique_ptr<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*logicEngine->apiObjects(), ramsesResolver.get(), dataSourceDescription, m_errors);
+        std::unique_ptr<ApiObjects> deserializedObjects = ApiObjects::Deserialize(*logicEngine->apiObjects(), ramsesResolver.get(), dataSourceDescription, m_errors, m_featureLevel);
 
         if (!deserializedObjects)
         {
@@ -434,6 +535,41 @@ namespace rlogic::internal
         // No errors -> move data into member
         m_apiObjects = std::move(deserializedObjects);
 
+        return true;
+    }
+
+    bool LogicEngineImpl::GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel)
+    {
+        std::optional<std::vector<char>> maybeBytesFromFile = FileUtils::LoadBinary(std::string(filename));
+        if (!maybeBytesFromFile)
+        {
+            LOG_ERROR("Failed to load file '{}'", filename);
+            return false;
+        }
+
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) Safe here, not worth transforming whole vector
+        flatbuffers::Verifier bufferVerifier(reinterpret_cast<const uint8_t*>(maybeBytesFromFile->data()), maybeBytesFromFile->size());
+        if (!bufferVerifier.VerifyBuffer<rlogic_serialization::LogicEngine>())
+        {
+            LOG_ERROR("'{}' contains corrupted data", filename);
+            return false;
+        }
+
+        const auto* logicEngine = rlogic_serialization::GetLogicEngine(maybeBytesFromFile->data());
+        if (!logicEngine)
+        {
+            LOG_ERROR("File '{}' could not be parsed", filename);
+            return false;
+        }
+
+        const uint32_t featureLevelInt = logicEngine->featureLevel();
+        if (featureLevelInt != EFeatureLevel_01 && featureLevelInt != EFeatureLevel_02)
+        {
+            LOG_ERROR("Could not recognize feature level in file '{}'", filename);
+            return false;
+        }
+
+        detectedFeatureLevel = static_cast<EFeatureLevel>(featureLevelInt);
         return true;
     }
 
@@ -500,10 +636,11 @@ namespace rlogic::internal
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
             ramsesVersionOffset,
             ramsesLogicVersionOffset,
-            ApiObjects::Serialize(*m_apiObjects, builder),
-            assetMetadataOffset);
+            ApiObjects::Serialize(*m_apiObjects, builder, m_featureLevel),
+            assetMetadataOffset,
+            m_featureLevel);
 
-        FinishLogicEngineBuffer(builder, logicEngine);
+        builder.Finish(logicEngine, getFileIdentifierMatchingFeatureLevel());
 
         if (!FileUtils::SaveBinary(std::string(filename), builder.GetBufferPointer(), builder.GetSize()))
         {

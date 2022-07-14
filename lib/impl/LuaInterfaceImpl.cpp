@@ -26,10 +26,9 @@ namespace rlogic::internal
         flatbuffers::FlatBufferBuilder& builder,
         SerializationMap& serializationMap)
     {
-        auto intf = rlogic_serialization::CreateLuaInterface(builder,
-            LogicObjectImpl::Serialize(luaInterface, builder),
-            PropertyImpl::Serialize(*luaInterface.getInputs()->m_impl, builder, serializationMap)
-        );
+        const auto logicObject = LogicObjectImpl::Serialize(luaInterface, builder);
+        const auto propertyObject = PropertyImpl::Serialize(*luaInterface.getInputs()->m_impl, builder, serializationMap);
+        auto intf = rlogic_serialization::CreateLuaInterface(builder, logicObject, propertyObject);
         builder.Finish(intf);
 
         return intf;

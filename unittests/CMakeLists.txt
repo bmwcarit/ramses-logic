@@ -51,7 +51,7 @@ if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     add_subdirectory(testAssetProducer)
 
     add_custom_target(RL_REGEN_TEST_ASSETS
-        COMMAND testAssetProducer ${PROJECT_SOURCE_DIR}/unittests/res testScene.ramses testLogic.rlogic
+        COMMAND testAssetProducer ${PROJECT_SOURCE_DIR}/unittests/res 2
         )
     set_property(TARGET RL_REGEN_TEST_ASSETS PROPERTY FOLDER "CMakePredefinedTargets")
 

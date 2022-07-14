@@ -46,12 +46,9 @@ namespace rlogic
 
         ASSERT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
-                  "[errorscript] Error while loading script. Lua stack trace:\n"
-                  "lua: error: Invalid type of field 'prop'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'nil' instead\n"
-                  "stack traceback:\n"
-                  "\t[C]: in ?\n"
-                  "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
+                    "[errorscript] Error while loading script. Lua stack trace:\n"
+                    "lua: error: Invalid type of field 'prop'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'nil' instead"));
         // nullptr because no LogicNode was created
         EXPECT_EQ(nullptr, m_logicEngine.getErrors()[0].object);
     }
@@ -63,11 +60,8 @@ namespace rlogic
         ASSERT_NE(nullptr, script);
         m_logicEngine.update();
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
-            "lua: error: Tried to access undefined struct property 'prop'\n"
-            "stack traceback:\n"
-            "\t[C]: in ?\n"
-            "\t[string \"errorscript\"]:5: in function <[string \"errorscript\"]:4>");
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
+            "lua: error: Tried to access undefined struct property 'prop'"));
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
     }
 
@@ -79,11 +73,8 @@ namespace rlogic
         // Error message contains script name in the stack (file not known)
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message,
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
             "[errorscript] Error while loading script. Lua stack trace:\n"
-            "lua: error: Invalid type of field 'prop'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'nil' instead\n"
-            "stack traceback:\n"
-            "\t[C]: in ?\n"
-            "\t[string \"errorscript\"]:3: in function <[string \"errorscript\"]:2>");
+            "lua: error: Invalid type of field 'prop'! Expected Type:T() syntax where T=Float,Int32,... Found a value of type 'nil' instead"));
     }
 }

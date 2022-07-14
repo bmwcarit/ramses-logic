@@ -63,10 +63,6 @@ namespace rlogic::internal
         case EPropertyType::Vec4f:
         case EPropertyType::Vec4i:
             return 4u;
-        // TODO Violin/Sven/Tobias this kind of a bad design, and the reason for it lies
-        // with the fact that we handle 3 different things in the same base class - "Property"
-        // Discuss whether we want this pattern, or maybe there are some other ideas how to deal
-        // with type abstraction and polymorphy where we would not have this problem
         case EPropertyType::Struct:
         case EPropertyType::Array:
         case EPropertyType::Float:
@@ -74,7 +70,7 @@ namespace rlogic::internal
         case EPropertyType::Int64:
         case EPropertyType::String:
         case EPropertyType::Bool:
-            assert(false && "Should not have reached this code!");
+            assert(false && "Should not ask about size of non-vector types!");
         }
 
         assert(false && "Vector type not handled!");

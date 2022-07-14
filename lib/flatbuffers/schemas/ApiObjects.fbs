@@ -12,10 +12,12 @@ include "LuaInterface.fbs";
 include "RamsesNodeBinding.fbs";
 include "RamsesAppearanceBinding.fbs";
 include "RamsesCameraBinding.fbs";
+include "RamsesRenderPassBinding.fbs";
 include "Link.fbs";
 include "DataArray.fbs";
 include "AnimationNode.fbs";
 include "TimerNode.fbs";
+include "AnchorPoint.fbs";
 
 namespace rlogic_serialization;
 
@@ -32,4 +34,6 @@ table ApiObjects
     timerNodes:[TimerNode];
     links:[Link];
     lastObjectId:uint64 = 0;
+    renderPassBindings:[RamsesRenderPassBinding];
+    anchorPoints:[AnchorPoint];
 }

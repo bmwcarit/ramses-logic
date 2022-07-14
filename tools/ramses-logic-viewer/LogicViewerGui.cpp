@@ -8,6 +8,7 @@
 
 #include "LogicViewerGui.h"
 #include "LogicViewer.h"
+#include "LogicViewerSettings.h"
 #include "ramses-client-api/Scene.h"
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/LuaScript.h"
@@ -17,8 +18,10 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/Property.h"
+#include "ramses-logic/AnchorPoint.h"
 #include "internals/StdFilesystemWrapper.h"
 #include "fmt/format.h"
 
@@ -92,12 +95,6 @@ namespace rlogic
             return "";
         }
 
-        bool IniReadFlag(const char* line, const char* fmt, int* flag)
-        {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg, cert-err34-c) no suitable replacement
-            return (sscanf(line, fmt, flag) == 1);
-        }
-
         void LogText(const std::string& text)
         {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
@@ -119,7 +116,11 @@ namespace rlogic
         const char* TypeName(const LogicNode* node)
         {
             const char* name = "Unknown";
-            if (node->as<LuaScript>() != nullptr)
+            if (node->as<LuaInterface>() != nullptr)
+            {
+                name = "LuaInterface";
+            }
+            else if (node->as<LuaScript>() != nullptr)
             {
                 name = "LuaScript";
             }
@@ -139,9 +140,17 @@ namespace rlogic
             {
                 name = "CameraBinding";
             }
+            else if (node->as<RamsesRenderPassBinding>() != nullptr)
+            {
+                name = "RenderPassBinding";
+            }
             else if (node->as<TimerNode>() != nullptr)
             {
                 name = "Timer";
+            }
+            else if (node->as<AnchorPoint>() != nullptr)
+            {
+                name = "AnchorPoint";
             }
             return name;
         }
@@ -162,22 +171,11 @@ namespace rlogic
         }
     }
 
-    LogicViewerGui::LogicViewerGui(rlogic::LogicViewer& viewer)
-        : m_viewer(viewer)
+    LogicViewerGui::LogicViewerGui(rlogic::LogicViewer& viewer, LogicViewerSettings& settings)
+        : m_settings(settings)
+        , m_viewer(viewer)
         , m_logicEngine(viewer.getEngine())
     {
-        auto* ctx = ImGui::GetCurrentContext();
-        ImGuiSettingsHandler ini_handler;
-        ini_handler.TypeName = "LogicViewerGui";
-        ini_handler.TypeHash = ImHashStr("LogicViewerGui");
-        ini_handler.ReadOpenFn = IniReadOpen;
-        ini_handler.ReadLineFn = IniReadLine;
-        ini_handler.WriteAllFn = IniWriteAll;
-        ini_handler.UserData   = this;
-        ctx->SettingsHandlers.push_back(ini_handler);
-
-        ImGui::LoadIniSettingsFromDisk(ImGui::GetIO().IniFilename);
-        m_persistentSettings = m_settings;
         m_viewer.enableUpdateReport(m_settings.showUpdateReport, m_updateReportInterval);
 
         // filename proposal if there is no lua file found at startup
@@ -188,12 +186,6 @@ namespace rlogic
 
     void LogicViewerGui::draw()
     {
-        if (m_settings != m_persistentSettings)
-        {
-            ImGui::MarkIniSettingsDirty();
-            m_persistentSettings = m_settings;
-        }
-
         if (ImGui::IsKeyPressed(ramses::EKeyCode_Left))
         {
             m_viewer.setCurrentView(m_viewer.getCurrentView() - 1);
@@ -205,6 +197,7 @@ namespace rlogic
         else if (ImGui::IsKeyPressed(ramses::EKeyCode_F11))
         {
             m_settings.showWindow = !m_settings.showWindow;
+            ImGui::MarkIniSettingsDirty();
         }
         else if (ImGui::IsKeyPressed(ramses::EKeyCode_F5))
         {
@@ -245,7 +238,10 @@ namespace rlogic
 
     void LogicViewerGui::drawMenuItemShowWindow()
     {
-        ImGui::MenuItem("Show Logic Viewer Window", "F11", &m_settings.showWindow);
+        if (ImGui::MenuItem("Show Logic Viewer Window", "F11", &m_settings.showWindow))
+        {
+            ImGui::MarkIniSettingsDirty();
+        }
     }
 
     void LogicViewerGui::drawMenuItemReload()
@@ -343,7 +339,7 @@ namespace rlogic
 
     void LogicViewerGui::drawWindow()
     {
-        if (!ImGui::Begin("Logic Viewer", &m_settings.showWindow, ImGuiWindowFlags_MenuBar))
+        if (!ImGui::Begin(fmt::format("Logic Viewer (FeatureLevel 0{})", m_logicEngine.getFeatureLevel()).c_str(), &m_settings.showWindow, ImGuiWindowFlags_MenuBar))
         {
             ImGui::End();
             return;
@@ -385,6 +381,8 @@ namespace rlogic
             drawAppearanceBindings();
             drawNodeBindings();
             drawCameraBindings();
+            drawRenderPassBindings();
+            drawAnchorPoints();
         }
 
         if (m_settings.showUpdateReport)
@@ -410,23 +408,29 @@ namespace rlogic
             {
                 drawMenuItemShowWindow();
                 ImGui::Separator();
-                ImGui::MenuItem("Show Interfaces", nullptr, &m_settings.showInterfaces);
-                ImGui::MenuItem("Show Scripts", nullptr, &m_settings.showScripts);
-                ImGui::MenuItem("Show Animation Nodes", nullptr, &m_settings.showAnimationNodes);
-                ImGui::MenuItem("Show Timer Nodes", nullptr, &m_settings.showTimerNodes);
-                ImGui::MenuItem("Show Data Arrays", nullptr, &m_settings.showDataArrays);
-                ImGui::MenuItem("Show Ramses Bindings", nullptr, &m_settings.showRamsesBindings);
-                if(ImGui::MenuItem("Show Update Report", nullptr, &m_settings.showUpdateReport))
+                bool changed = ImGui::MenuItem("Show Interfaces", nullptr, &m_settings.showInterfaces);
+                changed = ImGui::MenuItem("Show Scripts", nullptr, &m_settings.showScripts) || changed;
+                changed = ImGui::MenuItem("Show Animation Nodes", nullptr, &m_settings.showAnimationNodes) || changed;
+                changed = ImGui::MenuItem("Show Timer Nodes", nullptr, &m_settings.showTimerNodes) || changed;
+                changed = ImGui::MenuItem("Show Data Arrays", nullptr, &m_settings.showDataArrays) || changed;
+                changed = ImGui::MenuItem("Show Ramses Bindings", nullptr, &m_settings.showRamsesBindings) || changed;
+                if (ImGui::MenuItem("Show Update Report", nullptr, &m_settings.showUpdateReport))
                 {
                     m_viewer.enableUpdateReport(m_settings.showUpdateReport, m_updateReportInterval);
+                    ImGui::MarkIniSettingsDirty();
                 }
                 ImGui::Separator();
-                ImGui::MenuItem("Show Linked Inputs", nullptr, &m_settings.showLinkedInputs);
-                ImGui::MenuItem("Show Outputs", nullptr, &m_settings.showOutputs);
+                changed = ImGui::MenuItem("Show Linked Inputs", nullptr, &m_settings.showLinkedInputs) || changed;
+                changed = ImGui::MenuItem("Show Outputs", nullptr, &m_settings.showOutputs) || changed;
                 ImGui::Separator();
-                ImGui::MenuItem("Lua: prefer identifiers (scripts.foo)", nullptr, &m_settings.luaPreferIdentifiers);
-                ImGui::MenuItem("Lua: prefer object ids (scripts[1])", nullptr, &m_settings.luaPreferObjectIds);
+                changed = ImGui::MenuItem("Lua: prefer identifiers (scripts.foo)", nullptr, &m_settings.luaPreferIdentifiers) || changed;
+                changed = ImGui::MenuItem("Lua: prefer object ids (scripts[1])", nullptr, &m_settings.luaPreferObjectIds) || changed;
                 ImGui::EndMenu();
+
+                if (changed)
+                {
+                    ImGui::MarkIniSettingsDirty();
+                }
             }
             ImGui::EndMenuBar();
         }
@@ -661,6 +665,61 @@ namespace rlogic
         }
     }
 
+    void LogicViewerGui::drawRenderPassBindings()
+    {
+        const bool openBindings = ImGui::CollapsingHeader("RenderPass Bindings");
+        if (ImGui::BeginPopupContextItem("RenderPassBindingsContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all RenderPass Binding inputs"))
+            {
+                copyInputs(LogicViewer::ltnRenderPass, m_logicEngine.getCollection<RamsesRenderPassBinding>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openBindings)
+        {
+            for (auto* obj : m_logicEngine.getCollection<RamsesRenderPassBinding>())
+            {
+                const bool open = DrawTreeNode(obj);
+                drawNodeContextMenu(obj, LogicViewer::ltnRenderPass);
+                if (open)
+                {
+                    ImGui::TextUnformatted(fmt::format("Ramses RenderPass: {}", obj->getRamsesRenderPass().getName()).c_str());
+                    drawNode(obj);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
+    void LogicViewerGui::drawAnchorPoints()
+    {
+        const bool openAnchors = ImGui::CollapsingHeader("Anchor Points");
+        if (ImGui::BeginPopupContextItem("AnchorPointsContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all Anchor Point inputs"))
+            {
+                copyInputs(LogicViewer::ltnAnchorPoint, m_logicEngine.getCollection<AnchorPoint>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openAnchors)
+        {
+            for (auto* obj : m_logicEngine.getCollection<AnchorPoint>())
+            {
+                const bool open = DrawTreeNode(obj);
+                drawNodeContextMenu(obj, LogicViewer::ltnAnchorPoint);
+                if (open)
+                {
+                    ImGui::TextUnformatted(fmt::format("Ramses Node: {}", obj->getRamsesNode().getName()).c_str());
+                    ImGui::TextUnformatted(fmt::format("Ramses Camera: {}", obj->getRamsesCamera().getName()).c_str());
+                    drawNode(obj);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
     void LogicViewerGui::drawUpdateReport()
     {
         const bool open = ImGui::CollapsingHeader("Update Report");
@@ -773,11 +832,11 @@ namespace rlogic
             fs::path luafile(m_filename);
             if (fs::exists(luafile))
             {
-                ImGui::OpenPopup("Append?");
+                ImGui::OpenPopup("Overwrite?");
             }
             else if (!luafile.empty())
             {
-                saveDefaultLuaFile();
+                saveDefaultLuaFile(m_filename);
             }
         }
         ImGui::SameLine();
@@ -794,14 +853,14 @@ namespace rlogic
             }
         }
 
-        if (ImGui::BeginPopupModal("Append?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+        if (ImGui::BeginPopupModal("Overwrite?", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
         {
-            ImGui::TextUnformatted(fmt::format("File exists:\n{}\nAppend default lua configuration?", m_filename).c_str());
+            ImGui::TextUnformatted(fmt::format("File exists:\n{}\nOverwrite default lua configuration?", m_filename).c_str());
             ImGui::Separator();
 
             if (ImGui::Button("OK", ImVec2(120, 0)))
             {
-                saveDefaultLuaFile();
+                saveDefaultLuaFile(m_filename);
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SetItemDefaultFocus();
@@ -837,13 +896,16 @@ namespace rlogic
         auto* in = obj->getInputs();
         const auto* out = obj->getOutputs();
         ImGui::SetNextItemOpen(true, ImGuiCond_Always);
-        if (TreeNode(in, std::string_view("Inputs")))
+        if (in != nullptr)
         {
-            for (size_t i = 0; i < in->getChildCount(); ++i)
+            if (TreeNode(in, std::string_view("Inputs")))
             {
-                drawProperty(in->getChild(i), i);
+                for (size_t i = 0; i < in->getChildCount(); ++i)
+                {
+                    drawProperty(in->getChild(i), i);
+                }
+                ImGui::TreePop();
             }
-            ImGui::TreePop();
         }
         if (out != nullptr && m_settings.showOutputs)
         {
@@ -1236,131 +1298,44 @@ namespace rlogic
         path.pop_back();
     }
 
-    void* LogicViewerGui::IniReadOpen(ImGuiContext* /*context*/, ImGuiSettingsHandler* handler, const char* /*name*/)
+    template<class T>
+    void LogicViewerGui::logAllInputs(std::string_view headline, std::string_view ltn)
     {
-        return handler->UserData;
-    }
-
-    void LogicViewerGui::IniReadLine(ImGuiContext* /*context*/, ImGuiSettingsHandler* handler, void* /*entry*/, const char* line)
-    {
-        auto* gui = static_cast<LogicViewerGui*>(handler->UserData);
-        int flag = 0;
-        if (IniReadFlag(line, "ShowWindow=%d", &flag))
+        PathVector path;
+        const std::string indent = "    ";
+        std::string name = indent + LogicViewer::ltnModule + "." + ltn.data();
+        path.push_back(name);
+        LogText(indent + headline.data());
+        for (auto* node : m_logicEngine.getCollection<T>())
         {
-            gui->m_settings.showWindow = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowInterfaces=%d", &flag))
-        {
-            gui->m_settings.showInterfaces = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowScripts=%d", &flag))
-        {
-            gui->m_settings.showScripts = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowAnimationNodes=%d", &flag))
-        {
-            gui->m_settings.showAnimationNodes = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowTimerNodes=%d", &flag))
-        {
-            gui->m_settings.showTimerNodes = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowDataArrays=%d", &flag))
-        {
-            gui->m_settings.showDataArrays = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowRamsesBindings=%d", &flag))
-        {
-            gui->m_settings.showRamsesBindings = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowUpdateReport=%d", &flag))
-        {
-            gui->m_settings.showUpdateReport = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowLinkedInputs=%d", &flag))
-        {
-            gui->m_settings.showLinkedInputs = (flag != 0);
-        }
-        else if (IniReadFlag(line, "ShowOutputs=%d", &flag))
-        {
-            gui->m_settings.showOutputs = (flag != 0);
-        }
-        else if (IniReadFlag(line, "LuaPreferObjectIds=%d", &flag))
-        {
-            gui->m_settings.luaPreferObjectIds = (flag != 0);
-        }
-        else if (IniReadFlag(line, "LuaPreferIdentifiers=%d", &flag))
-        {
-            gui->m_settings.luaPreferIdentifiers = (flag != 0);
+            logInputs(node, path);
         }
     }
 
-    void LogicViewerGui::IniWriteAll(ImGuiContext* /*context*/, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
+    void LogicViewerGui::saveDefaultLuaFile(const std::string& filename)
     {
-        auto* gui = static_cast<LogicViewerGui*>(handler->UserData);
-        buf->reserve(buf->size() + 200);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("[%s][Settings]\n", handler->TypeName);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowWindow=%d\n", gui->m_settings.showWindow ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowInterfaces=%d\n", gui->m_settings.showInterfaces ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowScripts=%d\n", gui->m_settings.showScripts ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowAnimationNodes=%d\n", gui->m_settings.showAnimationNodes ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowTimerNodes=%d\n", gui->m_settings.showTimerNodes ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowDataArrays=%d\n", gui->m_settings.showDataArrays ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowRamsesBindings=%d\n", gui->m_settings.showRamsesBindings ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowUpdateReport=%d\n", gui->m_settings.showUpdateReport ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowLinkedInputs=%d\n", gui->m_settings.showLinkedInputs ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("ShowOutputs=%d\n", gui->m_settings.showOutputs ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("LuaPreferObjectIds=%d\n", gui->m_settings.luaPreferObjectIds ? 1 : 0);
-        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-        buf->appendf("LuaPreferIdentifiers=%d\n", gui->m_settings.luaPreferIdentifiers ? 1 : 0);
-        buf->append("\n");
-    }
-
-    void LogicViewerGui::saveDefaultLuaFile()
-    {
+        if (!filename.empty())
+        {
+            m_filename = filename;
+        }
+        std::error_code ec;
+        fs::remove(m_filename, ec);
+        if (ec)
+        {
+            m_lastErrorMessage = ec.message();
+            return;
+        }
         ImGui::LogToFile(-1, m_filename.c_str());
         LogText("function default()\n");
 
-        PathVector path;
-        std::string name = std::string("    ") + LogicViewer::ltnModule + "." + LogicViewer::ltnScript;
-        path.push_back(name);
-        LogText("    --Interfaces\n");
-        for (auto* script : m_logicEngine.getCollection<LuaInterface>())
-        {
-            logInputs(script, path);
-        }
-        LogText("    --Scripts\n");
-        for (auto* script : m_logicEngine.getCollection<LuaScript>())
-        {
-            logInputs(script, path);
-        }
-        LogText("    --Node bindings\n");
-        for (auto* script : m_logicEngine.getCollection<RamsesNodeBinding>())
-        {
-            logInputs(script, path);
-        }
-        LogText("    --Appearance bindings\n");
-        for (auto* script : m_logicEngine.getCollection<RamsesAppearanceBinding>())
-        {
-            logInputs(script, path);
-        }
-        LogText("    --Camera bindings\n");
-        for (auto* script : m_logicEngine.getCollection<RamsesCameraBinding>())
-        {
-            logInputs(script, path);
-        }
+        logAllInputs<LuaInterface>("--Interfaces\n", LogicViewer::ltnInterface);
+        logAllInputs<LuaScript>("--Scripts\n", LogicViewer::ltnScript);
+        logAllInputs<RamsesNodeBinding>("--Node bindings\n", LogicViewer::ltnNode);
+        logAllInputs<RamsesAppearanceBinding>("--Appearance bindings\n", LogicViewer::ltnAppearance);
+        logAllInputs<RamsesCameraBinding>("--Camera bindings\n", LogicViewer::ltnCamera);
+        logAllInputs<RamsesRenderPassBinding>("--RenderPass bindings\n", LogicViewer::ltnRenderPass);
+        logAllInputs<AnchorPoint>("--Anchor points\n", LogicViewer::ltnRenderPass);
+
         LogText("end\n\n");
         const char* code = R"(
 defaultView = {
@@ -1381,7 +1356,6 @@ function test_default()
     -- stores a screenshot (relative to the working directory)
     rlogic.screenshot("test_default.png")
 end
-
 )";
         LogText(code);
         ImGui::LogFinish();

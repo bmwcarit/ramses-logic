@@ -27,15 +27,21 @@ namespace rlogic::internal
 namespace rlogic
 {
     /**
-     * The RamsesNodeBinding is a type of #rlogic::RamsesBinding which allows manipulation of Ramses nodes.
-     * RamsesNodeBinding's can be created with #rlogic::LogicEngine::createRamsesNodeBinding.
+     * The RamsesNodeBinding is a #rlogic::RamsesBinding which allows manipulation of a Ramses node.
+     * RamsesNodeBinding can be created using #rlogic::LogicEngine::createRamsesNodeBinding.
      *
-     * The RamsesNodeBinding has a fixed set of inputs which correspond to properties of ramses::Node.
-     * They have a fixed type and name:
-     * 'visibility' (type bool)
-     * 'rotation' (type vec3f, or vec4f in case of quaternion)
-     * 'translation' (type vec3f)
-     * 'scaling' (type vec3f)
+     * The RamsesNodeBinding has a fixed set of inputs which correspond to the properties of a ramses::Node:
+     *   'visibility' (type bool)     - binds to node's visibility mode to switch between visible and invisible,
+     *                                  see also 'enabled' input for more options
+     *   'rotation' (type vec3f, or vec4f in case of quaternion) - binds to node's rotation
+     *   'translation' (type vec3f)   - binds to node's translation
+     *   'scaling' (type vec3f)       - binds to node's scaling
+     *   'enabled' (type bool)        - binds to node's visibility mode to be able to switch node to off mode
+     *                                  (see ramses::EVisibilityMode). When 'enabled' is true (default)
+     *                                  the visibility mode is determined by the 'visibility' input above.
+     *                                  When 'enabled' is false, the visibility mode is Off,
+     *                                  regardless of the 'visibility' input.
+     *                                  This property is only available in #rlogic::EFeatureLevel_02!
      *
      * The default values of the input properties are taken from the bound ramses::Node provided during construction.
      * This also applies for rotations, if the rlogic::ERotationType and ramses::ERotationConvention values of the
@@ -48,21 +54,15 @@ namespace rlogic
      * \rst
     .. note::
 
-        In case no values were set (because the user neither set a value explicitly
-        nor linked the input of rlogic::RamsesNodeBinding to another LogicNode output) the Ramses values
-        are not touched. It is possible to set values directly to ramses::Node which will not be overwritten
-        by rlogic::RamsesNodeBinding if you never explicitly assigned a value to the rlogic::RamsesNodeBinding inputs.
-        You can also mix-and-match this behavior - assign some properties and others not.
+        Not all states of the #ramses::Node must be managed via #RamsesNodeBinding, input properties which are not modified
+        via #RamsesNodeBinding (i.e. user never set a value explicitly nor linked the input) will not alter the corresponding Ramses object
+        state. This allows the user code to control some states via Ramses logic nodes and some directly using Ramses object.
 
      \endrst
      *
-     *
-     * The LogicEngine does not restrict which Scene the bound nodes belong to - it is possible to have
-     * nodes from different scenes bound to the same LogicEngine, and vice-versa. The effects
-     * on the ramses::Node property values which are bound to a rlogic::RamsesNodeBinding are immediately
-     * visible after rlogic::LogicEngine::update() returns, however the user has to call ramses::Scene::flush()
-     * explicitly based on their scene update logic and frame lifecycle.
-     *
+     * The changes via binding objects are applied to the bound object right away when calling rlogic::LogicEngine::update(),
+     * however keep in mind that Ramses has a mechanism for bundling scene changes and applying them at once using ramses::Scene::flush,
+     * so the changes will be applied all the way only after calling this method on the scene.
      */
     class RamsesNodeBinding : public RamsesBinding
     {

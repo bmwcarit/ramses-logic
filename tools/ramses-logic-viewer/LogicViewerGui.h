@@ -26,14 +26,20 @@ namespace rlogic
     class LogicNode;
     class LogicViewer;
     class DataArray;
+    struct LogicViewerSettings;
 
     class LogicViewerGui
     {
     public:
-        explicit LogicViewerGui(rlogic::LogicViewer& viewer);
+        explicit LogicViewerGui(rlogic::LogicViewer& viewer, LogicViewerSettings& settings);
         void draw();
         void openErrorPopup(const std::string& message);
         void setSceneTexture(ramses::TextureSampler* sampler, uint32_t width, uint32_t height);
+
+        /**
+         * saves a simple default lua configuration that can be used as a starting point
+         */
+        void saveDefaultLuaFile(const std::string& filename);
 
     private:
         void drawMenuItemShowWindow();
@@ -52,6 +58,8 @@ namespace rlogic
         void drawTimerNodes();
         void drawNodeBindings();
         void drawCameraBindings();
+        void drawRenderPassBindings();
+        void drawAnchorPoints();
         void drawUpdateReport();
         void drawAppearanceBindings();
         void drawSaveDefaultLuaFile();
@@ -74,51 +82,13 @@ namespace rlogic
         void copyScriptInputs();
 
         using PathVector = std::vector<std::string_view>;
+        template<class T> void logAllInputs(std::string_view headline, std::string_view ltn);
         void logInputs(rlogic::LogicNode* obj, const PathVector& path);
         void logProperty(rlogic::Property* prop, const std::string& prefix, PathVector& path);
 
-        static void* IniReadOpen(ImGuiContext* context, ImGuiSettingsHandler* handler, const char* name);
-        static void IniReadLine(ImGuiContext* context, ImGuiSettingsHandler* handler, void* entry, const char* line);
-        static void IniWriteAll(ImGuiContext* context, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf);
-
-        /**
-         * saves a simple default lua configuration that can be used as a starting point
-         */
-        void saveDefaultLuaFile();
-
-        struct Settings
-        {
-            bool showWindow         = true;
-            bool showOutputs        = true;
-            bool showLinkedInputs   = true;
-            bool showInterfaces     = true;
-            bool showScripts        = false;
-            bool showAnimationNodes = false;
-            bool showTimerNodes     = false;
-            bool showDataArrays     = false;
-            bool showRamsesBindings = false;
-            bool showUpdateReport   = true;
-
-            bool luaPreferObjectIds   = false;
-            bool luaPreferIdentifiers = false;
-
-            bool operator==(const Settings& rhs) const {
-                return showWindow == rhs.showWindow && showOutputs == rhs.showOutputs && showLinkedInputs == rhs.showLinkedInputs && showInterfaces == rhs.showInterfaces &&
-                       showScripts == rhs.showScripts && showAnimationNodes == rhs.showAnimationNodes && showTimerNodes == rhs.showTimerNodes &&
-                       showDataArrays == rhs.showDataArrays && showRamsesBindings == rhs.showRamsesBindings && showUpdateReport == rhs.showUpdateReport &&
-                       luaPreferObjectIds == rhs.luaPreferObjectIds && luaPreferIdentifiers == rhs.luaPreferIdentifiers;
-            }
-
-            bool operator!=(const Settings& rhs) const {
-                return !operator==(rhs);
-            }
-        };
-
-        rlogic::LogicViewer&       m_viewer;
-        rlogic::LogicEngine&       m_logicEngine;
-
-        Settings m_settings;
-        Settings m_persistentSettings;
+        LogicViewerSettings& m_settings;
+        rlogic::LogicViewer& m_viewer;
+        rlogic::LogicEngine& m_logicEngine;
 
         std::string m_lastErrorMessage;
         std::string m_filename;

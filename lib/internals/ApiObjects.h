@@ -10,7 +10,7 @@
 
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/ERotationType.h"
-#include "ramses-logic/AnimationTypes.h"
+#include "ramses-logic/EFeatureLevel.h"
 
 #include "impl/LuaConfigImpl.h"
 
@@ -28,6 +28,7 @@ namespace ramses
     class Node;
     class Appearance;
     class Camera;
+    class RenderPass;
 }
 
 namespace rlogic_serialization
@@ -51,9 +52,11 @@ namespace rlogic
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
+    class RamsesRenderPassBinding;
     class DataArray;
     class AnimationNode;
     class TimerNode;
+    class AnchorPoint;
 }
 
 namespace rlogic::internal
@@ -62,6 +65,8 @@ namespace rlogic::internal
     class IRamsesObjectResolver;
     class AnimationNodeConfigImpl;
     class ValidationResults;
+    class RamsesNodeBindingImpl;
+    class RamsesCameraBindingImpl;
 
     template <typename T>
     using ApiObjectContainer = std::vector<T*>;
@@ -71,7 +76,7 @@ namespace rlogic::internal
     {
     public:
         // Not move-able and non-copyable
-        ApiObjects();
+        explicit ApiObjects(EFeatureLevel featureLevel);
         ~ApiObjects() noexcept;
         // Not move-able because of the dependency between sol objects and their parent sol state
         // Moving those would require a custom move assignment operator which keeps both sol states alive
@@ -83,12 +88,16 @@ namespace rlogic::internal
         ApiObjects& operator=(const ApiObjects& other) = delete;
 
         // Serialization/Deserialization
-        static flatbuffers::Offset<rlogic_serialization::ApiObjects> Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder);
+        static flatbuffers::Offset<rlogic_serialization::ApiObjects> Serialize(
+            const ApiObjects& apiObjects,
+            flatbuffers::FlatBufferBuilder& builder,
+            EFeatureLevel featureLevel);
         static std::unique_ptr<ApiObjects> Deserialize(
             const rlogic_serialization::ApiObjects& apiObjects,
             const IRamsesObjectResolver* ramsesResolver,
             const std::string& dataSourceDescription,
-            ErrorReporting& errorReporting);
+            ErrorReporting& errorReporting,
+            EFeatureLevel featureLevel);
 
         // Create/destroy API objects
         LuaScript* createLuaScript(
@@ -107,16 +116,18 @@ namespace rlogic::internal
             ErrorReporting& errorReporting);
         RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
-        RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
+        RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, bool withFrustumPlanes, std::string_view name);
+        RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& renderPass, std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationNodeConfigImpl& config, std::string_view name);
         TimerNode* createTimerNode(std::string_view name);
+        AnchorPoint* createAnchorPoint(RamsesNodeBindingImpl& nodeBinding, RamsesCameraBindingImpl& cameraBinding, std::string_view name);
         bool destroy(LogicObject& object, ErrorReporting& errorReporting);
 
         // Invariance checks
         [[nodiscard]] bool checkBindingsReferToSameRamsesScene(ErrorReporting& errorReporting) const;
-        void checkAllInterfaceOutputsLinked(ValidationResults& validationResults) const;
+        void validateInterfaces(ValidationResults& validationResults) const;
 
         // Getters
         template <typename T>
@@ -131,7 +142,6 @@ namespace rlogic::internal
         [[nodiscard]] LogicObject* getApiObjectById(uint64_t id) const;
 
         // Internally used
-        [[nodiscard]] bool isDirty() const;
         [[nodiscard]] bool bindingsDirty() const;
         [[nodiscard]] uint64_t getNextLogicObjectId();
 
@@ -158,9 +168,11 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(LuaModule& luaModule, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(RamsesRenderPassBinding& ramsesRenderPassBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(AnimationNode& node, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(TimerNode& node, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(AnchorPoint& node, ErrorReporting& errorReporting);
 
         std::unique_ptr<SolState> m_solState {std::make_unique<SolState>()};
 
@@ -170,9 +182,11 @@ namespace rlogic::internal
         ApiObjectContainer<RamsesNodeBinding>       m_ramsesNodeBindings;
         ApiObjectContainer<RamsesAppearanceBinding> m_ramsesAppearanceBindings;
         ApiObjectContainer<RamsesCameraBinding>     m_ramsesCameraBindings;
+        ApiObjectContainer<RamsesRenderPassBinding> m_ramsesRenderPassBindings;
         ApiObjectContainer<DataArray>               m_dataArrays;
         ApiObjectContainer<AnimationNode>           m_animationNodes;
         ApiObjectContainer<TimerNode>               m_timerNodes;
+        ApiObjectContainer<AnchorPoint>             m_anchorPoints;
         ApiObjectContainer<LogicObject>             m_logicObjects;
         ApiObjectOwningContainer                    m_objectsOwningContainer;
 
@@ -181,5 +195,7 @@ namespace rlogic::internal
 
         std::unordered_map<LogicNodeImpl*, LogicNode*> m_reverseImplMapping;
         std::unordered_map<uint64_t, LogicObject*>     m_logicObjectIdMapping;
+
+        EFeatureLevel m_featureLevel;
     };
 }

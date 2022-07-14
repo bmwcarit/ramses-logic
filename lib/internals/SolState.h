@@ -50,6 +50,7 @@ namespace rlogic::internal
         SolState& operator=(const SolState& other) = delete;
 
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
+        sol::protected_function_result loadScriptByteCode(std::string_view byteCode, std::string_view scriptName, sol::environment& env);
         sol::environment createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules);
         void copyTableIntoEnvironment(const sol::table& table, std::string_view name, sol::environment& env);
         sol::table createTable();

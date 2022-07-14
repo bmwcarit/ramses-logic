@@ -30,6 +30,8 @@ function(add_example)
         )
     endif()
 
+    target_include_directories(${EXAMPLE_NAME} PRIVATE shared)
+
     folderize_target(${EXAMPLE_NAME} "examples")
 
     if(ramses-logic_BUILD_TESTS AND ${EXAMPLE_MAKE_TEST})
@@ -47,8 +49,11 @@ add_example(NAME 03_errors_runtime        FILES 03_errors_runtime/main.cpp      
 add_example(NAME 04_ramses_scene          FILES 04_ramses_scene/main.cpp)
 add_example(NAME 05_serialization         FILES 05_serialization/main.cpp         MAKE_TEST)
 add_example(NAME 07_links                 FILES 07_links/main.cpp                 MAKE_TEST)
-add_example(NAME 08a_static_animation     FILES 08a_static_animation/main.cpp     MAKE_TEST)
-add_example(NAME 08b_dynamic_animation    FILES 08b_dynamic_animation/main.cpp    MAKE_TEST)
+# Can't execute ramses animation examples as test - they have a loop which blocks test automation and wastes resources
+add_example(NAME 08a_static_animation     FILES 08a_static_animation/main.cpp)
+add_example(NAME 08b_dynamic_animation    FILES 08b_dynamic_animation/main.cpp)
 add_example(NAME 09_modules               FILES 09_modules/main.cpp               MAKE_TEST)
 add_example(NAME 10_globals               FILES 10_globals/main.cpp               MAKE_TEST)
 add_example(NAME 11_interfaces            FILES 11_interfaces/main.cpp            MAKE_TEST)
+# Can't execute as test - it is essentially animation with loop which blocks test automation and wastes resources
+add_example(NAME 12_anchor_point          FILES 12_anchor_point/main.cpp)

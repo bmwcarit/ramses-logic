@@ -59,6 +59,8 @@ def main():
         r'\.git',
         r'\.gitignore',
         r'gitconfig$',
+        r'xorg.conf',
+        r'Xwrapper.config',
         # Flatbuffer generated files
         r'_generated.h',
         # Should not be checked for anything, contains plain hashsum
@@ -119,7 +121,7 @@ def main():
         # Can be safely excluded, don't need license header because trivial
         r'__init__\.py$',
         # Excluded on purpose - add new lines reasonibly here!
-        r'^ci/scripts/config/ubsan_suppressions$',   # config file, can't add license
+        r'^ci/config/sanitizer/.*$',   # config file, can't add license
         r'\.md$',                           # .md files don't need a license
         r'.*/AndroidManifest\.xml$',        # Android manifests are difficult to modify with a license header
         r'^android/gradle\.properties$',    # Gradle config file, no license needed

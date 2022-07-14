@@ -20,6 +20,7 @@ namespace rlogic::internal
         MOCK_METHOD(ramses::Node*, findRamsesNodeInScene, (std::string_view logicNodeName, ramses::sceneObjectId_t objectId), (const, override));
         MOCK_METHOD(ramses::Appearance*, findRamsesAppearanceInScene, (std::string_view logicNodeName, ramses::sceneObjectId_t objectId), (const, override));
         MOCK_METHOD(ramses::Camera*, findRamsesCameraInScene, (std::string_view logicNodeName, ramses::sceneObjectId_t objectId), (const, override));
+        MOCK_METHOD(ramses::RenderPass*, findRamsesRenderPassInScene, (std::string_view logicNodeName, ramses::sceneObjectId_t objectId), (const, override));
     };
 
 }

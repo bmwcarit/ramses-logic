@@ -10,6 +10,7 @@
 
 #include "RamsesTestUtils.h"
 #include "WithTempDirectory.h"
+#include "FeatureLevelTestValues.h"
 
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/Effect.h"
@@ -18,6 +19,7 @@
 #include "ramses-client-api/UniformInput.h"
 #include "ramses-client-api/Appearance.h"
 #include "ramses-client-api/PerspectiveCamera.h"
+#include "ramses-client-api/RenderPass.h"
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/EStandardModule.h"
@@ -25,6 +27,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
 
 #include "impl/LogicEngineImpl.h"
 #include "impl/RamsesNodeBindingImpl.h"
@@ -37,11 +40,12 @@
 
 namespace rlogic
 {
-    class ALogicEngine_Linking : public ALogicEngine
+    class ALogicEngine_Linking : public ALogicEngineBase, public ::testing::TestWithParam<EFeatureLevel>
     {
     protected:
         ALogicEngine_Linking()
-            : m_sourceScript(*m_logicEngine.createLuaScript(m_minimalLinkScript, {}, "SourceScript"))
+            : ALogicEngineBase{ GetParam() }
+            , m_sourceScript(*m_logicEngine.createLuaScript(m_minimalLinkScript, {}, "SourceScript"))
             , m_targetScript(*m_logicEngine.createLuaScript(m_minimalLinkScript, {}, "TargetScript"))
             , m_sourceProperty(*m_sourceScript.getOutputs()->getChild("source"))
             , m_targetProperty(*m_targetScript.getInputs()->getChild("target"))
@@ -77,7 +81,12 @@ namespace rlogic
         Property& m_targetProperty;
     };
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertiesWithMismatchedTypesAreLinked)
+    INSTANTIATE_TEST_SUITE_P(
+        ALogicEngine_LinkingTests,
+        ALogicEngine_Linking,
+        rlogic::internal::GetFeatureLevelTestValues());
+
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfPropertiesWithMismatchedTypesAreLinked)
     {
         const char* errorString = "Types of source property 'outParam:{}' does not match target property 'inParam:{}'";
 
@@ -123,7 +132,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfLogicNodeIsLinkedToItself)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfLogicNodeIsLinkedToItself)
     {
         const auto targetPropertyFromTheSameScript = m_sourceScript.getInputs()->getChild("target");
 
@@ -131,11 +140,10 @@ namespace rlogic
 
         const auto& errors = m_logicEngine.getErrors();
         ASSERT_EQ(1u, errors.size());
-        // TODO Violin error message is not giving enough info where the error came from - improve
-        EXPECT_EQ(errors[0].message, "SourceNode and TargetNode are equal");
+        EXPECT_EQ(errors[0].message, "Link source and target can't belong to the same node! ('SourceScript')");
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfInputIsLinkedToOutput)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfInputIsLinkedToOutput)
     {
         const auto sourceProperty = m_sourceScript.getOutputs()->getChild("source");
         const auto targetProperty = m_targetScript.getInputs()->getChild("target");
@@ -146,7 +154,7 @@ namespace rlogic
         EXPECT_EQ("Failed to link input property 'target' to output property 'source'. Only outputs can be linked to inputs", errors[0].message);
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfInputIsLinkedToInput)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfInputIsLinkedToInput)
     {
         const auto sourceInput = m_sourceScript.getInputs()->getChild("target");
         const auto targetInput = m_targetScript.getInputs()->getChild("target");
@@ -157,7 +165,7 @@ namespace rlogic
         EXPECT_EQ("Failed to link input property 'target' to input property 'target'. Only outputs can be linked to inputs", errors[0].message);
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfOutputIsLinkedToOutput)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfOutputIsLinkedToOutput)
     {
         auto       sourceScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
         auto       targetScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
@@ -172,12 +180,12 @@ namespace rlogic
         EXPECT_EQ("Failed to link output property 'source_int' to output property 'source_int'. Only outputs can be linked to inputs", errors[0].message);
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesNoErrorIfMatchingPropertiesAreLinked)
+    TEST_P(ALogicEngine_Linking, ProducesNoErrorIfMatchingPropertiesAreLinked)
     {
         EXPECT_TRUE(m_logicEngine.link(m_sourceProperty, m_targetProperty));
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwiceToSameProperty_LuaScript)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwiceToSameProperty_LuaScript)
     {
         EXPECT_TRUE(m_logicEngine.link(m_sourceProperty, m_targetProperty));
         EXPECT_FALSE(m_logicEngine.link(m_sourceProperty, m_targetProperty));
@@ -187,7 +195,7 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "The property 'target' of LogicNode 'TargetScript' is already linked (to property 'source' of LogicNode 'SourceScript')");
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwice_RamsesBinding)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfPropertyIsLinkedTwice_RamsesBinding)
     {
         auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
@@ -201,7 +209,7 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "The property 'visibility' of LogicNode 'RamsesBinding' is already linked (to property 'source' of LogicNode 'SourceScript')");
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_LuaScript)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_LuaScript)
     {
         EXPECT_FALSE(m_logicEngine.unlink(m_sourceProperty, m_targetProperty));
 
@@ -210,7 +218,7 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "Input property 'target' is not currently linked!");
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesNodeBinding)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesNodeBinding)
     {
         auto ramsesBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "RamsesBinding");
 
@@ -223,7 +231,7 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "Input property 'visibility' is not currently linked!");
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesNoErrorIfLinkedToMatchingType)
+    TEST_P(ALogicEngine_Linking, ProducesNoErrorIfLinkedToMatchingType)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -272,7 +280,7 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.link(*vec3Source, *vec3Target));
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorOnNextUpdateIfLinkCycleWasCreated)
+    TEST_P(ALogicEngine_Linking, ProducesErrorOnNextUpdateIfLinkCycleWasCreated)
     {
         LuaScript& loopScript = *m_logicEngine.createLuaScript(m_minimalLinkScript);
         const Property* sourceInput = m_sourceScript.getInputs()->getChild("target");
@@ -297,7 +305,7 @@ namespace rlogic
         EXPECT_EQ("Failed to sort logic nodes based on links between their properties. Create a loop-free link graph before calling saveToFile()!", errors[0].message);
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesValuesAcrossMultipleLinksInAChain)
+    TEST_P(ALogicEngine_Linking, PropagatesValuesAcrossMultipleLinksInAChain)
     {
         auto scriptSource = R"(
             function interface(IN,OUT)
@@ -335,7 +343,7 @@ namespace rlogic
         EXPECT_EQ("Script1Script2Script3", script3Output->get<std::string>());
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingStructs)
+    TEST_P(ALogicEngine_Linking, ProducesErrorOnLinkingStructs)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -374,7 +382,7 @@ namespace rlogic
         EXPECT_EQ("Can't link properties of complex types directly, currently only primitive properties can be linked", errors[0].message);
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorOnLinkingArrays)
+    TEST_P(ALogicEngine_Linking, ProducesErrorOnLinkingArrays)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -397,7 +405,7 @@ namespace rlogic
         EXPECT_EQ("Can't link properties of complex types directly, currently only primitive properties can be linked", errors[0].message);
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_WhenAnotherLinkFromTheSameScriptExists)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_WhenAnotherLinkFromTheSameScriptExists)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -425,7 +433,7 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "Input property 'intTarget2' is not currently linked!");
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesBinding)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfNotLinkedPropertyIsUnlinked_RamsesBinding)
     {
         auto targetBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
         const auto visibilityProperty = targetBinding->getInputs()->getChild("visibility");
@@ -440,7 +448,7 @@ namespace rlogic
         EXPECT_EQ(errors[0].message, "Input property 'translation' is not currently linked!");
     }
 
-    TEST_F(ALogicEngine_Linking, UnlinksPropertiesWhichAreLinked)
+    TEST_P(ALogicEngine_Linking, UnlinksPropertiesWhichAreLinked)
     {
         ASSERT_TRUE(m_logicEngine.link(
             m_sourceProperty,
@@ -453,7 +461,7 @@ namespace rlogic
         ));
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesNoErrorsIfMultipleLinksFromSameSourceAreUnlinked)
+    TEST_P(ALogicEngine_Linking, ProducesNoErrorsIfMultipleLinksFromSameSourceAreUnlinked)
     {
         auto targetScript2 = m_logicEngine.createLuaScript(m_minimalLinkScript);
 
@@ -480,7 +488,7 @@ namespace rlogic
         ));
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked)
     {
         auto sourceScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
         auto targetScript = m_logicEngine.createLuaScript(m_linkScriptMultipleTypes);
@@ -497,7 +505,7 @@ namespace rlogic
         EXPECT_EQ(42, *targetScript->getOutputs()->getChild("source_int")->get<int32_t>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_Int64)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_Int64)
     {
         const std::string_view scriptSrc = R"(
             function interface(IN,OUT)
@@ -525,7 +533,7 @@ namespace rlogic
         EXPECT_EQ(value, *targetScript->getOutputs()->getChild("data")->get<int64_t>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_ArraysOfStructs)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_ArraysOfStructs)
     {
         const std::string_view scriptArrayOfStructs = R"(
             function interface(IN,OUT)
@@ -562,7 +570,7 @@ namespace rlogic
         EXPECT_EQ(42, *targetScript->getOutputs()->getChild("data")->getChild(1)->getChild("two")->get<int32_t>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_StructOfArrays)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinked_StructOfArrays)
     {
         const std::string_view scriptArrayOfStructs = R"(
             function interface(IN,OUT)
@@ -597,7 +605,7 @@ namespace rlogic
         EXPECT_EQ(42, *targetScript->getOutputs()->getChild("data")->getChild("two")->getChild(1)->get<int32_t>());
     }
 
-    TEST_F(ALogicEngine_Linking, DoesNotPropagateOutputsToInputsAfterUnlink)
+    TEST_P(ALogicEngine_Linking, DoesNotPropagateOutputsToInputsAfterUnlink)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -629,7 +637,7 @@ namespace rlogic
     }
 
     // TODO Violin add test with 2 scripts , one input in each
-    TEST_F(ALogicEngine_Linking, PropagatesOneOutputToMultipleInputs)
+    TEST_P(ALogicEngine_Linking, PropagatesOneOutputToMultipleInputs)
     {
         const auto  luaScriptSource1 = R"(
             function interface(IN,OUT)
@@ -673,8 +681,44 @@ namespace rlogic
         EXPECT_EQ(5, *input2->get<int32_t>());
     }
 
-    // TODO Violin need more tests - what is with default values after unlinking?
-    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesAppearanceBindings)
+    TEST_P(ALogicEngine_Linking, DoesNotOverwriteTargetValue_WhenUnlinked_WithoutLinkActivated)
+    {
+        const auto  luaScriptSource1 = R"(
+            function interface(IN,OUT)
+                OUT.output = Type:Int32()
+            end
+            function run(IN,OUT)
+                OUT.output = 5
+            end
+        )";
+
+        const auto  luaScriptSource2 = R"(
+            function interface(IN,OUT)
+                IN.input = Type:Int32()
+            end
+            function run(IN,OUT)
+            end
+        )";
+
+        auto        sourceScript = m_logicEngine.createLuaScript(luaScriptSource1);
+        auto        targetScript = m_logicEngine.createLuaScript(luaScriptSource2);
+
+        auto sourceOutput = sourceScript->getOutputs()->getChild("output");
+        auto targetInput = targetScript->getInputs()->getChild("input");
+
+        // Set target value
+        targetInput->set<int32_t>(100);
+        ASSERT_TRUE(m_logicEngine.update());
+
+        m_logicEngine.link(*sourceOutput, *targetInput);
+        m_logicEngine.unlink(*sourceOutput, *targetInput);
+        m_logicEngine.update();
+
+        // Value not overwritten by 5 from the link
+        EXPECT_EQ(100, *targetInput->get<int32_t>());
+    }
+
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesAppearanceBindings)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -705,7 +749,7 @@ namespace rlogic
         EXPECT_FLOAT_EQ(47.11f, result);
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesCameraBindings)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesCameraBindings)
     {
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
@@ -732,8 +776,37 @@ namespace rlogic
         EXPECT_FLOAT_EQ(47.11f, m_camera->getFarPlane());
     }
 
-    // TODO Violin test should actually test that the links propagates the value *even if the output is NOT set any more in the source script!*
-    TEST_F(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndOutputValueIsSetBeforehand)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesRenderPassBindings)
+    {
+        if (GetParam() < EFeatureLevel_02)
+            GTEST_SKIP();
+
+        const auto luaScriptSource = R"(
+            function interface(IN,OUT)
+                IN.val = Type:Int32()
+                OUT.val = Type:Int32()
+            end
+            function run(IN,OUT)
+                OUT.val = IN.val
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "TargetBinding");
+
+        auto sourceInput = sourceScript->getInputs()->getChild("val");
+        auto sourceOutput = sourceScript->getOutputs()->getChild("val");
+        auto targetInput = targetBinding->getInputs()->getChild("renderOrder");
+
+        m_logicEngine.link(*sourceOutput, *targetInput);
+
+        sourceInput->set(-11);
+        m_logicEngine.update();
+
+        EXPECT_EQ(-11, m_renderPass->getRenderOrder());
+    }
+
+    TEST_P(ALogicEngine_Linking, NewLinkTransfersValue_SourceValueSet)
     {
         const auto  luaScriptSource1 = R"(
             function interface(IN,OUT)
@@ -758,10 +831,9 @@ namespace rlogic
         auto sourceOutput = sourceScript->getOutputs()->getChild("output");
         auto targetInput  = targetScript->getInputs()->getChild("input");
 
-        //propagates source input to source output
+        // Execute run -> sets output to 5
         ASSERT_TRUE(m_logicEngine.update());
-        EXPECT_EQ(5, *sourceOutput->get<int32_t>());
-        EXPECT_EQ(0, *targetInput->get<int32_t>());
+        ASSERT_EQ(5, *sourceOutput->get<int32_t>());
 
         ASSERT_TRUE(m_logicEngine.link(*sourceOutput, *targetInput));
         m_logicEngine.update();
@@ -769,7 +841,49 @@ namespace rlogic
         EXPECT_EQ(5, *targetInput->get<int32_t>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndInputValueIsSetBeforehand)
+    TEST_P(ALogicEngine_Linking, NewLinkTransfersValue_SourceValueNotZero_OutputNotChanged)
+    {
+        const auto  luaScriptSource1 = R"(
+            function interface(IN,OUT)
+                IN.setOutput = Type:Bool()
+                OUT.output = Type:Int32()
+            end
+            function run(IN,OUT)
+                if IN.setOutput then
+                    OUT.output = 5
+                end
+            end
+        )";
+
+        const auto  luaScriptSource2 = R"(
+            function interface(IN,OUT)
+                IN.input = Type:Int32()
+            end
+            function run(IN,OUT)
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource1);
+        auto targetScript = m_logicEngine.createLuaScript(luaScriptSource2);
+
+        auto setOutput = sourceScript->getInputs()->getChild("setOutput");
+        setOutput->set<bool>(true);
+        auto sourceOutput = sourceScript->getOutputs()->getChild("output");
+        auto targetInput  = targetScript->getInputs()->getChild("input");
+
+        // Execute run -> sets output to 5
+        ASSERT_TRUE(m_logicEngine.update());
+        ASSERT_EQ(5, *sourceOutput->get<int32_t>());
+
+        // Disable output writing and add link
+        setOutput->set<bool>(false);
+        ASSERT_TRUE(m_logicEngine.link(*sourceOutput, *targetInput));
+        m_logicEngine.update();
+
+        EXPECT_EQ(5, *targetInput->get<int32_t>());
+    }
+
+    TEST_P(ALogicEngine_Linking, PropagatesValueIfLinkIsCreatedAndInputValueIsSetBeforehand)
     {
         const auto  luaScriptSource1 = R"(
             function interface(IN,OUT)
@@ -812,9 +926,9 @@ namespace rlogic
         EXPECT_EQ(5, *targetInput->get<int32_t>());
     }
 
-    TEST_F(ALogicEngine_Linking, ProducesErrorIfLinkIsCreatedBetweenDifferentLogicEngines)
+    TEST_P(ALogicEngine_Linking, ProducesErrorIfLinkIsCreatedBetweenDifferentLogicEngines)
     {
-        LogicEngine otherLogicEngine;
+        LogicEngine otherLogicEngine{ GetParam() };
         const auto  luaScriptSource = R"(
             function interface(IN,OUT)
                 IN.floatInput = Type:Float()
@@ -846,7 +960,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesValuesFromMultipleOutputScriptsToOneInputScript)
+    TEST_P(ALogicEngine_Linking, PropagatesValuesFromMultipleOutputScriptsToOneInputScript)
     {
         const auto  sourceScript = R"(
             function interface(IN,OUT)
@@ -896,7 +1010,7 @@ namespace rlogic
         EXPECT_FLOAT_EQ(24.f, *outputC2->get<float>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesValuesFromOutputScriptToMultipleInputScripts)
+    TEST_P(ALogicEngine_Linking, PropagatesValuesFromOutputScriptToMultipleInputScripts)
     {
         const auto  scriptSource = R"(
             function interface(IN,OUT)
@@ -930,7 +1044,7 @@ namespace rlogic
         EXPECT_FLOAT_EQ(42.f, *outputC->get<float>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesOutputToMultipleScriptsWithMultipleInputs)
+    TEST_P(ALogicEngine_Linking, PropagatesOutputToMultipleScriptsWithMultipleInputs)
     {
         const auto  sourceScript = R"(
             function interface(IN,OUT)
@@ -985,7 +1099,7 @@ namespace rlogic
         EXPECT_FLOAT_EQ(42.f, *outputC2->get<float>());
     }
 
-    TEST_F(ALogicEngine_Linking, DoesNotPropagateValuesIfScriptIsDestroyed)
+    TEST_P(ALogicEngine_Linking, DoesNotPropagateValuesIfScriptIsDestroyed)
     {
         const auto  scriptSource = R"(
             function interface(IN,OUT)
@@ -1022,7 +1136,7 @@ namespace rlogic
         EXPECT_FLOAT_EQ(0.f,  *outputC->get<float>());
     }
 
-    TEST_F(ALogicEngine_Linking, LinksNestedPropertiesBetweenScripts)
+    TEST_P(ALogicEngine_Linking, LinksNestedPropertiesBetweenScripts)
     {
         const auto  srcScriptA = R"(
             function interface(IN,OUT)
@@ -1074,7 +1188,7 @@ namespace rlogic
         EXPECT_EQ(std::string("str1 {foo, str2}"), *scriptB_concatenated->get<std::string>());
     }
 
-    TEST_F(ALogicEngine_Linking, LinksNestedScriptPropertiesToBindingInputs)
+    TEST_P(ALogicEngine_Linking, LinksNestedScriptPropertiesToBindingInputs)
     {
         const auto  scriptSrc = R"(
             function interface(IN,OUT)
@@ -1107,7 +1221,7 @@ namespace rlogic
         EXPECT_THAT(*nodeBindingInput_vec3f->get<vec3f>(), ::testing::ElementsAre(0.1f, 0.2f, 0.3f));
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesValuesCorrectlyAfterUnlink)
+    TEST_P(ALogicEngine_Linking, PropagatesValuesCorrectlyAfterUnlink)
     {
         /*
          *            --> ScriptB
@@ -1178,7 +1292,7 @@ namespace rlogic
         EXPECT_FLOAT_EQ(23.f, *scriptCOutput2->get<float>());
     }
 
-    TEST_F(ALogicEngine_Linking, canDestroyBindingAfterUnlinkingFromScript)
+    TEST_P(ALogicEngine_Linking, canDestroyBindingAfterUnlinkingFromScript)
     {
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
@@ -1210,7 +1324,7 @@ namespace rlogic
         EXPECT_TRUE(m_logicEngine.update());
     }
 
-    TEST_F(ALogicEngine_Linking, WHEN_ScriptWasUnlinkedFromBindingAndMultipleLinksDestroyed_THEN_UpdateDoesNotOverwriteBindingInputsByDanglingLinks)
+    TEST_P(ALogicEngine_Linking, WHEN_ScriptWasUnlinkedFromBindingAndMultipleLinksDestroyed_THEN_UpdateDoesNotOverwriteBindingInputsByDanglingLinks)
     {
         RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "");
 
@@ -1259,7 +1373,7 @@ namespace rlogic
         EXPECT_FALSE(*nodeVisibility->get<bool>());
     }
 
-    TEST_F(ALogicEngine_Linking, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLink)
+    TEST_P(ALogicEngine_Linking, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLink)
     {
         auto scriptSource = R"(
             function interface(IN,OUT)
@@ -1312,7 +1426,12 @@ namespace rlogic
         WithTempDirectory tempFolder;
     };
 
-    TEST_F(ALogicEngine_Linking_WithFiles, PreservesLinksBetweenScriptsAfterSavingAndLoading)
+    INSTANTIATE_TEST_SUITE_P(
+        ALogicEngine_Linking_WithFilesTests,
+        ALogicEngine_Linking_WithFiles,
+        rlogic::internal::GetFeatureLevelTestValues());
+
+    TEST_P(ALogicEngine_Linking_WithFiles, PreservesLinksBetweenScriptsAfterSavingAndLoading)
     {
         {
             /*
@@ -1321,7 +1440,7 @@ namespace rlogic
              *  ScriptA ------------------> ScriptC
              */
 
-            LogicEngine tmpLogicEngine;
+            LogicEngine tmpLogicEngine{ GetParam() };
             LuaConfig config;
             config.addStandardModuleDependency(EStandardModule::Base);
             const auto  srcScriptAB = R"(
@@ -1432,10 +1551,10 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking_WithFiles, PreservesNestedLinksBetweenScriptsAfterSavingAndLoading)
+    TEST_P(ALogicEngine_Linking_WithFiles, PreservesNestedLinksBetweenScriptsAfterSavingAndLoading)
     {
         {
-            LogicEngine tmpLogicEngine;
+            LogicEngine tmpLogicEngine{ GetParam() };
             const auto  srcScriptA = R"(
                 function interface(IN,OUT)
                     IN.appendixNestedStr2 = Type:String()
@@ -1544,7 +1663,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking_WithFiles, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLinkAfterSavingAndLoading)
+    TEST_P(ALogicEngine_Linking_WithFiles, PropagatesValuesInACycleAcrossMultipleLinksAndWeakLinkAfterSavingAndLoading)
     {
         {
             constexpr auto scriptSource = R"(
@@ -1557,7 +1676,7 @@ namespace rlogic
                 OUT.outString = IN.inString1 .. IN.inString2
             end)";
 
-            LogicEngine tmpLogicEngine;
+            LogicEngine tmpLogicEngine{ GetParam() };
             auto script1 = tmpLogicEngine.createLuaScript(scriptSource, {}, "scriptA");
             auto script2 = tmpLogicEngine.createLuaScript(scriptSource, {}, "scriptB");
             auto script3 = tmpLogicEngine.createLuaScript(scriptSource, {}, "scriptC");
@@ -1587,7 +1706,7 @@ namespace rlogic
             tmpLogicEngine.saveToFile("weaklinks.bin");
         }
 
-        m_logicEngine.loadFromFile("weaklinks.bin");
+        ASSERT_TRUE(m_logicEngine.loadFromFile("weaklinks.bin"));
         const auto script3 = m_logicEngine.findByName<LuaScript>("scriptC");
         const auto script3Output = script3->getOutputs()->getChild("outString");
         EXPECT_STREQ("ABC", script3Output->get<std::string>()->c_str());
@@ -1685,7 +1804,12 @@ namespace rlogic
         ramses::Scene* m_scene = nullptr;
     };
 
-    TEST_F(ALogicEngine_Linking_WithBindings, PreservesLinksToNodeBindingsAfterSavingAndLoadingFromFile)
+    INSTANTIATE_TEST_SUITE_P(
+        ALogicEngine_Linking_WithBindingsTests,
+        ALogicEngine_Linking_WithBindings,
+        rlogic::internal::GetFeatureLevelTestValues());
+
+    TEST_P(ALogicEngine_Linking_WithBindings, PreservesLinksToNodeBindingsAfterSavingAndLoadingFromFile)
     {
         auto ramsesNode1 = m_scene->createNode();
         auto ramsesNode2 = m_scene->createNode();
@@ -1697,7 +1821,7 @@ namespace rlogic
         ramsesNode2->setTranslation(11.1f, 11.2f, 11.3f);
 
         {
-            LogicEngine tmpLogicEngine;
+            LogicEngine tmpLogicEngine{ GetParam() };
             const auto  scriptSrc = R"(
                 function interface(IN,OUT)
                     OUT.vec3f = Type:Vec3f()
@@ -1790,7 +1914,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking_WithBindings, PreservesLinksToAppearanceBindingsAfterSavingAndLoadingFromFile)
+    TEST_P(ALogicEngine_Linking_WithBindings, PreservesLinksToAppearanceBindingsAfterSavingAndLoadingFromFile)
     {
         ramses::Effect& effect = createTestEffect(m_vertShader, m_fragShader);
         auto& appearance1 = createTestAppearance(effect);
@@ -1806,7 +1930,7 @@ namespace rlogic
         appearance2.setInputValueVector3f(uniform2, 4.1f, 4.2f, 4.3f);
 
         {
-            LogicEngine tmpLogicEngine;
+            LogicEngine tmpLogicEngine{ GetParam() };
             const auto  scriptSrc = R"(
                 function interface(IN,OUT)
                     OUT.uniform = Type:Vec3f()
@@ -1878,7 +2002,7 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking_WithBindings, PreservesLinksToCameraBindingsAfterSavingAndLoadingFromFile)
+    TEST_P(ALogicEngine_Linking_WithBindings, PreservesLinksToCameraBindingsAfterSavingAndLoadingFromFile)
     {
         auto camera1 = m_scene->createPerspectiveCamera();
         auto camera2 = m_scene->createPerspectiveCamera();
@@ -1889,7 +2013,7 @@ namespace rlogic
         camera2->setFrustum(15.f, 320.f / 240.f, 3.f, 4.f);
 
         {
-            LogicEngine tmpLogicEngine;
+            LogicEngine tmpLogicEngine{ GetParam() };
                     const std::string_view scriptSrc = R"(
             function interface(IN,OUT)
                 OUT.vpOffsetX = Type:Int32()
@@ -1963,7 +2087,95 @@ namespace rlogic
         }
     }
 
-    TEST_F(ALogicEngine_Linking, ReportsNodeAsLinked_IFF_ItHasIncomingOrOutgoingLinks)
+    TEST_P(ALogicEngine_Linking_WithBindings, PreservesLinksToRenderPassBindingsAfterSavingAndLoadingFromFile)
+    {
+        if (GetParam() < EFeatureLevel_02)
+            GTEST_SKIP();
+
+        auto rp1 = m_scene->createRenderPass();
+        auto rp2 = m_scene->createRenderPass();
+
+        rp1->setEnabled(true);
+        rp1->setRenderOrder(11);
+        rp2->setEnabled(false);
+        rp2->setRenderOrder(22);
+
+        {
+            LogicEngine tmpLogicEngine{ GetParam() };
+            const std::string_view scriptSrc = R"(
+            function interface(IN,OUT)
+                OUT.enabled = Type:Bool()
+                OUT.order = Type:Int32()
+                end
+                function run(IN,OUT)
+                    OUT.enabled = false
+                    OUT.order = 33
+                end
+            )";
+
+            auto script = tmpLogicEngine.createLuaScript(scriptSrc);
+            auto binding1 = tmpLogicEngine.createRamsesRenderPassBinding(*rp1, "RPBinding1");
+            auto binding2 = tmpLogicEngine.createRamsesRenderPassBinding(*rp2, "RPBinding2");
+
+            auto scriptOutputEnabled = script->getOutputs()->getChild("enabled");
+            auto scriptOutputOrder = script->getOutputs()->getChild("order");
+            auto binding1Property1 = binding1->getInputs()->getChild("enabled");
+            auto binding2Property1 = binding2->getInputs()->getChild("enabled");
+            auto binding2Property2 = binding2->getInputs()->getChild("renderOrder");
+
+            ASSERT_TRUE(tmpLogicEngine.link(*scriptOutputEnabled, *binding1Property1));
+            ASSERT_TRUE(tmpLogicEngine.link(*scriptOutputEnabled, *binding2Property1));
+            ASSERT_TRUE(tmpLogicEngine.link(*scriptOutputOrder, *binding2Property2));
+
+            ASSERT_TRUE(tmpLogicEngine.update());
+
+            EXPECT_FALSE(rp1->isEnabled());
+            EXPECT_EQ(rp1->getRenderOrder(), 11);
+            EXPECT_FALSE(rp2->isEnabled());
+            EXPECT_EQ(rp2->getRenderOrder(), 33);
+
+            tmpLogicEngine.saveToFile("binding_links.bin");
+        }
+
+        // Make sure loading of bindings doesn't do anything to the render pass until update() is called
+        // To test that, we reset both render passes' properties
+        rp1->setEnabled(true);
+        rp1->setRenderOrder(0);
+        rp2->setEnabled(true);
+        rp2->setRenderOrder(0);
+        {
+            ASSERT_TRUE(m_logicEngine.loadFromFile("binding_links.bin", m_scene));
+
+            EXPECT_TRUE(rp1->isEnabled());
+            EXPECT_EQ(rp1->getRenderOrder(), 0);
+            EXPECT_TRUE(rp2->isEnabled());
+            EXPECT_EQ(rp2->getRenderOrder(), 0);
+
+            auto binding1 = m_logicEngine.findByName<RamsesRenderPassBinding>("RPBinding1");
+            auto binding2 = m_logicEngine.findByName<RamsesRenderPassBinding>("RPBinding2");
+
+            auto binding1Property1 = binding1->getInputs()->getChild("enabled");
+            auto binding1Property2 = binding1->getInputs()->getChild("renderOrder");
+            auto binding2Property1 = binding2->getInputs()->getChild("enabled");
+            auto binding2Property2 = binding2->getInputs()->getChild("renderOrder");
+
+            // These values should be overwritten by the link - set them to a different value to make sure that happens
+            binding1Property1->m_impl->setValue(false);
+            // This should not be overwritten, but should keep the manual value instead, because no link points to it
+            ASSERT_TRUE(binding1Property2->set(100));
+            // These values should be overwritten by the link - set them to a different value to make sure that happens
+            binding2Property1->m_impl->setValue(false);
+            binding2Property2->m_impl->setValue(100);
+            EXPECT_TRUE(m_logicEngine.update());
+
+            EXPECT_FALSE(rp1->isEnabled());
+            EXPECT_EQ(rp1->getRenderOrder(), 100);
+            EXPECT_FALSE(rp2->isEnabled());
+            EXPECT_EQ(rp2->getRenderOrder(), 33);
+        }
+    }
+
+    TEST_P(ALogicEngine_Linking, ReportsNodeAsLinked_IFF_ItHasIncomingOrOutgoingLinks)
     {
         auto        scriptSource = R"(
             function interface(IN,OUT)
@@ -2007,7 +2219,7 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.isLinked(*targetBinding));
     }
 
-    TEST_F(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinking)
+    TEST_P(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinking)
     {
         auto        scriptSource = R"(
             function interface(IN,OUT)
@@ -2035,7 +2247,7 @@ namespace rlogic
         EXPECT_TRUE(targetBinding->m_impl.isDirty());
     }
 
-    TEST_F(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinkingWithStructs)
+    TEST_P(ALogicEngine_Linking, SetsAffectedNodesToDirtyAfterLinkingWithStructs)
     {
         auto scriptSource = R"(
             function interface(IN,OUT)
@@ -2067,7 +2279,7 @@ namespace rlogic
         EXPECT_TRUE(targetScript->m_impl.isDirty());
     }
 
-    TEST_F(ALogicEngine_Linking, SetsNeitherTargetNodeNorSourceNodeToDirtyAfterUnlink)
+    TEST_P(ALogicEngine_Linking, SetsNeitherTargetNodeNorSourceNodeToDirtyAfterUnlink)
     {
         auto        scriptSource = R"(
             function interface(IN,OUT)

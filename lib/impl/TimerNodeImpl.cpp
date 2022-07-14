@@ -71,11 +71,14 @@ namespace rlogic::internal
         timerNode.getOutputs()->getChild(0u)->m_impl->setValue(int64_t(0));
 
         // 3. Serialize
+        const auto logicObject = LogicObjectImpl::Serialize(timerNode, builder);
+        const auto inputPropertyObject = PropertyImpl::Serialize(*timerNode.getInputs()->m_impl, builder, serializationMap);
+        const auto outputPropertyObject = PropertyImpl::Serialize(*timerNode.getOutputs()->m_impl, builder, serializationMap);
         auto timerNodeOffset = rlogic_serialization::CreateTimerNode(
             builder,
-            LogicObjectImpl::Serialize(timerNode, builder),
-            PropertyImpl::Serialize(*timerNode.getInputs()->m_impl, builder, serializationMap),
-            PropertyImpl::Serialize(*timerNode.getOutputs()->m_impl, builder, serializationMap)
+            logicObject,
+            inputPropertyObject,
+            outputPropertyObject
         );
 
         // 4. Restore values

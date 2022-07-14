@@ -62,14 +62,18 @@ int main(int argc, char* argv[])
     std::string basePath {"."};
     std::string ramsesFilename = "testScene.ramses";
     std::string logicFilename = "testLogic.rlogic";
+    rlogic::EFeatureLevel featureLevel = rlogic::EFeatureLevel_01;
 
-    if (args.size() == 1u)
-    {
-        //Use defaults
-    }
-    else if (args.size() == 2u)
+    if (args.size() == 2u)
     {
         basePath = args[1];
+    }
+    else if (args.size() == 3u)
+    {
+        basePath = args[1];
+        featureLevel = static_cast<rlogic::EFeatureLevel>(std::stoi(args[2]));
+        if (featureLevel > rlogic::EFeatureLevel_01)
+            logicFilename = std::string("testLogic_0") + args[2] + ".rlogic";
     }
     else if (args.size() == 4u)
     {
@@ -77,13 +81,18 @@ int main(int argc, char* argv[])
         ramsesFilename = args[2];
         logicFilename = args[3];
     }
-    else
+
+    if (args.size() > 4u ||
+        (featureLevel != rlogic::EFeatureLevel_01 && featureLevel != rlogic::EFeatureLevel_02))
     {
-        std::cerr << "Generator of ramses and ramses logic test content.\n\n"
+        std::cerr
+            << "Generator of ramses and ramses logic test content.\n\n"
             << "Synopsis:\n"
-            << "testAssetProducer\n"
-            << "testAssetProducer <basePath>\n"
-            << "testAssetProducer <basePath> <ramsesFileName> <logicFileName>\n";
+            << "  testAssetProducer\n"
+            << "  testAssetProducer <basePath>\n"
+            << "  testAssetProducer <basePath> <featureLevel>\n"
+            << "  testAssetProducer <basePath> <ramsesFileName> <logicFileName>\n\n"
+            << "<featureLevel> must be integer matching one of existing feature levels";
         return 1;
     }
 
@@ -92,7 +101,7 @@ int main(int argc, char* argv[])
 
     ramses::Scene* scene = ramsesClient->createScene(ramses::sceneId_t(123u), ramses::SceneConfig(), "");
     scene->flush();
-    rlogic::LogicEngine logicEngine;
+    rlogic::LogicEngine logicEngine{ featureLevel };
 
     rlogic::LuaScript* script1 = logicEngine.createLuaScript(R"(
         function interface(IN,OUT)
@@ -116,10 +125,12 @@ int main(int argc, char* argv[])
             IN.arrayInput =    Type:Array(9, Type:Float())
             OUT.floatOutput = Type:Float()
             OUT.nodeTranslation = Type:Vec3f()
+            OUT.boolOutput = Type:Bool()
         end
         function run(IN,OUT)
             OUT.floatOutput = IN.floatInput
             OUT.nodeTranslation = {IN.floatInput, 2, 3}
+            OUT.boolOutput = false
         end
     )", {}, "script1");
 
@@ -189,12 +200,22 @@ int main(int argc, char* argv[])
         end)", "intf");
 
     ramses::Node* node = { scene->createNode("test node") };
-    ramses::OrthographicCamera* camera = { scene->createOrthographicCamera("test camera") };
+    ramses::OrthographicCamera* cameraOrtho = { scene->createOrthographicCamera("test camera") };
+    cameraOrtho->setFrustum(-1.f, 1.f, -1.f, 1.f, 0.1f, 10.f);
     ramses::Appearance* appearance = { createTestAppearance(*scene) };
+    ramses::RenderPass* renderPass = scene->createRenderPass();
+    ramses::PerspectiveCamera* cameraPersp = { scene->createPerspectiveCamera("test persp camera") };
 
     rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*node, rlogic::ERotationType::Euler_XYZ, "nodebinding");
-    rlogic::RamsesCameraBinding* camBinding = logicEngine.createRamsesCameraBinding(*camera, "camerabinding");
+    rlogic::RamsesCameraBinding* camBindingOrtho = logicEngine.createRamsesCameraBinding(*cameraOrtho, "camerabinding");
     rlogic::RamsesAppearanceBinding* appBinding = logicEngine.createRamsesAppearanceBinding(*appearance, "appearancebinding");
+    logicEngine.createRamsesCameraBinding(*cameraPersp, "camerabindingPersp");
+    if (featureLevel >= rlogic::EFeatureLevel_02)
+    {
+        logicEngine.createRamsesRenderPassBinding(*renderPass, "renderpassbinding");
+        logicEngine.createAnchorPoint(*nodeBinding, *camBindingOrtho, "anchorpoint");
+        logicEngine.createRamsesCameraBindingWithFrustumPlanes(*cameraPersp, "camerabindingPerspWithFrustumPlanes");
+    }
 
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
     rlogic::AnimationNodeConfig animConfig;
@@ -207,29 +228,23 @@ int main(int argc, char* argv[])
     logicEngine.link(*intf->getOutputs()->getChild("struct")->getChild("floatInput"), *script1->getInputs()->getChild("floatInput"));
     logicEngine.link(*script1->getOutputs()->getChild("floatOutput"), *script2->getInputs()->getChild("floatInput"));
     logicEngine.link(*script1->getOutputs()->getChild("nodeTranslation"), *nodeBinding->getInputs()->getChild("translation"));
-    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"), *camBinding->getInputs()->getChild("viewport")->getChild("offsetX"));
-    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetY"), *camBinding->getInputs()->getChild("viewport")->getChild("offsetY"));
-    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("width"), *camBinding->getInputs()->getChild("viewport")->getChild("width"));
-    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("height"), *camBinding->getInputs()->getChild("viewport")->getChild("height"));
+    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"), *camBindingOrtho->getInputs()->getChild("viewport")->getChild("offsetX"));
+    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("offsetY"), *camBindingOrtho->getInputs()->getChild("viewport")->getChild("offsetY"));
+    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("width"), *camBindingOrtho->getInputs()->getChild("viewport")->getChild("width"));
+    logicEngine.link(*script2->getOutputs()->getChild("cameraViewport")->getChild("height"), *camBindingOrtho->getInputs()->getChild("viewport")->getChild("height"));
     logicEngine.link(*script2->getOutputs()->getChild("floatUniform"), *appBinding->getInputs()->getChild("floatUniform"));
     logicEngine.link(*animNode->getOutputs()->getChild("channel"), *appBinding->getInputs()->getChild("animatedFloatUniform"));
 
-    bool success = logicEngine.update();
-
-    if(!success)
+    if (featureLevel >= rlogic::EFeatureLevel_02)
     {
-        return 1;
+        logicEngine.link(*script1->getOutputs()->getChild("boolOutput"), *nodeBinding->getInputs()->getChild("enabled"));
     }
+
+    if (!logicEngine.update())
+        return 1;
 
     logicEngine.saveToFile(basePath + "/" + logicFilename);
     scene->saveToFile((basePath +  "/" + ramsesFilename).c_str(), false);
-
-    logicEngine.destroy(*script1);
-    logicEngine.destroy(*script2);
-    logicEngine.destroy(*nodeBinding);
-    logicEngine.destroy(*camBinding);
-    logicEngine.destroy(*appBinding);
-    ramsesClient->destroy(*scene);
 
     return 0;
 }

@@ -230,7 +230,7 @@ without further changes:
 * A LLVM-based build in Debug mode (Linux or Windows WSL)
 * A Visual Studio 2017 CE Release build (Windows)
 * A CLANG_TIDY run in Docker (Linux or Windows WSL)
-* A TEST_COVERAGE run in Docker (Linux or Windows WSL)
+* A LLVM_L64_COVERAGE run in Docker (Linux or Windows WSL)
 
  The following subchapters explain how to execute these builds.
 

@@ -17,6 +17,7 @@ namespace rlogic::internal
     class LogicNodeImpl;
     class ErrorReporting;
     class PropertyImpl;
+    class RamsesBindingImpl;
 
     using NodeSet = std::unordered_set<LogicNodeImpl*>;
 
@@ -36,6 +37,10 @@ namespace rlogic::internal
         bool link(PropertyImpl& output, PropertyImpl& input, bool isWeakLink, ErrorReporting& errorReporting);
         bool unlink(PropertyImpl& output, PropertyImpl& input, ErrorReporting& errorReporting);
         [[nodiscard]] bool isLinked(const LogicNodeImpl& node) const;
+
+        // Dependency between binding and node, i.e. node depends on binding
+        void addBindingDependency(RamsesBindingImpl& binding, LogicNodeImpl& node);
+        void removeBindingDependency(RamsesBindingImpl& binding, LogicNodeImpl& node);
 
     private:
         DirectedAcyclicGraph m_logicNodeDAG;

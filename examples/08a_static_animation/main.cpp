@@ -20,6 +20,8 @@
 #include "ramses-client.h"
 #include "ramses-utils.h"
 
+#include "SimpleRenderer.h"
+
 #include <cassert>
 #include <iostream>
 #include <thread>
@@ -43,28 +45,18 @@ struct SceneAndNodes
 */
 SceneAndNodes CreateSceneWithTriangles(ramses::RamsesClient& client);
 
-int main(int argc, char* argv[])
+int main()
 {
     /**
-     * Create Ramses framework and client objects. Ramses Logic does not manage
-     * or encapsulate Ramses objects - it only interacts with existing Ramses objects.
-     * The application must take special care to not destroy Ramses objects while a
-     * LogicEngine instance is still referencing them!
-     */
-    ramses::RamsesFramework ramsesFramework(argc, argv);
-    ramses::RamsesClient* ramsesClient = ramsesFramework.createClient("example client");
-
-    /**
-     * To keep this example simple, we don't include a Renderer, but only provide the scene
-     * over network. Start a ramses daemon and a renderer additionally to see the visual result!
-     * The connect() ensures the scene published in this example will be distributed over network.
-     */
-    ramsesFramework.connect();
+    * Use simple class to create ramses framework objects which are not essential for this example.
+    * For more info on those, please refer to the ramses docs: https://bmwcarit.github.io/ramses
+    */
+    SimpleRenderer renderer;
 
     /**
      * Create a test Ramses scene with two simple triangles to be animated separately.
      */
-    auto [scene, tri1, tri2] = CreateSceneWithTriangles(*ramsesClient);
+    auto [scene, tri1, tri2] = CreateSceneWithTriangles(*renderer.getClient());
 
     rlogic::LogicEngine logicEngine;
 
@@ -76,21 +68,21 @@ int main(int argc, char* argv[])
     rlogic::RamsesNodeBinding* nodeBinding2 = logicEngine.createRamsesNodeBinding(*tri2);
 
     /**
-     * Create two simple animations (cubic and step) by providing keyframes and timestamps.
+     * Create two simple animations (cubic and linear) by providing keyframes and timestamps.
      * Animations have a single key-frame channel in this example for simplicity.
      *
      * First, create the data arrays which contain the time stamp data, the key-frame data points, and tangent arrays for the cubic animation.
      */
-    rlogic::DataArray* animTimestamps = logicEngine.createDataArray(std::vector<float>{ 0.f, 0.5f, 1.f, 1.5f }); // will be interpreted as seconds
-    rlogic::DataArray* animKeyframes = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, {0.f, 0.f, 180.f}, {0.f, 0.f, 100.f}, {0.f, 0.f, 360.f} });
-    rlogic::DataArray* cubicAnimTangentsIn = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, { 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f } });
-    rlogic::DataArray* cubicAnimTangentsOut = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, { 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f }, { 0.f, 0.f, 0.f } });
+    rlogic::DataArray* animTimestamps = logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f, 4.f }); // will be interpreted as seconds
+    rlogic::DataArray* animKeyframes = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, {0.f, 0.f, 90.f}, {0.f, 0.f, 180.f}, {0.f, 0.f, 360.f} });
+    rlogic::DataArray* cubicAnimTangentsIn = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ { 0.f, 0.f, -300.f }, { 0.f, 0.f, 300.f }, { 0.f, 0.f, -300.f }, { 0.f, 0.f, -300.f } });
+    rlogic::DataArray* cubicAnimTangentsOut = logicEngine.createDataArray(std::vector<rlogic::vec3f>{ { 0.f, 0.f, -300.f }, { 0.f, 0.f, -300.f }, { 0.f, 0.f, 300.f }, { 0.f, 0.f, 300.f } });
 
     /**
-     * Create a channel for each animation - cubic and nearest/step.
+     * Create a channel for each animation - cubic and linear.
      */
     const rlogic::AnimationChannel cubicAnimChannel { "rotationZcubic", animTimestamps, animKeyframes, rlogic::EInterpolationType::Cubic, cubicAnimTangentsIn, cubicAnimTangentsOut };
-    const rlogic::AnimationChannel stepAnimChannel { "rotationZstep", animTimestamps, animKeyframes, rlogic::EInterpolationType::Step };
+    const rlogic::AnimationChannel linearAnimChannel { "rotationZlinear", animTimestamps, animKeyframes, rlogic::EInterpolationType::Linear };
 
     /**
      * Create the animation nodes by passing in the channel data via config
@@ -99,9 +91,9 @@ int main(int argc, char* argv[])
     animConfigCubic.addChannel(cubicAnimChannel);
     rlogic::AnimationNode* cubicAnimNode = logicEngine.createAnimationNode(animConfigCubic);
 
-    rlogic::AnimationNodeConfig animConfigStep;
-    animConfigStep.addChannel(stepAnimChannel);
-    rlogic::AnimationNode* stepAnimNode = logicEngine.createAnimationNode(animConfigStep);
+    rlogic::AnimationNodeConfig animConfigLinear;
+    animConfigLinear.addChannel(linearAnimChannel);
+    rlogic::AnimationNode* linearAnimNode = logicEngine.createAnimationNode(animConfigLinear);
 
     /**
     * Connect the animation channel 'rotationZ' output with the rotation property of the RamsesNodeBinding object.
@@ -111,7 +103,7 @@ int main(int argc, char* argv[])
         *cubicAnimNode->getOutputs()->getChild("rotationZcubic"),
         *nodeBinding1->getInputs()->getChild("rotation"));
     logicEngine.link(
-        *stepAnimNode->getOutputs()->getChild("rotationZstep"),
+        *linearAnimNode->getOutputs()->getChild("rotationZlinear"),
         *nodeBinding2->getInputs()->getChild("rotation"));
 
     /**
@@ -145,11 +137,11 @@ int main(int argc, char* argv[])
             -- play anim1 right away
             local anim1Progress = elapsedTime / IN.anim1Duration
             -- play anim2 after anim1
-            local anim2Progress = (elapsedTime - IN.anim1Duration) / IN.anim2Duration
+            local anim2Progress = math.max(0, (elapsedTime - IN.anim1Duration) / IN.anim2Duration)
 
-            -- clamp normalized progress
-            OUT.anim1Progress = math.min(math.max(anim1Progress, 0), 1)
-            OUT.anim2Progress = math.min(math.max(anim2Progress, 0), 1)
+            -- modulo progress to loop animations
+            OUT.anim1Progress = anim1Progress % 1
+            OUT.anim2Progress = anim2Progress % 1
         end
     )", scriptConfig);
 
@@ -169,7 +161,7 @@ int main(int argc, char* argv[])
     * (see #rlogic::LogicEngine::linkWeak). We know that the durations will not change so setting them here once is sufficient.
     **/
     controlScript->getInputs()->getChild("anim1Duration")->set(*cubicAnimNode->getOutputs()->getChild("duration")->get<float>());
-    controlScript->getInputs()->getChild("anim2Duration")->set(*stepAnimNode->getOutputs()->getChild("duration")->get<float>());
+    controlScript->getInputs()->getChild("anim2Duration")->set(*linearAnimNode->getOutputs()->getChild("duration")->get<float>());
 
     /**
     * And finally, link control script to animation nodes
@@ -179,12 +171,17 @@ int main(int argc, char* argv[])
         *cubicAnimNode->getInputs()->getChild("progress"));
     logicEngine.link(
         *controlScript->getOutputs()->getChild("anim2Progress"),
-        *stepAnimNode->getInputs()->getChild("progress"));
+        *linearAnimNode->getInputs()->getChild("progress"));
+
+    /**
+    * Show the scene on the renderer
+    */
+    renderer.showScene(scene->getSceneId());
 
     /**
      * Simulate an application loop.
      */
-    for(int loop = 0; loop < 500; ++loop)
+    while (!renderer.isWindowClosed())
     {
         /**
         * Update the LogicEngine. This will apply changes to Ramses scene from any running animation.
@@ -195,6 +192,11 @@ int main(int argc, char* argv[])
         * In order to commit the changes to Ramses scene caused by animations logic we need to "flush" them.
         */
         scene->flush();
+
+        /**
+        * Process window events, check if window was closed
+        */
+        renderer.processEvents();
 
         /**
         * Throttle the simulation loop by sleeping for a bit.
@@ -210,14 +212,14 @@ int main(int argc, char* argv[])
     * the data arrays. Generally objects referencing other objects should always be destroyed first.
     */
     logicEngine.destroy(*cubicAnimNode);
-    logicEngine.destroy(*stepAnimNode);
+    logicEngine.destroy(*linearAnimNode);
     logicEngine.destroy(*animTimestamps);
     logicEngine.destroy(*animKeyframes);
     logicEngine.destroy(*cubicAnimTangentsIn);
     logicEngine.destroy(*cubicAnimTangentsOut);
     logicEngine.destroy(*nodeBinding1);
     logicEngine.destroy(*nodeBinding2);
-    ramsesClient->destroy(*scene);
+    renderer.getClient()->destroy(*scene);
 
     return 0;
 }

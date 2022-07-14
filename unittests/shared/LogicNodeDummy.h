@@ -10,6 +10,7 @@
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/PropertyImpl.h"
+#include "impl/RamsesBindingImpl.h"
 
 #include "ramses-logic/LogicNode.h"
 #include "ramses-logic/Property.h"
@@ -67,25 +68,19 @@ namespace rlogic::internal
             return outputsStruct;
         }
     };
-}
 
-// TODO Violin delete this class, not needed for tests - should be able to test with impl only
-namespace rlogic
-{
-    class LogicNodeDummy : public LogicNode
+    class RamsesBindingDummyImpl : public RamsesBindingImpl
     {
     public:
-        explicit LogicNodeDummy(std::unique_ptr<internal::LogicNodeDummyImpl> impl)
-            : LogicNode(std::move(impl))
-            /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) */
-            , m_node(static_cast<internal::LogicNodeDummyImpl&>(LogicNode::m_impl))
+        RamsesBindingDummyImpl() : RamsesBindingImpl("dummybinding", 1u)
         {
-        }
-        static std::unique_ptr<LogicNodeDummy> Create(std::string_view name)
-        {
-            return std::make_unique<LogicNodeDummy>(std::make_unique<internal::LogicNodeDummyImpl>(name));
         }
 
-        internal::LogicNodeDummyImpl& m_node;
+        std::optional<LogicNodeRuntimeError> update() override
+        {
+            return std::nullopt;
+        }
+
+        void createRootProperties() final {}
     };
 }

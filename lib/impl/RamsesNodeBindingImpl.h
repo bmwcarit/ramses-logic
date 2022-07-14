@@ -11,6 +11,7 @@
 #include "impl/RamsesBindingImpl.h"
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/EPropertyType.h"
+#include "ramses-logic/EFeatureLevel.h"
 #include "internals/SerializationMap.h"
 #include "internals/DeserializationMap.h"
 #include "ramses-client-api/ERotationConvention.h"
@@ -45,13 +46,14 @@ namespace rlogic::internal
         Rotation = 1,
         Translation = 2,
         Scaling = 3,
+        Enabled = 4
     };
 
     class RamsesNodeBindingImpl : public RamsesBindingImpl
     {
     public:
         // Move-able (noexcept); Not copy-able
-        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name, uint64_t id);
+        explicit RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name, uint64_t id, EFeatureLevel featureLevel);
         ~RamsesNodeBindingImpl() noexcept override = default;
         RamsesNodeBindingImpl(const RamsesNodeBindingImpl& other) = delete;
         RamsesNodeBindingImpl& operator=(const RamsesNodeBindingImpl& other) = delete;
@@ -65,7 +67,8 @@ namespace rlogic::internal
             const rlogic_serialization::RamsesNodeBinding& nodeBinding,
             const IRamsesObjectResolver& ramsesResolver,
             ErrorReporting& errorReporting,
-            DeserializationMap& deserializationMap);
+            DeserializationMap& deserializationMap,
+            EFeatureLevel featureLevel);
 
         [[nodiscard]] ramses::Node& getRamsesNode() const;
 
@@ -76,9 +79,10 @@ namespace rlogic::internal
         void createRootProperties() final;
 
     private:
-        static void ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode);
+        static void ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode, EFeatureLevel featureLevel);
 
         std::reference_wrapper<ramses::Node> m_ramsesNode;
         ERotationType m_rotationType;
+        EFeatureLevel m_featureLevel;
     };
 }

@@ -60,7 +60,7 @@ namespace rlogic::internal
         AspectRatio = 3,
     };
 
-    enum class EOrthographicCameraFrustumPropertyStaticIndex : size_t
+    enum class ECameraFrustumPlanesPropertyStaticIndex : size_t
     {
         NearPlane = 0,
         FarPlane = 1,
@@ -73,7 +73,7 @@ namespace rlogic::internal
     class RamsesCameraBindingImpl : public RamsesBindingImpl
     {
     public:
-        explicit RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, std::string_view name, uint64_t id);
+        explicit RamsesCameraBindingImpl(ramses::Camera& ramsesCamera, bool withFrustumPlanes, std::string_view name, uint64_t id);
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> Serialize(
             const RamsesCameraBindingImpl& cameraBinding,
@@ -87,16 +87,16 @@ namespace rlogic::internal
             DeserializationMap& deserializationMap);
 
         [[nodiscard]] ramses::Camera& getRamsesCamera() const;
-        [[nodiscard]] ramses::ERamsesObjectType getCameraType() const;
+        [[nodiscard]] bool hasFrustumPlanesProperties() const;
 
-        // TODO Violin make nodiscard
         std::optional<LogicNodeRuntimeError> update() override;
 
         void createRootProperties() final;
 
     private:
         std::reference_wrapper<ramses::Camera> m_ramsesCamera;
+        bool m_hasFrustumPlanesProperties;
 
-        static void ApplyRamsesValuesToInputProperties(RamsesCameraBindingImpl& binding, ramses::Camera& ramsesCamera);
+        static void ApplyRamsesValuesToInputProperties(RamsesCameraBindingImpl& binding);
     };
 }

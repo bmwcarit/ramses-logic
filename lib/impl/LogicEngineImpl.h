@@ -8,6 +8,7 @@
 
 #pragma once
 
+#include "ramses-logic/EFeatureLevel.h"
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/LogicEngineReport.h"
@@ -31,6 +32,7 @@ namespace ramses
     class Node;
     class Appearance;
     class Camera;
+    class RenderPass;
 }
 
 namespace rlogic
@@ -38,10 +40,12 @@ namespace rlogic
     class RamsesNodeBinding;
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
+    class RamsesRenderPassBinding;
     class DataArray;
     class AnimationNode;
     class AnimationNodeConfig;
     class TimerNode;
+    class AnchorPoint;
     class LuaScript;
     class LuaInterface;
     class LuaModule;
@@ -70,7 +74,7 @@ namespace rlogic::internal
         // Move-able (noexcept); Not copy-able
 
         // can't be noexcept anymore because constructor of std::unordered_map can throw
-        LogicEngineImpl();
+        explicit LogicEngineImpl(EFeatureLevel featureLevel);
         ~LogicEngineImpl() noexcept;
 
         LogicEngineImpl(LogicEngineImpl&& other) noexcept = default;
@@ -86,10 +90,13 @@ namespace rlogic::internal
         RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
         RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
+        RamsesCameraBinding* createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name);
+        RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationNodeConfig& config, std::string_view name);
         TimerNode* createTimerNode(std::string_view name);
+        AnchorPoint* createAnchorPoint(RamsesNodeBinding& nodeBinding, RamsesCameraBinding& cameraBinding, std::string_view name);
 
         bool destroy(LogicObject& object);
 
@@ -101,12 +108,15 @@ namespace rlogic::internal
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
         bool saveToFile(std::string_view filename, const SaveFileConfigImpl& config);
+        [[nodiscard]] static bool GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel);
 
         bool link(const Property& sourceProperty, const Property& targetProperty);
         bool linkWeak(const Property& sourceProperty, const Property& targetProperty);
         bool unlink(const Property& sourceProperty, const Property& targetProperty);
 
         [[nodiscard]] bool isLinked(const LogicNode& logicNode) const;
+
+        [[nodiscard]] EFeatureLevel getFeatureLevel() const;
 
         [[nodiscard]] ApiObjects& getApiObjects();
 
@@ -121,7 +131,7 @@ namespace rlogic::internal
 
     private:
         size_t activateLinksRecursive(PropertyImpl& output);
-        void setTimerNodesDirty();
+        void setNodeToBeAlwaysUpdatedDirty();
 
         static bool CheckRamsesVersionFromFile(const rlogic_serialization::Version& ramsesVersion);
 
@@ -131,6 +141,7 @@ namespace rlogic::internal
 
         [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription);
         [[nodiscard]] bool checkFileIdentifierBytes(const std::string& dataSourceDescription, const std::string& fileIdBytes);
+        [[nodiscard]] const char* getFileIdentifierMatchingFeatureLevel() const;
 
         std::unique_ptr<ApiObjects> m_apiObjects;
         ErrorReporting m_errors;
@@ -141,5 +152,7 @@ namespace rlogic::internal
         bool m_statisticsEnabled   = true;
         UpdateReport m_updateReport;
         LogicNodeUpdateStatistics m_statistics;
+
+        EFeatureLevel m_featureLevel;
     };
 }

@@ -12,12 +12,12 @@
 #include "impl/LuaConfigImpl.h"
 
 #include "internals/LuaCompilationUtils.h"
-#include "internals/SerializationMap.h"
 #include "internals/DeserializationMap.h"
 #include "internals/WrappedLuaProperty.h"
 
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/EFeatureLevel.h"
 
 #include <memory>
 #include <functional>
@@ -44,6 +44,7 @@ namespace rlogic
 namespace rlogic::internal
 {
     class SolState;
+    class SerializationMap;
 
     class LuaScriptImpl : public LogicNodeImpl
     {
@@ -56,13 +57,15 @@ namespace rlogic::internal
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LuaScript> Serialize(
             const LuaScriptImpl& luaScript,
             flatbuffers::FlatBufferBuilder& builder,
-            SerializationMap& serializationMap);
+            SerializationMap& serializationMap,
+            EFeatureLevel featureLevel);
 
         [[nodiscard]] static std::unique_ptr<LuaScriptImpl> Deserialize(
             SolState& solState,
             const rlogic_serialization::LuaScript& luaScript,
             ErrorReporting& errorReporting,
-            DeserializationMap& deserializationMap);
+            DeserializationMap& deserializationMap,
+            EFeatureLevel featureLevel);
 
         std::optional<LogicNodeRuntimeError> update() override;
 
@@ -72,6 +75,7 @@ namespace rlogic::internal
 
     private:
         std::string             m_source;
+        sol::bytecode           m_byteCode;
         WrappedLuaProperty      m_wrappedRootInput;
         WrappedLuaProperty      m_wrappedRootOutput;
         sol::protected_function m_runFunction;

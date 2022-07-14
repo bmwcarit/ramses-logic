@@ -14,7 +14,6 @@ namespace rlogic_serialization
 {
     struct Property;
     struct DataArray;
-    struct LuaModule;
 }
 
 namespace rlogic
@@ -26,6 +25,8 @@ namespace rlogic
 namespace rlogic::internal
 {
     class PropertyImpl;
+    class RamsesNodeBindingImpl;
+    class RamsesCameraBindingImpl;
 
     // Remembers flatbuffers pointers to deserialized objects temporarily during deserialization
     class DeserializationMap
@@ -33,50 +34,85 @@ namespace rlogic::internal
     public:
         void storePropertyImpl(const rlogic_serialization::Property& flatbufferObject, PropertyImpl& impl)
         {
-            assert(m_properties.find(&flatbufferObject) == m_properties.end() && "never try to store the same object twice");
-            m_properties.emplace(std::make_pair(&flatbufferObject, &impl));
+            Store(&flatbufferObject, &impl, m_properties);
         }
 
         PropertyImpl& resolvePropertyImpl(const rlogic_serialization::Property& flatbufferObject) const
         {
-            auto iter = m_properties.find(&flatbufferObject);
-            assert(iter != m_properties.end() && iter->second != nullptr);
-            return *iter->second;
+            return *Get(&flatbufferObject, m_properties);
         }
 
         void storeDataArray(const rlogic_serialization::DataArray& flatbufferObject, const DataArray& dataArray)
         {
-            assert(m_dataArrays.count(&flatbufferObject) == 0 && "one time store only");
-            m_dataArrays.insert({ &flatbufferObject, &dataArray });
+            Store(&flatbufferObject, &dataArray, m_dataArrays);
         }
 
         const DataArray& resolveDataArray(const rlogic_serialization::DataArray& flatbufferObject) const
         {
-            const auto it = m_dataArrays.find(&flatbufferObject);
-            assert(it != m_dataArrays.cend());
-            return *it->second;
+            return *Get(&flatbufferObject, m_dataArrays);
         }
 
         void storeLuaModule(uint64_t luaModuleId, const LuaModule& luaModule)
         {
-            assert(m_luaModules.count(luaModuleId) == 0 && "one time store only");
-            m_luaModules.insert({ luaModuleId, &luaModule });
+            Store(luaModuleId, &luaModule, m_luaModules);
         }
 
         const LuaModule* resolveLuaModule(uint64_t luaModuleId) const
         {
-            const auto it = m_luaModules.find(luaModuleId);
-            if (it == m_luaModules.cend())
-            {
-                return nullptr;
-            }
-            return it->second;
+            return Get(luaModuleId, m_luaModules);
+        }
+
+        void storeNodeBinding(uint64_t id, RamsesNodeBindingImpl& nodeBinding)
+        {
+            Store(id, &nodeBinding, m_nodeBindings);
+        }
+
+        RamsesNodeBindingImpl* resolveNodeBinding(uint64_t id) const
+        {
+            return Get(id, m_nodeBindings);
+        }
+
+        void storeCameraBinding(uint64_t id, RamsesCameraBindingImpl& cameraBinding)
+        {
+            Store(id, &cameraBinding, m_cameraBindings);
+        }
+
+        RamsesCameraBindingImpl* resolveCameraBinding(uint64_t id) const
+        {
+            return Get(id, m_cameraBindings);
         }
 
     private:
+        template <typename Key, typename Value>
+        static void Store(Key key, Value value, std::unordered_map<Key, Value>& container)
+        {
+            static_assert(std::is_trivially_copyable_v<Key> && std::is_trivially_copyable_v<Value>, "Performance warning");
+            assert(container.count(key) == 0 && "one time store only");
+            container.emplace(std::move(key), std::move(value));
+        }
+
+        template <typename Key, typename Value>
+        [[nodiscard]] static Value Get(Key key, const std::unordered_map<Key, Value>& container)
+        {
+            const auto it = container.find(key);
+            assert(it != container.cend());
+            return it->second;
+        }
+
+        // fail queries using IDs gracefully if given ID not found
+        // file can be OK on flatbuffer schema level but might still contain corrupted value
+        template <typename Value>
+        [[nodiscard]] static Value Get(uint64_t key, const std::unordered_map<uint64_t, Value>& container)
+        {
+            const auto it = container.find(key);
+            return (it == container.cend()) ? nullptr : it->second;
+        }
+
         std::unordered_map<const rlogic_serialization::Property*, PropertyImpl*> m_properties;
         std::unordered_map<const rlogic_serialization::DataArray*, const DataArray*> m_dataArrays;
         std::unordered_map<uint64_t, const LuaModule*> m_luaModules;
+        std::unordered_map<uint64_t, RamsesNodeBindingImpl*> m_nodeBindings;
+        std::unordered_map<uint64_t, RamsesCameraBindingImpl*> m_cameraBindings;
     };
 
 }

@@ -49,20 +49,27 @@ namespace rlogic::internal
         EXPECT_EQ(0u, m_loggedErrors.size());
     }
 
-    TEST_F(AErrorReporting, StoresSourceLogicNodeWhenProvided)
+    TEST_F(AErrorReporting, StoresSourceLogicObjectWhenProvided)
     {
-        auto dummyNode1 = LogicNodeDummy::Create("");
-        auto dummyNode2 = LogicNodeDummy::Create("");
+        class TestObject : public LogicObject
+        {
+        public:
+            TestObject() : LogicObject(std::make_unique<LogicObjectImpl>("", 0))
+            {
+            }
+        };
+        TestObject object1;
+        TestObject object2;
 
-        m_errorReporting.add("error 1", dummyNode1.get(), EErrorType::ContentStateError);
-        m_errorReporting.add("error 2", dummyNode2.get(), EErrorType::BinaryVersionMismatch);
+        m_errorReporting.add("error 1", &object1, EErrorType::ContentStateError);
+        m_errorReporting.add("error 2", &object2, EErrorType::BinaryVersionMismatch);
 
         ASSERT_EQ(m_errorReporting.getErrors().size(), 2u);
         EXPECT_EQ(m_errorReporting.getErrors()[0].message, "error 1");
-        EXPECT_EQ(m_errorReporting.getErrors()[0].object, dummyNode1.get());
+        EXPECT_EQ(m_errorReporting.getErrors()[0].object, &object1);
         EXPECT_EQ(m_errorReporting.getErrors()[0].type, EErrorType::ContentStateError);
         EXPECT_EQ(m_errorReporting.getErrors()[1].message, "error 2");
-        EXPECT_EQ(m_errorReporting.getErrors()[1].object, dummyNode2.get());
+        EXPECT_EQ(m_errorReporting.getErrors()[1].object, &object2);
         EXPECT_EQ(m_errorReporting.getErrors()[1].type, EErrorType::BinaryVersionMismatch);
     }
 

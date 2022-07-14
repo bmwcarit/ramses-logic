@@ -94,11 +94,12 @@ namespace rlogic::internal
     {
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(binding.m_ramsesAppearance, builder);
 
+        const auto logicObject = LogicObjectImpl::Serialize(binding, builder);
+        const auto propertyObject = PropertyImpl::Serialize(*binding.getInputs()->m_impl, builder, serializationMap);
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
-            LogicObjectImpl::Serialize(binding, builder),
+            logicObject,
             ramsesReference,
-            // TODO Violin don't serialize these - they carry no useful information and are redundant
-            PropertyImpl::Serialize(*binding.getInputs()->m_impl, builder, serializationMap));
+            propertyObject);
         builder.Finish(ramsesBinding);
 
         rlogic_serialization::ResourceId parentEffectResourceId;
@@ -148,7 +149,6 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        // TODO Violin don't serialize these inputs -> get rid of the check
         if (deserializedRootInput->getType() != EPropertyType::Struct)
         {
             errorReporting.add("Fatal error during loading of RamsesAppearanceBinding from serialized data: root input has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);

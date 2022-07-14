@@ -12,6 +12,7 @@
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/PropertyImpl.h"
+#include "impl/RamsesBindingImpl.h"
 
 #include "internals/ErrorReporting.h"
 #include "internals/TypeUtils.h"
@@ -113,7 +114,7 @@ namespace rlogic::internal
 
         if (&output.getLogicNode() == &input.getLogicNode())
         {
-            errorReporting.add("SourceNode and TargetNode are equal", nullptr, EErrorType::IllegalArgument);
+            errorReporting.add(fmt::format("Link source and target can't belong to the same node! ('{}')", input.getLogicNode().getName()), nullptr, EErrorType::IllegalArgument);
             return false;
         }
 
@@ -203,5 +204,24 @@ namespace rlogic::internal
         input.resetIncomingLink();
 
         return true;
+    }
+
+    void LogicNodeDependencies::addBindingDependency(RamsesBindingImpl& binding, LogicNodeImpl& node)
+    {
+        assert(m_logicNodeDAG.containsNode(node));
+        assert(m_logicNodeDAG.containsNode(binding));
+        assert(&node != &binding);
+
+        if (m_logicNodeDAG.addEdge(binding, node))
+            m_nodeTopologyChanged = true;
+    }
+
+    void LogicNodeDependencies::removeBindingDependency(RamsesBindingImpl& binding, LogicNodeImpl& node)
+    {
+        assert(m_logicNodeDAG.containsNode(node));
+        assert(m_logicNodeDAG.containsNode(binding));
+        assert(&node != &binding);
+
+        m_logicNodeDAG.removeEdge(binding, node);
     }
 }

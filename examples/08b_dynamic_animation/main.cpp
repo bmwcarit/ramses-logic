@@ -20,6 +20,8 @@
 #include "ramses-client.h"
 #include "ramses-utils.h"
 
+#include "SimpleRenderer.h"
+
 #include <cassert>
 #include <iostream>
 #include <thread>
@@ -45,28 +47,18 @@ struct SceneAndNode
 */
 SceneAndNode CreateSceneWithTriangle(ramses::RamsesClient& client);
 
-int main(int argc, char* argv[])
+int main()
 {
     /**
-     * Create Ramses framework and client objects. Ramses Logic does not manage
-     * or encapsulate Ramses objects - it only interacts with existing Ramses objects.
-     * The application must take special care to not destroy Ramses objects while a
-     * LogicEngine instance is still referencing them!
+     * Use simple class to create ramses framework objects which are not essential for this example.
+     * For more info on those, please refer to the ramses docs: https://bmwcarit.github.io/ramses
      */
-    ramses::RamsesFramework ramsesFramework(argc, argv);
-    ramses::RamsesClient* ramsesClient = ramsesFramework.createClient("example client");
-
-    /**
-     * To keep this example simple, we don't include a Renderer, but only provide the scene
-     * over network. Start a ramses daemon and a renderer additionally to see the visual result!
-     * The connect() ensures the scene published in this example will be distributed over network.
-     */
-    ramsesFramework.connect();
+    SimpleRenderer renderer;
 
     /**
      * Create a simple Ramses scene with a triangle.
      */
-    auto [scene, tri] = CreateSceneWithTriangle(*ramsesClient);
+    auto [scene, tri] = CreateSceneWithTriangle(*renderer.getClient());
 
     rlogic::LogicEngine logicEngine;
 
@@ -202,11 +194,17 @@ int main(int argc, char* argv[])
         *animNode->getInputs()->getChild("progress"));
 
     /**
+    * Show the scene on the renderer
+    */
+    renderer.showScene(scene->getSceneId());
+
+    /**
      * Simulate an application loop.
      */
     int nextChangeLoop = 0;
     int numChanges = 0;
-    for(int loop = 0; loop < 1000; ++loop)
+    int loop = 0;
+    while (!renderer.isWindowClosed())
     {
         // change direction every now and then
         if (loop == nextChangeLoop)
@@ -231,9 +229,16 @@ int main(int argc, char* argv[])
         scene->flush();
 
         /**
+        * Process window events, check if window was closed
+        */
+        renderer.processEvents();
+
+        /**
         * Throttle the simulation loop by sleeping for a bit.
         */
         std::this_thread::sleep_for(std::chrono::milliseconds(5));
+
+        loop = (loop + 1) % 1000;
     }
 
     return 0;

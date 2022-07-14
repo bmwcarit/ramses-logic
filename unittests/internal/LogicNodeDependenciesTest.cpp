@@ -413,4 +413,90 @@ namespace rlogic::internal
         expectNoLinks(*m_nestedOutputA);
         expectNoLinks(*m_nestedInputB);
     }
+
+    TEST_F(ALogicNodeDependencies, AddsDependencyToBinding)
+    {
+        RamsesBindingDummyImpl binding;
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(binding);
+
+        m_dependencies.addBindingDependency(binding, m_nodeA);
+
+        expectSortedNodeOrder({ &binding, &m_nodeA });
+    }
+
+    TEST_F(ALogicNodeDependencies, AddsDependencyToBinding_WithLinkedNodes)
+    {
+        RamsesBindingDummyImpl binding;
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(m_nodeB);
+        m_dependencies.addNode(binding);
+
+        PropertyImpl& output = *m_nodeA.getOutputs()->getChild("output1")->m_impl;
+        PropertyImpl& input = *m_nodeB.getInputs()->getChild("input1")->m_impl;
+        EXPECT_TRUE(m_dependencies.link(output, input, false, m_errorReporting));
+
+        m_dependencies.addBindingDependency(binding, m_nodeA);
+
+        // Sorted topologically
+        expectSortedNodeOrder({ &binding, &m_nodeA, &m_nodeB });
+
+        // Has exactly one link
+        expectLink(output, { {&input, false} });
+    }
+
+    TEST_F(ALogicNodeDependencies, RemovesDependencyToBinding)
+    {
+        RamsesBindingDummyImpl binding;
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(binding);
+
+        m_dependencies.addBindingDependency(binding, m_nodeA);
+        expectSortedNodeOrder({ &binding, &m_nodeA });
+
+        m_dependencies.removeBindingDependency(binding, m_nodeA);
+        expectUnsortedNodeOrder({ &binding, &m_nodeA });
+    }
+
+    TEST_F(ALogicNodeDependencies, RemovesDependencyToBindingAfterNodeRemoved)
+    {
+        RamsesBindingDummyImpl binding;
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(binding);
+
+        m_dependencies.addBindingDependency(binding, m_nodeA);
+        expectSortedNodeOrder({ &binding, &m_nodeA });
+
+        m_dependencies.removeNode(m_nodeA);
+        expectUnsortedNodeOrder({ &binding });
+    }
+
+    TEST_F(ALogicNodeDependencies, RemovesDependencyToBindingAfterBindingRemoved)
+    {
+        RamsesBindingDummyImpl binding;
+        m_dependencies.addNode(m_nodeA);
+        m_dependencies.addNode(binding);
+
+        m_dependencies.addBindingDependency(binding, m_nodeA);
+        expectSortedNodeOrder({ &binding, &m_nodeA });
+
+        m_dependencies.removeNode(binding);
+        expectUnsortedNodeOrder({ &m_nodeA });
+    }
+
+    TEST_F(ALogicNodeDependencies, RespectsSwappedDependencyBetweenBindings)
+    {
+        RamsesBindingDummyImpl binding1;
+        RamsesBindingDummyImpl binding2;
+        m_dependencies.addNode(binding1);
+        m_dependencies.addNode(binding2);
+
+        m_dependencies.addBindingDependency(binding1, binding2);
+        expectSortedNodeOrder({ &binding1, &binding2 });
+
+        m_dependencies.removeBindingDependency(binding1, binding2);
+
+        m_dependencies.addBindingDependency(binding2, binding1);
+        expectSortedNodeOrder({ &binding2, &binding1 });
+    }
 }

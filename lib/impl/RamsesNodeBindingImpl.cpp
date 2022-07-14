@@ -23,13 +23,13 @@
 
 namespace rlogic::internal
 {
-    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name, uint64_t id)
-        : RamsesBindingImpl(name, id)
-        , m_ramsesNode(ramsesNode)
-        , m_rotationType(rotationType)
+    RamsesNodeBindingImpl::RamsesNodeBindingImpl(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name, uint64_t id, EFeatureLevel featureLevel)
+        : RamsesBindingImpl{ name, id }
+        , m_ramsesNode{ ramsesNode }
+        , m_rotationType{ rotationType }
+        , m_featureLevel{ featureLevel }
     {
     }
-
 
     void RamsesNodeBindingImpl::createRootProperties()
     {
@@ -38,13 +38,15 @@ namespace rlogic::internal
                 TypeData{"visibility", EPropertyType::Bool},
                 TypeData{"rotation", m_rotationType == ERotationType::Quaternion ? EPropertyType::Vec4f : EPropertyType::Vec3f},
                 TypeData{"translation", EPropertyType::Vec3f},
-                TypeData{"scaling", EPropertyType::Vec3f},
+                TypeData{"scaling", EPropertyType::Vec3f}
             });
+        if (m_featureLevel == EFeatureLevel_02)
+            inputsType.children.push_back({ TypeData{"enabled", EPropertyType::Bool}, {} });
         auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsType, EPropertySemantics::BindingInput));
 
         setRootProperties(std::move(inputs), {});
 
-        ApplyRamsesValuesToInputProperties(*this, m_ramsesNode);
+        ApplyRamsesValuesToInputProperties(*this, m_ramsesNode, m_featureLevel);
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::Serialize(
@@ -54,11 +56,12 @@ namespace rlogic::internal
     {
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(nodeBinding.m_ramsesNode, builder);
 
+        const auto logicObject = LogicObjectImpl::Serialize(nodeBinding, builder);
+        const auto propertyObject = PropertyImpl::Serialize(*nodeBinding.getInputs()->m_impl, builder, serializationMap);
         auto ramsesBinding = rlogic_serialization::CreateRamsesBinding(builder,
-            LogicObjectImpl::Serialize(nodeBinding, builder),
+            logicObject,
             ramsesReference,
-            // TODO Violin don't serialize inputs - it's better to re-create them on the fly, they are uniquely defined and don't need serialization
-            PropertyImpl::Serialize(*nodeBinding.getInputs()->m_impl, builder, serializationMap));
+            propertyObject);
         builder.Finish(ramsesBinding);
 
         auto ramsesNodeBinding = rlogic_serialization::CreateRamsesNodeBinding(builder,
@@ -74,7 +77,8 @@ namespace rlogic::internal
         const rlogic_serialization::RamsesNodeBinding& nodeBinding,
         const IRamsesObjectResolver& ramsesResolver,
         ErrorReporting& errorReporting,
-        DeserializationMap& deserializationMap)
+        DeserializationMap& deserializationMap,
+        EFeatureLevel featureLevel)
     {
         if (!nodeBinding.base())
         {
@@ -105,7 +109,6 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        // TODO Violin don't serialize these inputs -> get rid of the check
         if (deserializedRootInput->getType() != EPropertyType::Struct)
         {
             errorReporting.add("Fatal error during loading of RamsesNodeBinding from serialized data: root input has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
@@ -136,11 +139,11 @@ namespace rlogic::internal
 
         const auto rotationType (static_cast<ERotationType>(nodeBinding.rotationType()));
 
-        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name, id);
+        auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name, id, featureLevel);
         binding->setUserId(userIdHigh, userIdLow);
         binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
 
-        ApplyRamsesValuesToInputProperties(*binding, *ramsesNode);
+        ApplyRamsesValuesToInputProperties(*binding, *ramsesNode, featureLevel);
 
         return binding;
     }
@@ -148,22 +151,35 @@ namespace rlogic::internal
     std::optional<LogicNodeRuntimeError> RamsesNodeBindingImpl::update()
     {
         ramses::status_t status = ramses::StatusOK;
-        PropertyImpl& visibility = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl;
-        if (visibility.checkForBindingInputNewValueAndReset())
-        {
-            // TODO Violin what about 'Off' state? Worth discussing!
-            if (visibility.getValueAs<bool>())
-            {
-                status = m_ramsesNode.get().setVisibility(ramses::EVisibilityMode::Visible);
-            }
-            else
-            {
-                status = m_ramsesNode.get().setVisibility(ramses::EVisibilityMode::Invisible);
-            }
 
-            if (status != ramses::StatusOK)
+        PropertyImpl& visibility = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl;
+        if (m_featureLevel == EFeatureLevel_01)
+        {
+            if (visibility.checkForBindingInputNewValueAndReset())
             {
-                return LogicNodeRuntimeError{m_ramsesNode.get().getStatusMessage(status)};
+                const auto visibilityMode = (visibility.getValueAs<bool>() ? ramses::EVisibilityMode::Visible : ramses::EVisibilityMode::Invisible);
+                status = m_ramsesNode.get().setVisibility(visibilityMode);
+                if (status != ramses::StatusOK)
+                    return LogicNodeRuntimeError{ m_ramsesNode.get().getStatusMessage(status) };
+            }
+        }
+        else // EFeatureLevel_02 and future levels
+        {
+            PropertyImpl& enabled = *getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Enabled))->m_impl;
+
+            // Ramses uses 3-state visibility mode, transform the 2 bool properties 'visibility' and 'enabled' into 3-state
+            const bool visibilityChanged = visibility.checkForBindingInputNewValueAndReset();
+            const bool enabledChanged = enabled.checkForBindingInputNewValueAndReset();
+            if (visibilityChanged || enabledChanged)
+            {
+                ramses::EVisibilityMode visibilityMode = (visibility.getValueAs<bool>() ? ramses::EVisibilityMode::Visible : ramses::EVisibilityMode::Invisible);
+                // if 'enabled' false it overrides visibility mode to OFF, otherwise (enabled==true) the mode is determined by 'visibility' only
+                if (!enabled.getValueAs<bool>())
+                    visibilityMode = ramses::EVisibilityMode::Off;
+
+                status = m_ramsesNode.get().setVisibility(visibilityMode);
+                if (status != ramses::StatusOK)
+                    return LogicNodeRuntimeError{ m_ramsesNode.get().getStatusMessage(status) };
             }
         }
 
@@ -227,10 +243,18 @@ namespace rlogic::internal
 
     // Overwrites binding value cache silently (without triggering dirty check) - this code is only executed at initialization,
     // should not overwrite values unless set() or link explicitly called
-    void RamsesNodeBindingImpl::ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode)
+    void RamsesNodeBindingImpl::ApplyRamsesValuesToInputProperties(RamsesNodeBindingImpl& binding, ramses::Node& ramsesNode, EFeatureLevel featureLevel)
     {
-        const bool visible = (ramsesNode.getVisibility() == ramses::EVisibilityMode::Visible);
+        // The 3-state ramses visibility mode is transformed into 2 bool properties in node binding - 'visibility' and 'enabled'.
+        const ramses::EVisibilityMode visibilityMode = ramsesNode.getVisibility();
+        const bool visible = (visibilityMode == ramses::EVisibilityMode::Visible);
         binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Visibility))->m_impl->initializeBindingInputValue(PropertyValue{ visible });
+
+        if (featureLevel >= EFeatureLevel_02)
+        {
+            const bool enabled = (visibilityMode == ramses::EVisibilityMode::Visible || visibilityMode == ramses::EVisibilityMode::Invisible);
+            binding.getInputs()->getChild(static_cast<size_t>(ENodePropertyStaticIndex::Enabled))->m_impl->initializeBindingInputValue(PropertyValue{ enabled });
+        }
 
         vec3f translationValue;
         ramsesNode.getTranslation(translationValue[0], translationValue[1], translationValue[2]);

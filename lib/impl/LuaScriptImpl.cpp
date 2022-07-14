@@ -18,6 +18,7 @@
 #include "internals/ErrorReporting.h"
 #include "internals/PropertyTypeExtractor.h"
 #include "internals/EnvironmentProtection.h"
+#include "internals/SerializationMap.h"
 
 #include "generated/LuaScriptGen.h"
 
@@ -28,6 +29,7 @@ namespace rlogic::internal
     LuaScriptImpl::LuaScriptImpl(LuaCompiledScript compiledScript, std::string_view name, uint64_t id)
         : LogicNodeImpl(name, id)
         , m_source(std::move(compiledScript.source.sourceCode))
+        , m_byteCode(std::move(compiledScript.source.byteCode))
         , m_wrappedRootInput(*compiledScript.rootInput->m_impl)
         , m_wrappedRootOutput(*compiledScript.rootOutput->m_impl)
         , m_runFunction(std::move(compiledScript.runFunction))
@@ -42,11 +44,8 @@ namespace rlogic::internal
         // unlike other logic objects, luascript properties created outside of it (from script or deserialized)
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap)
+    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap, EFeatureLevel featureLevel)
     {
-        // TODO Violin investigate options to save byte code, instead of plain text, e.g.:
-        //sol::bytecode scriptCode = m_solFunction.dump();
-
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> userModules;
         userModules.reserve(luaScript.m_modules.size());
         for (const auto& module : luaScript.m_modules)
@@ -64,24 +63,67 @@ namespace rlogic::internal
             stdModules.push_back(static_cast<uint8_t>(stdModule));
         }
 
-        auto script = rlogic_serialization::CreateLuaScript(builder,
-            LogicObjectImpl::Serialize(luaScript, builder),
-            builder.CreateString(luaScript.m_source),
-            builder.CreateVector(userModules),
-            builder.CreateVector(stdModules),
-            PropertyImpl::Serialize(*luaScript.getInputs()->m_impl, builder, serializationMap),
-            PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap)
-        );
-        builder.Finish(script);
+        const auto fbLogicObject = LogicObjectImpl::Serialize(luaScript, builder);
+        const auto fbModulesVec = builder.CreateVector(userModules);
+        const auto fbStdModulesVec = builder.CreateVector(stdModules);
+        const auto fbInputPropertyObject = PropertyImpl::Serialize(*luaScript.getInputs()->m_impl, builder, serializationMap);
+        const auto fbOuputPropertyObject = PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap);
 
-        return script;
+        if (featureLevel == EFeatureLevel_01)
+        {
+            const auto fbSrcCode = builder.CreateString(luaScript.m_source);
+            auto script = rlogic_serialization::CreateLuaScript(builder,
+                fbLogicObject,
+                fbSrcCode,
+                fbModulesVec,
+                fbStdModulesVec,
+                fbInputPropertyObject,
+                fbOuputPropertyObject,
+                0
+            );
+            builder.Finish(script);
+
+            return script;
+        }
+
+        if (featureLevel >= EFeatureLevel_02)
+        {
+            std::string byteCodeString{ luaScript.m_byteCode.as_string_view() };
+            auto byteCodeOffset = serializationMap.resolveByteCodeOffsetIfFound(byteCodeString);
+            if (byteCodeOffset.IsNull())
+            {
+                std::vector<uint8_t> byteCodeAsVectorUInt8;
+                byteCodeAsVectorUInt8.reserve(luaScript.m_byteCode.size());
+                std::transform(luaScript.m_byteCode.cbegin(), luaScript.m_byteCode.cend(), std::back_inserter(byteCodeAsVectorUInt8), [](std::byte b) { return uint8_t(b); });
+
+                byteCodeOffset = builder.CreateVector(byteCodeAsVectorUInt8);
+                serializationMap.storeByteCodeOffset(std::move(byteCodeString), byteCodeOffset);
+            }
+
+            auto script = rlogic_serialization::CreateLuaScript(builder,
+                fbLogicObject,
+                0, //no source
+                fbModulesVec,
+                fbStdModulesVec,
+                fbInputPropertyObject,
+                fbOuputPropertyObject,
+                byteCodeOffset
+            );
+            builder.Finish(script);
+
+            return script;
+        }
+
+        assert(false);
+        return {};
     }
 
     std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Deserialize(
         SolState& solState,
         const rlogic_serialization::LuaScript& luaScript,
         ErrorReporting& errorReporting,
-        DeserializationMap& deserializationMap)
+        DeserializationMap& deserializationMap,
+        EFeatureLevel featureLevel)
     {
         std::string name;
         uint64_t id = 0u;
@@ -93,12 +135,17 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        if (!luaScript.luaSourceCode())
+        if (featureLevel == EFeatureLevel_01 && (!luaScript.luaSourceCode() || luaScript.luaSourceCode()->size() == 0))
         {
             errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-        std::string sourceCode = luaScript.luaSourceCode()->str();
+
+        if (featureLevel >= EFeatureLevel_02 && (!luaScript.luaByteCode() || luaScript.luaByteCode()->size() == 0))
+        {
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua byte code!", nullptr, EErrorType::BinaryVersionMismatch);
+            return nullptr;
+        }
 
         if (!luaScript.rootInput())
         {
@@ -133,15 +180,6 @@ namespace rlogic::internal
         if (rootOutput->getType() != EPropertyType::Struct)
         {
             errorReporting.add("Fatal error during loading of LuaScript from serialized data: root output has unexpected type!", nullptr, EErrorType::BinaryVersionMismatch);
-            return nullptr;
-        }
-
-        // TODO Violin we use 'name' here, and not 'chunkname' as in Create(). This is inconsistent! Investigate closer
-        sol::load_result load_result = solState.loadScript(sourceCode, name);
-        if (!load_result.valid())
-        {
-            sol::error error = load_result;
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed parsing Lua source code:\n{}", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -180,72 +218,34 @@ namespace rlogic::internal
         for (const uint8_t stdModule : *luaScript.standardModules())
             stdModules.push_back(static_cast<EStandardModule>(stdModule));
 
-        sol::protected_function mainFunction = load_result;
-        sol::environment env = solState.createEnvironment(stdModules, userModules);
-        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
-
-        env.set_on(mainFunction);
-
-        sol::protected_function_result main_result {};
-        {
-            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
-            main_result = mainFunction();
-        }
-
-        if (!main_result.valid())
-        {
-            sol::error error = main_result;
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed executing script:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
-            return nullptr;
-        }
-
-        env["GLOBAL"] = solState.createTable();
-        sol::protected_function init = internalEnv["init"];
-
-        if (init.valid())
-        {
-            // in order to support interface definitions in globals we need to register the symbols for init section
-            PropertyTypeExtractor::RegisterTypes(internalEnv);
-            sol::protected_function_result initResult {};
-            {
-                ScopedEnvironmentProtection p(env, EEnvProtectionFlag::InitFunction);
-                initResult = init();
-            }
-            PropertyTypeExtractor::UnregisterTypes(internalEnv);
-
-            if (!initResult.valid())
-            {
-                sol::error error = initResult;
-                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: failed initializing script:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
-                return nullptr;
-            }
-        }
-
-        sol::protected_function run = internalEnv["run"];
-
-        if (!run.valid())
-        {
-            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data: scripts contains no run() function!", name), nullptr, EErrorType::BinaryVersionMismatch);
-            return nullptr;
-        }
-
         auto inputs = std::make_unique<Property>(std::move(rootInput));
         auto outputs = std::make_unique<Property>(std::move(rootOutput));
 
-        EnvironmentProtection::SetEnvironmentProtectionLevel(env, EEnvProtectionFlag::RunFunction);
+        sol::environment env = solState.createEnvironment(stdModules, userModules);
+        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
+
+        sol::protected_function init;
+        sol::protected_function run;
+        sol::bytecode byteCode;
+
+        std::string sourceCode =  (featureLevel == EFeatureLevel_01 ? luaScript.luaSourceCode()->str() : "");
+
+        if (featureLevel >= EFeatureLevel_02)
+        {
+            byteCode.reserve(luaScript.luaByteCode()->size());
+            std::transform(luaScript.luaByteCode()->cbegin(), luaScript.luaByteCode()->cend(), std::back_inserter(byteCode), [](uint8_t b) { return std::byte(b); });
+        }
+
+        auto compiledScript = LuaCompilationUtils::CompileScriptOrImportPrecompiled(solState, userModules, stdModules, std::move(sourceCode), name, errorReporting, std::move(byteCode), std::move(inputs), std::move(outputs), featureLevel);
+
+        if (!compiledScript)
+        {
+            errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' from serialized data!", name), nullptr, EErrorType::BinaryVersionMismatch);
+            return nullptr;
+        }
 
         auto deserialized = std::make_unique<LuaScriptImpl>(
-            LuaCompiledScript{
-                LuaSource{
-                    std::move(sourceCode),
-                    solState,
-                    std::move(stdModules),
-                    std::move(userModules)
-                },
-                std::move(run),
-                std::move(inputs),
-                std::move(outputs)
-            },
+            std::move(*compiledScript),
             name, id);
 
         deserialized->setUserId(userIdHigh, userIdLow);

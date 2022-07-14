@@ -16,6 +16,8 @@ table LuaModule
     source:string;
     dependencies:[LuaModuleUsage];
     standardModules:[uint8];
+    //TODO VersionBreak remove source and use byte code for base feature level
+    luaByteCode:[uint8];
 }
 
 table LuaModuleUsage

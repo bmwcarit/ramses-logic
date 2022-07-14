@@ -24,59 +24,73 @@
 
 namespace rlogic::internal
 {
-    std::optional<LuaCompiledScript> LuaCompilationUtils::CompileScript(
+    std::optional<LuaCompiledScript> LuaCompilationUtils::CompileScriptOrImportPrecompiled(
         SolState& solState,
         const ModuleMapping& userModules,
         const StandardModules& stdModules,
         std::string source,
         std::string_view name,
-        ErrorReporting& errorReporting)
+        ErrorReporting& errorReporting,
+        sol::bytecode byteCodeFromPrecompiledScript,
+        std::unique_ptr<Property> inputsFromPrecompiledScript,
+        std::unique_ptr<Property> outputsFromPrecompiledScript,
+        EFeatureLevel featureLevel)
     {
-        const std::string chunkname = BuildChunkName(name);
-
-        sol::load_result load_result = solState.loadScript(source, chunkname);
-        if (!load_result.valid())
-        {
-            sol::error error = load_result;
-            errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()), nullptr, EErrorType::LuaSyntaxError);
-            return std::nullopt;
-        }
-
-        if (!CrossCheckDeclaredAndProvidedModules(source, userModules, chunkname, errorReporting))
-            return std::nullopt;
-
         sol::environment env = solState.createEnvironment(stdModules, userModules);
         sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
 
         internalEnv["GLOBAL"] = solState.createTable();
 
-        sol::protected_function mainFunction = load_result;
-        env.set_on(mainFunction);
+        sol::load_result load_result{};
+        sol::protected_function_result main_result{};
+        sol::protected_function mainFunction{};
 
-        sol::protected_function_result main_result {};
+        const std::string debuggingName = (featureLevel == EFeatureLevel_01 ? std::string(name) : "RL_lua_script");
+        if (byteCodeFromPrecompiledScript.empty())
+        {
+            load_result = solState.loadScript(source, debuggingName);
+            if (!load_result.valid())
+            {
+                sol::error error = load_result;
+                errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", name, error.what()), nullptr, EErrorType::LuaSyntaxError);
+                return std::nullopt;
+            }
+
+            if (!CrossCheckDeclaredAndProvidedModules(source, userModules, name, errorReporting))
+                return std::nullopt;
+
+            mainFunction = load_result;
+            env.set_on(mainFunction);
+
+            {
+                ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
+                main_result = mainFunction();
+            }
+
+            if (!main_result.valid())
+            {
+                sol::error error = main_result;
+                errorReporting.add(error.what(), nullptr, EErrorType::LuaSyntaxError);
+                return std::nullopt;
+            }
+        }
+        else
         {
             ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
-            main_result = mainFunction();
-        }
+            main_result = solState.loadScriptByteCode(byteCodeFromPrecompiledScript.as_string_view(), debuggingName, env);
 
-        if (!main_result.valid())
-        {
-            sol::error error = main_result;
-            errorReporting.add(error.what(), nullptr, EErrorType::LuaSyntaxError);
-            return std::nullopt;
+            if (!main_result.valid())
+            {
+                sol::error error = main_result;
+                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}': failed loading pre-compiled byte code:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
+                return std::nullopt;
+            }
         }
 
         if (main_result.get_type() != sol::type::none)
         {
             errorReporting.add(fmt::format("[{}] Expected no return value in script source, but a value of type '{}' was returned!",
-                chunkname, sol_helper::GetSolTypeName(main_result.get_type())), nullptr, EErrorType::LuaSyntaxError);
-            return std::nullopt;
-        }
-
-        sol::protected_function intf = internalEnv["interface"];
-        if (!intf.valid())
-        {
-            errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname), nullptr, EErrorType::LuaSyntaxError);
+                name, sol_helper::GetSolTypeName(main_result.get_type())), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
@@ -95,7 +109,7 @@ namespace rlogic::internal
             if (!initResult.valid())
             {
                 sol::error error = initResult;
-                errorReporting.add(fmt::format("[{}] Error while initializing script. Lua stack trace:\n{}", chunkname, error.what()), nullptr, EErrorType::LuaSyntaxError);
+                errorReporting.add(fmt::format("[{}] Error while initializing script. Lua stack trace:\n{}", name, error.what()), nullptr, EErrorType::LuaSyntaxError);
                 return std::nullopt;
             }
         }
@@ -104,71 +118,101 @@ namespace rlogic::internal
 
         if (!run.valid())
         {
-            errorReporting.add(fmt::format("[{}] No 'run' function defined!", chunkname), nullptr, EErrorType::LuaSyntaxError);
+            errorReporting.add(fmt::format("[{}] No 'run' function defined!", name), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
-        // Names used only for better error messages!
-        PropertyTypeExtractor inputsExtractor("inputs", EPropertyType::Struct);
-        PropertyTypeExtractor outputsExtractor("outputs", EPropertyType::Struct);
+        std::unique_ptr<Property> resultInputs;
+        std::unique_ptr<Property> resultOutputs;
 
-        sol::environment interfaceEnv = solState.createEnvironment(stdModules, userModules);
-        sol::table internalInterfaceEnv = EnvironmentProtection::GetProtectedEnvironmentTable(interfaceEnv);
-        PropertyTypeExtractor::RegisterTypes(internalInterfaceEnv);
-        // Expose globals to interface function
-        internalInterfaceEnv["GLOBAL"] = internalEnv["GLOBAL"];
-
-        interfaceEnv.set_on(intf);
-        sol::protected_function_result intfResult {};
+        if (inputsFromPrecompiledScript)
         {
-            ScopedEnvironmentProtection p(interfaceEnv, EEnvProtectionFlag::InterfaceFunctionInScript);
-            intfResult = intf(std::ref(inputsExtractor), std::ref(outputsExtractor));
+            assert(outputsFromPrecompiledScript);
+            resultInputs = std::move(inputsFromPrecompiledScript);
+            resultOutputs = std::move(outputsFromPrecompiledScript);
+        }
+        else
+        {
+            sol::protected_function intf = internalEnv["interface"];
+            if (!intf.valid())
+            {
+                errorReporting.add(fmt::format("[{}] No 'interface' function defined!", name), nullptr, EErrorType::LuaSyntaxError);
+                return std::nullopt;
+            }
+
+            // Names used only for better error messages!
+            PropertyTypeExtractor inputsExtractor("inputs", EPropertyType::Struct);
+            PropertyTypeExtractor outputsExtractor("outputs", EPropertyType::Struct);
+
+            sol::environment interfaceEnv = solState.createEnvironment(stdModules, userModules);
+            sol::table internalInterfaceEnv = EnvironmentProtection::GetProtectedEnvironmentTable(interfaceEnv);
+            PropertyTypeExtractor::RegisterTypes(internalInterfaceEnv);
+            // Expose globals to interface function
+            internalInterfaceEnv["GLOBAL"] = internalEnv["GLOBAL"];
+
+            interfaceEnv.set_on(intf);
+            sol::protected_function_result intfResult{};
+            {
+                ScopedEnvironmentProtection p(interfaceEnv, EEnvProtectionFlag::InterfaceFunctionInScript);
+                intfResult = intf(std::ref(inputsExtractor), std::ref(outputsExtractor));
+            }
+
+            for (const auto& module : userModules)
+                interfaceEnv[module.first] = sol::lua_nil;
+            PropertyTypeExtractor::UnregisterTypes(internalInterfaceEnv);
+
+            if (!intfResult.valid())
+            {
+                sol::error error = intfResult;
+                errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", name, error.what()), nullptr, EErrorType::LuaSyntaxError);
+                return std::nullopt;
+            }
+
+            HierarchicalTypeData extractedInputsType = inputsExtractor.getExtractedTypeData();
+            HierarchicalTypeData extractedOutputsType = outputsExtractor.getExtractedTypeData();
+            // Remove names
+            extractedInputsType.typeData.name = "";
+            extractedOutputsType.typeData.name = "";
+
+            resultInputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(extractedInputsType, EPropertySemantics::ScriptInput));
+            resultOutputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(extractedOutputsType, EPropertySemantics::ScriptOutput));
         }
 
-        for (const auto& module : userModules)
-            interfaceEnv[module.first] = sol::lua_nil;
-        PropertyTypeExtractor::UnregisterTypes(internalInterfaceEnv);
+        std::string resultSource;
+        sol::bytecode resultByteCode;
 
-        if (!intfResult.valid())
+        if(featureLevel == EFeatureLevel_01)
         {
-            sol::error error = intfResult;
-            errorReporting.add(fmt::format("[{}] Error while loading script. Lua stack trace:\n{}", chunkname, error.what()), nullptr, EErrorType::LuaSyntaxError);
-            return std::nullopt;
+            resultSource = std::move(source);
         }
-
-        HierarchicalTypeData extractedInputsType = inputsExtractor.getExtractedTypeData();
-        HierarchicalTypeData extractedOutputsType = outputsExtractor.getExtractedTypeData();
-        // Remove names
-        extractedInputsType.typeData.name = "";
-        extractedOutputsType.typeData.name = "";
-
-        auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(extractedInputsType, EPropertySemantics::ScriptInput));
-        auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(extractedOutputsType, EPropertySemantics::ScriptOutput));
+        else if(featureLevel >= EFeatureLevel_02)
+        {
+            resultByteCode = (byteCodeFromPrecompiledScript.empty() ? mainFunction.dump() : std::move(byteCodeFromPrecompiledScript));
+        }
 
         EnvironmentProtection::SetEnvironmentProtectionLevel(env, EEnvProtectionFlag::RunFunction);
 
         return LuaCompiledScript{
-            LuaSource{
-                std::move(source),
+            LuaCompiledSource{
+                std::move(resultSource),
+                std::move(resultByteCode),
                 solState,
                 stdModules,
                 userModules
             },
             std::move(run),
-            std::move(inputs),
-            std::move(outputs)
+            std::move(resultInputs),
+            std::move(resultOutputs)
         };
     }
 
     std::optional<rlogic::internal::LuaCompiledInterface> LuaCompilationUtils::CompileInterface(SolState& solState, const std::string& source, std::string_view name, ErrorReporting& errorReporting)
     {
-        const std::string chunkname = BuildChunkName(name);
-
-        sol::load_result load_result = solState.loadScript(source, chunkname);
+        sol::load_result load_result = solState.loadScript(source, name);
         if (!load_result.valid())
         {
             sol::error error = load_result;
-            errorReporting.add(fmt::format("[{}] Error while loading interface. Lua stack trace:\n{}", chunkname, error.what()), nullptr, EErrorType::LuaSyntaxError);
+            errorReporting.add(fmt::format("[{}] Error while loading interface. Lua stack trace:\n{}", name, error.what()), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
@@ -194,14 +238,14 @@ namespace rlogic::internal
         if (main_result.get_type() != sol::type::none)
         {
             errorReporting.add(fmt::format("[{}] Expected no return value in interface source, but a value of type '{}' was returned!",
-                chunkname, sol_helper::GetSolTypeName(main_result.get_type())), nullptr, EErrorType::LuaSyntaxError);
+                name, sol_helper::GetSolTypeName(main_result.get_type())), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
         sol::protected_function intf = internalEnv["interface"];
         if (!intf.valid())
         {
-            errorReporting.add(fmt::format("[{}] No 'interface' function defined!", chunkname), nullptr, EErrorType::LuaSyntaxError);
+            errorReporting.add(fmt::format("[{}] No 'interface' function defined!", name), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
@@ -222,7 +266,7 @@ namespace rlogic::internal
         if (!interfaceResult.valid())
         {
             sol::error error = interfaceResult;
-            errorReporting.add(fmt::format("[{}] Error while loading interface. Lua stack trace:\n{}", chunkname, error.what()), nullptr, EErrorType::LuaSyntaxError);
+            errorReporting.add(fmt::format("[{}] Error while loading interface. Lua stack trace:\n{}", name, error.what()), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
@@ -240,47 +284,66 @@ namespace rlogic::internal
         };
     }
 
-    std::optional<LuaCompiledModule> LuaCompilationUtils::CompileModule(
+    std::optional<LuaCompiledModule> LuaCompilationUtils::CompileModuleOrImportPrecompiled(
         SolState& solState,
         const ModuleMapping& userModules,
         const StandardModules& stdModules,
         std::string source,
         std::string_view name,
-        ErrorReporting& errorReporting)
+        ErrorReporting& errorReporting,
+        sol::bytecode byteCodeFromPrecompiledModule,
+        EFeatureLevel featureLevel)
     {
-        const std::string chunkname = BuildChunkName(name);
-
-        sol::load_result load_result = solState.loadScript(source, chunkname);
-        if (!load_result.valid())
-        {
-            sol::error error = load_result;
-            errorReporting.add(fmt::format("[{}] Error while loading module. Lua stack trace:\n{}", chunkname, error.what()), nullptr, EErrorType::LuaSyntaxError);
-            return std::nullopt;
-        }
-
-        if (!CrossCheckDeclaredAndProvidedModules(source, userModules, chunkname, errorReporting))
-            return std::nullopt;
-
         sol::environment env = solState.createEnvironment(stdModules, userModules);
         sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
         // interface definitions can be provided within module, in order to be able to extract them
         // when used in LuaScript interface the necessary user types need to be provided
         PropertyTypeExtractor::RegisterTypes(internalEnv);
 
-        sol::protected_function mainFunction = load_result;
-        env.set_on(mainFunction);
-
+        sol::load_result load_result{};
+        sol::protected_function mainFunction{};
         sol::protected_function_result main_result{};
-        {
 
-            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::Module);
-            main_result = mainFunction();
-        }
-        if (!main_result.valid())
+        const std::string debuggingName = (featureLevel == EFeatureLevel_01 ? std::string(name) : "RL_lua_module");
+        if (!byteCodeFromPrecompiledModule.empty())
         {
-            sol::error error = main_result;
-            errorReporting.add(error.what(), nullptr, EErrorType::LuaSyntaxError);
-            return std::nullopt;
+            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::Module);
+            main_result = solState.loadScriptByteCode(byteCodeFromPrecompiledModule.as_string_view(), debuggingName, env);
+
+            if (!main_result.valid())
+            {
+                sol::error error = main_result;
+                errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}': failed loading pre-compiled byte code:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
+                return std::nullopt;
+            }
+        }
+        else
+        {
+            load_result = solState.loadScript(source, debuggingName);
+            if (!load_result.valid())
+            {
+                sol::error error = load_result;
+                errorReporting.add(fmt::format("[{}] Error while loading module. Lua stack trace:\n{}", name, error.what()), nullptr, EErrorType::LuaSyntaxError);
+                return std::nullopt;
+            }
+
+            if (!CrossCheckDeclaredAndProvidedModules(source, userModules, name, errorReporting))
+                return std::nullopt;
+
+            mainFunction = load_result;
+            env.set_on(mainFunction);
+
+            {
+                ScopedEnvironmentProtection p(env, EEnvProtectionFlag::Module);
+                main_result = mainFunction();
+            }
+
+            if (!main_result.valid())
+            {
+                sol::error error = main_result;
+                errorReporting.add(error.what(), nullptr, EErrorType::LuaSyntaxError);
+                return std::nullopt;
+            }
         }
 
         PropertyTypeExtractor::UnregisterTypes(internalEnv);
@@ -289,15 +352,28 @@ namespace rlogic::internal
         // TODO Violin check and test for abuse: yield, more than one result
         if (!resultObj.is<sol::table>())
         {
-            errorReporting.add(fmt::format("[{}] Error while loading module. Module script must return a table!", chunkname), nullptr, EErrorType::LuaSyntaxError);
+            errorReporting.add(fmt::format("[{}] Error while loading module. Module script must return a table!", name), nullptr, EErrorType::LuaSyntaxError);
             return std::nullopt;
         }
 
         sol::table moduleTable = resultObj;
 
+        //for serialization
+        std::string resultSource;
+        sol::bytecode resultByteCode;
+        if (featureLevel == EFeatureLevel_01)
+        {
+            resultSource = std::move(source);
+        }
+        else if(featureLevel >= EFeatureLevel_02)
+        {
+            resultByteCode = (byteCodeFromPrecompiledModule.empty() ? mainFunction.dump() : std::move(byteCodeFromPrecompiledModule));
+        }
+
         auto compiledModule = LuaCompiledModule{
-            LuaSource{
-                std::move(source),
+            LuaCompiledSource{
+                std::move(resultSource),
+                std::move(resultByteCode),
                 solState,
                 stdModules,
                 userModules
@@ -347,11 +423,6 @@ namespace rlogic::internal
         return readOnlyTable;
     }
 
-    std::string LuaCompilationUtils::BuildChunkName(std::string_view scriptName)
-    {
-        return std::string(scriptName.empty() ? "unknown" : scriptName);
-    }
-
     bool LuaCompilationUtils::CheckModuleName(std::string_view name)
     {
         if (name.empty())
@@ -369,7 +440,7 @@ namespace rlogic::internal
         return true;
     }
 
-    bool LuaCompilationUtils::CrossCheckDeclaredAndProvidedModules(std::string_view source, const ModuleMapping& modules, std::string_view chunkname, ErrorReporting& errorReporting)
+    bool LuaCompilationUtils::CrossCheckDeclaredAndProvidedModules(std::string_view source, const ModuleMapping& modules, std::string_view name, ErrorReporting& errorReporting)
     {
         std::optional<std::vector<std::string>> declaredModules = LuaCompilationUtils::ExtractModuleDependencies(source, errorReporting);
         if (!declaredModules) // failed extraction
@@ -385,7 +456,7 @@ namespace rlogic::internal
         std::sort(providedModules.begin(), providedModules.end());
         if (providedModules != declaredModules)
         {
-            std::string errMsg = fmt::format("[{}] Error while loading script/module. Module dependencies declared in source code do not match those provided by LuaConfig.\n", chunkname);
+            std::string errMsg = fmt::format("[{}] Error while loading script/module. Module dependencies declared in source code do not match those provided by LuaConfig.\n", name);
             errMsg += fmt::format("  Module dependencies declared in source code: {}\n", fmt::join(*declaredModules, ", "));
             errMsg += fmt::format("  Module dependencies provided on create API: {}", fmt::join(providedModules, ", "));
             errorReporting.add(errMsg, nullptr, EErrorType::IllegalArgument);

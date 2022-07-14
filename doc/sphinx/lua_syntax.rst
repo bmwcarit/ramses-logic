@@ -21,8 +21,6 @@ If not, we suggest reading through the docs and trying out the presented concept
 created `Ramses Composer <https://github.com/bmwcarit/ramses-composer>`_ project.
 Just create a new LuaScript object (right-clicking the resource menu), set its URI to a file on your local machine, and start jamming!
 
-.. todo: (Violin) maybe create a dedicated "test" binary, a-la "Lua shell" which can read a lua file and execute/print result? Or maybe have a special mode in the IMgui tool?
-
 Alternatively, if you have a C++ compiler/IDE, you can use some of the :ref:`examples <List of all examples>`, e.g. :ref:`the structs example <Example with structured properties>`
 as a sandbox to compile and try out the code presented here.
 

@@ -36,8 +36,10 @@ content = [
         'RamsesBinding',
         'RamsesCameraBinding',
         'RamsesNodeBinding',
+        'RamsesRenderPassBinding',
         'SaveFileConfig',
         'TimerNode',
+        'AnchorPoint',
     ],
     },
     {
@@ -84,6 +86,7 @@ content = [
         'EPropertyType',
         'ERotationType',
         'EStandardModule',
+        'EFeatureLevel',
     ],
     },
 ]

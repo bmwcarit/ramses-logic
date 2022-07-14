@@ -21,4 +21,6 @@ table LuaScript
     // These are cached because they hold the property values
     rootInput:Property;
     rootOutput:Property;
+    //TODO VersionBreak remove source and use byte code for base feature level
+    luaByteCode:[uint8];
 }

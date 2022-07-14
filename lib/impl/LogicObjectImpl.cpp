@@ -30,16 +30,7 @@ namespace rlogic::internal
 
     bool LogicObjectImpl::setName(std::string_view name)
     {
-        auto* potentiallyInterface = dynamic_cast<rlogic::LuaInterface*>(this);
-
-        if (potentiallyInterface != nullptr)
-        {
-            LOG_ERROR("Interface objects cannot change their name '{}'!", getIdentificationString());
-            return false;
-        }
-
         m_name = name;
-
         return true;
     }
 

@@ -20,9 +20,11 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
+#include "ramses-logic/AnchorPoint.h"
 #include "ramses-client-api/OrthographicCamera.h"
 #include "ramses-client-api/Appearance.h"
 #include "ramses-utils.h"
@@ -32,6 +34,11 @@ namespace rlogic
     class ALogicEngineBase
     {
     public:
+        explicit ALogicEngineBase(EFeatureLevel featureLevel = EFeatureLevel_01)
+            : m_logicEngine{ featureLevel }
+        {
+        }
+
         static LuaConfig CreateDeps(const std::vector<std::pair<std::string_view, const LuaModule*>>& dependencies)
         {
             LuaConfig config;
@@ -61,6 +68,7 @@ namespace rlogic
         ramses::Node* m_node = { m_scene->createNode() };
         ramses::OrthographicCamera* m_camera = { m_scene->createOrthographicCamera() };
         ramses::Appearance* m_appearance = { &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene) };
+        ramses::RenderPass* m_renderPass = { m_scene->createRenderPass() };
 
         const std::string_view m_valid_empty_script = R"(
             function interface(IN,OUT)
@@ -86,7 +94,7 @@ namespace rlogic
             end
         )";
 
-        void recreate(bool skipAppearance = false)
+        void recreate()
         {
             const ramses::sceneId_t sceneId = m_scene->getSceneId();
 
@@ -94,18 +102,17 @@ namespace rlogic
             m_scene = m_ramses.createScene(sceneId);
             m_node = m_scene->createNode();
             m_camera = m_scene->createOrthographicCamera();
-            if (skipAppearance)
-            {
-                m_appearance = nullptr;
-            }
-            else
-            {
-                m_appearance = &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene);
-            }
+            m_appearance = &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene);
+            m_renderPass = m_scene->createRenderPass();
         }
     };
 
     class ALogicEngine : public ALogicEngineBase, public ::testing::Test
     {
+    public:
+        explicit ALogicEngine(EFeatureLevel featureLevel = EFeatureLevel_01)
+            : ALogicEngineBase{ featureLevel }
+        {
+        }
     };
 }

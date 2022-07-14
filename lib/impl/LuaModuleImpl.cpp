@@ -17,6 +17,8 @@
 #include "internals/ErrorReporting.h"
 #include "internals/DeserializationMap.h"
 #include "internals/SerializationMap.h"
+#include "internals/EnvironmentProtection.h"
+#include "internals/PropertyTypeExtractor.h"
 #include <fmt/format.h>
 
 namespace rlogic::internal
@@ -24,6 +26,7 @@ namespace rlogic::internal
     LuaModuleImpl::LuaModuleImpl(LuaCompiledModule module, std::string_view name, uint64_t id)
         : LogicObjectImpl(name, id)
         , m_sourceCode{ std::move(module.source.sourceCode) }
+        , m_byteCode{ std::move(module.source.byteCode) }
         , m_module{ std::move(module.moduleTable) }
         , m_dependencies{std::move(module.source.userModules)}
         , m_stdModules {std::move(module.source.stdModules)}
@@ -31,17 +34,12 @@ namespace rlogic::internal
         assert(m_module != sol::nil);
     }
 
-    std::string_view LuaModuleImpl::getSourceCode() const
-    {
-        return m_sourceCode;
-    }
-
     const sol::table& LuaModuleImpl::getModule() const
     {
         return m_module;
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder)
+    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder, EFeatureLevel featureLevel, SerializationMap& serializationMap)
     {
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> modulesFB;
         modulesFB.reserve(module.m_dependencies.size());
@@ -60,19 +58,53 @@ namespace rlogic::internal
             stdModules.push_back(static_cast<uint8_t>(stdModule));
         }
 
-        return rlogic_serialization::CreateLuaModule(builder,
-            LogicObjectImpl::Serialize(module, builder),
-            builder.CreateString(module.getSourceCode()),
-            builder.CreateVector(modulesFB),
-            builder.CreateVector(stdModules)
-        );
+        const auto fbLogicObject = LogicObjectImpl::Serialize(module, builder);
+        const auto fbModulesVec = builder.CreateVector(modulesFB);
+        const auto fbStdModulesVec = builder.CreateVector(stdModules);
+
+        if (featureLevel == EFeatureLevel_01)
+        {
+            const auto fbSrcCode = builder.CreateString(module.m_sourceCode);
+            return rlogic_serialization::CreateLuaModule(builder,
+                fbLogicObject,
+                fbSrcCode,
+                fbModulesVec,
+                fbStdModulesVec,
+                0);
+        }
+
+        if (featureLevel >= EFeatureLevel_02)
+        {
+            std::string byteCodeString{ module.m_byteCode.as_string_view() };
+            auto byteCodeOffset = serializationMap.resolveByteCodeOffsetIfFound(byteCodeString);
+            if (byteCodeOffset.IsNull())
+            {
+                std::vector<uint8_t> byteCodeAsVectorUInt8;
+                byteCodeAsVectorUInt8.reserve(module.m_byteCode.size());
+                std::transform(module.m_byteCode.cbegin(), module.m_byteCode.cend(), std::back_inserter(byteCodeAsVectorUInt8), [](std::byte b) { return uint8_t(b); });
+
+                byteCodeOffset = builder.CreateVector(byteCodeAsVectorUInt8);
+                serializationMap.storeByteCodeOffset(std::move(byteCodeString), byteCodeOffset);
+            }
+
+            return rlogic_serialization::CreateLuaModule(builder,
+                fbLogicObject,
+                0, //no source
+                fbModulesVec,
+                fbStdModulesVec,
+                byteCodeOffset);
+        }
+
+        assert(false);
+        return {};
     }
 
     std::unique_ptr<LuaModuleImpl> LuaModuleImpl::Deserialize(
         SolState& solState,
         const rlogic_serialization::LuaModule& module,
         ErrorReporting& errorReporting,
-        DeserializationMap& deserializationMap)
+        DeserializationMap& deserializationMap,
+        EFeatureLevel featureLevel)
     {
         std::string name;
         uint64_t id = 0u;
@@ -84,9 +116,15 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        if (!module.source())
+        if (featureLevel == EFeatureLevel_01 && (!module.source() || module.source()->size() == 0))
         {
             errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing source code!", nullptr, EErrorType::BinaryVersionMismatch);
+            return nullptr;
+        }
+
+        if (featureLevel >= EFeatureLevel_02 && (!module.luaByteCode() || module.luaByteCode()->size() == 0))
+        {
+            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing byte code!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -95,8 +133,6 @@ namespace rlogic::internal
             errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing dependencies!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
-
-        std::string source = module.source()->str();
 
         StandardModules stdModules;
         stdModules.reserve(module.standardModules()->size());
@@ -125,10 +161,20 @@ namespace rlogic::internal
             modulesUsed.emplace(mod->name()->str(), moduleUsed);
         }
 
-        std::optional<LuaCompiledModule> compiledModule = LuaCompilationUtils::CompileModule(solState, modulesUsed, stdModules, source, name, errorReporting);
+        std::string source = (featureLevel == EFeatureLevel_01 ? module.source()->str() : "");
+
+        sol::bytecode byteCode;
+        if (featureLevel >= EFeatureLevel_02)
+        {
+            byteCode.reserve(module.luaByteCode()->size());
+            std::transform(module.luaByteCode()->cbegin(), module.luaByteCode()->cend(), std::back_inserter(byteCode), [](uint8_t b) { return std::byte(b); });
+        }
+
+        auto compiledModule = LuaCompilationUtils::CompileModuleOrImportPrecompiled(solState, modulesUsed, stdModules, source, name, errorReporting, byteCode, featureLevel);
+
         if (!compiledModule)
         {
-            errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' from serialized data: failed parsing Lua module source code.", name), nullptr, EErrorType::BinaryVersionMismatch);
+            errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' from serialized data!", name), nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 

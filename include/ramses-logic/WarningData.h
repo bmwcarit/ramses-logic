@@ -23,8 +23,8 @@ namespace rlogic
         UnsafeDataState,    ///< Warns about possible data races, potential data loss or otherwise unsafe data
         UninitializedData,  ///< Warns about uninitialized data which may result in unexpected behavior
         PrecisionLoss,      ///< Warns about possible precision issues, e.g. casting large types to smaller types
-        UnusedContent,      ///< Warns about duplicate content which might be possible to merge/optimize
-        DuplicateContent,   ///< Warns about possible precision issues, e.g. casting large types to smaller types
+        UnusedContent,      ///< Warns about unused content which might be removed altogether
+        DuplicateContent,   ///< Warns about duplicate content which might be possible to merge/optimize
         Other,              ///< Warning does not match any of the existing categories (this is used for new warnings for API compatibility)
     };
 

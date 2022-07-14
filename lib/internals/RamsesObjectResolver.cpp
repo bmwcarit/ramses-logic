@@ -42,6 +42,11 @@ namespace rlogic::internal
         return findRamsesObjectInScene<ramses::Camera>(logicNodeName, objectId);
     }
 
+    ramses::RenderPass* RamsesObjectResolver::findRamsesRenderPassInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
+    {
+        return findRamsesObjectInScene<ramses::RenderPass>(logicNodeName, objectId);
+    }
+
     template <typename T>
     T* RamsesObjectResolver::findRamsesObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const
     {
@@ -71,4 +76,5 @@ namespace rlogic::internal
     template ramses::Node* RamsesObjectResolver::findRamsesObjectInScene<ramses::Node>(std::string_view, ramses::sceneObjectId_t) const;
     template ramses::Appearance* RamsesObjectResolver::findRamsesObjectInScene<ramses::Appearance>(std::string_view, ramses::sceneObjectId_t) const;
     template ramses::Camera* RamsesObjectResolver::findRamsesObjectInScene<ramses::Camera>(std::string_view, ramses::sceneObjectId_t) const;
+    template ramses::RenderPass* RamsesObjectResolver::findRamsesObjectInScene<ramses::RenderPass>(std::string_view, ramses::sceneObjectId_t) const;
 }

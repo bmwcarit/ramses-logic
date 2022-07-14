@@ -201,6 +201,13 @@ if (ramses-logic_BUILD_TOOLS AND NOT TARGET CLI11::CLI11)
     ensure_submodule_exists(cli11)
 
     add_subdirectory(cli11)
+
+    # show CLI11 INTERFACE library in VS
+    file(GLOB CLI11_HEADER
+        ${CMAKE_CURRENT_SOURCE_DIR}/cli11/include/CLI/*.hpp
+        )
+    add_custom_target(cli11 SOURCES ${CLI11_HEADER})
+    folderize_target(cli11 "external")
 endif()
 
 ################################################

@@ -35,7 +35,7 @@ namespace rlogic
     *
     * Violating any of these requirements will result in errors, which can be obtained by calling
     * #rlogic::LogicEngine::getErrors().
-    * for other than interface definition purposes, see #rlogic::LuaModule and #rlogic::LuaScript for details.
+    * For other than interface definition purposes, see #rlogic::LuaModule and #rlogic::LuaScript for details.
     *
     * See also the full documentation at https://ramses-logic.readthedocs.io/en/latest/api.html for more details on Lua and
     * its interaction with C++.

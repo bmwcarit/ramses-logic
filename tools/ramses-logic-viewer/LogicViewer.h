@@ -35,6 +35,8 @@ namespace rlogic
         static const char* const ltnNode;
         static const char* const ltnAppearance;
         static const char* const ltnCamera;
+        static const char* const ltnRenderPass;
+        static const char* const ltnAnchorPoint;
         static const char* const ltnScreenshot;
         static const char* const ltnViews;
         static const char* const ltnLink;
@@ -107,7 +109,7 @@ namespace rlogic
             sol::optional<sol::table> m_tbl;
         };
 
-        explicit LogicViewer(ScreenshotFunc screenshotFunc);
+        LogicViewer(EFeatureLevel engineFeatureLevel, ScreenshotFunc screenshotFunc);
 
         [[nodiscard]] bool loadRamsesLogic(const std::string& filename, ramses::Scene* scene);
 

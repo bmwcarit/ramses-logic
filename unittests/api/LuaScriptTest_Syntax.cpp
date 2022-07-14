@@ -49,7 +49,7 @@ namespace rlogic
         LuaScript* script = m_logicEngine.createLuaScript("this.is.not.valid.lua.code", {}, "badSyntaxScript");
         ASSERT_EQ(nullptr, script);
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"badSyntaxScript\"]:1: '<name>' expected near 'not'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'<name>' expected near 'not'"));
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfScriptReturnsValue)
@@ -81,9 +81,8 @@ namespace rlogic
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
-            "[string \"scriptWithErrorInGlobalCode\"]:2: Expect this error!\nstack traceback:\n"
-            "\t[C]: in function 'error'\n"
-            "\t[string \"scriptWithErrorInGlobalCode\"]:2: in main chunk"));
+            "Expect this error!\nstack traceback:\n"
+            "\t[C]: in function 'error'"));
     }
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_DuringInterfaceDeclaration)
@@ -99,9 +98,8 @@ namespace rlogic
         EXPECT_EQ(nullptr, script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
-            "[string \"scriptWithErrorInInterface\"]:3: Expect this error!\nstack traceback:\n"
-            "\t[C]: in function 'error'\n"
-            "\t[string \"scriptWithErrorInInterface\"]:3: in function <[string \"scriptWithErrorInInterface\"]:2>"));
+            "Expect this error!\nstack traceback:\n"
+            "\t[C]: in function 'error'"));
     }
 
     TEST_F(ALuaScript_Syntax, PropagatesErrorsEmittedInLua_DuringRun)
@@ -120,11 +118,11 @@ namespace rlogic
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(
-            "[string \"scriptWithErrorInRun\"]:6: Expect this error!\n"
+            "Expect this error!\n"
             "stack traceback:\n"
-            "\t[C]: in function 'error'\n"
-            "\t[string \"scriptWithErrorInRun\"]:6: in function <[string \"scriptWithErrorInRun\"]:5>"));
+            "\t[C]: in function 'error'"));
         EXPECT_EQ(script, m_logicEngine.getErrors()[0].object);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].object->getName(), "scriptWithErrorInRun");
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorWhenIndexingVectorPropertiesOutOfRange)
@@ -195,7 +193,7 @@ namespace rlogic
                         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(fmt::format("Bad index '{}', expected 1 <= i <= {}", i, componentCount)));
                     }
 
-                    EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("scriptOOR"));
+                    EXPECT_EQ(m_logicEngine.getErrors()[0].object->getName(), "scriptOOR");
                     EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
                 }
                 else
@@ -383,7 +381,7 @@ namespace rlogic
         ASSERT_FALSE(m_logicEngine.update());
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("attempt to get length of field 'notArray' (a number value)"));
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("invalidArraySizeAccess"));
+        EXPECT_EQ(m_logicEngine.getErrors()[0].object->getName(), "invalidArraySizeAccess");
         EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
     }
 
@@ -431,12 +429,8 @@ namespace rlogic
             EXPECT_FALSE(m_logicEngine.update());
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
 
-            // TODO Violin this is a workaround for a compiler issue with VS 2019 version 16.7 and latest sol
-            // Investigate further if not fixed by VS or sol or both
-            // Issue summary: function overloads handled differently on MSVC and clang/gcc -> results in different behavior in this test
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::AnyOf(::testing::HasSubstr("Only non-negative integers supported as array index type!"),
-                                                                       ::testing::HasSubstr("not a numeric type")));
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("invalidIndexingScript"));
+            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("Only non-negative integers supported as array index type!"));
+            EXPECT_EQ(m_logicEngine.getErrors()[0].object->getName(), "invalidIndexingScript");
             EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
         }
     }
@@ -505,7 +499,7 @@ namespace rlogic
 
             ASSERT_EQ(1u, m_logicEngine.getErrors().size());
             EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr(errorCase.expectedErrorMessage));
-            EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("mismatchedVecSizes"));
+            EXPECT_EQ(m_logicEngine.getErrors()[0].object->getName(), "mismatchedVecSizes");
             EXPECT_EQ(m_logicEngine.getErrors()[0].object, script);
 
             EXPECT_TRUE(m_logicEngine.destroy(*script));
@@ -523,7 +517,7 @@ namespace rlogic
 
         ASSERT_EQ(nullptr, scriptWithWrongEndInRun);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"missingEndInScript\"]:6: '=' expected near '<eof>'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'=' expected near '<eof>'"));
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfInterfaceFunctionDoesNotEndCorrectly)
@@ -537,7 +531,7 @@ namespace rlogic
 
         ASSERT_EQ(nullptr, scriptWithWrongEndInInterface);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"missingEndInScript\"]:4: '=' expected near 'function'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'=' expected near 'function'"));
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfInterfaceFunctionDoesNotEndAtAll)
@@ -550,7 +544,7 @@ namespace rlogic
 
         ASSERT_EQ(nullptr, scriptWithNoEndInInterface);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"endlessInterface\"]:5: 'end' expected (to close 'function' at line 2) near '<eof>'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'end' expected (to close 'function' at line 2) near '<eof>'"));
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorIfRunFunctionDoesNotEndAtAll)
@@ -563,7 +557,7 @@ namespace rlogic
 
         ASSERT_EQ(nullptr, scriptWithNoEndInRun);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("[string \"endlessRun\"]:5: 'end' expected (to close 'function' at line 4) near '<eof>'"));
+        EXPECT_THAT(m_logicEngine.getErrors()[0].message, ::testing::HasSubstr("'end' expected (to close 'function' at line 4) near '<eof>'"));
     }
 
     TEST_F(ALuaScript_Syntax, ProducesErrorMessageCorrectlyNotConflictingWithFmtFormatSyntax)

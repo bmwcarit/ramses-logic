@@ -10,21 +10,8 @@
 
 #include "generated/PropertyGen.h"
 #include "generated/DataArrayGen.h"
-
 #include <unordered_map>
-
-namespace rlogic_serialization
-{
-    struct Property;
-    struct DataArray;
-    struct LuaModule;
-}
-
-namespace rlogic
-{
-    class DataArray;
-    class LuaModule;
-}
+#include <string_view>
 
 namespace rlogic::internal
 {
@@ -34,51 +21,60 @@ namespace rlogic::internal
     class SerializationMap
     {
     public:
-        void storePropertyOffset(const PropertyImpl& impl, flatbuffers::Offset<rlogic_serialization::Property> offset)
+        void storePropertyOffset(const PropertyImpl& prop, flatbuffers::Offset<rlogic_serialization::Property> offset)
         {
-            assert(m_properties.find(&impl) == m_properties.end() && "never try to store the same impl twice");
-            m_properties.emplace(std::make_pair(&impl, offset));
+            Store(&prop, offset, m_properties);
         }
 
-        flatbuffers::Offset<rlogic_serialization::Property> resolvePropertyOffset(const PropertyImpl& impl) const
+        [[nodiscard]] flatbuffers::Offset<rlogic_serialization::Property> resolvePropertyOffset(const PropertyImpl& prop) const
         {
-            auto iter = m_properties.find(&impl);
-            assert(iter != m_properties.end() && !iter->second.IsNull());
-            return iter->second;
+            return Get(&prop, m_properties);
         }
 
-        void storeDataArray(const DataArray& dataArray, flatbuffers::Offset<rlogic_serialization::DataArray> offset)
+        void storeDataArray(uint64_t id, flatbuffers::Offset<rlogic_serialization::DataArray> offset)
         {
-            assert(m_dataArrays.count(&dataArray) == 0 && "one time store only");
-            m_dataArrays.insert({ &dataArray, offset });
+            Store(id, offset, m_dataArrays);
         }
 
-        flatbuffers::Offset<rlogic_serialization::DataArray> resolveDataArrayOffset(const DataArray& dataArray) const
+        [[nodiscard]] flatbuffers::Offset<rlogic_serialization::DataArray> resolveDataArrayOffset(uint64_t dataArrayId) const
         {
-            const auto it = m_dataArrays.find(&dataArray);
-            assert(it != m_dataArrays.cend());
-            return it->second;
+            return Get(dataArrayId, m_dataArrays);
         }
 
-        void storeLuaModule(uint64_t luaModuleId, flatbuffers::Offset<rlogic_serialization::LuaModule> offset)
+        void storeByteCodeOffset(std::string byteCode, flatbuffers::Offset<flatbuffers::Vector<uint8_t>> offset)
         {
-            assert(luaModuleId != 0 && "Module must have valid id!");
-            assert(m_luaModules.count(luaModuleId) == 0 && "one time store only");
-            m_luaModules.insert({ luaModuleId, offset });
+            m_byteCodeOffsets.emplace(std::move(byteCode), offset);
         }
 
-        flatbuffers::Offset<rlogic_serialization::LuaModule> resolveLuaModuleOffset(uint64_t luaModuleId) const
+        [[nodiscard]] flatbuffers::Offset<flatbuffers::Vector<uint8_t>> resolveByteCodeOffsetIfFound(const std::string& v)
         {
-            assert(luaModuleId != 0 && "Module must have valid id!");
-            const auto it = m_luaModules.find(luaModuleId);
-            assert(it != m_luaModules.cend());
-            return it->second;
+            const auto it = m_byteCodeOffsets.find(v);
+            if (it != m_byteCodeOffsets.cend())
+            {
+                return it->second;
+            }
+            return 0;
         }
 
     private:
-        std::unordered_map<const PropertyImpl*, flatbuffers::Offset<rlogic_serialization::Property>> m_properties;
-        std::unordered_map<const DataArray*, flatbuffers::Offset<rlogic_serialization::DataArray>> m_dataArrays;
-        std::unordered_map<uint64_t, flatbuffers::Offset<rlogic_serialization::LuaModule>> m_luaModules;
-    };
+        template <typename Key, typename Value>
+        static void Store(Key key, Value value, std::unordered_map<Key, Value>& container)
+        {
+            static_assert(std::is_trivially_copyable_v<Key> && std::is_trivially_copyable_v<Value>, "Performance warning");
+            assert(container.count(key) == 0 && "one time store only");
+            container.emplace(std::move(key), std::move(value));
+        }
 
+        template <typename Key, typename Value>
+        [[nodiscard]] static Value Get(Key key, const std::unordered_map<Key, Value>& container)
+        {
+            const auto it = container.find(key);
+            assert(it != container.cend());
+            return it->second;
+        }
+
+        std::unordered_map<const PropertyImpl*, flatbuffers::Offset<rlogic_serialization::Property>> m_properties;
+        std::unordered_map<uint64_t, flatbuffers::Offset<rlogic_serialization::DataArray>> m_dataArrays;
+        std::unordered_map<std::string, flatbuffers::Offset<flatbuffers::Vector<uint8_t>>> m_byteCodeOffsets;
+    };
 }

@@ -76,6 +76,11 @@ namespace rlogic::internal
         return m_solState.load(source, std::string(scriptName));
     }
 
+    sol::protected_function_result SolState::loadScriptByteCode(std::string_view byteCode, std::string_view scriptName, sol::environment& env)
+    {
+        return m_solState.safe_script(byteCode, env, sol::script_pass_on_error, std::string(scriptName));
+    }
+
     sol::environment SolState::createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules)
     {
         sol::environment protectedEnv(m_solState, sol::create);

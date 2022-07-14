@@ -14,9 +14,11 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Property.h"
+#include "ramses-logic/AnchorPoint.h"
 #include "fmt/format.h"
 #include "internals/SolHelper.h"
 #include <iostream>
@@ -62,6 +64,8 @@ namespace rlogic
             , nodeBindings(logicEngine)
             , appearanceBindings(logicEngine)
             , cameraBindings(logicEngine)
+            , renderPassBindings(logicEngine)
+            , anchorPoints(logicEngine)
         {
         }
 
@@ -74,6 +78,8 @@ namespace rlogic
         NodeListWrapper<RamsesNodeBinding> nodeBindings;
         NodeListWrapper<RamsesAppearanceBinding> appearanceBindings;
         NodeListWrapper<RamsesCameraBinding> cameraBindings;
+        NodeListWrapper<RamsesRenderPassBinding> renderPassBindings;
+        NodeListWrapper<AnchorPoint> anchorPoints;
     };
 
     const char* const LogicViewer::ltnModule     = "rlogic";
@@ -84,6 +90,8 @@ namespace rlogic
     const char* const LogicViewer::ltnNode       = "nodeBindings";
     const char* const LogicViewer::ltnAppearance = "appearanceBindings";
     const char* const LogicViewer::ltnCamera     = "cameraBindings";
+    const char* const LogicViewer::ltnRenderPass = "renderPassBindings";
+    const char* const LogicViewer::ltnAnchorPoint = "anchorPoints";
     const char* const LogicViewer::ltnScreenshot = "screenshot";
     const char* const LogicViewer::ltnViews      = "views";
     const char* const LogicViewer::ltnLink       = "link";
@@ -98,8 +106,9 @@ namespace rlogic
     const char* const LogicViewer::ltnViewName        = "name";
     const char* const LogicViewer::ltnViewDescription = "description";
 
-    LogicViewer::LogicViewer(ScreenshotFunc screenshotFunc)
-        : m_screenshotFunc(std::move(screenshotFunc))
+    LogicViewer::LogicViewer(EFeatureLevel engineFeatureLevel, ScreenshotFunc screenshotFunc)
+        : m_logicEngine{ engineFeatureLevel }
+        , m_screenshotFunc(std::move(screenshotFunc))
     {
         m_startTime = std::chrono::steady_clock::now();
     }
@@ -123,6 +132,8 @@ namespace rlogic
         registerNodeListType<RamsesNodeBinding>(m_sol, "NodeBindings");
         registerNodeListType<RamsesAppearanceBinding>(m_sol, "AppearanceBindings");
         registerNodeListType<RamsesCameraBinding>(m_sol, "CameraBindings");
+        registerNodeListType<RamsesRenderPassBinding>(m_sol, "RenderPassBindings");
+        registerNodeListType<AnchorPoint>(m_sol, "AnchorPoints");
         m_sol.new_usertype<LogicNodeWrapper>("LogicNode", sol::meta_function::index, &LogicNodeWrapper::get, sol::meta_function::to_string, &LogicNodeWrapper::toString);
         m_sol.new_usertype<PropertyWrapper>("LogicProperty",
                                             ltnPropertyValue,
@@ -155,6 +166,10 @@ namespace rlogic
             sol::readonly(&LogicWrapper::appearanceBindings),
             ltnCamera,
             sol::readonly(&LogicWrapper::cameraBindings),
+            ltnRenderPass,
+            sol::readonly(&LogicWrapper::renderPassBindings),
+            ltnAnchorPoint,
+            sol::readonly(&LogicWrapper::anchorPoints),
             ltnViews,
             &LogicWrapper::views,
             ltnScreenshot,

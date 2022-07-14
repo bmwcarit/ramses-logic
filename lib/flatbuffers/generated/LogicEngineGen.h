@@ -6,6 +6,7 @@
 
 #include "flatbuffers/flatbuffers.h"
 
+#include "AnchorPointGen.h"
 #include "AnimationNodeGen.h"
 #include "ApiObjectsGen.h"
 #include "DataArrayGen.h"
@@ -20,6 +21,7 @@
 #include "RamsesCameraBindingGen.h"
 #include "RamsesNodeBindingGen.h"
 #include "RamsesReferenceGen.h"
+#include "RamsesRenderPassBindingGen.h"
 #include "TimerNodeGen.h"
 
 namespace rlogic_serialization {
@@ -232,7 +234,8 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_RAMSESVERSION = 4,
     VT_RLOGICVERSION = 6,
     VT_APIOBJECTS = 8,
-    VT_ASSETMETADATA = 10
+    VT_ASSETMETADATA = 10,
+    VT_FEATURELEVEL = 12
   };
   const rlogic_serialization::Version *ramsesVersion() const {
     return GetPointer<const rlogic_serialization::Version *>(VT_RAMSESVERSION);
@@ -246,6 +249,9 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::Metadata *assetMetadata() const {
     return GetPointer<const rlogic_serialization::Metadata *>(VT_ASSETMETADATA);
   }
+  uint32_t featureLevel() const {
+    return GetField<uint32_t>(VT_FEATURELEVEL, 1);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffsetRequired(verifier, VT_RAMSESVERSION) &&
@@ -256,6 +262,7 @@ struct LogicEngine FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyTable(apiObjects()) &&
            VerifyOffset(verifier, VT_ASSETMETADATA) &&
            verifier.VerifyTable(assetMetadata()) &&
+           VerifyField<uint32_t>(verifier, VT_FEATURELEVEL) &&
            verifier.EndTable();
   }
 };
@@ -276,6 +283,9 @@ struct LogicEngineBuilder {
   void add_assetMetadata(flatbuffers::Offset<rlogic_serialization::Metadata> assetMetadata) {
     fbb_.AddOffset(LogicEngine::VT_ASSETMETADATA, assetMetadata);
   }
+  void add_featureLevel(uint32_t featureLevel) {
+    fbb_.AddElement<uint32_t>(LogicEngine::VT_FEATURELEVEL, featureLevel, 1);
+  }
   explicit LogicEngineBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -295,8 +305,10 @@ inline flatbuffers::Offset<LogicEngine> CreateLogicEngine(
     flatbuffers::Offset<rlogic_serialization::Version> ramsesVersion = 0,
     flatbuffers::Offset<rlogic_serialization::Version> rlogicVersion = 0,
     flatbuffers::Offset<rlogic_serialization::ApiObjects> apiObjects = 0,
-    flatbuffers::Offset<rlogic_serialization::Metadata> assetMetadata = 0) {
+    flatbuffers::Offset<rlogic_serialization::Metadata> assetMetadata = 0,
+    uint32_t featureLevel = 1) {
   LogicEngineBuilder builder_(_fbb);
+  builder_.add_featureLevel(featureLevel);
   builder_.add_assetMetadata(assetMetadata);
   builder_.add_apiObjects(apiObjects);
   builder_.add_rlogicVersion(rlogicVersion);
@@ -353,7 +365,8 @@ inline const flatbuffers::TypeTable *LogicEngineTypeTable() {
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_SEQUENCE, 0, 1 },
-    { flatbuffers::ET_SEQUENCE, 0, 2 }
+    { flatbuffers::ET_SEQUENCE, 0, 2 },
+    { flatbuffers::ET_UINT, 0, -1 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     rlogic_serialization::VersionTypeTable,
@@ -364,10 +377,11 @@ inline const flatbuffers::TypeTable *LogicEngineTypeTable() {
     "ramsesVersion",
     "rlogicVersion",
     "apiObjects",
-    "assetMetadata"
+    "assetMetadata",
+    "featureLevel"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }

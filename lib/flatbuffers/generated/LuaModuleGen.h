@@ -30,7 +30,8 @@ struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_BASE = 4,
     VT_SOURCE = 6,
     VT_DEPENDENCIES = 8,
-    VT_STANDARDMODULES = 10
+    VT_STANDARDMODULES = 10,
+    VT_LUABYTECODE = 12
   };
   const rlogic_serialization::LogicObject *base() const {
     return GetPointer<const rlogic_serialization::LogicObject *>(VT_BASE);
@@ -44,6 +45,9 @@ struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const flatbuffers::Vector<uint8_t> *standardModules() const {
     return GetPointer<const flatbuffers::Vector<uint8_t> *>(VT_STANDARDMODULES);
   }
+  const flatbuffers::Vector<uint8_t> *luaByteCode() const {
+    return GetPointer<const flatbuffers::Vector<uint8_t> *>(VT_LUABYTECODE);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_BASE) &&
@@ -55,6 +59,8 @@ struct LuaModule FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            verifier.VerifyVectorOfTables(dependencies()) &&
            VerifyOffset(verifier, VT_STANDARDMODULES) &&
            verifier.VerifyVector(standardModules()) &&
+           VerifyOffset(verifier, VT_LUABYTECODE) &&
+           verifier.VerifyVector(luaByteCode()) &&
            verifier.EndTable();
   }
 };
@@ -75,6 +81,9 @@ struct LuaModuleBuilder {
   void add_standardModules(flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules) {
     fbb_.AddOffset(LuaModule::VT_STANDARDMODULES, standardModules);
   }
+  void add_luaByteCode(flatbuffers::Offset<flatbuffers::Vector<uint8_t>> luaByteCode) {
+    fbb_.AddOffset(LuaModule::VT_LUABYTECODE, luaByteCode);
+  }
   explicit LuaModuleBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -92,8 +101,10 @@ inline flatbuffers::Offset<LuaModule> CreateLuaModule(
     flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     flatbuffers::Offset<flatbuffers::String> source = 0,
     flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>> dependencies = 0,
-    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0) {
+    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> standardModules = 0,
+    flatbuffers::Offset<flatbuffers::Vector<uint8_t>> luaByteCode = 0) {
   LuaModuleBuilder builder_(_fbb);
+  builder_.add_luaByteCode(luaByteCode);
   builder_.add_standardModules(standardModules);
   builder_.add_dependencies(dependencies);
   builder_.add_source(source);
@@ -111,16 +122,19 @@ inline flatbuffers::Offset<LuaModule> CreateLuaModuleDirect(
     flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     const char *source = nullptr,
     const std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> *dependencies = nullptr,
-    const std::vector<uint8_t> *standardModules = nullptr) {
+    const std::vector<uint8_t> *standardModules = nullptr,
+    const std::vector<uint8_t> *luaByteCode = nullptr) {
   auto source__ = source ? _fbb.CreateString(source) : 0;
   auto dependencies__ = dependencies ? _fbb.CreateVector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>(*dependencies) : 0;
   auto standardModules__ = standardModules ? _fbb.CreateVector<uint8_t>(*standardModules) : 0;
+  auto luaByteCode__ = luaByteCode ? _fbb.CreateVector<uint8_t>(*luaByteCode) : 0;
   return rlogic_serialization::CreateLuaModule(
       _fbb,
       base,
       source__,
       dependencies__,
-      standardModules__);
+      standardModules__,
+      luaByteCode__);
 }
 
 struct LuaModuleUsage FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
@@ -201,6 +215,7 @@ inline const flatbuffers::TypeTable *LuaModuleTypeTable() {
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_STRING, 0, -1 },
     { flatbuffers::ET_SEQUENCE, 1, 1 },
+    { flatbuffers::ET_UCHAR, 1, -1 },
     { flatbuffers::ET_UCHAR, 1, -1 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
@@ -211,10 +226,11 @@ inline const flatbuffers::TypeTable *LuaModuleTypeTable() {
     "base",
     "source",
     "dependencies",
-    "standardModules"
+    "standardModules",
+    "luaByteCode"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }

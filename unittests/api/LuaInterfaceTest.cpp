@@ -98,21 +98,6 @@ namespace rlogic::internal
             ::testing::HasSubstr("Can't create interface with empty name!"));
     }
 
-    TEST_F(ALuaInterface, FailsIfNameExists)
-    {
-        const LuaInterface* intf = createTestInterface(m_minimalInterface, "intf name");
-
-        createTestInterfaceAndExpectFailure(R"SCRIPT(
-            function interface(inputs)
-            end
-        )SCRIPT", "intf name");
-
-        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_THAT(m_logicEngine.getErrors().begin()->message,
-            ::testing::HasSubstr("Interface object with name 'intf name' already exists!"));
-        EXPECT_EQ(intf, m_logicEngine.getErrors()[0].object);
-    }
-
     TEST_F(ALuaInterface, UpdatingInputsLeadsToUpdatingOutputs)
     {
         LuaInterface* intf = createTestInterface(m_minimalInterface, "intf name");

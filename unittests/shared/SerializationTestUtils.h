@@ -11,6 +11,7 @@
 #include "generated/LuaScriptGen.h"
 #include "generated/LuaInterfaceGen.h"
 #include "generated/PropertyGen.h"
+#include "generated/RamsesRenderPassBindingGen.h"
 
 namespace rlogic::internal
 {
@@ -86,6 +87,14 @@ namespace rlogic::internal
                 m_builder.CreateString("{}"),
                 m_builder.CreateVector(std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>>{}),
                 m_builder.CreateVector(std::vector<uint8_t>{})
+            );
+        }
+
+        flatbuffers::Offset<rlogic_serialization::RamsesRenderPassBinding> serializeTestRenderPassBindingWithError()
+        {
+            return rlogic_serialization::CreateRamsesRenderPassBinding(
+                m_builder,
+                0 // no base -> causes errors
             );
         }
 

@@ -11,6 +11,8 @@
 #include "impl/LuaConfigImpl.h"
 #include "internals/SolWrapper.h"
 
+#include "ramses-logic/EFeatureLevel.h"
+
 #include <string>
 #include <memory>
 #include <optional>
@@ -26,10 +28,11 @@ namespace rlogic::internal
     class SolState;
     class ErrorReporting;
 
-    struct LuaSource
+    struct LuaCompiledSource
     {
         // Metadata
         std::string sourceCode;
+        sol::bytecode byteCode;
         std::reference_wrapper<SolState> solState;
         StandardModules stdModules;
         ModuleMapping userModules;
@@ -37,7 +40,7 @@ namespace rlogic::internal
 
     struct LuaCompiledScript
     {
-        LuaSource source;
+        LuaCompiledSource source;
 
         // The run() function
         sol::protected_function runFunction;
@@ -54,20 +57,24 @@ namespace rlogic::internal
 
     struct LuaCompiledModule
     {
-        LuaSource source;
+        LuaCompiledSource source;
         sol::table moduleTable;
     };
 
     class LuaCompilationUtils
     {
     public:
-        [[nodiscard]] static std::optional<LuaCompiledScript> CompileScript(
+        [[nodiscard]] static std::optional<LuaCompiledScript> CompileScriptOrImportPrecompiled(
             SolState& solState,
             const ModuleMapping& userModules,
             const StandardModules& stdModules,
             std::string source,
             std::string_view name,
-            ErrorReporting& errorReporting);
+            ErrorReporting& errorReporting,
+            sol::bytecode byteCodeFromPrecompiledScript,
+            std::unique_ptr<Property> inputsFromPrecompiledScript,
+            std::unique_ptr<Property> outputsFromPrecompiledScript,
+            EFeatureLevel featureLevel);
 
         [[nodiscard]] static std::optional<LuaCompiledInterface> CompileInterface(
             SolState& solState,
@@ -75,13 +82,15 @@ namespace rlogic::internal
             std::string_view name,
             ErrorReporting& errorReporting);
 
-        [[nodiscard]] static std::optional<LuaCompiledModule> CompileModule(
+        [[nodiscard]] static std::optional<LuaCompiledModule> CompileModuleOrImportPrecompiled(
             SolState& solState,
             const ModuleMapping& userModules,
             const StandardModules& stdModules,
             std::string source,
             std::string_view name,
-            ErrorReporting& errorReporting);
+            ErrorReporting& errorReporting,
+            sol::bytecode byteCodeFromPrecompiledModule,
+            EFeatureLevel featureLevel);
 
         [[nodiscard]] static bool CheckModuleName(std::string_view name);
 
@@ -92,7 +101,6 @@ namespace rlogic::internal
         [[nodiscard]] static sol::table MakeTableReadOnly(SolState& solState, sol::table table);
 
     private:
-        [[nodiscard]] static std::string BuildChunkName(std::string_view scriptName);
         [[nodiscard]] static bool CrossCheckDeclaredAndProvidedModules(
             std::string_view source,
             const ModuleMapping& modules,

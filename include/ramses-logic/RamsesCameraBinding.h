@@ -26,8 +26,9 @@ namespace rlogic::internal
 namespace rlogic
 {
     /**
-     * The RamsesCameraBinding is a type of #rlogic::RamsesBinding which allows the #rlogic::LogicEngine to control instances
-     * of ramses::Camera. RamsesCameraBinding's can be created with #rlogic::LogicEngine::createRamsesCameraBinding.
+     * The RamsesCameraBinding is a type of #rlogic::RamsesBinding which allows the #rlogic::LogicEngine to control instances of ramses::Camera.
+     * RamsesCameraBinding's can be created with #rlogic::LogicEngine::createRamsesCameraBinding or #rlogic::LogicEngine::createRamsesCameraBindingWithFrustumPlanes,
+     * which affects the set of input properties that will be used to control camera frustum as described below.
      *
      * The #RamsesCameraBinding has a static link to a ramses::Camera. After creation, #rlogic::LogicNode::getInputs will
      * return a struct property with children equivalent to the camera settings of the provided ramses::Camera.
@@ -50,13 +51,29 @@ namespace rlogic
      * Since the RamsesCameraBinding derives from #rlogic::RamsesBinding, it also provides the #rlogic::LogicNode::getInputs
      * and #rlogic::LogicNode::getOutputs method. For this class, the methods behave as follows:
      *  - #rlogic::LogicNode::getInputs: returns inputs struct with two child properties: viewport and frustum.
-     *                                   Their child properties in turn vary for the two available camera types (ramses::PerspectiveCamera and ramses::OrthographicCamera)
-     *      - Perspective Camera
-     *          - viewport: offsetX, offsetY, width, height
-     *          - frustum: fieldOfView, aspectRatio, nearPlane, farPlane
-     *      - Orthographic Camera
-     *          - viewport: same as for Perspective Camera
-     *          - frustum: leftPlane, rightPlane, bottomPlane, topPlane, nearPlane, farPlane
+     *          - 'viewport' (type struct) with these children:
+     *              - 'offsetX' (type Int32)  - viewport offset horizontal
+     *              - 'offsetY' (type Int32)  - viewport offset vertical
+     *              - 'width'   (type Int32)  - viewport width
+     *              - 'height'  (type Int32)  - viewport height
+     *          - 'frustum' (type struct) children vary depending on frustum parameters to use, it will be one of the following sets of parameters:
+     *              - full set of frustum plane properties:
+     *                  - 'nearPlane'   (type Float)  - frustum plane near
+     *                  - 'farPlane'    (type Float)  - frustum plane far
+     *                  - 'leftPlane'   (type Float)  - frustum plane left
+     *                  - 'rightPlane'  (type Float)  - frustum plane right
+     *                  - 'bottomPlane' (type Float)  - frustum plane bottom
+     *                  - 'topPlane'    (type Float)  - frustum plane top
+     *              - simplified set of frustum properties:
+     *                  - 'nearPlane'   (type Float)  - frustum plane near
+     *                  - 'farPlane'    (type Float)  - frustum plane far
+     *                  - 'fieldOfView' (type Float)  - frustum field of view in degrees
+     *                  - 'aspectRatio' (type Float)  - aspect ratio of frustum width / frustum height
+     *            Full set of frustum planes properties will be present if camera is ramses::Orthographic (regardless of which create method was used)
+     *            or camera is ramses::PerspectiveCamera and #rlogic::LogicEngine::createRamsesCameraBindingWithFrustumPlanes was used to create it.
+     *            Simplified set of frustum properties will be present if camera is ramses::PerspectiveCamera and #rlogic::LogicEngine::createRamsesCameraBinding was used to create it.
+     *    Refer to ramses::Camera, ramses::PerspectiveCamera and ramses::OrthographicCamera for meaning and constraints of all these inputs.
+     *
      *  - #rlogic::LogicNode::getOutputs: returns always nullptr, because a #RamsesCameraBinding does not have outputs,
      *    it implicitly controls the ramses Camera
      */

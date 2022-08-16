@@ -547,25 +547,30 @@ namespace rlogic::internal
             return false;
         }
 
+        return GetFeatureLevelFromBuffer(filename, maybeBytesFromFile->data(), maybeBytesFromFile->size(), detectedFeatureLevel);
+    }
+
+    bool LogicEngineImpl::GetFeatureLevelFromBuffer(std::string_view logname, const void* buffer, size_t bufferSize, EFeatureLevel& detectedFeatureLevel)
+    {
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast) Safe here, not worth transforming whole vector
-        flatbuffers::Verifier bufferVerifier(reinterpret_cast<const uint8_t*>(maybeBytesFromFile->data()), maybeBytesFromFile->size());
+        flatbuffers::Verifier bufferVerifier(reinterpret_cast<const uint8_t*>(buffer), bufferSize);
         if (!bufferVerifier.VerifyBuffer<rlogic_serialization::LogicEngine>())
         {
-            LOG_ERROR("'{}' contains corrupted data", filename);
+            LOG_ERROR("'{}' contains corrupted data", logname);
             return false;
         }
 
-        const auto* logicEngine = rlogic_serialization::GetLogicEngine(maybeBytesFromFile->data());
+        const auto* logicEngine = rlogic_serialization::GetLogicEngine(buffer);
         if (!logicEngine)
         {
-            LOG_ERROR("File '{}' could not be parsed", filename);
+            LOG_ERROR("File '{}' could not be parsed", logname);
             return false;
         }
 
         const uint32_t featureLevelInt = logicEngine->featureLevel();
         if (featureLevelInt != EFeatureLevel_01 && featureLevelInt != EFeatureLevel_02)
         {
-            LOG_ERROR("Could not recognize feature level in file '{}'", filename);
+            LOG_ERROR("Could not recognize feature level in file '{}'", logname);
             return false;
         }
 

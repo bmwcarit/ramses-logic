@@ -1429,28 +1429,34 @@ namespace rlogic::internal
         LuaScript* script = apiObjects.getApiObjectContainer<LuaScript>()[0];
         EXPECT_EQ(script, apiObjects.getApiObject(script->m_impl));
         EXPECT_EQ(script->getName(), "script");
+        EXPECT_EQ(script, &script->m_script.getLogicObject());
 
         LuaInterface* intf = apiObjects.getApiObjectContainer<LuaInterface>()[0];
         EXPECT_EQ(intf, apiObjects.getApiObject(intf->m_impl));
         EXPECT_EQ(intf->getName(), "intf");
+        EXPECT_EQ(intf, &intf->m_interface.getLogicObject());
 
         RamsesNodeBinding* nodeBinding = apiObjects.getApiObjectContainer<RamsesNodeBinding>()[0];
         EXPECT_EQ(nodeBinding, apiObjects.getApiObject(nodeBinding->m_impl));
         EXPECT_EQ(nodeBinding->getName(), "node");
+        EXPECT_EQ(nodeBinding, &nodeBinding->m_nodeBinding.getLogicObject());
 
         RamsesAppearanceBinding* appBinding = apiObjects.getApiObjectContainer<RamsesAppearanceBinding>()[0];
         EXPECT_EQ(appBinding, apiObjects.getApiObject(appBinding->m_impl));
         EXPECT_EQ(appBinding->getName(), "appearance");
+        EXPECT_EQ(appBinding, &appBinding->m_appearanceBinding.getLogicObject());
 
         RamsesCameraBinding* camBinding = apiObjects.getApiObjectContainer<RamsesCameraBinding>()[0];
         EXPECT_EQ(camBinding, apiObjects.getApiObject(camBinding->m_impl));
         EXPECT_EQ(camBinding->getName(), "camera");
+        EXPECT_EQ(camBinding, &camBinding->m_cameraBinding.getLogicObject());
 
         if (GetParam() >= EFeatureLevel_02)
         {
             RamsesRenderPassBinding* rpBinding = apiObjects.getApiObjectContainer<RamsesRenderPassBinding>()[0];
             EXPECT_EQ(rpBinding, apiObjects.getApiObject(rpBinding->m_impl));
             EXPECT_EQ(rpBinding->getName(), "rp");
+            EXPECT_EQ(rpBinding, &rpBinding->m_renderPassBinding.getLogicObject());
         }
     }
 
@@ -2120,6 +2126,7 @@ namespace rlogic::internal
         {
             EXPECT_EQ(logicObjects[i], expected[i]);
             EXPECT_EQ(ownedObjects[i].get(), expected[i]);
+            EXPECT_EQ(logicObjects[i], &logicObjects[i]->m_impl->getLogicObject());
         }
     }
 }

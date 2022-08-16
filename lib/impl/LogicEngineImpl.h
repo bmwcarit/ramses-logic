@@ -109,6 +109,7 @@ namespace rlogic::internal
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
         bool saveToFile(std::string_view filename, const SaveFileConfigImpl& config);
         [[nodiscard]] static bool GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel);
+        [[nodiscard]] static bool GetFeatureLevelFromBuffer(std::string_view logname, const void* buffer, size_t bufferSize, EFeatureLevel& detectedFeatureLevel);
 
         bool link(const Property& sourceProperty, const Property& targetProperty);
         bool linkWeak(const Property& sourceProperty, const Property& targetProperty);

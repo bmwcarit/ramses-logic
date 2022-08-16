@@ -28,6 +28,7 @@ target_include_directories(ramses-logic-viewer-obj
     PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/lib>
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/tools/ramses-logic-utils>
+    $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/BuildConfig>
 )
 
 target_link_libraries(ramses-logic-viewer-obj PUBLIC rlogic::ramses-logic-utils imgui fmt::fmt sol2::sol2 lua::lua CLI11::CLI11)

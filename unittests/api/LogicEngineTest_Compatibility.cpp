@@ -11,6 +11,7 @@
 #include "RamsesTestUtils.h"
 #include "WithTempDirectory.h"
 #include "FeatureLevelTestValues.h"
+#include "PropertyLinkTestUtils.h"
 
 #include "ramses-logic/RamsesLogicVersion.h"
 #include "ramses-logic/Property.h"
@@ -277,44 +278,67 @@ namespace rlogic::internal
             ASSERT_NE(nullptr, logicEngine.findByName<LuaModule>("nestedModuleMath"));
             ASSERT_NE(nullptr, logicEngine.findByName<LuaModule>("moduleMath"));
             ASSERT_NE(nullptr, logicEngine.findByName<LuaModule>("moduleTypes"));
-            ASSERT_NE(nullptr, logicEngine.findByName<LuaScript>("script1"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("intInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("int64Input"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("vec2iInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("vec3iInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("vec4iInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("floatInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("vec2fInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("vec3fInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("vec4fInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("boolInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("stringInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("structInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("arrayInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getOutputs()->getChild("floatOutput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getOutputs()->getChild("nodeTranslation"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script1")->getInputs()->getChild("floatInput"));
-            ASSERT_NE(nullptr, logicEngine.findByName<LuaScript>("script2"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getInputs()->getChild("floatInput"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetX"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("offsetY"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("width"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("cameraViewport")->getChild("height"));
-            EXPECT_NE(nullptr, logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("floatUniform"));
-            ASSERT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNode"));
-            EXPECT_EQ(1u, logicEngine.findByName<AnimationNode>("animNode")->getInputs()->getChildCount());
-            ASSERT_EQ(2u, logicEngine.findByName<AnimationNode>("animNode")->getOutputs()->getChildCount());
-            EXPECT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNode")->getOutputs()->getChild("channel"));
+            const auto script1 = logicEngine.findByName<LuaScript>("script1");
+            ASSERT_NE(nullptr, script1);
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("intInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("int64Input"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("vec2iInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("vec3iInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("vec4iInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("vec2fInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("vec3fInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("vec4fInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("boolInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("stringInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("structInput"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("arrayInput"));
+            EXPECT_NE(nullptr, script1->getOutputs()->getChild("floatOutput"));
+            EXPECT_NE(nullptr, script1->getOutputs()->getChild("nodeTranslation"));
+            EXPECT_NE(nullptr, script1->getInputs()->getChild("floatInput"));
+            const auto script2 = logicEngine.findByName<LuaScript>("script2");
+            ASSERT_NE(nullptr, script2);
+            EXPECT_NE(nullptr, script2->getInputs()->getChild("floatInput"));
+            EXPECT_NE(nullptr, script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"));
+            EXPECT_NE(nullptr, script2->getOutputs()->getChild("cameraViewport")->getChild("offsetY"));
+            EXPECT_NE(nullptr, script2->getOutputs()->getChild("cameraViewport")->getChild("width"));
+            EXPECT_NE(nullptr, script2->getOutputs()->getChild("cameraViewport")->getChild("height"));
+            EXPECT_NE(nullptr, script2->getOutputs()->getChild("floatUniform"));
+            const auto animNode = logicEngine.findByName<AnimationNode>("animNode");
+            ASSERT_NE(nullptr, animNode);
+            EXPECT_EQ(1u, animNode->getInputs()->getChildCount());
+            ASSERT_EQ(2u, animNode->getOutputs()->getChildCount());
+            EXPECT_NE(nullptr, animNode->getOutputs()->getChild("channel"));
             ASSERT_NE(nullptr, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties"));
             EXPECT_EQ(2u, logicEngine.findByName<AnimationNode>("animNodeWithDataProperties")->getInputs()->getChildCount());
             EXPECT_NE(nullptr, logicEngine.findByName<TimerNode>("timerNode"));
 
-            EXPECT_NE(nullptr, logicEngine.findByName<RamsesNodeBinding>("nodebinding"));
-            EXPECT_NE(nullptr, logicEngine.findByName<RamsesCameraBinding>("camerabinding"));
-            EXPECT_NE(nullptr, logicEngine.findByName<RamsesAppearanceBinding>("appearancebinding"));
+            const auto nodeBinding = logicEngine.findByName<RamsesNodeBinding>("nodebinding");
+            ASSERT_NE(nullptr, nodeBinding);
+            const auto cameraBinding = logicEngine.findByName<RamsesCameraBinding>("camerabinding");
+            ASSERT_NE(nullptr, cameraBinding);
+            const auto appearanceBinding = logicEngine.findByName<RamsesAppearanceBinding>("appearancebinding");
+            ASSERT_NE(nullptr, appearanceBinding);
             EXPECT_NE(nullptr, logicEngine.findByName<DataArray>("dataarray"));
             const auto intf = logicEngine.findByName<LuaInterface>("intf");
             ASSERT_NE(nullptr, intf);
+
+            // Check all links
+            std::vector<PropertyLink> expectedLinks;
+            expectedLinks.push_back({ intf->getOutputs()->getChild("struct")->getChild("floatInput"), script1->getInputs()->getChild("floatInput"), false });
+            expectedLinks.push_back({ script1->getOutputs()->getChild("floatOutput"), script2->getInputs()->getChild("floatInput"), false });
+            expectedLinks.push_back({ script1->getOutputs()->getChild("nodeTranslation"), nodeBinding->getInputs()->getChild("translation"), false });
+            expectedLinks.push_back({ script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"), cameraBinding->getInputs()->getChild("viewport")->getChild("offsetX"), false });
+            expectedLinks.push_back({ script2->getOutputs()->getChild("cameraViewport")->getChild("offsetY"), cameraBinding->getInputs()->getChild("viewport")->getChild("offsetY"), false });
+            expectedLinks.push_back({ script2->getOutputs()->getChild("cameraViewport")->getChild("width"), cameraBinding->getInputs()->getChild("viewport")->getChild("width"), false });
+            expectedLinks.push_back({ script2->getOutputs()->getChild("cameraViewport")->getChild("height"), cameraBinding->getInputs()->getChild("viewport")->getChild("height"), false });
+            expectedLinks.push_back({ script2->getOutputs()->getChild("floatUniform"), appearanceBinding->getInputs()->getChild("floatUniform"), false });
+            expectedLinks.push_back({ animNode->getOutputs()->getChild("channel"), appearanceBinding->getInputs()->getChild("animatedFloatUniform"), false });
+            if (logicEngine.getFeatureLevel() >= rlogic::EFeatureLevel_02)
+            {
+                expectedLinks.push_back({ script1->getOutputs()->getChild("boolOutput"), nodeBinding->getInputs()->getChild("enabled"), false });
+            }
+            PropertyLinkTestUtils::ExpectLinks(logicEngine, expectedLinks);
 
             // Can set new value via interface and update()
             intf->getInputs()->getChild("struct")->getChild("floatInput")->set<float>(42.5f);
@@ -333,8 +357,6 @@ namespace rlogic::internal
             EXPECT_EQ(camera->getViewportHeight(), 243u);
 
             // Animation node is linked and can be animated
-            const auto animNode = logicEngine.findByName<AnimationNode>("animNode");
-            EXPECT_TRUE(logicEngine.isLinked(*animNode));
             EXPECT_FLOAT_EQ(2.f, *animNode->getOutputs()->getChild("duration")->get<float>());
             animNode->getInputs()->getChild("progress")->set(0.75f);
             EXPECT_TRUE(logicEngine.update());

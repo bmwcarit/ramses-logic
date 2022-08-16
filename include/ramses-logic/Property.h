@@ -10,6 +10,7 @@
 
 #include "ramses-logic/APIExport.h"
 #include "ramses-logic/EPropertyType.h"
+#include "ramses-logic/PropertyLink.h"
 
 #include <cstddef>
 #include <optional>
@@ -23,6 +24,8 @@ namespace rlogic::internal
 
 namespace rlogic
 {
+    class LogicNode;
+
     /**
     * Represents a generic property slot of the #rlogic::LogicNode and its derived classes.
     * Properties can have primitive types (string, integer, etc.) or complex types (structs, arrays).
@@ -81,6 +84,7 @@ namespace rlogic
         * However, once a script is created, the index will not change, i.e. it is permitted that user code caches
         * the property index for faster future access.
         *
+        * @param[in] index zero based index of child property to retrieve
         * @return the child with the given index, or nullptr if the property is primitive or the index is out of range
         */
         [[nodiscard]] RLOGIC_API const Property* getChild(size_t index) const;
@@ -96,6 +100,7 @@ namespace rlogic
         *
         * Note that this method may be slower than #getChild(size_t index) as it must do a string-based search.
         *
+        * @param[in] name name of child property to retrieve
         * @return the child with the given name, or nullptr if property is not of type #rlogic::EPropertyType::Struct
         */
         [[nodiscard]] RLOGIC_API Property* getChild(std::string_view name);
@@ -158,6 +163,43 @@ namespace rlogic
         * @return true if the property is an output and is linked, false otherwise.
         */
         [[nodiscard]] RLOGIC_API bool hasOutgoingLink() const;
+
+        /**
+        * Returns information about the incoming link to this property, namely which property is the source of the link.
+        * Only certain properties can have an incoming link, see #rlogic::LogicEngine::link for details.
+        *
+        * @return incoming link data or std::nullopt if there is no link.
+        */
+        [[nodiscard]] RLOGIC_API std::optional<PropertyLink> getIncomingLink() const;
+
+        /**
+        * Returns the number of outgoing links from this property.
+        * Only certain properties can have outgoing links, see #rlogic::LogicEngine::link for details.
+        *
+        * @return number of outgoing links from this property.
+        */
+        [[nodiscard]] RLOGIC_API size_t getOutgoingLinksCount() const;
+
+        /**
+        * Returns information about the outgoing link from this property, namely which property is the target of the link with given index.
+        * Use #getOutgoingLinksCount to query how many outgoing links there are.
+        * Only certain properties can have outgoing links, see #rlogic::LogicEngine::link for details.
+        *
+        * @param[in] index zero based index of outgoing link to retrieve
+        * @return outgoing link data or std::nullopt if there is no link with given index.
+        */
+        [[nodiscard]] RLOGIC_API std::optional<PropertyLink> getOutgoingLink(size_t index) const;
+
+        /**
+        * Get #rlogic::LogicNode that owns this property.
+        * Every property is owned by a #rlogic::LogicNode and represents either its input or output.
+        *
+        * @return #rlogic::LogicNode that owns this property.
+        */
+        [[nodiscard]] RLOGIC_API const LogicNode& getOwningLogicNode() const;
+
+        /// @copydoc getOwningLogicNode() const
+        [[nodiscard]] RLOGIC_API LogicNode& getOwningLogicNode();
 
         /**
         * Constructor of Property. User is not supposed to call this - properties are created by other factory classes

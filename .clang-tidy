@@ -222,9 +222,11 @@ Checks:
     cppcoreguidelines-pro-type-union-access,
     cppcoreguidelines-pro-type-vararg,
     cppcoreguidelines-slicing,
+    # TODO Violin check if we can workaround these issues with our clang-tidy wrapper
     # Google test templated tests TEST_P macros break this rule
     #cppcoreguidelines-special-member-functions,
-    cppcoreguidelines-avoid-non-const-global-variables,
+    # Google test does not comply to this rule
+    #cppcoreguidelines-avoid-non-const-global-variables,
 
     # We are not using Darwin
     #darwin-*,

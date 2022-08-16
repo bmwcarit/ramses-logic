@@ -111,6 +111,10 @@ namespace rlogic::internal
             return std::get<T>(m_value);
         }
 
+        void setPropertyInstance(Property& property);
+        [[nodiscard]] Property& getPropertyInstance();
+        [[nodiscard]] const Property& getPropertyInstance() const;
+
         void setLogicNode(LogicNodeImpl& logicNode);
         [[nodiscard]] LogicNodeImpl& getLogicNode();
         [[nodiscard]] const LogicNodeImpl& getLogicNode() const;
@@ -135,6 +139,8 @@ namespace rlogic::internal
 
         Link m_incomingLink;
         std::vector<Link> m_outgoingLinks;
+
+        Property* m_propertyInstance = nullptr;
         LogicNodeImpl* m_logicNode = nullptr;
 
         bool m_bindingInputHasNewValue = false;

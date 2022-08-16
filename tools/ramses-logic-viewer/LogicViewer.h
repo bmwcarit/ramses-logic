@@ -117,6 +117,8 @@ namespace rlogic
 
         [[nodiscard]] Result loadLuaFile(const std::string& filename);
 
+        [[nodiscard]] Result exec(const std::string& lua);
+
         [[nodiscard]] Result call(const std::string& functionName);
 
         [[nodiscard]] const std::string& getLuaFilename() const;
@@ -143,6 +145,8 @@ namespace rlogic
 
     private:
         void updateEngine();
+
+        void load(sol::load_result&& loadResult);
 
         rlogic::LogicEngine m_logicEngine;
         ScreenshotFunc      m_screenshotFunc;

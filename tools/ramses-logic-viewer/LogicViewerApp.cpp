@@ -87,29 +87,14 @@ namespace rlogic
         ramses::RamsesFramework::SetConsoleLogLevel(args.ramsesLogLevel());
         rlogic::Logger::SetLogVerbosityLimit(args.ramsesLogicLogLevel());
         m_framework = std::make_unique<ramses::RamsesFramework>(frameworkConfig);
-        ramses::RamsesClient*   client = m_framework->createClient("ramses-logic-viewer");
-        if (!client)
+        m_client = m_framework->createClient("ramses-logic-viewer");
+        if (!m_client)
         {
             std::cerr << "Could not create ramses client" << std::endl;
             return static_cast<int>(ExitCode::ErrorRamsesClient);
         }
 
-        ramses::RamsesRenderer* renderer = m_framework->createRenderer(rendererConfig);
-        if (!renderer)
-        {
-            std::cerr << "Could not create ramses renderer" << std::endl;
-            return static_cast<int>(ExitCode::ErrorRamsesRenderer);
-        }
-
-        ramses::RendererSceneControl* sceneControl = renderer->getSceneControlAPI();
-        if (!sceneControl)
-        {
-            std::cerr << "Could not create scene Control" << std::endl;
-            return static_cast<int>(ExitCode::ErrorSceneControl);
-        }
-        renderer->startThread();
-
-        m_scene = client->loadSceneFromFile(args.sceneFile().c_str());
+        m_scene = m_client->loadSceneFromFile(args.sceneFile().c_str());
         if (!m_scene)
         {
             std::cerr << "Failed to load scene: " << args.sceneFile() << std::endl;
@@ -120,35 +105,23 @@ namespace rlogic
 
         const auto guiSceneId = ramses::sceneId_t(m_scene->getSceneId().getValue() + 1);
 
-        uint32_t width  = 0;
-        uint32_t height = 0;
-        if (autoDetectViewportSize && getPreferredSize(*m_scene, width, height))
+        if (autoDetectViewportSize && getPreferredSize(*m_scene, m_width, m_height))
         {
-            displayConfig.setWindowRectangle(0, 0, width, height);
+            displayConfig.setWindowRectangle(0, 0, m_width, m_height);
         }
 
         int32_t winX = 0;
         int32_t winY = 0;
-        displayConfig.getWindowRectangle(winX, winY, width, height);
-        m_imguiHelper = std::make_unique<rlogic::ImguiClientHelper>(*client, width, height, guiSceneId);
-        m_imguiHelper->setRenderer(renderer);
+        displayConfig.getWindowRectangle(winX, winY, m_width, m_height);
+        m_imguiHelper = std::make_unique<rlogic::ImguiClientHelper>(*m_client, m_width, m_height, guiSceneId);
 
-        const ramses::displayId_t display = renderer->createDisplay(displayConfig);
-        m_imguiHelper->setDisplayId(display);
-        renderer->flush();
-
-        if (!m_imguiHelper->waitForDisplay(display))
+        if (!args.headless())
         {
-            return static_cast<int>(ExitCode::ErrorNoDisplay);
-        }
-
-        if (args.noOffscreen())
-        {
-            m_sceneSetup = std::make_unique<FramebufferSetup>(*m_imguiHelper, renderer, m_scene, display);
-        }
-        else
-        {
-            m_sceneSetup = std::make_unique<OffscreenSetup>(*m_imguiHelper, renderer, m_scene, display, width, height);
+            const auto errorCode = initDisplay(args, rendererConfig, displayConfig);
+            if (errorCode != 0)
+            {
+                return errorCode;
+            }
         }
 
         auto takeScreenshot = [&](const std::string& filename) {
@@ -168,6 +141,12 @@ namespace rlogic
             return false;
         };
 
+        if (!fs::exists(args.logicFile()))
+        {
+            std::cerr << "Logic file does not exist: " << args.logicFile() << std::endl;
+            return static_cast<int>(ExitCode::ErrorLoadLogic);
+        }
+
         rlogic::EFeatureLevel engineFeatureLevel = rlogic::EFeatureLevel_01;
         if (!rlogic::LogicEngine::GetFeatureLevelFromFile(args.logicFile(), engineFeatureLevel))
         {
@@ -176,7 +155,14 @@ namespace rlogic
         }
 
         m_settings = std::make_unique<rlogic::LogicViewerSettings>();
-        m_viewer = std::make_unique<rlogic::LogicViewer>(engineFeatureLevel, takeScreenshot);
+        if (args.headless())
+        {
+            m_viewer = std::make_unique<rlogic::LogicViewer>(engineFeatureLevel, LogicViewer::ScreenshotFunc());
+        }
+        else
+        {
+            m_viewer = std::make_unique<rlogic::LogicViewer>(engineFeatureLevel, takeScreenshot);
+        }
 
         if (!m_viewer->loadRamsesLogic(args.logicFile(), m_scene))
         {
@@ -184,22 +170,24 @@ namespace rlogic
             return static_cast<int>(ExitCode::ErrorLoadLogic);
         }
 
-        m_gui = std::make_unique<rlogic::LogicViewerGui>(*m_viewer, *m_settings);
-        m_gui->setSceneTexture(m_sceneSetup->getTextureSampler(), width, height);
-
-        m_sceneSetup->apply();
-
-        m_loadLuaStatus = (args.luaFile().empty() || args.writeConfig()) ? rlogic::Result() : m_viewer->loadLuaFile(args.luaFile());
+        m_gui = std::make_unique<rlogic::LogicViewerGui>(*m_viewer, *m_settings, args.luaFile());
+        if (!args.headless())
+        {
+            m_gui->setSceneTexture(m_sceneSetup->getTextureSampler(), m_width, m_height);
+            m_sceneSetup->apply();
+        }
 
         if (args.writeConfig())
         {
             ImGui::NewFrame();
-            m_gui->saveDefaultLuaFile(args.luaFile());
+            m_gui->saveDefaultLuaFile();
             ImGui::EndFrame();
-            m_imguiHelper->windowClosed(display);
+            m_imguiHelper->windowClosed({});
         }
         else if (!args.luaFunction().empty())
         {
+            m_loadLuaStatus = m_viewer->loadLuaFile(args.luaFile());
+
             if (m_loadLuaStatus.ok())
             {
                 m_loadLuaStatus = m_viewer->call(args.luaFunction());
@@ -209,11 +197,71 @@ namespace rlogic
                 std::cerr << m_loadLuaStatus.getMessage() << std::endl;
                 return static_cast<int>(ExitCode::ErrorLoadLua);
             }
-            m_imguiHelper->windowClosed(display);
+            m_imguiHelper->windowClosed({});
+        }
+        else if (!args.exec().empty())
+        {
+            // default lua file may be missing (explicit lua file is checked by CLI11 before)
+            m_loadLuaStatus = m_viewer->loadLuaFile(fs::exists(args.luaFile()) ? args.luaFile() : "");
+            if (m_loadLuaStatus.ok())
+            {
+                m_loadLuaStatus = m_viewer->exec(args.exec());
+            }
+            if (!m_loadLuaStatus.ok())
+            {
+                std::cerr << m_loadLuaStatus.getMessage() << std::endl;
+                return static_cast<int>(ExitCode::ErrorLoadLua);
+            }
+            m_imguiHelper->windowClosed({});
         }
         else
         {
+            // interactive mode
+            // default lua file may be missing (explicit lua file is checked by CLI11 before)
+            if (fs::exists(args.luaFile()))
+            {
+                m_loadLuaStatus = m_viewer->loadLuaFile(args.luaFile());
+            }
         }
+        return 0;
+    }
+
+    int LogicViewerApp::initDisplay(const Arguments& args, const ramses::RendererConfig& rendererConfig, const ramses::DisplayConfig& displayConfig)
+    {
+        ramses::RamsesRenderer* renderer = m_framework->createRenderer(rendererConfig);
+        if (!renderer)
+        {
+            std::cerr << "Could not create ramses renderer" << std::endl;
+            return static_cast<int>(ExitCode::ErrorRamsesRenderer);
+        }
+
+        ramses::RendererSceneControl* sceneControl = renderer->getSceneControlAPI();
+        if (!sceneControl)
+        {
+            std::cerr << "Could not create scene Control" << std::endl;
+            return static_cast<int>(ExitCode::ErrorSceneControl);
+        }
+        renderer->startThread();
+        m_imguiHelper->setRenderer(renderer);
+
+        auto display = renderer->createDisplay(displayConfig);
+        m_imguiHelper->setDisplayId(display);
+        renderer->flush();
+
+        if (!m_imguiHelper->waitForDisplay(display))
+        {
+            return static_cast<int>(ExitCode::ErrorNoDisplay);
+        }
+
+        if (args.noOffscreen())
+        {
+            m_sceneSetup = std::make_unique<FramebufferSetup>(*m_imguiHelper, renderer, m_scene, display);
+        }
+        else
+        {
+            m_sceneSetup = std::make_unique<OffscreenSetup>(*m_imguiHelper, renderer, m_scene, display, m_width, m_height);
+        }
+
         return 0;
     }
 

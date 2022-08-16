@@ -11,6 +11,7 @@
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/EFeatureLevel.h"
+#include "ramses-logic/PropertyLink.h"
 
 #include "impl/LuaConfigImpl.h"
 
@@ -150,6 +151,8 @@ namespace rlogic::internal
 
         [[nodiscard]] int getNumElementsInLuaStack() const;
 
+        [[nodiscard]] const std::vector<PropertyLink>& getAllPropertyLinks() const;
+
     private:
         // Handle internal data structures and mappings
         void registerLogicNode(LogicNode& logicNode);
@@ -174,6 +177,8 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(TimerNode& node, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(AnchorPoint& node, ErrorReporting& errorReporting);
 
+        std::vector<PropertyLink> collectPropertyLinks() const;
+
         std::unique_ptr<SolState> m_solState {std::make_unique<SolState>()};
 
         ApiObjectContainer<LuaScript>               m_scripts;
@@ -195,6 +200,9 @@ namespace rlogic::internal
 
         std::unordered_map<LogicNodeImpl*, LogicNode*> m_reverseImplMapping;
         std::unordered_map<uint64_t, LogicObject*>     m_logicObjectIdMapping;
+
+        // persistent storage for links to be given out via public API getPropertyLinks()
+        mutable std::vector<PropertyLink> m_collectedLinks;
 
         EFeatureLevel m_featureLevel;
     };

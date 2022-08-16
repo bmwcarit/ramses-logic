@@ -100,4 +100,22 @@ namespace rlogic::internal
 
         return true;
     }
+
+    void LogicObjectImpl::setLogicObject(LogicObject& obj)
+    {
+        assert(m_logicObject == nullptr);
+        m_logicObject = &obj;
+    }
+
+    const LogicObject& LogicObjectImpl::getLogicObject() const
+    {
+        assert(m_logicObject != nullptr);
+        return *m_logicObject;
+    }
+
+    LogicObject& LogicObjectImpl::getLogicObject()
+    {
+        assert(m_logicObject != nullptr);
+        return *m_logicObject;
+    }
 }

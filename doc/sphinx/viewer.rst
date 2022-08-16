@@ -60,6 +60,17 @@ Options
    Calls the given <luafunction> defined in ``<luafile>`` and exits. This can be e.g. used to run a test case
    and/or to make a screenshot
 
+.. option:: --exec-lua=<lua>
+
+   Runs the given lua source code and exits. The code is executed after parsing ``<luafile>`` (if available)
+   and runs in the same context, i.e.: all functions from ``<luafile>`` and the :ref:`lua_configuration_api` can be used
+
+.. option:: --headless
+
+   Runs the viewer without user interface and renderer. This can be useful for CI environments to run tests
+   (:option:`ramses-logic-viewer --exec` :option:`ramses-logic-viewer --exec-lua`).
+   Screenshots will not work in this mode though.
+
 .. option:: --width WIDTH
 
    overrides the auto-detected display width
@@ -237,7 +248,7 @@ Logic Engine Update
 
 The logic engine is automatically updated (:cpp:func:`rlogic::LogicEngine::update()`) before
 a new frame is drawn or before a screenshot is stored.
-In batch mode (:option:`ramses-logic-viewer --exec`) it's sometimes useful to explicitly update
+In batch mode (:option:`ramses-logic-viewer --exec` :option:`ramses-logic-viewer --exec-lua`) it's sometimes useful to explicitly update
 the logic engine state by calling ``rlogic.update()``:
 
 .. code-block:: lua

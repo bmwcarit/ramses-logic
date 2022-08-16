@@ -11,6 +11,7 @@
 #include "RamsesTestUtils.h"
 #include "WithTempDirectory.h"
 #include "FeatureLevelTestValues.h"
+#include "PropertyLinkTestUtils.h"
 
 #include "ramses-client-api/EffectDescription.h"
 #include "ramses-client-api/Effect.h"
@@ -1510,19 +1511,11 @@ namespace rlogic
             auto scriptC_concatenate_AB = scriptC->getOutputs()->getChild("concatenate_AB");
 
             // Internal check that deserialization did not result in more link copies
-            EXPECT_EQ(scriptBInput->m_impl->getIncomingLink().property, scriptAOutput->m_impl.get());
-            EXPECT_EQ(scriptC_fromA->m_impl->getIncomingLink().property, scriptAOutput->m_impl.get());
-            EXPECT_EQ(scriptC_fromB->m_impl->getIncomingLink().property, scriptBOutput->m_impl.get());
-            EXPECT_FALSE(scriptBInput->m_impl->getIncomingLink().isWeakLink);
-            EXPECT_TRUE(scriptC_fromA->m_impl->getIncomingLink().isWeakLink);
-            EXPECT_FALSE(scriptC_fromB->m_impl->getIncomingLink().isWeakLink);
-            ASSERT_EQ(scriptAOutput->m_impl->getOutgoingLinks().size(), 2u);
-            const std::vector<rlogic::internal::PropertyImpl*> outLinks{ scriptAOutput->m_impl->getOutgoingLinks()[0].property, scriptAOutput->m_impl->getOutgoingLinks()[1].property };
-            const std::vector<rlogic::internal::PropertyImpl*> expectedOutLinks{ scriptBInput->m_impl.get(), scriptC_fromA->m_impl.get() };
-            EXPECT_TRUE(std::is_permutation(outLinks.cbegin(), outLinks.cend(), expectedOutLinks.cbegin()));
-            ASSERT_EQ(scriptBOutput->m_impl->getOutgoingLinks().size(), 1u);
-            EXPECT_EQ(scriptBOutput->m_impl->getOutgoingLinks()[0].property, scriptC_fromB->m_impl.get());
-            EXPECT_TRUE(scriptC_concatenate_AB->m_impl->getOutgoingLinks().empty());
+            PropertyLinkTestUtils::ExpectLinks(m_logicEngine, {
+                { scriptAOutput, scriptBInput, false },
+                { scriptAOutput, scriptC_fromA, true },
+                { scriptBOutput, scriptC_fromB, false }
+                });
 
             // Before update, values should be still as before saving
             EXPECT_EQ(std::string("forward 'From A'"), *scriptAOutput->get<std::string>());
@@ -1625,15 +1618,11 @@ namespace rlogic
             auto scriptB_concatenated = scriptB->getOutputs()->getChild("concat_all");
 
             // Internal check that deserialization did not result in more link copies
-            EXPECT_EQ(scriptBnested_str1->m_impl->getIncomingLink().property, scriptAOutput->m_impl.get());
-            EXPECT_EQ(scriptBInput->m_impl->getIncomingLink().property, scriptAnested_str1->m_impl.get());
-            EXPECT_EQ(scriptBnested_str2->m_impl->getIncomingLink().property, scriptAnested_str2->m_impl.get());
-            ASSERT_EQ(scriptAOutput->m_impl->getOutgoingLinks().size(), 1u);
-            ASSERT_EQ(scriptAnested_str1->m_impl->getOutgoingLinks().size(), 1u);
-            ASSERT_EQ(scriptAnested_str2->m_impl->getOutgoingLinks().size(), 1u);
-            EXPECT_EQ(scriptAOutput->m_impl->getOutgoingLinks()[0].property, scriptBnested_str1->m_impl.get());
-            EXPECT_EQ(scriptAnested_str1->m_impl->getOutgoingLinks()[0].property, scriptBInput->m_impl.get());
-            EXPECT_EQ(scriptAnested_str2->m_impl->getOutgoingLinks()[0].property, scriptBnested_str2->m_impl.get());
+            PropertyLinkTestUtils::ExpectLinks(m_logicEngine, {
+                { scriptAOutput, scriptBnested_str1, false },
+                { scriptAnested_str1, scriptBInput, false },
+                { scriptAnested_str2, scriptBnested_str2, false }
+                });
 
             // Before update, values should be still as before saving
             EXPECT_EQ(std::string("foo"), *scriptAOutput->get<std::string>());

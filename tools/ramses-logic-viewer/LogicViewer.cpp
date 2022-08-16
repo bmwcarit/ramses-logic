@@ -175,6 +175,10 @@ namespace rlogic
             ltnScreenshot,
             [&](const std::string& screenshotFile) {
                 updateEngine();
+                if (!m_screenshotFunc)
+                {
+                    throw sol::error("No screenshots available in current configuration");
+                }
                 return m_screenshotFunc(screenshotFile);
             },
             ltnUpdate,
@@ -186,12 +190,19 @@ namespace rlogic
 
         m_sol[ltnModule] = LogicWrapper(m_logicEngine, m_sol);
 
-        m_luaFilename  = filename;
-        auto loadResult = m_sol.load_file(filename);
+        m_luaFilename = filename;
+        if (!filename.empty())
+        {
+            load(m_sol.load_file(filename));
+        }
+        return m_result;
+    }
+
+    void LogicViewer::load(sol::load_result&& loadResult)
+    {
         if (!loadResult.valid())
         {
             sol::error err = loadResult;
-            std::cerr << err.what() << std::endl;
             m_result = Result(err.what());
         }
         else
@@ -201,10 +212,14 @@ namespace rlogic
             if (!mainResult.valid())
             {
                 sol::error err = mainResult;
-                std::cerr << err.what() << std::endl;
                 m_result = Result(err.what());
             }
         }
+    }
+
+    Result LogicViewer::exec(const std::string& lua)
+    {
+        load(m_sol.load_buffer(lua.c_str(), lua.size()));
         return m_result;
     }
 

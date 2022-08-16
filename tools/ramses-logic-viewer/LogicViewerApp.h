@@ -12,6 +12,13 @@
 #include "Result.h"
 
 class ISceneSetup;
+class Arguments;
+
+namespace ramses
+{
+    class DisplayConfig;
+    class RendererConfig;
+}
 
 namespace rlogic
 {
@@ -54,8 +61,11 @@ namespace rlogic
 
         [[nodiscard]] rlogic::ImguiClientHelper* getImguiClientHelper();
 
+        [[nodiscard]] const rlogic::LogicViewerSettings* getSettings() const;
+
     private:
         [[nodiscard]] int init(int argc, char const* const* argv);
+        [[nodiscard]] int initDisplay(const Arguments& args, const ramses::RendererConfig& rendererConfig, const ramses::DisplayConfig& displayConfig);
 
         std::unique_ptr<ramses::RamsesFramework>     m_framework;
         std::unique_ptr<rlogic::LogicViewerSettings> m_settings;
@@ -64,8 +74,12 @@ namespace rlogic
         std::unique_ptr<rlogic::LogicViewerGui>      m_gui;
         std::unique_ptr<ISceneSetup>                 m_sceneSetup;
 
+        ramses::RamsesClient* m_client = nullptr;
         ramses::Scene* m_scene = nullptr;
         rlogic::Result m_loadLuaStatus;
+
+        uint32_t m_width  = 0u;
+        uint32_t m_height = 0u;
 
         int m_exitCode = -1;
     };
@@ -90,6 +104,11 @@ namespace rlogic
     inline rlogic::ImguiClientHelper* LogicViewerApp::getImguiClientHelper()
     {
         return m_imguiHelper.get();
+    }
+
+    inline const rlogic::LogicViewerSettings* LogicViewerApp::getSettings() const
+    {
+        return m_settings.get();
     }
 }
 

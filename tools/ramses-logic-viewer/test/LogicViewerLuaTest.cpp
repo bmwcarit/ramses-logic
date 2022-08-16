@@ -877,7 +877,9 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerLua, enableUpdateReport)
     {
-        const size_t updateInterval = 5; // in frames
+        // set update interval to 1 to avoid random test failures
+        // (only the longest update is reported for an interval)
+        const size_t updateInterval = 1u; // in frames
         EXPECT_TRUE(viewer.loadRamsesLogic(logicFile, m_scene));
         EXPECT_FALSE(viewer.isUpdateReportEnabled());
         auto& summary = viewer.getUpdateReport();
@@ -890,10 +892,7 @@ namespace rlogic::internal
         viewer.enableUpdateReport(true, updateInterval);
         EXPECT_TRUE(viewer.isUpdateReportEnabled());
 
-        for (size_t i = 0; i < updateInterval; ++i)
-        {
-            EXPECT_EQ(Result(), viewer.update());
-        }
+        EXPECT_EQ(Result(), viewer.update());
 
         EXPECT_EQ(0u, summary.getLinkActivations().maxValue);
         EXPECT_EQ(6u, summary.getNodesExecuted().size());

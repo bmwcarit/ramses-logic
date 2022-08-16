@@ -116,6 +116,11 @@ namespace rlogic
             }
         }
 
+        [[nodiscard]] size_t getInterval() const
+        {
+            return m_measureInterval;
+        }
+
     private:
         void applySummary()
         {

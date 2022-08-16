@@ -40,7 +40,7 @@ namespace rlogic
     * graphical elements or text following a 3D object.
     *
     * - Property output:
-    *     - viewportCoords (#rlogic::Vec2f)
+    *     - viewportCoords (#rlogic::EPropertyType::Vec2f)
     *         - provides [viewportCoordX, viewportCoordY] representing the [X,Y] coordinates of the projected node transformation in viewport space
     *         - note that it is up to user if and how he decides to round the floating point values to snap to discrete pixels
     *         - note that the coordinates will not be clamped to the viewport, so viewport coordinates can be negative

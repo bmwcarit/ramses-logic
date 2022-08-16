@@ -21,6 +21,11 @@ namespace rlogic_serialization
     struct LogicObject;
 }
 
+namespace rlogic
+{
+    class LogicObject;
+}
+
 namespace rlogic::internal
 {
     class ErrorReporting;
@@ -41,6 +46,10 @@ namespace rlogic::internal
 
         [[nodiscard]] std::string getIdentificationString() const;
 
+        void setLogicObject(LogicObject& obj);
+        [[nodiscard]] const LogicObject& getLogicObject() const;
+        [[nodiscard]] LogicObject& getLogicObject();
+
     protected:
         static flatbuffers::Offset<rlogic_serialization::LogicObject> Serialize(const LogicObjectImpl& object, flatbuffers::FlatBufferBuilder& builder);
         static bool Deserialize(const rlogic_serialization::LogicObject* object,
@@ -54,5 +63,6 @@ namespace rlogic::internal
         std::string m_name;
         uint64_t    m_id;
         std::pair<uint64_t, uint64_t> m_userId{ 0u, 0u };
+        LogicObject* m_logicObject = nullptr;
     };
 }

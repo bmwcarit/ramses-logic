@@ -1,5 +1,21 @@
 # master
 
+# Ongoing
+
+# v1.1.1
+
+**API Changes**
+
+* Added Property::getOwningLogicNode to query which logic node the propery belongs to
+* Added Property::getIncomingLink, Property::getOutogingLinksCount and Property::getOutogingLink to query which properties are linked to it
+* Added LogicEngine::getPropertyLinks to collect and retrieve all existing links between properties
+* Added static LogicEngine::GetFeatureLevelFromBuffer which can parse a rlogic data buffer and detect its feature level without having to instantiate LogicEngine first.
+
+**General Changes**
+
+* ramses-logic-viewer: added `--exec-lua` cli to execute lua code (after the lua configuration file was executed)
+* ramses-logic-viewer: added `--headless` cli to run the viewer without renderer and display (e.g. in CI environments)
+
 # v1.1.0
 
 **General Changes**

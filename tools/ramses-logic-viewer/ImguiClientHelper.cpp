@@ -466,8 +466,11 @@ namespace rlogic
 
     void ImguiClientHelper::dispatchEvents()
     {
-        m_renderer->dispatchEvents(*this);
-        m_renderer->getSceneControlAPI()->dispatchEvents(*this);
+        if (m_renderer)
+        {
+            m_renderer->dispatchEvents(*this);
+            m_renderer->getSceneControlAPI()->dispatchEvents(*this);
+        }
     }
 
     bool ImguiClientHelper::saveScreenshot(const std::string& filename)
@@ -523,13 +526,16 @@ namespace rlogic
 
     bool ImguiClientHelper::waitUntil(const std::function<bool()>& conditionFunction)
     {
-        const std::chrono::steady_clock::time_point timeoutTS = std::chrono::steady_clock::now() + std::chrono::seconds{5};
-        while (m_isRunning && !conditionFunction() && std::chrono::steady_clock::now() < timeoutTS)
+        if (m_renderer)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds{5}); // will give the renderer time to process changes
-            m_renderer->dispatchEvents(*this);
-            auto* sceneControl = m_renderer->getSceneControlAPI();
-            sceneControl->dispatchEvents(*this);
+            const std::chrono::steady_clock::time_point timeoutTS = std::chrono::steady_clock::now() + std::chrono::seconds{5};
+            while (m_isRunning && !conditionFunction() && std::chrono::steady_clock::now() < timeoutTS)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds{5}); // will give the renderer time to process changes
+                m_renderer->dispatchEvents(*this);
+                auto* sceneControl = m_renderer->getSceneControlAPI();
+                sceneControl->dispatchEvents(*this);
+            }
         }
 
         return conditionFunction();

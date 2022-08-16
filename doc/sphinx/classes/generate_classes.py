@@ -54,6 +54,7 @@ content = [
         'PropertyEnumToType',
         'PropertyTypeToEnum',
         'WarningData',
+        'PropertyLink',
     ],
     },
     {

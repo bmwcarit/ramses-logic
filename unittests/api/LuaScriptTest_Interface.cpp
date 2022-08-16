@@ -12,7 +12,7 @@
 #include "impl/PropertyImpl.h"
 #include "LogTestUtils.h"
 #include "fmt/format.h"
-
+#include <deque>
 
 namespace rlogic
 {
@@ -709,4 +709,34 @@ namespace rlogic
         ASSERT_TRUE(script != nullptr);
     }
 
+    TEST_F(ALuaScript_Interface, OwnsAllProperties_confidenceTest)
+    {
+        const auto* script = m_logicEngine.createLuaScript(R"(
+            function interface(IN,OUT)
+                IN.array_int = Type:Array(2, Type:Int32())
+                OUT.struct = {a=Type:Int32(), b={c = Type:Int32(), d=Type:Float()}}
+                OUT.array_struct = Type:Array(3, {a=Type:Int32(), b=Type:Float()})
+            end
+
+            function run(IN,OUT)
+            end
+        )");
+        ASSERT_NE(nullptr, script);
+
+        int propsCount = 0;
+        std::deque<const Property*> props{ script->getInputs(), script->getOutputs() };
+        while (!props.empty())
+        {
+            const auto prop = props.back();
+            props.pop_back();
+            propsCount++;
+
+            EXPECT_EQ(script, &prop->getOwningLogicNode());
+
+            for (size_t i = 0u; i < prop->getChildCount(); ++i)
+                props.push_back(prop->getChild(i));
+        }
+
+        EXPECT_EQ(20, propsCount); // just check that the unrolled recursion works
+    }
 }

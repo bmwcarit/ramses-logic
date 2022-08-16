@@ -8,12 +8,23 @@
 
 #include "gmock/gmock.h"
 
+#include "ramses-logic/LogicNode.h"
 #include "ramses-logic/Property.h"
 #include "impl/LogicNodeImpl.h"
 #include "impl/PropertyImpl.h"
 
 namespace rlogic::internal
 {
+    class LogicNodeDummy : public LogicNode
+    {
+    public:
+        explicit LogicNodeDummy(std::unique_ptr<internal::LogicNodeImpl> impl)
+            : LogicNode(std::move(impl))
+        {
+            m_impl.setLogicObject(*this);
+        }
+    };
+
     class LogicNodeImplMock : public LogicNodeImpl
     {
     public:
@@ -64,23 +75,64 @@ namespace rlogic::internal
 
     TEST_F(ALogicNodeImpl, TakesOwnershipOfGivenProperties)
     {
-        auto inputType = MakeStruct("", { TypeData{"subProperty", EPropertyType::Int32} });
-        auto outputType = MakeStruct("", { TypeData{"subProperty", EPropertyType::Int32} });
+        const HierarchicalTypeData nestedTypeData(
+            TypeData{ "root", EPropertyType::Struct }, {
+                HierarchicalTypeData(TypeData{"nested", EPropertyType::Struct}, {
+                    MakeType("float", EPropertyType::Float),
+                    MakeStruct("nested", { TypeData("float", EPropertyType::Float) })
+                    })
+            });
+
+        auto inputType = nestedTypeData;
+        auto outputType = nestedTypeData;
         // These usually come from subclasses deserialization code
         auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputType, EPropertySemantics::ScriptInput));
         auto outputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(outputType, EPropertySemantics::ScriptOutput));
 
-        LogicNodeImplMock logicNode("");
-        logicNode.setRootProperties(std::move(inputs), std::move(outputs));
+        LogicNodeDummy logicNode{ std::make_unique<LogicNodeImplMock>("name") };
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) known test type
+        (static_cast<LogicNodeImplMock&>(logicNode.m_impl)).setRootProperties(std::move(inputs), std::move(outputs));
 
-        EXPECT_EQ(logicNode.getInputs()->getName(), "");
-        EXPECT_EQ(&logicNode.getInputs()->m_impl->getLogicNode(), &logicNode);
-        EXPECT_EQ(logicNode.getInputs()->getChild(0)->getName(), "subProperty");
-        EXPECT_EQ(&logicNode.getInputs()->getChild(0)->m_impl->getLogicNode(), &logicNode);
+        // const outputs
+        {
+            const Property* root = logicNode.getOutputs();
+            EXPECT_EQ(&logicNode, &root->getOwningLogicNode());
+            ASSERT_EQ(1u, root->getChildCount());
 
-        EXPECT_EQ(logicNode.getOutputs()->getName(), "");
-        EXPECT_EQ(&logicNode.getOutputs()->m_impl->getLogicNode(), &logicNode);
-        EXPECT_EQ(logicNode.getOutputs()->getChild(0)->getName(), "subProperty");
-        EXPECT_EQ(&logicNode.getOutputs()->getChild(0)->m_impl->getLogicNode(), &logicNode);
+            const auto nested = root->getChild(0);
+            EXPECT_EQ(&logicNode, &nested->getOwningLogicNode());
+            ASSERT_EQ(2u, nested->getChildCount());
+
+            const auto nestedFloat = nested->getChild(0);
+            EXPECT_EQ(&logicNode, &nestedFloat->getOwningLogicNode());
+
+            const auto nestedNested = nested->getChild(1);
+            EXPECT_EQ(&logicNode, &nestedNested->getOwningLogicNode());
+            ASSERT_EQ(1u, nestedNested->getChildCount());
+
+            const auto nestedNestedFloat = nestedNested->getChild(0);
+            EXPECT_EQ(&logicNode, &nestedNestedFloat->getOwningLogicNode());
+        }
+
+        // non-const inputs
+        {
+            Property* root = logicNode.getInputs();
+            EXPECT_EQ(&logicNode, &root->getOwningLogicNode());
+            ASSERT_EQ(1u, root->getChildCount());
+
+            const auto nested = root->getChild(0);
+            EXPECT_EQ(&logicNode, &nested->getOwningLogicNode());
+            ASSERT_EQ(2u, nested->getChildCount());
+
+            const auto nestedFloat = nested->getChild(0);
+            EXPECT_EQ(&logicNode, &nestedFloat->getOwningLogicNode());
+
+            const auto nestedNested = nested->getChild(1);
+            EXPECT_EQ(&logicNode, &nestedNested->getOwningLogicNode());
+            ASSERT_EQ(1u, nestedNested->getChildCount());
+
+            const auto nestedNestedFloat = nestedNested->getChild(0);
+            EXPECT_EQ(&logicNode, &nestedNestedFloat->getOwningLogicNode());
+        }
     }
 }

@@ -15,6 +15,7 @@
 #include <CLI/CLI.hpp>
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 #include "ramses-logic/ELogMessageType.h"
+#include "ramses-logic-build-config.h"
 
 class Arguments
 {
@@ -27,17 +28,20 @@ Loads and shows a ramses scene from the <ramsesfile>.
 )");
         cli.add_option("ramsesfile", m_sceneFile, "Ramses scene file")->required()->check(CLI::ExistingFile);
         cli.add_option("logicfile", m_logicFile, "Ramses Logic file")->check(CLI::ExistingFile);
-        cli.add_option("luafile", m_luaFile, "Lua configuration file")->check(CLI::ExistingFile);
+        cli.add_option("luafile,--lua", m_luaFile, "Lua configuration file")->check(CLI::ExistingFile);
         auto exec = cli.add_option("--exec", m_luaFunction, "Calls the given lua function and exits.");
+        cli.add_option("--exec-lua", m_exec, "Calls the given lua code and exits.")->excludes(exec);
         auto setWriteConfig = [&](const std::string& filename) {
             m_luaFile     = filename;
             m_writeConfig = true;
         };
+        cli.add_flag("--headless", m_headless, "Runs without user interface and renderer. Disables screenshots.");
         cli.add_option_function<std::string>("--write-config", setWriteConfig, "Writes the default lua configuration file and exits")
             ->expected(0, 1)
             ->type_name("[FILE]")
             ->excludes(exec);
         cli.add_flag("--no-offscreen", m_noOffscreen, "Renders the scene directly to the window's framebuffer. Screenshot size will be the current window size.");
+        cli.set_version_flag("--version", rlogic::g_PROJECT_VERSION.data());
 
         std::vector<std::pair<std::string, ramses::ELogLevel>> loglevelMap{{"off", ramses::ELogLevel::Off},
                                                              {"fatal", ramses::ELogLevel::Fatal},
@@ -58,7 +62,7 @@ Loads and shows a ramses scene from the <ramsesfile>.
     {
         if (m_logicFile.empty())
         {
-            m_logicFile = FindOther(m_sceneFile, "rlogic");
+            m_logicFile = ReplaceExtension(m_sceneFile, "rlogic");
         }
         return m_logicFile;
     }
@@ -67,7 +71,7 @@ Loads and shows a ramses scene from the <ramsesfile>.
     {
         if (m_luaFile.empty())
         {
-            m_luaFile = FindOther(m_sceneFile, "lua");
+            m_luaFile = ReplaceExtension(m_sceneFile, "lua");
         }
         return m_luaFile;
     }
@@ -77,9 +81,19 @@ Loads and shows a ramses scene from the <ramsesfile>.
         return m_luaFunction;
     }
 
+    const std::string& exec() const
+    {
+        return m_exec;
+    }
+
     bool noOffscreen() const
     {
         return m_noOffscreen;
+    }
+
+    bool headless() const
+    {
+        return m_headless;
     }
 
     bool writeConfig() const
@@ -116,23 +130,21 @@ Loads and shows a ramses scene from the <ramsesfile>.
     }
 
 private:
-    [[nodiscard]] static std::string FindOther(fs::path existing, const std::string& extension)
+    [[nodiscard]] static std::string ReplaceExtension(fs::path filename, const std::string& extension)
     {
         std::string retval;
-        existing.replace_extension(extension);
-        if (fs::exists(existing))
-        {
-            retval = existing.string();
-        }
-        return retval;
+        filename.replace_extension(extension);
+        return filename.string();
     }
 
     std::string m_sceneFile;
     mutable std::string m_logicFile;
     mutable std::string m_luaFile;
     std::string m_luaFunction;
+    std::string m_exec;
     bool m_noOffscreen = false;
     bool m_writeConfig = false;
+    bool m_headless    = false;
     ramses::ELogLevel m_ramsesLogLevel = ramses::ELogLevel::Error;
 };
 

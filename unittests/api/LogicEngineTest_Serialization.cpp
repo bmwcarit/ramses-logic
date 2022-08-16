@@ -11,6 +11,7 @@
 #include "RamsesTestUtils.h"
 #include "WithTempDirectory.h"
 #include "FeatureLevelTestValues.h"
+#include "PropertyLinkTestUtils.h"
 
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/Property.h"
@@ -46,6 +47,7 @@
 #include "fmt/format.h"
 
 #include <fstream>
+#include <deque>
 
 namespace rlogic::internal
 {
@@ -76,6 +78,54 @@ namespace rlogic::internal
         static void SaveBufferToFile(const std::vector<char>& bufferData, const std::string& file)
         {
             FileUtils::SaveBinary(file, static_cast<const void*>(bufferData.data()), bufferData.size());
+        }
+
+        std::vector<LogicObject*> saveAndLoadAllTypesOfObjects()
+        {
+            LogicEngine logicEngine{ GetParam() };
+            logicEngine.createLuaModule(m_moduleSourceCode, {}, "module");
+            logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+            auto* nodeBinding = logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodeBinding");
+            logicEngine.createRamsesAppearanceBinding(*m_appearance, "appearanceBinding");
+            auto* cameraBinding = logicEngine.createRamsesCameraBinding(*m_camera, "cameraBinding");
+            auto* dataArray = logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataArray");
+            AnimationNodeConfig config;
+            config.addChannel({ "channel", dataArray, dataArray, EInterpolationType::Linear });
+            logicEngine.createAnimationNode(config, "animNode");
+            logicEngine.createTimerNode("timerNode");
+            logicEngine.createLuaInterface(R"(
+                function interface(IN, OUT)
+                end
+            )", "intf");
+
+            if (GetParam() >= EFeatureLevel_02)
+            {
+                logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpBinding");
+                logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+            }
+
+            EXPECT_TRUE(logicEngine.update());
+            logicEngine.saveToFile("LogicEngine.bin");
+
+            EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
+            EXPECT_TRUE(m_logicEngine.getErrors().empty());
+
+            std::vector<std::string> names{ "module", "script", "nodeBinding", "appearanceBinding", "cameraBinding", "dataArray", "animNode", "timerNode", "intf" };
+            if (GetParam() >= EFeatureLevel_02)
+            {
+                names.emplace_back("rpBinding");
+                names.emplace_back("anchor");
+            }
+
+            std::vector<LogicObject*> objects;
+            for (const auto& name : names)
+            {
+                auto obj = m_logicEngine.findByName<LogicObject>(name);
+                EXPECT_NE(nullptr, obj);
+                objects.push_back(obj);
+            }
+
+            return objects;
         }
 
         WithTempDirectory m_tempDirectory;
@@ -710,6 +760,11 @@ namespace rlogic::internal
             const auto tgtInput1 = targetScript1->getInputs()->getChild("input");
             const auto srcOutput2 = sourceScript2->getOutputs()->getChild("output");
             const auto tgtInput2 = targetScript2->getInputs()->getChild("input");
+            PropertyLinkTestUtils::ExpectLinks(m_logicEngine, {
+                { srcOutput1, tgtInput1, false },
+                { srcOutput2, tgtInput2, true }
+                });
+
             const auto& srcOutLinks1 = srcOutput1->m_impl->getOutgoingLinks();
             const auto& srcOutLinks2 = srcOutput2->m_impl->getOutgoingLinks();
             ASSERT_EQ(1u, srcOutLinks1.size());
@@ -952,6 +1007,91 @@ namespace rlogic::internal
             ASSERT_NE(nullptr, obj);
             EXPECT_EQ(21u, obj->getUserId().first);
             EXPECT_EQ(22u, obj->getUserId().second);
+        }
+    }
+
+    TEST_P(ALogicEngine_Serialization, persistsLogicObjectImplToHLObjectMapping)
+    {
+        const auto objects = saveAndLoadAllTypesOfObjects();
+        for (const auto& obj : objects)
+        {
+            EXPECT_EQ(obj, &obj->m_impl->getLogicObject());
+        }
+    }
+
+    TEST_P(ALogicEngine_Serialization, persistsOwnershipOfAllPropertiesByTheirLogicNode)
+    {
+        const auto objects = saveAndLoadAllTypesOfObjects();
+
+        int propsCount = 0;
+        for (const auto& obj : objects)
+        {
+            const auto logicNode = obj->as<LogicNode>();
+            if (!logicNode)
+                continue;
+
+            std::deque<const Property*> props{ logicNode->getInputs(), logicNode->getOutputs() };
+            while (!props.empty())
+            {
+                const auto prop = props.back();
+                props.pop_back();
+                if (prop == nullptr)
+                    continue;
+
+                propsCount++;
+                EXPECT_EQ(obj, &prop->getOwningLogicNode());
+
+                for (size_t i = 0u; i < prop->getChildCount(); ++i)
+                    props.push_back(prop->getChild(i));
+            }
+        }
+
+        // just check that the iterating over all props works
+        if (GetParam() < EFeatureLevel_02)
+        {
+            EXPECT_EQ(33, propsCount);
+        }
+        else
+        {
+            EXPECT_EQ(42, propsCount);
+        }
+    }
+
+    TEST_P(ALogicEngine_Serialization, persistsPropertyImplToHLObjectMapping)
+    {
+        const auto objects = saveAndLoadAllTypesOfObjects();
+
+        int propsCount = 0;
+        for (const auto& obj : objects)
+        {
+            const auto logicNode = obj->as<LogicNode>();
+            if (!logicNode)
+                continue;
+
+            std::deque<const Property*> props{ logicNode->getInputs(), logicNode->getOutputs() };
+            while (!props.empty())
+            {
+                const auto prop = props.back();
+                props.pop_back();
+                if (prop == nullptr)
+                    continue;
+
+                propsCount++;
+                EXPECT_EQ(prop, &prop->m_impl->getPropertyInstance());
+
+                for (size_t i = 0u; i < prop->getChildCount(); ++i)
+                    props.push_back(prop->getChild(i));
+            }
+        }
+
+        // just check that the iterating over all props works
+        if (GetParam() < EFeatureLevel_02)
+        {
+            EXPECT_EQ(33, propsCount);
+        }
+        else
+        {
+            EXPECT_EQ(42, propsCount);
         }
     }
 }

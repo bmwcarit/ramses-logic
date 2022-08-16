@@ -31,7 +31,11 @@ namespace rlogic
     class LogicViewerGui
     {
     public:
-        explicit LogicViewerGui(rlogic::LogicViewer& viewer, LogicViewerSettings& settings);
+        /**
+        * @param luafile the luafile argument provided by command line
+        *        If it does not exist the LogicViewerGui will provide a UI to save the default settings
+        */
+        explicit LogicViewerGui(rlogic::LogicViewer& viewer, LogicViewerSettings& settings, std::string luafile);
         void draw();
         void openErrorPopup(const std::string& message);
         void setSceneTexture(ramses::TextureSampler* sampler, uint32_t width, uint32_t height);
@@ -39,7 +43,7 @@ namespace rlogic
         /**
          * saves a simple default lua configuration that can be used as a starting point
          */
-        void saveDefaultLuaFile(const std::string& filename);
+        void saveDefaultLuaFile();
 
     private:
         void drawMenuItemShowWindow();
@@ -72,6 +76,7 @@ namespace rlogic
         void drawOutProperty(const rlogic::Property* prop, size_t index);
         static void DrawDataArray(const rlogic::DataArray* obj, std::string_view context = std::string_view());
 
+        void reloadConfiguration();
         void loadLuaFile(const std::string& filename);
 
         /**

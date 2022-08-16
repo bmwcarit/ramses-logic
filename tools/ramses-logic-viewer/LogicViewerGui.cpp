@@ -171,17 +171,13 @@ namespace rlogic
         }
     }
 
-    LogicViewerGui::LogicViewerGui(rlogic::LogicViewer& viewer, LogicViewerSettings& settings)
+    LogicViewerGui::LogicViewerGui(rlogic::LogicViewer& viewer, LogicViewerSettings& settings, std::string luafile)
         : m_settings(settings)
         , m_viewer(viewer)
         , m_logicEngine(viewer.getEngine())
+        , m_filename(std::move(luafile))
     {
         m_viewer.enableUpdateReport(m_settings.showUpdateReport, m_updateReportInterval);
-
-        // filename proposal if there is no lua file found at startup
-        fs::path p = m_viewer.getLogicFilename();
-        p.replace_extension("lua");
-        m_filename = p.string();
     }
 
     void LogicViewerGui::draw()
@@ -201,7 +197,7 @@ namespace rlogic
         }
         else if (ImGui::IsKeyPressed(ramses::EKeyCode_F5))
         {
-            loadLuaFile(m_viewer.getLuaFilename());
+            reloadConfiguration();
         }
         else if (ImGui::IsKeyPressed(ramses::EKeyCode_C) && ImGui::GetIO().KeyCtrl)
         {
@@ -248,7 +244,7 @@ namespace rlogic
     {
         if (ImGui::MenuItem("Reload configuration", "F5"))
         {
-            loadLuaFile(m_viewer.getLuaFilename());
+            reloadConfiguration();
         }
     }
 
@@ -257,6 +253,14 @@ namespace rlogic
         if (ImGui::MenuItem("Copy script inputs", "Ctrl+C"))
         {
             copyScriptInputs();
+        }
+    }
+
+    void LogicViewerGui::reloadConfiguration()
+    {
+        if (fs::exists(m_filename))
+        {
+            loadLuaFile(m_filename);
         }
     }
 
@@ -836,7 +840,7 @@ namespace rlogic
             }
             else if (!luafile.empty())
             {
-                saveDefaultLuaFile(m_filename);
+                saveDefaultLuaFile();
             }
         }
         ImGui::SameLine();
@@ -860,7 +864,7 @@ namespace rlogic
 
             if (ImGui::Button("OK", ImVec2(120, 0)))
             {
-                saveDefaultLuaFile(m_filename);
+                saveDefaultLuaFile();
                 ImGui::CloseCurrentPopup();
             }
             ImGui::SetItemDefaultFocus();
@@ -1312,12 +1316,8 @@ namespace rlogic
         }
     }
 
-    void LogicViewerGui::saveDefaultLuaFile(const std::string& filename)
+    void LogicViewerGui::saveDefaultLuaFile()
     {
-        if (!filename.empty())
-        {
-            m_filename = filename;
-        }
         std::error_code ec;
         fs::remove(m_filename, ec);
         if (ec)

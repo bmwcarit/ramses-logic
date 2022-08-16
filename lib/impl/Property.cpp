@@ -7,7 +7,9 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic/Property.h"
+#include "ramses-logic/LogicNode.h"
 #include "impl/PropertyImpl.h"
+#include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
 
 namespace rlogic
@@ -15,6 +17,7 @@ namespace rlogic
     Property::Property(std::unique_ptr<internal::PropertyImpl> impl) noexcept
         : m_impl(std::move(impl))
     {
+        m_impl->setPropertyInstance(*this);
     }
 
     Property::~Property() noexcept = default;
@@ -110,5 +113,41 @@ namespace rlogic
     bool Property::hasOutgoingLink() const
     {
         return m_impl->hasOutgoingLink();
+    }
+
+    std::optional<PropertyLink> Property::getIncomingLink() const
+    {
+        if (!m_impl->hasIncomingLink())
+            return std::nullopt;
+
+        const auto& link = m_impl->getIncomingLink();
+        return PropertyLink{ &link.property->getPropertyInstance(), this, link.isWeakLink };
+    }
+
+    size_t Property::getOutgoingLinksCount() const
+    {
+        return m_impl->hasOutgoingLink() ? m_impl->getOutgoingLinks().size() : 0u;
+    }
+
+    std::optional<PropertyLink> Property::getOutgoingLink(size_t index) const
+    {
+        if (index >= getOutgoingLinksCount())
+        {
+            LOG_ERROR("Failed to get outgoing link: zero-based index #{} exceeds the total count of outgoing links which is {}.", index, getOutgoingLinksCount());
+            return std::nullopt;
+        }
+
+        const auto& link = m_impl->getOutgoingLinks()[index];
+        return PropertyLink{ this, &link.property->getPropertyInstance(), link.isWeakLink };
+    }
+
+    const LogicNode& Property::getOwningLogicNode() const
+    {
+        return *m_impl->getLogicNode().getLogicObject().as<LogicNode>();
+    }
+
+    LogicNode& Property::getOwningLogicNode()
+    {
+        return *m_impl->getLogicNode().getLogicObject().as<LogicNode>();
     }
 }

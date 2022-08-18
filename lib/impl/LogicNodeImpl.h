@@ -22,8 +22,6 @@ namespace rlogic
 
 namespace rlogic::internal
 {
-    class PropertyImpl;
-
     struct LogicNodeRuntimeError { std::string message; };
 
     class LogicNodeImpl : public LogicObjectImpl

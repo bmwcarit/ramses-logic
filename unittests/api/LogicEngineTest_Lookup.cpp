@@ -9,6 +9,18 @@
 #include "LogicEngineTest_Base.h"
 #include "ramses-logic/AnimationNodeConfig.h"
 
+#include "impl/LuaModuleImpl.h"
+#include "impl/LuaScriptImpl.h"
+#include "impl/LuaInterfaceImpl.h"
+#include "impl/RamsesNodeBindingImpl.h"
+#include "impl/RamsesAppearanceBindingImpl.h"
+#include "impl/RamsesCameraBindingImpl.h"
+#include "impl/RamsesRenderPassBindingImpl.h"
+#include "impl/DataArrayImpl.h"
+#include "impl/AnimationNodeImpl.h"
+#include "impl/TimerNodeImpl.h"
+#include "impl/AnchorPointImpl.h"
+
 namespace rlogic
 {
     class ALogicEngine_Lookup : public ALogicEngine
@@ -374,6 +386,72 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesNodeBinding>("binding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesNodeBinding>("Xnodebinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesNodeBinding>("nodebindinY"));
+    }
+
+    TEST_F(ALogicEngine_Lookup, GetHLObjectFromImpl)
+    {
+        auto module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        auto script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        auto rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
+        auto animNode = createAnimationNode(dataArray);
+        auto timer = m_logicEngine.createTimerNode("timerNode");
+        auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
+        auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+
+        EXPECT_EQ(module, &module->m_impl.getLogicObject());
+        EXPECT_EQ(script, &script->m_script.getLogicObject());
+        EXPECT_EQ(nodeBinding, &nodeBinding->m_nodeBinding.getLogicObject());
+        EXPECT_EQ(appearanceBinding, &appearanceBinding->m_appearanceBinding.getLogicObject());
+        EXPECT_EQ(cameraBinding, &cameraBinding->m_cameraBinding.getLogicObject());
+        EXPECT_EQ(rpBinding, &rpBinding->m_renderPassBinding.getLogicObject());
+        EXPECT_EQ(dataArray, &dataArray->m_impl.getLogicObject());
+        EXPECT_EQ(animNode, &animNode->m_animationNodeImpl.getLogicObject());
+        EXPECT_EQ(timer, &timer->m_timerNodeImpl.getLogicObject());
+        EXPECT_EQ(intf, &intf->m_interface.getLogicObject());
+        EXPECT_EQ(anchor, &anchor->m_anchorPointImpl.getLogicObject());
+    }
+
+    TEST_F(ALogicEngine_Lookup, GetHLObjectFromImpl_const)
+    {
+        const auto module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        const auto script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const auto rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
+        const auto animNode = createAnimationNode(dataArray);
+        const auto timer = m_logicEngine.createTimerNode("timerNode");
+        const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
+        const auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+
+        const auto& moduleImpl = module->m_impl;
+        const auto& scriptImpl = script->m_script;
+        const auto& nodeBindingImpl = nodeBinding->m_nodeBinding;
+        const auto& appearanceBindingImpl = appearanceBinding->m_appearanceBinding;
+        const auto& cameraBindingImpl = cameraBinding->m_cameraBinding;
+        const auto& rpBindingImpl = rpBinding->m_renderPassBinding;
+        const auto& dataArrayImpl = dataArray->m_impl;
+        const auto& animNodeImpl = animNode->m_animationNodeImpl;
+        const auto& timerImpl = timer->m_timerNodeImpl;
+        const auto& intfImpl = intf->m_interface;
+        const auto& anchorImpl = anchor->m_anchorPointImpl;
+
+        EXPECT_EQ(module, &moduleImpl.getLogicObject());
+        EXPECT_EQ(script, &scriptImpl.getLogicObject());
+        EXPECT_EQ(nodeBinding, &nodeBindingImpl.getLogicObject());
+        EXPECT_EQ(appearanceBinding, &appearanceBindingImpl.getLogicObject());
+        EXPECT_EQ(cameraBinding, &cameraBindingImpl.getLogicObject());
+        EXPECT_EQ(rpBinding, &rpBindingImpl.getLogicObject());
+        EXPECT_EQ(dataArray, &dataArrayImpl.getLogicObject());
+        EXPECT_EQ(animNode, &animNodeImpl.getLogicObject());
+        EXPECT_EQ(timer, &timerImpl.getLogicObject());
+        EXPECT_EQ(intf, &intfImpl.getLogicObject());
+        EXPECT_EQ(anchor, &anchorImpl.getLogicObject());
     }
 }
 

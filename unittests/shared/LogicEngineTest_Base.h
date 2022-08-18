@@ -37,6 +37,8 @@ namespace rlogic
         explicit ALogicEngineBase(EFeatureLevel featureLevel = EFeatureLevel_01)
             : m_logicEngine{ featureLevel }
         {
+            // make ramses camera valid, needed for anchor points
+            m_camera->setFrustum(-1.f, 1.f, -1.f, 1.f, 0.1f, 1.f);
         }
 
         static LuaConfig CreateDeps(const std::vector<std::pair<std::string_view, const LuaModule*>>& dependencies)

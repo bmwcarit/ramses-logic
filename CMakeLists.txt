@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.13)
 
 set(RLOGIC_VERSION_MAJOR 1)
 set(RLOGIC_VERSION_MINOR 1)
-set(RLOGIC_VERSION_PATCH 0)
+set(RLOGIC_VERSION_PATCH 1)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)
@@ -57,6 +57,7 @@ option(ramses-logic_ENABLE_FLATBUFFERS_GENERATION "Create target to generate fla
 option(ramses-logic_ENABLE_TEST_COVERAGE "Enable test coverage - works on clang only (ON/OFF)" OFF)
 option(ramses-logic_ENABLE_CODE_STYLE "Enable code style checker target (requires python3.6+)" ON)
 option(ramses-logic_USE_CCACHE "Enable ccache for build" OFF)
+option(ramses-logic_USE_IMAGEMAGICK "Enable tests depending on image magick compare" OFF)
 
 if(NOT ramses-logic_BUILD_STATIC_LIB AND NOT ramses-logic_BUILD_SHARED_LIB)
     message(FATAL_ERROR "One of the ramses-logic_BUILD_SHARED_LIB/ramses-logic_BUILD_STATIC_LIB options must be enabled!")

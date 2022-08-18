@@ -19,6 +19,7 @@
 #include "ramses-logic/LuaConfig.h"
 #include "ramses-logic/SaveFileConfig.h"
 #include "ramses-logic/WarningData.h"
+#include "ramses-logic/PropertyLink.h"
 
 #include <vector>
 #include <string_view>
@@ -533,6 +534,18 @@ namespace rlogic
         [[nodiscard]] RLOGIC_API bool isLinked(const LogicNode& logicNode) const;
 
         /**
+         * Collect and retrieve all existing links between properties of logic nodes.
+         * There will be a #rlogic::PropertyLink in the returned container for every existing link created
+         * (using #link or #linkWeak).
+         *
+         * Note that the returned container will not be modified (even if new links are created or unlinked in #LogicEngine)
+         * until #getPropertyLinks is called again.
+         *
+         * @return all existing links between properties of logic nodes.
+         */
+        [[nodiscard]] RLOGIC_API const std::vector<PropertyLink>& getPropertyLinks() const;
+
+        /**
          * Returns the list of all errors which occurred during the last API call to a #LogicEngine method
          * or any other method of its subclasses (scripts, bindings etc). Note that errors get wiped by all
          * mutable methods of the #LogicEngine.
@@ -649,6 +662,17 @@ namespace rlogic
         * @return true if parsing was successful, false otherwise.
         */
         [[nodiscard]] RLOGIC_API static bool GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel);
+
+        /**
+        * Attempts to parse feature level from a Ramses Logic buffer.
+        *
+        * @param[in] logname additional name for errors logging (e.g. Ramses Logic file name)
+        * @param[in] buffer data buffer with Ramses Logic file content
+        * @param[in] bufferSize size of the data buffer
+        * @param[out] detectedFeatureLevel feature level detected in given file (valid only if parsing successful!)
+        * @return true if parsing was successful, false otherwise.
+        */
+        [[nodiscard]] RLOGIC_API static bool GetFeatureLevelFromBuffer(std::string_view logname, const void* buffer, size_t bufferSize, EFeatureLevel& detectedFeatureLevel);
 
         /**
         * Copy Constructor of LogicEngine is deleted because logic engines hold named resources and are not supposed to be copied

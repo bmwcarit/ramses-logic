@@ -583,6 +583,24 @@ namespace rlogic::internal
         return valueChanged;
     }
 
+    void PropertyImpl::setPropertyInstance(Property& property)
+    {
+        assert(m_propertyInstance == nullptr);
+        m_propertyInstance = &property;
+    }
+
+    Property& PropertyImpl::getPropertyInstance()
+    {
+        assert(m_propertyInstance != nullptr);
+        return *m_propertyInstance;
+    }
+
+    const Property& PropertyImpl::getPropertyInstance() const
+    {
+        assert(m_propertyInstance != nullptr);
+        return *m_propertyInstance;
+    }
+
     void PropertyImpl::setLogicNode(LogicNodeImpl& logicNode)
     {
         assert(m_logicNode == nullptr && "Properties are not transferrable across logic nodes!");

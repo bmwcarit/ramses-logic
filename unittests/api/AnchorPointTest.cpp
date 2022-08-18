@@ -75,7 +75,8 @@ namespace rlogic::internal
 
     TEST_F(AnAnchorPoint, ProducesErrorOnUpdateIfCameraNotInitialized)
     {
-        m_logicEngine.createAnchorPoint(m_nodeBinding, m_cameraBinding, "anchor");
+        const auto uninitializedCamera = m_scene->createOrthographicCamera();
+        m_logicEngine.createAnchorPoint(m_nodeBinding, *m_logicEngine.createRamsesCameraBinding(*uninitializedCamera), "anchor");
         EXPECT_FALSE(m_logicEngine.update());
         ASSERT_EQ(1u, m_logicEngine.getErrors().size());
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Failed to retrieve projection matrix from Ramses camera!");

@@ -57,6 +57,7 @@
 #include "fmt/format.h"
 #include "TypeUtils.h"
 #include "ValidationResults.h"
+#include <deque>
 
 namespace rlogic::internal
 {
@@ -546,11 +547,12 @@ namespace rlogic::internal
     void ApiObjects::registerLogicObject(std::unique_ptr<LogicObject> obj)
     {
         m_logicObjects.push_back(obj.get());
+        obj->m_impl->setLogicObject(*obj);
+
         auto logicNode = dynamic_cast<LogicNode*>(obj.get());
         if (logicNode)
-        {
             registerLogicNode(*logicNode);
-        }
+
         m_logicObjectIdMapping.emplace(obj->getId(), obj.get());
         m_objectsOwningContainer.push_back(move(obj));
     }
@@ -565,9 +567,8 @@ namespace rlogic::internal
 
         auto logicNode = dynamic_cast<LogicNode*>(&objToDelete);
         if (logicNode)
-        {
             unregisterLogicNode(*logicNode);
-        }
+
         m_logicObjectIdMapping.erase(objToDelete.getId());
         m_objectsOwningContainer.erase(findOwnedObj);
         m_logicObjects.erase(findLogicNode);
@@ -851,37 +852,15 @@ namespace rlogic::internal
         assert(featureLevel >= EFeatureLevel_02 || anchorPoints.empty());
 
         // links must go last due to dependency on serialized properties
+        const auto collectedLinks = apiObjects.collectPropertyLinks();
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
-
-        std::function<void(const Property& input)> serializeLinks = [&serializeLinks, &links, &serializationMap, &builder](const Property& input){
-            const auto inputCount = input.getChildCount();
-            for (size_t i = 0; i < inputCount; ++i)
-            {
-                const auto child = input.getChild(i);
-
-                if (TypeUtils::CanHaveChildren(child->getType()))
-                {
-                    serializeLinks(*child);
-                }
-                else
-                {
-                    assert(TypeUtils::IsPrimitiveType(child->getType()));
-                    const auto& incomingLink = child->m_impl->getIncomingLink();
-                    if (incomingLink.property != nullptr)
-                    {
-                        links.emplace_back(rlogic_serialization::CreateLink(builder,
-                            serializationMap.resolvePropertyOffset(*incomingLink.property),
-                            serializationMap.resolvePropertyOffset(*child->m_impl),
-                            incomingLink.isWeakLink));
-                    }
-                }
-            }
-        };
-
-        for (const auto& item : apiObjects.m_reverseImplMapping)
+        links.reserve(collectedLinks.size());
+        for (const auto& link : collectedLinks)
         {
-            if (item.first->getInputs())
-                serializeLinks(*item.first->getInputs());
+            links.push_back(rlogic_serialization::CreateLink(builder,
+                serializationMap.resolvePropertyOffset(*link.source->m_impl),
+                serializationMap.resolvePropertyOffset(*link.target->m_impl),
+                link.isWeakLink));
         }
 
         const auto fbModules = builder.CreateVector(luaModules);
@@ -1313,6 +1292,45 @@ namespace rlogic::internal
     int ApiObjects::getNumElementsInLuaStack() const
     {
         return m_solState->getNumElementsInLuaStack();
+    }
+
+    const std::vector<PropertyLink>& ApiObjects::getAllPropertyLinks() const
+    {
+        m_collectedLinks = collectPropertyLinks();
+        return m_collectedLinks;
+    }
+
+    std::vector<PropertyLink> ApiObjects::collectPropertyLinks() const
+    {
+        std::vector<PropertyLink> links;
+
+        std::deque<const Property*> propsStack;
+        for (const auto& obj : m_logicObjects)
+        {
+            const auto logicNode = obj->as<LogicNode>();
+            if (!logicNode)
+                continue;
+
+            propsStack.clear();
+            propsStack.push_back(logicNode->getInputs());
+            propsStack.push_back(logicNode->getOutputs());
+            while (!propsStack.empty())
+            {
+                const auto prop = propsStack.back();
+                propsStack.pop_back();
+                if (prop == nullptr)
+                    continue;
+
+                const auto incomingLink = prop->getIncomingLink();
+                if (incomingLink)
+                    links.push_back(*incomingLink);
+
+                for (size_t i = 0u; i < prop->getChildCount(); ++i)
+                    propsStack.push_back(prop->getChild(i));
+            }
+        }
+
+        return links;
     }
 
     template DataArray* ApiObjects::createDataArray<float>(const std::vector<float>&, std::string_view);

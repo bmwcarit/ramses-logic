@@ -217,6 +217,11 @@ namespace rlogic
         return internal::LogicEngineImpl::GetFeatureLevelFromFile(filename, detectedFeatureLevel);
     }
 
+    bool LogicEngine::GetFeatureLevelFromBuffer(std::string_view logname, const void* buffer, size_t bufferSize, EFeatureLevel& detectedFeatureLevel)
+    {
+        return internal::LogicEngineImpl::GetFeatureLevelFromBuffer(logname, buffer, bufferSize, detectedFeatureLevel);
+    }
+
     bool LogicEngine::saveToFile(std::string_view filename, const SaveFileConfig& config)
     {
         return m_impl->saveToFile(filename, *config.m_impl);
@@ -240,6 +245,11 @@ namespace rlogic
     bool LogicEngine::isLinked(const LogicNode& logicNode) const
     {
         return m_impl->isLinked(logicNode);
+    }
+
+    const std::vector<PropertyLink>& LogicEngine::getPropertyLinks() const
+    {
+        return m_impl->getApiObjects().getAllPropertyLinks();
     }
 
     template RLOGIC_API Collection<LogicObject>             LogicEngine::getLogicObjectsInternal<LogicObject>() const;

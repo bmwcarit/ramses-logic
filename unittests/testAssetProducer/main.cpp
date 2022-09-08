@@ -14,6 +14,8 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesRenderGroupBindingElements.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/AnimationNodeConfig.h"
@@ -83,7 +85,7 @@ int main(int argc, char* argv[])
     }
 
     if (args.size() > 4u ||
-        (featureLevel != rlogic::EFeatureLevel_01 && featureLevel != rlogic::EFeatureLevel_02))
+        (featureLevel != rlogic::EFeatureLevel_01 && featureLevel != rlogic::EFeatureLevel_02 && featureLevel != rlogic::EFeatureLevel_03))
     {
         std::cerr
             << "Generator of ramses and ramses logic test content.\n\n"
@@ -205,6 +207,11 @@ int main(int argc, char* argv[])
     ramses::Appearance* appearance = { createTestAppearance(*scene) };
     ramses::RenderPass* renderPass = scene->createRenderPass();
     ramses::PerspectiveCamera* cameraPersp = { scene->createPerspectiveCamera("test persp camera") };
+    auto renderGroup = scene->createRenderGroup();
+    const auto nestedRenderGroup = scene->createRenderGroup();
+    const auto meshNode = scene->createMeshNode();
+    renderGroup->addMeshNode(*meshNode);
+    renderGroup->addRenderGroup(*nestedRenderGroup);
 
     rlogic::RamsesNodeBinding* nodeBinding = logicEngine.createRamsesNodeBinding(*node, rlogic::ERotationType::Euler_XYZ, "nodebinding");
     rlogic::RamsesCameraBinding* camBindingOrtho = logicEngine.createRamsesCameraBinding(*cameraOrtho, "camerabinding");
@@ -215,6 +222,14 @@ int main(int argc, char* argv[])
         logicEngine.createRamsesRenderPassBinding(*renderPass, "renderpassbinding");
         logicEngine.createAnchorPoint(*nodeBinding, *camBindingOrtho, "anchorpoint");
         logicEngine.createRamsesCameraBindingWithFrustumPlanes(*cameraPersp, "camerabindingPerspWithFrustumPlanes");
+    }
+
+    if (featureLevel >= rlogic::EFeatureLevel_03)
+    {
+        rlogic::RamsesRenderGroupBindingElements elements;
+        elements.addElement(*meshNode, "mesh");
+        elements.addElement(*nestedRenderGroup, "nestedRenderGroup");
+        logicEngine.createRamsesRenderGroupBinding(*renderGroup, elements, "rendergroupbinding");
     }
 
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
@@ -243,7 +258,10 @@ int main(int argc, char* argv[])
     if (!logicEngine.update())
         return 1;
 
-    logicEngine.saveToFile(basePath + "/" + logicFilename);
+    rlogic::SaveFileConfig noValidationConfig;
+    noValidationConfig.setValidationEnabled(false);
+    logicEngine.saveToFile(basePath + "/" + logicFilename, noValidationConfig);
+
     scene->saveToFile((basePath +  "/" + ramsesFilename).c_str(), false);
 
     return 0;

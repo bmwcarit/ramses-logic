@@ -12,6 +12,7 @@
 #include "generated/LuaInterfaceGen.h"
 #include "generated/PropertyGen.h"
 #include "generated/RamsesRenderPassBindingGen.h"
+#include "generated/RamsesRenderGroupBindingGen.h"
 
 namespace rlogic::internal
 {
@@ -93,6 +94,14 @@ namespace rlogic::internal
         flatbuffers::Offset<rlogic_serialization::RamsesRenderPassBinding> serializeTestRenderPassBindingWithError()
         {
             return rlogic_serialization::CreateRamsesRenderPassBinding(
+                m_builder,
+                0 // no base -> causes errors
+            );
+        }
+
+        flatbuffers::Offset<rlogic_serialization::RamsesRenderGroupBinding> serializeTestRenderGroupBindingWithError()
+        {
+            return rlogic_serialization::CreateRamsesRenderGroupBinding(
                 m_builder,
                 0 // no base -> causes errors
             );

@@ -37,15 +37,15 @@ public:
 class OffscreenSetup : public ISceneSetup
 {
 public:
-    OffscreenSetup(rlogic::ImguiClientHelper& imguiHelper, ramses::RamsesRenderer* renderer, ramses::Scene* scene, ramses::displayId_t display, uint32_t width, uint32_t height)
+    OffscreenSetup(rlogic::ImguiClientHelper& imguiHelper, ramses::RamsesRenderer& renderer, ramses::Scene* scene, ramses::displayId_t display, uint32_t width, uint32_t height)
         : m_imguiHelper(imguiHelper)
-        , m_sceneControl(renderer->getSceneControlAPI())
+        , m_sceneControl(renderer.getSceneControlAPI())
         , m_scene(scene)
         , m_width(width)
         , m_height(height)
     {
-        m_ob = renderer->createOffscreenBuffer(display, width, height);
-        renderer->flush();
+        m_ob = renderer.createOffscreenBuffer(display, width, height);
+        renderer.flush();
 
         static const std::array<uint8_t, 4> imgbuf = {255, 255, 255, 255};
         ramses::MipLevelData mipLevelData(4, imgbuf.data());
@@ -119,9 +119,9 @@ private:
 class FramebufferSetup : public ISceneSetup
 {
 public:
-    FramebufferSetup(rlogic::ImguiClientHelper& imguiHelper, ramses::RamsesRenderer* renderer, ramses::Scene* scene, ramses::displayId_t display)
+    FramebufferSetup(rlogic::ImguiClientHelper& imguiHelper, ramses::RamsesRenderer& renderer, ramses::Scene* scene, ramses::displayId_t display)
         : m_imguiHelper(imguiHelper)
-        , m_sceneControl(renderer->getSceneControlAPI())
+        , m_sceneControl(renderer.getSceneControlAPI())
         , m_scene(scene)
     {
         const auto guiSceneId = imguiHelper.getScene()->getSceneId();

@@ -180,11 +180,11 @@ namespace rlogic::internal
         auto module1 = logic.createLuaModule(m_moduleSourceCode, {}, "mymodule1");
         auto module2 = logic.createLuaModule(m_moduleSourceCode, {}, "mymodule2");
 
-        auto serOffset1 = LuaModuleImpl::Serialize(module1->m_impl, m_flatBufferBuilder, GetParam(), serializationMap);
+        auto serOffset1 = LuaModuleImpl::Serialize(module1->m_impl, m_flatBufferBuilder, serializationMap, GetParam());
         m_flatBufferBuilder.Finish(serOffset1);
         const auto& serialized1 = *flatbuffers::GetRoot<rlogic_serialization::LuaModule>(m_flatBufferBuilder.GetBufferPointer());
 
-        auto serOffset2 = LuaModuleImpl::Serialize(module2->m_impl, m_flatBufferBuilder, GetParam(), serializationMap);
+        auto serOffset2 = LuaModuleImpl::Serialize(module2->m_impl, m_flatBufferBuilder, serializationMap, GetParam());
         m_flatBufferBuilder.Finish(serOffset2);
         const auto& serialized2 = *flatbuffers::GetRoot<rlogic_serialization::LuaModule>(m_flatBufferBuilder.GetBufferPointer());
 

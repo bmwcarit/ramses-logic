@@ -57,3 +57,5 @@ add_example(NAME 10_globals               FILES 10_globals/main.cpp             
 add_example(NAME 11_interfaces            FILES 11_interfaces/main.cpp            MAKE_TEST)
 # Can't execute as test - it is essentially animation with loop which blocks test automation and wastes resources
 add_example(NAME 12_anchor_point          FILES 12_anchor_point/main.cpp)
+# Can't execute ramses runtime example as test - it has a loop which blocks test automation and wastes resources
+add_example(NAME 13_render_order          FILES 13_render_order/main.cpp)

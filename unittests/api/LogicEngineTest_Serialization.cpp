@@ -62,15 +62,29 @@ namespace rlogic::internal
         static std::vector<char> CreateTestBuffer(const SaveFileConfig& config = {})
         {
             LogicEngine logicEngineForSaving{ GetParam() };
-            logicEngineForSaving.createLuaScript(R"(
+
+            const std::string src = R"(
                 function interface(IN,OUT)
                     IN.param = Type:Int32()
+                    OUT.param2 = Type:Int32()
                 end
                 function run(IN,OUT)
                 end
-            )", {}, "luascript");
+            )";
 
-            logicEngineForSaving.saveToFile("tempfile.bin", config);
+            // Create simple (and compact) valid setup, where two (identical) scripts are created
+            // and their inputs and outputs are cross linked, so that none of the scripts
+            // generate a warning for having unlinked inputs or outputs
+
+            auto* script1 = logicEngineForSaving.createLuaScript(src, {}, "luascript");
+            auto* script2 = logicEngineForSaving.createLuaScript(src, {}, "luascript2");
+
+            //link output of 1st script to input of 2nd script
+            logicEngineForSaving.link(*script1->getOutputs()->getChild("param2"), *script2->getInputs()->getChild("param"));
+            //link output of 2nd script to input of 1st script, use weak link to avoid circular dependancy
+            logicEngineForSaving.linkWeak(*script2->getOutputs()->getChild("param2"), *script1->getInputs()->getChild("param"));
+
+            EXPECT_TRUE(logicEngineForSaving.saveToFile("tempfile.bin", config));
 
             return *FileUtils::LoadBinary("tempfile.bin");
         }
@@ -103,9 +117,13 @@ namespace rlogic::internal
                 logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpBinding");
                 logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
             }
+            if (GetParam() >= EFeatureLevel_03)
+            {
+                createRenderGroupBinding(logicEngine);
+            }
 
             EXPECT_TRUE(logicEngine.update());
-            logicEngine.saveToFile("LogicEngine.bin");
+            EXPECT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
 
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
             EXPECT_TRUE(m_logicEngine.getErrors().empty());
@@ -115,6 +133,10 @@ namespace rlogic::internal
             {
                 names.emplace_back("rpBinding");
                 names.emplace_back("anchor");
+            }
+            if (GetParam() >= EFeatureLevel_03)
+            {
+                names.emplace_back("renderGroupBinding");
             }
 
             std::vector<LogicObject*> objects;
@@ -385,7 +407,7 @@ namespace rlogic::internal
     {
         {
             LogicEngine logicEngine{ GetParam() };
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(logicEngine.saveToFile("LogicEngine.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
@@ -398,7 +420,8 @@ namespace rlogic::internal
         {
             LogicEngine logicEngine{ GetParam() };
             logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "binding");
-            logicEngine.saveToFile("LogicEngine.bin");
+
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
@@ -423,7 +446,7 @@ namespace rlogic::internal
                 end
             )", {}, "luascript");
 
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
@@ -454,13 +477,15 @@ namespace rlogic::internal
         // Set a value and save -> causes warning
         nodeBinding->getInputs()->getChild("visibility")->set<bool>(false);
         ASSERT_TRUE(nodeBinding->m_impl.isDirty());
-        m_logicEngine.saveToFile("LogicEngine.bin");
+        ASSERT_FALSE(m_logicEngine.saveToFile("LogicEngine.bin"));
 
-        ASSERT_EQ(2u, messages.size());
+        ASSERT_EQ(3u, messages.size());
         EXPECT_EQ("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", messages[0]);
-        EXPECT_EQ("Failed to saveToFile() because validation warnings were encountered! Refer to the documentation of saveToFile() for details how to address these gracefully.", messages[1]);
+        EXPECT_EQ("[binding [Id=1]] Node [binding] has no ingoing links! Node should be deleted or properly linked!", messages[1]);
+        EXPECT_EQ("Failed to saveToFile() because validation warnings were encountered! Refer to the documentation of saveToFile() for details how to address these gracefully.", messages[2]);
         EXPECT_EQ(ELogMessageType::Warn, messageTypes[0]);
-        EXPECT_EQ(ELogMessageType::Error, messageTypes[1]);
+        EXPECT_EQ(ELogMessageType::Warn, messageTypes[1]);
+        EXPECT_EQ(ELogMessageType::Error, messageTypes[2]);
 
         // Unset custom log handler
         Logger::SetLogHandler([](ELogMessageType msgType, std::string_view message) {
@@ -532,6 +557,39 @@ namespace rlogic::internal
         EXPECT_EQ(nullptr, m_logicEngine.getErrors()[1].object);
     }
 
+    TEST_P(ALogicEngine_Serialization, RefusesToSaveTwoRenderGroupBindingsWhichPointToDifferentScenes)
+    {
+        if (GetParam() < EFeatureLevel_03)
+            GTEST_SKIP();
+
+        RamsesTestSetup testSetup;
+        ramses::Scene* scene1 = testSetup.createScene(ramses::sceneId_t(1));
+        ramses::Scene* scene2 = testSetup.createScene(ramses::sceneId_t(2));
+
+        const auto meshNode1 = scene1->createMeshNode();
+        auto* rg1 = scene1->createRenderGroup("rg1");
+        rg1->addMeshNode(*meshNode1);
+
+        const auto meshNode2 = scene2->createMeshNode();
+        auto* rg2 = scene2->createRenderGroup("rg2");
+        rg2->addMeshNode(*meshNode2);
+
+        RamsesRenderGroupBindingElements elements1;
+        EXPECT_TRUE(elements1.addElement(*meshNode1, "mesh"));
+        m_logicEngine.createRamsesRenderGroupBinding(*rg1, elements1, "binding1");
+
+        RamsesRenderGroupBindingElements elements2;
+        EXPECT_TRUE(elements2.addElement(*meshNode2, "mesh"));
+        const auto binding2 = m_logicEngine.createRamsesRenderGroupBinding(*rg2, elements2, "binding2");
+
+        EXPECT_FALSE(m_logicEngine.saveToFile("will_not_be_written.logic"));
+        ASSERT_EQ(2u, m_logicEngine.getErrors().size());
+        EXPECT_EQ("Ramses render group 'rg2' is from scene with id:2 but other objects are from scene with id:1!", m_logicEngine.getErrors()[0].message);
+        EXPECT_EQ(binding2, m_logicEngine.getErrors()[0].object);
+        EXPECT_EQ("Can't save a logic engine to file while it has references to more than one Ramses scene!", m_logicEngine.getErrors()[1].message);
+        EXPECT_EQ(nullptr, m_logicEngine.getErrors()[1].object);
+    }
+
     TEST_P(ALogicEngine_Serialization, RefusesToSaveAppearanceBindingWhichIsFromDifferentSceneThanNodeBinding)
     {
         ramses::Scene* scene2 = m_ramses.createScene(ramses::sceneId_t(2));
@@ -574,8 +632,10 @@ namespace rlogic::internal
             logicEngine.createAnimationNode(config, "animNode");
             if (GetParam() >= EFeatureLevel_02)
                 logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+            if (GetParam() >= EFeatureLevel_03)
+                createRenderGroupBinding(logicEngine);
 
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
@@ -661,6 +721,18 @@ namespace rlogic::internal
                 EXPECT_EQ(4u, inputs->getChildCount());
                 EXPECT_FALSE(rpBindingByName->m_impl.isDirty());
             }
+            if (GetParam() >= EFeatureLevel_03)
+            {
+                auto rgBindingByName = m_logicEngine.findByName<RamsesRenderGroupBinding>("renderGroupBinding");
+                auto rgBindingById = m_logicEngine.findLogicObjectById(9u);
+                ASSERT_NE(nullptr, rgBindingByName);
+                ASSERT_EQ(rgBindingById, rgBindingByName);
+                const auto inputs = rgBindingByName->getInputs();
+                ASSERT_NE(nullptr, inputs);
+                EXPECT_EQ(1u, inputs->getChildCount());
+                EXPECT_EQ(1u, inputs->getChild("renderOrders")->getChildCount());
+                EXPECT_FALSE(rgBindingByName->m_impl.isDirty());
+            }
         }
     }
 
@@ -677,7 +749,7 @@ namespace rlogic::internal
             )", {}, "luascript");
 
             logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "binding");
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
         {
             m_logicEngine.createLuaScript(R"(
@@ -732,7 +804,7 @@ namespace rlogic::internal
             EXPECT_TRUE(logicEngine.link(*srcOutput1, *tgtInput1));
             EXPECT_TRUE(logicEngine.linkWeak(*srcOutput2, *tgtInput2));
 
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
@@ -795,7 +867,7 @@ namespace rlogic::internal
         auto targetScript = m_logicEngine.createLuaScript(scriptSource, {}, "TargetScript");
 
         // Save logic engine state without links to file
-        m_logicEngine.saveToFile("LogicEngine.bin");
+        ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "LogicEngine.bin"));
 
         // Create link (should be wiped after loading from file)
         auto output = sourceScript->getOutputs()->getChild("output");
@@ -849,7 +921,7 @@ namespace rlogic::internal
             config.addDependency("mymath", *mymath);
             logicEngineForSaving.createLuaScript(script, config, "script");
 
-            logicEngineForSaving.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngineForSaving, "LogicEngine.bin"));
         }
 
         // Create a module with name colliding with the one from file - it should be deleted
@@ -865,7 +937,7 @@ namespace rlogic::internal
         LuaModule* moduleToBeWiped = m_logicEngine.createLuaModule(moduleToBeWipedSrc, {}, "mymath");
         EXPECT_NE(nullptr, moduleToBeWiped);
 
-        EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
+        ASSERT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
 
         m_logicEngine.update();
 
@@ -889,7 +961,7 @@ namespace rlogic::internal
             )", {}, "luascript");
             serializedId = script->getId();
 
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin"));
@@ -944,8 +1016,13 @@ namespace rlogic::internal
                 auto* anchor = logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
                 EXPECT_TRUE(anchor->setUserId(21u, 22u));
             }
+            if (GetParam() >= EFeatureLevel_03)
+            {
+                auto* rgBinding = createRenderGroupBinding(logicEngine);
+                EXPECT_TRUE(rgBinding->setUserId(23u, 24u));
+            }
 
-            logicEngine.saveToFile("LogicEngine.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(logicEngine, "LogicEngine.bin"));
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("LogicEngine.bin", m_scene));
@@ -1008,6 +1085,14 @@ namespace rlogic::internal
             EXPECT_EQ(21u, obj->getUserId().first);
             EXPECT_EQ(22u, obj->getUserId().second);
         }
+
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            obj = m_logicEngine.findByName<LogicObject>("renderGroupBinding");
+            ASSERT_NE(nullptr, obj);
+            EXPECT_EQ(23u, obj->getUserId().first);
+            EXPECT_EQ(24u, obj->getUserId().second);
+        }
     }
 
     TEST_P(ALogicEngine_Serialization, persistsLogicObjectImplToHLObjectMapping)
@@ -1051,9 +1136,13 @@ namespace rlogic::internal
         {
             EXPECT_EQ(33, propsCount);
         }
-        else
+        else if(GetParam() < EFeatureLevel_03)
         {
             EXPECT_EQ(42, propsCount);
+        }
+        else
+        {
+            EXPECT_EQ(45, propsCount);
         }
     }
 
@@ -1089,9 +1178,35 @@ namespace rlogic::internal
         {
             EXPECT_EQ(33, propsCount);
         }
-        else
+        else if (GetParam() < EFeatureLevel_03)
         {
             EXPECT_EQ(42, propsCount);
         }
+        else
+        {
+            EXPECT_EQ(45, propsCount);
+        }
+    }
+
+    TEST_P(ALogicEngine_Serialization, checksSerializedSize)
+    {
+        LogicEngine logicEngine{ GetParam() };
+        auto emptySize = logicEngine.getTotalSerializedSize();
+        EXPECT_EQ(emptySize, m_emptySerializedSizeTotal);
+        EXPECT_EQ(logicEngine.getSerializedSize<AnchorPoint>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<AnimationNode>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<LuaInterface>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<LuaModule>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<LuaScript>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<RamsesAppearanceBinding>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<RamsesCameraBinding>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<RamsesNodeBinding>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<RamsesRenderPassBinding>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<RamsesRenderGroupBinding>(), 0u);
+        EXPECT_EQ(logicEngine.getSerializedSize<TimerNode>(), 0u);
+
+        logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        auto size = logicEngine.getTotalSerializedSize();
+        EXPECT_GT(size, 0u);
     }
 }

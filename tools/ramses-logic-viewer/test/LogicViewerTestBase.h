@@ -19,6 +19,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/AnchorPoint.h"
@@ -131,13 +132,15 @@ namespace rlogic::internal
 
     protected:
         WithTempDirectory m_withTempDirectory;
-        LogicViewer viewer{ EFeatureLevel_02, doScreenshot };
+        LogicViewer viewer{ EFeatureLevel_03, doScreenshot };
         RamsesTestSetup m_ramses;
         ramses::Scene* m_scene = { m_ramses.createScene() };
         ramses::Node* m_node = { m_scene->createNode() };
         ramses::OrthographicCamera* m_camera = { m_scene->createOrthographicCamera() };
         ramses::Appearance* m_appearance = { &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene) };
         ramses::RenderPass* m_renderPass = { m_scene->createRenderPass() };
+        ramses::RenderGroup* m_renderGroup = { m_scene->createRenderGroup() };
+        ramses::RenderGroup* m_nestedRenderGroup = { m_scene->createRenderGroup() };
 
     private:
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables) must be static and non-const (see SetMockScreenshot)

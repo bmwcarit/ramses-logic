@@ -14,6 +14,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
@@ -66,33 +67,35 @@ namespace rlogic
         return m_impl->setName(name);
     }
 
-    template RLOGIC_API const LogicObject*             LogicObject::internalCast() const;
-    template RLOGIC_API const LogicNode*               LogicObject::internalCast() const;
-    template RLOGIC_API const RamsesBinding*           LogicObject::internalCast() const;
-    template RLOGIC_API const LuaModule*               LogicObject::internalCast() const;
-    template RLOGIC_API const LuaScript*               LogicObject::internalCast() const;
-    template RLOGIC_API const LuaInterface*            LogicObject::internalCast() const;
-    template RLOGIC_API const RamsesNodeBinding*       LogicObject::internalCast() const;
-    template RLOGIC_API const RamsesAppearanceBinding* LogicObject::internalCast() const;
-    template RLOGIC_API const RamsesCameraBinding*     LogicObject::internalCast() const;
-    template RLOGIC_API const RamsesRenderPassBinding* LogicObject::internalCast() const;
-    template RLOGIC_API const DataArray*               LogicObject::internalCast() const;
-    template RLOGIC_API const AnimationNode*           LogicObject::internalCast() const;
-    template RLOGIC_API const TimerNode*               LogicObject::internalCast() const;
-    template RLOGIC_API const AnchorPoint*             LogicObject::internalCast() const;
+    template RLOGIC_API const LogicObject*              LogicObject::internalCast() const;
+    template RLOGIC_API const LogicNode*                LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesBinding*            LogicObject::internalCast() const;
+    template RLOGIC_API const LuaModule*                LogicObject::internalCast() const;
+    template RLOGIC_API const LuaScript*                LogicObject::internalCast() const;
+    template RLOGIC_API const LuaInterface*             LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesNodeBinding*        LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesAppearanceBinding*  LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesCameraBinding*      LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesRenderPassBinding*  LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesRenderGroupBinding* LogicObject::internalCast() const;
+    template RLOGIC_API const DataArray*                LogicObject::internalCast() const;
+    template RLOGIC_API const AnimationNode*            LogicObject::internalCast() const;
+    template RLOGIC_API const TimerNode*                LogicObject::internalCast() const;
+    template RLOGIC_API const AnchorPoint*              LogicObject::internalCast() const;
 
-    template RLOGIC_API LogicObject*             LogicObject::internalCast();
-    template RLOGIC_API LogicNode*               LogicObject::internalCast();
-    template RLOGIC_API RamsesBinding*           LogicObject::internalCast();
-    template RLOGIC_API LuaModule*               LogicObject::internalCast();
-    template RLOGIC_API LuaScript*               LogicObject::internalCast();
-    template RLOGIC_API LuaInterface*            LogicObject::internalCast();
-    template RLOGIC_API RamsesNodeBinding*       LogicObject::internalCast();
-    template RLOGIC_API RamsesAppearanceBinding* LogicObject::internalCast();
-    template RLOGIC_API RamsesCameraBinding*     LogicObject::internalCast();
-    template RLOGIC_API RamsesRenderPassBinding* LogicObject::internalCast();
-    template RLOGIC_API DataArray*               LogicObject::internalCast();
-    template RLOGIC_API AnimationNode*           LogicObject::internalCast();
-    template RLOGIC_API TimerNode*               LogicObject::internalCast();
-    template RLOGIC_API AnchorPoint*             LogicObject::internalCast();
+    template RLOGIC_API LogicObject*              LogicObject::internalCast();
+    template RLOGIC_API LogicNode*                LogicObject::internalCast();
+    template RLOGIC_API RamsesBinding*            LogicObject::internalCast();
+    template RLOGIC_API LuaModule*                LogicObject::internalCast();
+    template RLOGIC_API LuaScript*                LogicObject::internalCast();
+    template RLOGIC_API LuaInterface*             LogicObject::internalCast();
+    template RLOGIC_API RamsesNodeBinding*        LogicObject::internalCast();
+    template RLOGIC_API RamsesAppearanceBinding*  LogicObject::internalCast();
+    template RLOGIC_API RamsesCameraBinding*      LogicObject::internalCast();
+    template RLOGIC_API RamsesRenderPassBinding*  LogicObject::internalCast();
+    template RLOGIC_API RamsesRenderGroupBinding* LogicObject::internalCast();
+    template RLOGIC_API DataArray*                LogicObject::internalCast();
+    template RLOGIC_API AnimationNode*            LogicObject::internalCast();
+    template RLOGIC_API TimerNode*                LogicObject::internalCast();
+    template RLOGIC_API AnchorPoint*              LogicObject::internalCast();
 }

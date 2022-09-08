@@ -12,6 +12,7 @@
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/LogicEngineReport.h"
+#include "internals/ApiObjects.h"
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
 #include "internals/ValidationResults.h"
@@ -33,6 +34,7 @@ namespace ramses
     class Appearance;
     class Camera;
     class RenderPass;
+    class RenderGroup;
 }
 
 namespace rlogic
@@ -41,6 +43,8 @@ namespace rlogic
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
     class RamsesRenderPassBinding;
+    class RamsesRenderGroupBinding;
+    class RamsesRenderGroupBindingElements;
     class DataArray;
     class AnimationNode;
     class AnimationNodeConfig;
@@ -92,6 +96,7 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, std::string_view name);
         RamsesCameraBinding* createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name);
         RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name);
+        RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationNodeConfig& config, std::string_view name);
@@ -130,6 +135,11 @@ namespace rlogic::internal
         void setStatisticsLoggingRate(size_t loggingRate);
         void setStatisticsLogLevel(ELogMessageType logLevel);
 
+        [[nodiscard]] size_t getTotalSerializedSize() const;
+
+        template<typename T>
+        [[nodiscard]] size_t getSerializedSize() const;
+
     private:
         size_t activateLinksRecursive(PropertyImpl& output);
         void setNodeToBeAlwaysUpdatedDirty();
@@ -156,4 +166,10 @@ namespace rlogic::internal
 
         EFeatureLevel m_featureLevel;
     };
+
+    template<typename T>
+    size_t LogicEngineImpl::getSerializedSize() const
+    {
+        return m_apiObjects->getSerializedSize<T>();
+    }
 }

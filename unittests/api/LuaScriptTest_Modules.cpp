@@ -676,7 +676,9 @@ namespace rlogic::internal
                 end
             )", config2, "script2");
 
-            EXPECT_TRUE(logic.saveToFile("scriptmodules.tmp"));
+            SaveFileConfig configNoValidation;
+            configNoValidation.setValidationEnabled(false);
+            EXPECT_TRUE(logic.saveToFile("scriptmodules.tmp", configNoValidation));
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("scriptmodules.tmp"));
@@ -852,7 +854,10 @@ namespace rlogic::internal
             ASSERT_NE(nullptr, script);
 
             EXPECT_TRUE(otherLogicEngine.update());
-            ASSERT_TRUE(otherLogicEngine.saveToFile("moduleWithInterface.bin"));
+
+            SaveFileConfig configNoValidation;
+            configNoValidation.setValidationEnabled(false);
+            ASSERT_TRUE(otherLogicEngine.saveToFile("moduleWithInterface.bin", configNoValidation));
         }
 
         m_logicEngine.loadFromFile("moduleWithInterface.bin");

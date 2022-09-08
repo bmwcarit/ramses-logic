@@ -30,6 +30,8 @@ namespace rlogic
         bool luaPreferObjectIds   = false;
         bool luaPreferIdentifiers = false;
 
+        bool showDisplaySettings = false;
+
         LogicViewerSettings();
 
         static void* IniReadOpen(ImGuiContext* context, ImGuiSettingsHandler* handler, const char* name);

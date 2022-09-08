@@ -21,6 +21,8 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesRenderGroupBindingElements.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
@@ -39,6 +41,8 @@ namespace rlogic
         {
             // make ramses camera valid, needed for anchor points
             m_camera->setFrustum(-1.f, 1.f, -1.f, 1.f, 0.1f, 1.f);
+            m_renderGroup->addMeshNode(*m_meshNode);
+            m_saveFileConfigNoValidation.setValidationEnabled(false);
         }
 
         static LuaConfig CreateDeps(const std::vector<std::pair<std::string_view, const LuaModule*>>& dependencies)
@@ -62,15 +66,24 @@ namespace rlogic
             return config;
         }
 
+        static bool SaveToFileWithoutValidation(LogicEngine& logicEngine, std::string_view filename)
+        {
+            SaveFileConfig configNoValidation;
+            configNoValidation.setValidationEnabled(false);
+            return logicEngine.saveToFile(filename, configNoValidation);
+        }
 
     protected:
         LogicEngine m_logicEngine;
+        SaveFileConfig m_saveFileConfigNoValidation;
         RamsesTestSetup m_ramses;
         ramses::Scene* m_scene = { m_ramses.createScene() };
         ramses::Node* m_node = { m_scene->createNode() };
         ramses::OrthographicCamera* m_camera = { m_scene->createOrthographicCamera() };
         ramses::Appearance* m_appearance = { &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene) };
         ramses::RenderPass* m_renderPass = { m_scene->createRenderPass() };
+        ramses::RenderGroup* m_renderGroup = { m_scene->createRenderGroup() };
+        ramses::MeshNode* m_meshNode = { m_scene->createMeshNode("meshNode") };
 
         const std::string_view m_valid_empty_script = R"(
             function interface(IN,OUT)
@@ -92,7 +105,7 @@ namespace rlogic
 
         const std::string_view m_interfaceSourceCode = R"(
             function interface(inout_params)
-                inout_params.translation_x = Type:Int32()
+                inout_params.param_vec3f = Type:Vec3f()
             end
         )";
 
@@ -106,7 +119,23 @@ namespace rlogic
             m_camera = m_scene->createOrthographicCamera();
             m_appearance = &RamsesTestSetup::CreateTrivialTestAppearance(*m_scene);
             m_renderPass = m_scene->createRenderPass();
+            m_renderGroup = m_scene->createRenderGroup();
+            m_meshNode = m_scene->createMeshNode();
         }
+
+        RamsesRenderGroupBinding* createRenderGroupBinding(LogicEngine& logicEngine)
+        {
+            RamsesRenderGroupBindingElements elements;
+            EXPECT_TRUE(elements.addElement(*m_meshNode, "mesh"));
+            return logicEngine.createRamsesRenderGroupBinding(*m_renderGroup, elements, "renderGroupBinding");
+        }
+
+        RamsesRenderGroupBinding* createRenderGroupBinding()
+        {
+            return createRenderGroupBinding(m_logicEngine);
+        }
+
+        size_t m_emptySerializedSizeTotal{144u};
     };
 
     class ALogicEngine : public ALogicEngineBase, public ::testing::Test

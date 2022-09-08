@@ -206,8 +206,13 @@ void CreateAndSaveContent(const std::string &ramsesSceneFile, const std::string&
 
     /**
      * Save the script, the node binding and their link to a file so that they can be loaded later
+     *
+     * Note: in this example validation on saving is disabled for simplification, since normally a warning
+     * gets generated for script input that is not linked.
      */
-    logicEngine.saveToFile(ramsesLogicFile);
+    rlogic::SaveFileConfig saveFileConfig;
+    saveFileConfig.setValidationEnabled(false);
+    logicEngine.saveToFile(ramsesLogicFile, saveFileConfig);
 
     /**
      * Finally, we save the Ramses scene with the values/data which has been applied by the LogicEngine above

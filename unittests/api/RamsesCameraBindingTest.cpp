@@ -268,11 +268,11 @@ namespace rlogic::internal
     {
         EXPECT_EQ(nullptr, m_logicEngine.createRamsesCameraBindingWithFrustumPlanes(m_orthoCam));
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 is required, feature level in this runtime set to 01.");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 or higher is required, feature level in this runtime set to 01.");
 
         EXPECT_EQ(nullptr, m_logicEngine.createRamsesCameraBindingWithFrustumPlanes(m_perspectiveCam));
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 is required, feature level in this runtime set to 01.");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 or higher is required, feature level in this runtime set to 01.");
     }
 
     TEST_F(ARamsesCameraBinding, DoesNotOverwriteDefaultValues_WhenCreatedFromOrthoCamera)
@@ -815,7 +815,7 @@ namespace rlogic::internal
         {
             RamsesCameraBindingImpl binding(*m_camera, true, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -853,7 +853,7 @@ namespace rlogic::internal
         {
             RamsesCameraBindingImpl binding(*m_camera, true, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -878,7 +878,7 @@ namespace rlogic::internal
         {
             RamsesCameraBindingImpl binding(*m_camera, true, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_02);
         }
 
         const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
@@ -901,7 +901,7 @@ namespace rlogic::internal
         {
             RamsesCameraBindingImpl binding(*perspCamera, false, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesCameraBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_02);
         }
 
         const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesCameraBinding>(m_flatBufferBuilder.GetBufferPointer());
@@ -1164,7 +1164,7 @@ namespace rlogic::internal
             frustum->getChild("nearPlane")->set<float>(newNearPlane);
             frustum->getChild("farPlane")->set<float>(newFarPlane);
             m_logicEngine.update();
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
@@ -1217,7 +1217,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesCameraBinding(*m_camera, "CameraBinding");
-            ASSERT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
 
         {
@@ -1234,7 +1234,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
@@ -1247,7 +1247,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile("camerabinding.bin"));
@@ -1261,7 +1261,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "");
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
 
         // Fake that the ramses scene is exactly the same, just camera type changed (perspective -> ortho)
@@ -1281,7 +1281,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
 
         m_testScene.destroy(m_perspectiveCam);
@@ -1298,7 +1298,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesCameraBinding(m_perspectiveCam, "CameraBinding");
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("camerabinding.bin", &m_testScene));
@@ -1321,7 +1321,7 @@ namespace rlogic::internal
             vpProperties->getChild("width")->set<int32_t>(6);
             vpProperties->getChild("height")->set<int32_t>(7);
             m_logicEngine.update();
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
 
         // These values will be used to fill the cache of camera bindings on load()
@@ -1395,7 +1395,7 @@ namespace rlogic::internal
             ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("frustProps")->getChild("fP"), *cameraBinding.getInputs()->getChild("frustum")->getChild("farPlane")));
 
             m_logicEngine.update();
-            EXPECT_TRUE(m_logicEngine.saveToFile("camerabinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "camerabinding.bin"));
         }
 
         // Modify 'linked' properties before loading to check if logic will overwrite them after load + update

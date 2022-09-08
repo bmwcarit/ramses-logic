@@ -19,6 +19,8 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesRenderGroupBindingElements.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/AnimationNode.h"
@@ -33,6 +35,7 @@
 #include "impl/RamsesAppearanceBindingImpl.h"
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/RamsesRenderPassBindingImpl.h"
+#include "impl/RamsesRenderGroupBindingImpl.h"
 #include "impl/DataArrayImpl.h"
 #include "impl/AnimationNodeImpl.h"
 #include "impl/AnimationNodeConfigImpl.h"
@@ -43,6 +46,7 @@
 #include "ramses-client-api/Appearance.h"
 #include "ramses-client-api/Camera.h"
 #include "ramses-client-api/RenderPass.h"
+#include "ramses-client-api/RenderGroup.h"
 
 #include "generated/ApiObjectsGen.h"
 #include "generated/RamsesAppearanceBindingGen.h"
@@ -217,6 +221,18 @@ namespace rlogic::internal
         return binding;
     }
 
+    RamsesRenderGroupBinding* ApiObjects::createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name)
+    {
+        assert(m_featureLevel >= EFeatureLevel_03);
+        std::unique_ptr<RamsesRenderGroupBinding> up = std::make_unique<RamsesRenderGroupBinding>(std::make_unique<RamsesRenderGroupBindingImpl>(ramsesRenderGroup, *elements.m_impl, name, getNextLogicObjectId()));
+        RamsesRenderGroupBinding* binding = up.get();
+        m_ramsesRenderGroupBindings.push_back(binding);
+        registerLogicObject(std::move(up));
+        binding->m_impl.createRootProperties();
+
+        return binding;
+    }
+
     template <typename T>
     DataArray* ApiObjects::createDataArray(const std::vector<T>& data, std::string_view name)
     {
@@ -314,6 +330,10 @@ namespace rlogic::internal
         auto ramsesRenderPassBinding = dynamic_cast<RamsesRenderPassBinding*>(&object);
         if (ramsesRenderPassBinding)
             return destroyInternal(*ramsesRenderPassBinding, errorReporting);
+
+        auto ramsesRenderGroupBinding = dynamic_cast<RamsesRenderGroupBinding*>(&object);
+        if (ramsesRenderGroupBinding)
+            return destroyInternal(*ramsesRenderGroupBinding, errorReporting);
 
         auto animNode = dynamic_cast<AnimationNode*>(&object);
         if (animNode)
@@ -495,6 +515,22 @@ namespace rlogic::internal
         return true;
     }
 
+    bool ApiObjects::destroyInternal(RamsesRenderGroupBinding& ramsesRenderGroupBinding, ErrorReporting& errorReporting)
+    {
+        assert(m_featureLevel >= EFeatureLevel_03);
+        auto bindingIter = std::find(m_ramsesRenderGroupBindings.begin(), m_ramsesRenderGroupBindings.end(), &ramsesRenderGroupBinding);
+        if (bindingIter == m_ramsesRenderGroupBindings.end())
+        {
+            errorReporting.add("Can't find RamsesRenderGroupBinding in logic engine!", &ramsesRenderGroupBinding, EErrorType::IllegalArgument);
+            return false;
+        }
+
+        unregisterLogicObject(ramsesRenderGroupBinding);
+        m_ramsesRenderGroupBindings.erase(bindingIter);
+
+        return true;
+    }
+
     bool ApiObjects::destroyInternal(AnimationNode& node, ErrorReporting& errorReporting)
     {
         auto nodeIt = std::find(m_animationNodes.begin(), m_animationNodes.end(), &node);
@@ -645,12 +681,31 @@ namespace rlogic::internal
             }
         }
 
+        for (const auto& binding : m_ramsesRenderGroupBindings)
+        {
+            const auto& rg = binding->m_renderGroupBinding.getRamsesRenderGroup();
+            const ramses::sceneId_t rgSceneId = rg.getSceneId();
+            if (!sceneId)
+                sceneId = rgSceneId;
+
+            if (*sceneId != rgSceneId)
+            {
+                errorReporting.add(fmt::format("Ramses render group '{}' is from scene with id:{} but other objects are from scene with id:{}!",
+                    rg.getName(), rgSceneId.getValue(), sceneId->getValue()), binding, EErrorType::IllegalArgument);
+                return false;
+            }
+        }
+
         return true;
     }
 
     void ApiObjects::validateInterfaces(ValidationResults& validationResults) const
     {
         // check if there are any outputs without link
+        // Note: this is different from the check for dangling nodes/content, where nodes are checked if they have ANY
+        // linked inputs and/or outputs depending on node type. Interfaces on the other hand must have ALL of their outputs
+        // linked to be valid.
+
         for (const auto* intf : m_interfaces)
         {
             std::vector<const Property*> unlinkedProperties = intf->m_interface.collectUnlinkedProperties();
@@ -664,6 +719,56 @@ namespace rlogic::internal
         const auto duplicateIt = std::adjacent_find(interfacesByName.cbegin(), interfacesByName.cend(), [](const auto i1, const auto i2) { return i1->getName() == i2->getName(); });
         if (duplicateIt != interfacesByName.cend())
             validationResults.add(fmt::format("Interface [{}] does not have a unique name", (*duplicateIt)->getName()), *duplicateIt, EWarningType::Other);
+    }
+
+    void ApiObjects::validateDanglingNodes(ValidationResults& validationResults) const
+    {
+        //nodes with no outputs linked
+        for (const auto* logicObj : m_logicObjects)
+        {
+            const auto* objAsNode = dynamic_cast<const rlogic::LogicNode*>(logicObj);
+            if (objAsNode != nullptr)
+            {
+                const auto* nodeAsIntf = dynamic_cast<const rlogic::LuaInterface*>(logicObj);
+                const auto* nodeAsBinding = dynamic_cast<const rlogic::RamsesBinding*>(logicObj);
+
+                if (nodeAsIntf != nullptr || nodeAsBinding != nullptr)
+                    continue;
+
+                assert(objAsNode->getOutputs() != nullptr);
+
+                bool anyOutputLinked = false;
+                for(const auto* output : objAsNode->getOutputs()->m_impl->collectLeafChildren())
+                    anyOutputLinked |= (output->hasOutgoingLink());
+
+                if (!anyOutputLinked)
+                    validationResults.add(fmt::format("Node [{}] has no outgoing links! Node should be deleted or properly linked!", objAsNode->getName()), objAsNode, EWarningType::UnusedContent);
+            }
+        }
+
+        //nodes with no linked inputs
+        for (const auto* logicObj : m_logicObjects)
+        {
+            const auto* objAsNode = dynamic_cast<const rlogic::LogicNode*>(logicObj);
+            if (objAsNode != nullptr)
+            {
+                const auto* nodeAsIntf = dynamic_cast<const rlogic::LuaInterface*>(logicObj);
+                const auto* nodeAsAnchorPoint = dynamic_cast<const rlogic::AnchorPoint*>(logicObj);
+                const auto* nodeAsTimer = dynamic_cast<const rlogic::TimerNode*>(logicObj);
+
+                if (nodeAsIntf != nullptr || nodeAsAnchorPoint != nullptr || nodeAsTimer != nullptr)
+                    continue;
+
+                assert(objAsNode->getInputs() != nullptr);
+
+                bool anyInputLinked = false;
+                for (const auto* input : objAsNode->getInputs()->m_impl->collectLeafChildren())
+                    anyInputLinked |= (input->hasIncomingLink());
+
+                if (!anyInputLinked)
+                    validationResults.add(fmt::format("Node [{}] has no ingoing links! Node should be deleted or properly linked!", objAsNode->getName()), objAsNode, EWarningType::UnusedContent);
+            }
+        }
     }
 
     template <typename T>
@@ -700,6 +805,10 @@ namespace rlogic::internal
         else if constexpr (std::is_same_v<T, RamsesRenderPassBinding>)
         {
             return m_ramsesRenderPassBindings;
+        }
+        else if constexpr (std::is_same_v<T, RamsesRenderGroupBinding>)
+        {
+            return m_ramsesRenderGroupBindings;
         }
         else if constexpr (std::is_same_v<T, DataArray>)
         {
@@ -764,14 +873,14 @@ namespace rlogic::internal
         return m_reverseImplMapping;
     }
 
-    flatbuffers::Offset<rlogic_serialization::ApiObjects> ApiObjects::Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder, EFeatureLevel featureLevel)
+    flatbuffers::Offset<rlogic_serialization::ApiObjects> ApiObjects::Serialize(const ApiObjects& apiObjects, flatbuffers::FlatBufferBuilder& builder)
     {
         SerializationMap serializationMap;
 
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModule>> luaModules;
         luaModules.reserve(apiObjects.m_luaModules.size());
         for (const auto& luaModule : apiObjects.m_luaModules)
-            luaModules.push_back(LuaModuleImpl::Serialize(luaModule->m_impl, builder, apiObjects.m_featureLevel, serializationMap));
+            luaModules.push_back(LuaModuleImpl::Serialize(luaModule->m_impl, builder, serializationMap, apiObjects.m_featureLevel));
 
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaScript>> luascripts;
         luascripts.reserve(apiObjects.m_scripts.size());
@@ -783,8 +892,8 @@ namespace rlogic::internal
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaInterface>> luaInterfaces;
         luascripts.reserve(apiObjects.m_interfaces.size());
         std::transform(apiObjects.m_interfaces.cbegin(), apiObjects.m_interfaces.cend(), std::back_inserter(luaInterfaces),
-            [&builder, &serializationMap](const std::vector<LuaInterface*>::value_type& it) {
-                return LuaInterfaceImpl::Serialize(it->m_interface, builder, serializationMap);
+            [&builder, &serializationMap, &apiObjects](const std::vector<LuaInterface*>::value_type& it) {
+                return LuaInterfaceImpl::Serialize(it->m_interface, builder, serializationMap, apiObjects.m_featureLevel);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding>> ramsesnodebindings;
@@ -792,8 +901,8 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesNodeBindings.begin(),
             apiObjects.m_ramsesNodeBindings.end(),
             std::back_inserter(ramsesnodebindings),
-            [&builder, &serializationMap](const std::vector<RamsesNodeBinding*>::value_type& it) {
-                return RamsesNodeBindingImpl::Serialize(it->m_nodeBinding, builder, serializationMap);
+            [&builder, &serializationMap, &apiObjects](const std::vector<RamsesNodeBinding*>::value_type& it) {
+                return RamsesNodeBindingImpl::Serialize(it->m_nodeBinding, builder, serializationMap, apiObjects.m_featureLevel);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding>> ramsesappearancebindings;
@@ -801,8 +910,8 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesAppearanceBindings.begin(),
             apiObjects.m_ramsesAppearanceBindings.end(),
             std::back_inserter(ramsesappearancebindings),
-            [&builder, &serializationMap](const std::vector<RamsesAppearanceBinding*>::value_type& it) {
-                return RamsesAppearanceBindingImpl::Serialize(it->m_appearanceBinding, builder, serializationMap);
+            [&builder, &serializationMap, &apiObjects](const std::vector<RamsesAppearanceBinding*>::value_type& it) {
+                return RamsesAppearanceBindingImpl::Serialize(it->m_appearanceBinding, builder, serializationMap, apiObjects.m_featureLevel);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding>> ramsescamerabindings;
@@ -810,8 +919,8 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesCameraBindings.begin(),
             apiObjects.m_ramsesCameraBindings.end(),
             std::back_inserter(ramsescamerabindings),
-            [&builder, &serializationMap](const std::vector<RamsesCameraBinding*>::value_type& it) {
-                return RamsesCameraBindingImpl::Serialize(it->m_cameraBinding, builder, serializationMap);
+            [&builder, &serializationMap, &apiObjects](const std::vector<RamsesCameraBinding*>::value_type& it) {
+                return RamsesCameraBindingImpl::Serialize(it->m_cameraBinding, builder, serializationMap, apiObjects.m_featureLevel);
             });
 
         std::vector<flatbuffers::Offset<rlogic_serialization::RamsesRenderPassBinding>> ramsesrenderpassbindings;
@@ -819,17 +928,16 @@ namespace rlogic::internal
         std::transform(apiObjects.m_ramsesRenderPassBindings.begin(),
             apiObjects.m_ramsesRenderPassBindings.end(),
             std::back_inserter(ramsesrenderpassbindings),
-            [&builder, &serializationMap](const std::vector<RamsesRenderPassBinding*>::value_type& it) {
-                return RamsesRenderPassBindingImpl::Serialize(it->m_renderPassBinding, builder, serializationMap);
+            [&builder, &serializationMap, &apiObjects](const std::vector<RamsesRenderPassBinding*>::value_type& it) {
+                return RamsesRenderPassBindingImpl::Serialize(it->m_renderPassBinding, builder, serializationMap, apiObjects.m_featureLevel);
             });
-        assert(featureLevel >= EFeatureLevel_02 || ramsesrenderpassbindings.empty());
-        (void)featureLevel;
+        assert(apiObjects.m_featureLevel >= EFeatureLevel_02 || ramsesrenderpassbindings.empty());
 
         std::vector<flatbuffers::Offset<rlogic_serialization::DataArray>> dataArrays;
         dataArrays.reserve(apiObjects.m_dataArrays.size());
         for (const auto& da : apiObjects.m_dataArrays)
         {
-            dataArrays.push_back(DataArrayImpl::Serialize(da->m_impl, builder));
+            dataArrays.push_back(DataArrayImpl::Serialize(da->m_impl, builder, serializationMap, apiObjects.m_featureLevel));
             serializationMap.storeDataArray(da->getId(), dataArrays.back());
         }
 
@@ -842,14 +950,20 @@ namespace rlogic::internal
         std::vector<flatbuffers::Offset<rlogic_serialization::TimerNode>> timerNodes;
         timerNodes.reserve(apiObjects.m_timerNodes.size());
         for (const auto& timerNode : apiObjects.m_timerNodes)
-            timerNodes.push_back(TimerNodeImpl::Serialize(timerNode->m_timerNodeImpl, builder, serializationMap));
+            timerNodes.push_back(TimerNodeImpl::Serialize(timerNode->m_timerNodeImpl, builder, serializationMap, apiObjects.m_featureLevel));
 
-        // anchor points must go after bindings because they reference them
+        // anchor points must go after node and camera bindings because they reference them
         std::vector<flatbuffers::Offset<rlogic_serialization::AnchorPoint>> anchorPoints;
         anchorPoints.reserve(apiObjects.m_anchorPoints.size());
         for (const auto& anchorPoint : apiObjects.m_anchorPoints)
-            anchorPoints.push_back(AnchorPointImpl::Serialize(anchorPoint->m_anchorPointImpl, builder, serializationMap));
-        assert(featureLevel >= EFeatureLevel_02 || anchorPoints.empty());
+            anchorPoints.push_back(AnchorPointImpl::Serialize(anchorPoint->m_anchorPointImpl, builder, serializationMap, apiObjects.m_featureLevel));
+        assert(apiObjects.m_featureLevel >= EFeatureLevel_02 || anchorPoints.empty());
+
+        std::vector<flatbuffers::Offset<rlogic_serialization::RamsesRenderGroupBinding>> ramsesRenderGroupBindings;
+        ramsesRenderGroupBindings.reserve(apiObjects.m_ramsesRenderGroupBindings.size());
+        for (const auto& rgBinding : apiObjects.m_ramsesRenderGroupBindings)
+            ramsesRenderGroupBindings.push_back(RamsesRenderGroupBindingImpl::Serialize(rgBinding->m_renderGroupBinding, builder, serializationMap, apiObjects.m_featureLevel));
+        assert(apiObjects.m_featureLevel >= EFeatureLevel_03 || ramsesRenderGroupBindings.empty());
 
         // links must go last due to dependency on serialized properties
         const auto collectedLinks = apiObjects.collectPropertyLinks();
@@ -875,6 +989,7 @@ namespace rlogic::internal
         const auto fbLinks = builder.CreateVector(links);
         const auto fbRenderPasses = builder.CreateVector(ramsesrenderpassbindings);
         const auto fbAnchorPoints = builder.CreateVector(anchorPoints);
+        const auto fbRenderGroupBindings = builder.CreateVector(ramsesRenderGroupBindings);
 
         const auto logicEngine = rlogic_serialization::CreateApiObjects(
             builder,
@@ -890,7 +1005,8 @@ namespace rlogic::internal
             fbLinks,
             apiObjects.m_lastObjectId,
             fbRenderPasses,
-            fbAnchorPoints
+            fbAnchorPoints,
+            fbRenderGroupBindings
             );
 
         builder.Finish(logicEngine);
@@ -983,6 +1099,12 @@ namespace rlogic::internal
             return nullptr;
         }
 
+        if (featureLevel >= EFeatureLevel_03 && !apiObjects.renderGroupBindings())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing rendergroup bindings container!", nullptr, EErrorType::BinaryVersionMismatch);
+            return nullptr;
+        }
+
         deserialized->m_lastObjectId = apiObjects.lastObjectId();
 
         const size_t logicObjectsTotalSize =
@@ -996,7 +1118,8 @@ namespace rlogic::internal
             static_cast<size_t>(apiObjects.dataArrays()->size()) +
             static_cast<size_t>(apiObjects.animationNodes()->size()) +
             static_cast<size_t>(apiObjects.timerNodes()->size()) +
-            (featureLevel >= EFeatureLevel_02 ? static_cast<size_t>(apiObjects.anchorPoints()->size()) : 0u);
+            (featureLevel >= EFeatureLevel_02 ? static_cast<size_t>(apiObjects.anchorPoints()->size()) : 0u) +
+            (featureLevel >= EFeatureLevel_03 ? static_cast<size_t>(apiObjects.renderGroupBindings()->size()) : 0u);
 
         deserialized->m_objectsOwningContainer.reserve(logicObjectsTotalSize);
         deserialized->m_logicObjects.reserve(logicObjectsTotalSize);
@@ -1061,7 +1184,8 @@ namespace rlogic::internal
         if (apiObjects.nodeBindings()->size() != 0u ||
             apiObjects.appearanceBindings()->size() != 0u ||
             apiObjects.cameraBindings()->size() != 0u ||
-            (featureLevel >= EFeatureLevel_02 && apiObjects.renderPassBindings()->size() != 0u))
+            (featureLevel >= EFeatureLevel_02 && apiObjects.renderPassBindings()->size() != 0u) ||
+            (featureLevel >= EFeatureLevel_03 && apiObjects.renderGroupBindings()->size() != 0u))
         {
             if (ramsesResolver == nullptr)
             {
@@ -1205,7 +1329,7 @@ namespace rlogic::internal
             deserialized->registerLogicObject(std::move(up));
         }
 
-        // anchor points must go after bindings because they need to resolve references
+        // anchor points must go after node and camera bindings because they need to resolve references
         if (featureLevel >= EFeatureLevel_02)
         {
             const auto& anchorPoints = *apiObjects.anchorPoints();
@@ -1221,6 +1345,30 @@ namespace rlogic::internal
                     auto up = std::make_unique<AnchorPoint>(std::move(deserializedAnchor));
                     AnchorPoint* anchor = up.get();
                     deserialized->m_anchorPoints.push_back(anchor);
+                    deserialized->registerLogicObject(std::move(up));
+                }
+                else
+                {
+                    return nullptr;
+                }
+            }
+        }
+
+        if (featureLevel >= EFeatureLevel_03)
+        {
+            const auto& ramsesRenderGroupBindings = *apiObjects.renderGroupBindings();
+            deserialized->m_ramsesRenderGroupBindings.reserve(ramsesRenderGroupBindings.size());
+            for (const auto* binding : ramsesRenderGroupBindings)
+            {
+                assert(binding);
+                assert(ramsesResolver);
+                std::unique_ptr<RamsesRenderGroupBindingImpl> deserializedBinding = RamsesRenderGroupBindingImpl::Deserialize(*binding, *ramsesResolver, errorReporting, deserializationMap);
+
+                if (deserializedBinding)
+                {
+                    std::unique_ptr<RamsesRenderGroupBinding> up = std::make_unique<RamsesRenderGroupBinding>(std::move(deserializedBinding));
+                    RamsesRenderGroupBinding* rgBinding = up.get();
+                    deserialized->m_ramsesRenderGroupBindings.push_back(rgBinding);
                     deserialized->registerLogicObject(std::move(up));
                 }
                 else
@@ -1281,7 +1429,8 @@ namespace rlogic::internal
             std::any_of(m_ramsesNodeBindings.cbegin(), m_ramsesNodeBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
             std::any_of(m_ramsesAppearanceBindings.cbegin(), m_ramsesAppearanceBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
             std::any_of(m_ramsesCameraBindings.cbegin(), m_ramsesCameraBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
-            std::any_of(m_ramsesRenderPassBindings.cbegin(), m_ramsesRenderPassBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); });
+            std::any_of(m_ramsesRenderPassBindings.cbegin(), m_ramsesRenderPassBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
+            std::any_of(m_ramsesRenderGroupBindings.cbegin(), m_ramsesRenderGroupBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); });
     }
 
     uint64_t ApiObjects::getNextLogicObjectId()
@@ -1342,29 +1491,31 @@ namespace rlogic::internal
     template DataArray* ApiObjects::createDataArray<vec3i>(const std::vector<vec3i>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec4i>(const std::vector<vec4i>&, std::string_view);
 
-    template ApiObjectContainer<LogicObject>&             ApiObjects::getApiObjectContainer<LogicObject>();
-    template ApiObjectContainer<LuaScript>&               ApiObjects::getApiObjectContainer<LuaScript>();
-    template ApiObjectContainer<LuaInterface>&            ApiObjects::getApiObjectContainer<LuaInterface>();
-    template ApiObjectContainer<LuaModule>&               ApiObjects::getApiObjectContainer<LuaModule>();
-    template ApiObjectContainer<RamsesNodeBinding>&       ApiObjects::getApiObjectContainer<RamsesNodeBinding>();
-    template ApiObjectContainer<RamsesAppearanceBinding>& ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>();
-    template ApiObjectContainer<RamsesCameraBinding>&     ApiObjects::getApiObjectContainer<RamsesCameraBinding>();
-    template ApiObjectContainer<RamsesRenderPassBinding>& ApiObjects::getApiObjectContainer<RamsesRenderPassBinding>();
-    template ApiObjectContainer<DataArray>&               ApiObjects::getApiObjectContainer<DataArray>();
-    template ApiObjectContainer<AnimationNode>&           ApiObjects::getApiObjectContainer<AnimationNode>();
-    template ApiObjectContainer<TimerNode>&               ApiObjects::getApiObjectContainer<TimerNode>();
-    template ApiObjectContainer<AnchorPoint>&             ApiObjects::getApiObjectContainer<AnchorPoint>();
+    template ApiObjectContainer<LogicObject>&              ApiObjects::getApiObjectContainer<LogicObject>();
+    template ApiObjectContainer<LuaScript>&                ApiObjects::getApiObjectContainer<LuaScript>();
+    template ApiObjectContainer<LuaInterface>&             ApiObjects::getApiObjectContainer<LuaInterface>();
+    template ApiObjectContainer<LuaModule>&                ApiObjects::getApiObjectContainer<LuaModule>();
+    template ApiObjectContainer<RamsesNodeBinding>&        ApiObjects::getApiObjectContainer<RamsesNodeBinding>();
+    template ApiObjectContainer<RamsesAppearanceBinding>&  ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>();
+    template ApiObjectContainer<RamsesCameraBinding>&      ApiObjects::getApiObjectContainer<RamsesCameraBinding>();
+    template ApiObjectContainer<RamsesRenderPassBinding>&  ApiObjects::getApiObjectContainer<RamsesRenderPassBinding>();
+    template ApiObjectContainer<RamsesRenderGroupBinding>& ApiObjects::getApiObjectContainer<RamsesRenderGroupBinding>();
+    template ApiObjectContainer<DataArray>&                ApiObjects::getApiObjectContainer<DataArray>();
+    template ApiObjectContainer<AnimationNode>&            ApiObjects::getApiObjectContainer<AnimationNode>();
+    template ApiObjectContainer<TimerNode>&                ApiObjects::getApiObjectContainer<TimerNode>();
+    template ApiObjectContainer<AnchorPoint>&              ApiObjects::getApiObjectContainer<AnchorPoint>();
 
-    template const ApiObjectContainer<LogicObject>&             ApiObjects::getApiObjectContainer<LogicObject>() const;
-    template const ApiObjectContainer<LuaScript>&               ApiObjects::getApiObjectContainer<LuaScript>() const;
-    template const ApiObjectContainer<LuaInterface>&            ApiObjects::getApiObjectContainer<LuaInterface>() const;
-    template const ApiObjectContainer<LuaModule>&               ApiObjects::getApiObjectContainer<LuaModule>() const;
-    template const ApiObjectContainer<RamsesNodeBinding>&       ApiObjects::getApiObjectContainer<RamsesNodeBinding>() const;
-    template const ApiObjectContainer<RamsesAppearanceBinding>& ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>() const;
-    template const ApiObjectContainer<RamsesCameraBinding>&     ApiObjects::getApiObjectContainer<RamsesCameraBinding>() const;
-    template const ApiObjectContainer<RamsesRenderPassBinding>& ApiObjects::getApiObjectContainer<RamsesRenderPassBinding>() const;
-    template const ApiObjectContainer<DataArray>&               ApiObjects::getApiObjectContainer<DataArray>() const;
-    template const ApiObjectContainer<AnimationNode>&           ApiObjects::getApiObjectContainer<AnimationNode>() const;
-    template const ApiObjectContainer<TimerNode>&               ApiObjects::getApiObjectContainer<TimerNode>() const;
-    template const ApiObjectContainer<AnchorPoint>&             ApiObjects::getApiObjectContainer<AnchorPoint>() const;
+    template const ApiObjectContainer<LogicObject>&              ApiObjects::getApiObjectContainer<LogicObject>() const;
+    template const ApiObjectContainer<LuaScript>&                ApiObjects::getApiObjectContainer<LuaScript>() const;
+    template const ApiObjectContainer<LuaInterface>&             ApiObjects::getApiObjectContainer<LuaInterface>() const;
+    template const ApiObjectContainer<LuaModule>&                ApiObjects::getApiObjectContainer<LuaModule>() const;
+    template const ApiObjectContainer<RamsesNodeBinding>&        ApiObjects::getApiObjectContainer<RamsesNodeBinding>() const;
+    template const ApiObjectContainer<RamsesAppearanceBinding>&  ApiObjects::getApiObjectContainer<RamsesAppearanceBinding>() const;
+    template const ApiObjectContainer<RamsesCameraBinding>&      ApiObjects::getApiObjectContainer<RamsesCameraBinding>() const;
+    template const ApiObjectContainer<RamsesRenderPassBinding>&  ApiObjects::getApiObjectContainer<RamsesRenderPassBinding>() const;
+    template const ApiObjectContainer<RamsesRenderGroupBinding>& ApiObjects::getApiObjectContainer<RamsesRenderGroupBinding>() const;
+    template const ApiObjectContainer<DataArray>&                ApiObjects::getApiObjectContainer<DataArray>() const;
+    template const ApiObjectContainer<AnimationNode>&            ApiObjects::getApiObjectContainer<AnimationNode>() const;
+    template const ApiObjectContainer<TimerNode>&                ApiObjects::getApiObjectContainer<TimerNode>() const;
+    template const ApiObjectContainer<AnchorPoint>&              ApiObjects::getApiObjectContainer<AnchorPoint>() const;
 }

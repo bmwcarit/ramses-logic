@@ -9,7 +9,9 @@
 #pragma once
 
 #include "ramses-client.h"
+#include "ramses-framework-api/RamsesFrameworkTypes.h"
 #include "Result.h"
+#include <array>
 
 class ISceneSetup;
 class Arguments;
@@ -65,7 +67,7 @@ namespace rlogic
 
     private:
         [[nodiscard]] int init(int argc, char const* const* argv);
-        [[nodiscard]] int initDisplay(const Arguments& args, const ramses::RendererConfig& rendererConfig, const ramses::DisplayConfig& displayConfig);
+        [[nodiscard]] ramses::displayId_t initDisplay(const Arguments& args, ramses::RamsesRenderer& renderer, const ramses::DisplayConfig& displayConfig);
 
         std::unique_ptr<ramses::RamsesFramework>     m_framework;
         std::unique_ptr<rlogic::LogicViewerSettings> m_settings;
@@ -80,6 +82,7 @@ namespace rlogic
 
         uint32_t m_width  = 0u;
         uint32_t m_height = 0u;
+        std::array<float, 4> m_defaultClearColor{ 0, 0, 0, 1 };
 
         int m_exitCode = -1;
     };

@@ -10,6 +10,7 @@
 #pragma once
 
 #include "impl/LogicObjectImpl.h"
+#include "ramses-logic/EFeatureLevel.h"
 #include <memory>
 #include <string>
 #include <vector>

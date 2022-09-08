@@ -10,12 +10,14 @@
 
 #include "ImguiClientHelper.h"
 #include "ramses-logic/Collection.h"
+#include <array>
 
 struct ImGuiSettingsHandler;
 
 namespace ramses
 {
     class Scene;
+    class RamsesRenderer;
 }
 
 namespace rlogic
@@ -39,6 +41,7 @@ namespace rlogic
         void draw();
         void openErrorPopup(const std::string& message);
         void setSceneTexture(ramses::TextureSampler* sampler, uint32_t width, uint32_t height);
+        void setRendererInfo(ramses::RamsesRenderer& renderer, ramses::displayId_t displayId, ramses::displayBufferId_t displayBufferId, const std::array<float, 4>& initialClearColor);
 
         /**
          * saves a simple default lua configuration that can be used as a starting point
@@ -63,9 +66,11 @@ namespace rlogic
         void drawNodeBindings();
         void drawCameraBindings();
         void drawRenderPassBindings();
+        void drawRenderGroupBindings();
         void drawAnchorPoints();
         void drawUpdateReport();
         void drawAppearanceBindings();
+        void drawDisplaySettings();
         void drawSaveDefaultLuaFile();
 
         static bool DrawTreeNode(rlogic::LogicObject* obj);
@@ -101,6 +106,12 @@ namespace rlogic
 
         ramses::TextureSampler* m_sampler = nullptr;
         ImVec2 m_samplerSize;
+
+        ramses::RamsesRenderer* m_renderer = nullptr;
+        ramses::displayId_t m_displayId;
+        ramses::displayBufferId_t m_displayBufferId;
+        std::array<float, 4> m_clearColor{ 0, 0, 0, 1 };
+        bool m_skipUnmodifiedBuffers = true;
     };
 }
 

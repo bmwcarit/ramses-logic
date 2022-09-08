@@ -39,7 +39,7 @@ namespace rlogic::internal
         return m_module;
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder, EFeatureLevel featureLevel, SerializationMap& serializationMap)
+    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap, EFeatureLevel featureLevel)
     {
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> modulesFB;
         modulesFB.reserve(module.m_dependencies.size());

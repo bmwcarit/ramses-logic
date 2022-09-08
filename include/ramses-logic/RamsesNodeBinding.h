@@ -41,7 +41,7 @@ namespace rlogic
      *                                  the visibility mode is determined by the 'visibility' input above.
      *                                  When 'enabled' is false, the visibility mode is Off,
      *                                  regardless of the 'visibility' input.
-     *                                  This property is only available in #rlogic::EFeatureLevel_02!
+     *                                  This property is only available in #rlogic::EFeatureLevel_02 or higher!
      *
      * The default values of the input properties are taken from the bound ramses::Node provided during construction.
      * This also applies for rotations, if the rlogic::ERotationType and ramses::ERotationConvention values of the

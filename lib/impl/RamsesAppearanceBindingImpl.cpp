@@ -81,16 +81,14 @@ namespace rlogic::internal
 
         HierarchicalTypeData bindingInputsType(TypeData{ "", EPropertyType::Struct }, bindingInputs);
 
-        setRootProperties(
-            std::make_unique<Property>(std::make_unique<PropertyImpl>(bindingInputsType, EPropertySemantics::BindingInput)),
-            {} // No outputs
-        );
+        setRootInputs(std::make_unique<Property>(std::make_unique<PropertyImpl>(bindingInputsType, EPropertySemantics::BindingInput)));
     }
 
     flatbuffers::Offset<rlogic_serialization::RamsesAppearanceBinding> RamsesAppearanceBindingImpl::Serialize(
         const RamsesAppearanceBindingImpl& binding,
         flatbuffers::FlatBufferBuilder& builder,
-        SerializationMap& serializationMap)
+        SerializationMap& serializationMap,
+        EFeatureLevel /*featureLevel*/)
     {
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(binding.m_ramsesAppearance, builder);
 
@@ -180,7 +178,7 @@ namespace rlogic::internal
 
         auto binding = std::make_unique<RamsesAppearanceBindingImpl>(*resolvedAppearance, name, id);
         binding->setUserId(userIdHigh, userIdLow);
-        binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
+        binding->setRootInputs(std::make_unique<Property>(std::move(deserializedRootInput)));
 
         return binding;
     }

@@ -77,7 +77,7 @@ namespace rlogic::internal
                 )");
 
             ASSERT_NE(nullptr, script);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "script.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));
@@ -119,7 +119,7 @@ namespace rlogic::internal
 
             script->getInputs()->getChild("array")->getChild(0)->set<float>(0.1f);
             script->getInputs()->getChild("array")->getChild(1)->set<float>(0.2f);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "script.bin"));
         }
         {
             m_logicEngine.loadFromFile("script.bin");
@@ -163,7 +163,7 @@ namespace rlogic::internal
             )", {}, "MyScript");
 
             script->getInputs()->getChild("nested")->getChild("array")->getChild(0)->set<vec3f>({1.1f, 1.2f, 1.3f});
-            EXPECT_TRUE(tempLogicEngine.saveToFile("arrays.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "arrays.bin"));
         }
         {
             m_logicEngine.loadFromFile("arrays.bin");
@@ -211,7 +211,7 @@ namespace rlogic::internal
             )");
 
             ASSERT_NE(nullptr, script);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("nested_array.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "nested_array.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("nested_array.bin"));
@@ -282,7 +282,7 @@ namespace rlogic::internal
 
             ASSERT_NE(nullptr, script);
             script->getInputs()->getChild("arrayOfStructs")->getChild(1)->getChild("nested_struct")->getChild("nested_array")->getChild(0)->set<float>(42.f);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("array_of_structs.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "array_of_structs.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("array_of_structs.bin"));
@@ -349,7 +349,7 @@ namespace rlogic::internal
             auto script = tempLogicEngine.createLuaScript(scriptSrc, {}, "MyScript");
 
             ASSERT_NE(nullptr, script);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("arrays.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "arrays.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("arrays.bin"));
@@ -408,7 +408,7 @@ namespace rlogic::internal
 
             ASSERT_NE(nullptr, script);
             script->getInputs()->getChild("data")->set<int32_t>(42);
-            EXPECT_TRUE(tempLogicEngine.saveToFile("script.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempLogicEngine, "script.bin"));
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("script.bin"));

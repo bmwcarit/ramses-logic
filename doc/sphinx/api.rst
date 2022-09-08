@@ -291,6 +291,16 @@ bound Ramses objects are updated and when not.
     exception to this are Appearance bindings - extracting all data from Ramses Appearances would incur performance
     costs not worth the convenience.
 
+==================================================
+Dynamic sorting of content
+==================================================
+
+The ``Logic Engine`` provides a mechanism to dynamically sort select ``ramses::MeshNode`` and ``ramses::RenderGroup``
+objects. To do so, you can use the :class:`rlogic::RamsesRenderGroupBinding` class. The class works similarly to
+other binding classes - it statically binds to Ramses content (configured using :class:`rlogic::RamsesRenderGroupBindingElements`)
+and allows setting the rendering priority of the bound content by setting input properties of type ``Int32`` with a name as
+configured in :class:`rlogic::RamsesRenderGroupBindingElements`.
+
 =========================
 Animations
 =========================
@@ -703,3 +713,5 @@ List of all examples
     examples/09_modules
     examples/10_globals
     examples/11_interfaces
+    examples/12_anchor_point
+    examples/13_render_order

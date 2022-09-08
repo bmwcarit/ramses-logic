@@ -99,6 +99,10 @@ namespace rlogic
         {
             gui->luaPreferIdentifiers = (flag != 0);
         }
+        else if (IniReadFlag(line, "ShowDisplaySettings=%d", &flag))
+        {
+            gui->showDisplaySettings = (flag != 0);
+        }
     }
 
     void LogicViewerSettings::IniWriteAll(ImGuiContext* /*context*/, ImGuiSettingsHandler* handler, ImGuiTextBuffer* buf)
@@ -131,6 +135,8 @@ namespace rlogic
         buf->appendf("LuaPreferObjectIds=%d\n", gui->luaPreferObjectIds ? 1 : 0);
         // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
         buf->appendf("LuaPreferIdentifiers=%d\n", gui->luaPreferIdentifiers ? 1 : 0);
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
+        buf->appendf("ShowDisplaySettings=%d\n", gui->showDisplaySettings ? 1 : 0);
         buf->append("\n");
     }
 }

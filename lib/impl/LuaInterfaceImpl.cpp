@@ -24,7 +24,8 @@ namespace rlogic::internal
     flatbuffers::Offset<rlogic_serialization::LuaInterface> LuaInterfaceImpl::Serialize(
         const LuaInterfaceImpl& luaInterface,
         flatbuffers::FlatBufferBuilder& builder,
-        SerializationMap& serializationMap)
+        SerializationMap& serializationMap,
+        EFeatureLevel /*featureLevel*/)
     {
         const auto logicObject = LogicObjectImpl::Serialize(luaInterface, builder);
         const auto propertyObject = PropertyImpl::Serialize(*luaInterface.getInputs()->m_impl, builder, serializationMap);
@@ -87,34 +88,7 @@ namespace rlogic::internal
 
     std::vector<const Property*> LuaInterfaceImpl::collectUnlinkedProperties() const
     {
-        auto collectLeafProperties = [](auto* root) {
-
-            std::vector<const Property*> result;
-
-            std::vector<const Property*> nodesToTraverse;
-            nodesToTraverse.push_back(root);
-            while (!nodesToTraverse.empty())
-            {
-                const auto* currentNode = nodesToTraverse.back();
-                nodesToTraverse.pop_back();
-
-                if (TypeUtils::IsPrimitiveType(currentNode->getType()))
-                {
-                    result.push_back(currentNode);
-                }
-                else
-                {
-                    for (uint32_t i = 0; i < currentNode->getChildCount(); ++i)
-                    {
-                        nodesToTraverse.emplace_back(currentNode->getChild(i));
-                    }
-                }
-            }
-
-            return result;
-        };
-
-        std::vector<const Property*> outputProperties = collectLeafProperties(getOutputs());
+        std::vector<const Property*> outputProperties = getOutputs()->m_impl->collectLeafChildren();
 
         // filter for unlinked properties by removing linked ones
         auto it = std::remove_if(outputProperties.begin(), outputProperties.end(), [](const auto* node) { return node->isLinked(); });

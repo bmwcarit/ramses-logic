@@ -475,6 +475,33 @@ namespace rlogic::internal
             });
     }
 
+    std::vector<const Property*> PropertyImpl::collectLeafChildren() const
+    {
+        std::vector<const Property*> result;
+
+        std::vector<const Property*> toTraverse;
+        toTraverse.push_back(m_propertyInstance);
+        while (!toTraverse.empty())
+        {
+            const auto* current = toTraverse.back();
+            toTraverse.pop_back();
+
+            if (TypeUtils::IsPrimitiveType(current->getType()))
+            {
+                result.push_back(current);
+            }
+            else
+            {
+                for (uint32_t i = 0; i < current->getChildCount(); ++i)
+                {
+                    toTraverse.emplace_back(current->getChild(i));
+                }
+            }
+        }
+
+        return result;
+    }
+
     template <typename T> std::optional<T> PropertyImpl::getValue_PublicApi() const
     {
         if (PropertyTypeToEnum<T>::TYPE == m_typeData.type)
@@ -697,5 +724,4 @@ namespace rlogic::internal
         setValue(std::move(value));
         m_bindingInputHasNewValue = false;
     }
-
 }

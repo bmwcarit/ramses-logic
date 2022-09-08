@@ -36,5 +36,10 @@ namespace rlogic::internal
     protected:
         // Used by subclasses to handle serialization
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesReference> SerializeRamsesReference(const ramses::SceneObject& object, flatbuffers::FlatBufferBuilder& builder);
+
+        void setRootInputs(std::unique_ptr<Property> rootInputs);
+
+    private:
+        using LogicNodeImpl::setRootProperties;
     };
 }

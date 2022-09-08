@@ -533,7 +533,9 @@ namespace rlogic::internal
             otherEngine.link(*intf->getOutputs()->getChild("param2")->getChild("y")->getChild(0u), *inputsScript->getInputs()->getChild("param2")->getChild("y")->getChild(0u));
             otherEngine.link(*intf->getOutputs()->getChild("param2")->getChild("y")->getChild(1u), *inputsScript->getInputs()->getChild("param2")->getChild("y")->getChild(1u));
 
-            ASSERT_TRUE(otherEngine.saveToFile("interface.rlogic"));
+            SaveFileConfig configNoValidation;
+            configNoValidation.setValidationEnabled(false);
+            ASSERT_TRUE(otherEngine.saveToFile("interface.rlogic", configNoValidation));
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("interface.rlogic"));

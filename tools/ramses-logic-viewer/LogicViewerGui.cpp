@@ -19,6 +19,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/AnchorPoint.h"
@@ -144,6 +145,10 @@ namespace rlogic
             {
                 name = "RenderPassBinding";
             }
+            else if (node->as<RamsesRenderGroupBinding>() != nullptr)
+            {
+                name = "RenderGroupBinding";
+            }
             else if (node->as<TimerNode>() != nullptr)
             {
                 name = "Timer";
@@ -230,6 +235,14 @@ namespace rlogic
         m_sampler       = sampler;
         m_samplerSize.x = static_cast<float>(width);
         m_samplerSize.y = static_cast<float>(height);
+    }
+
+    void LogicViewerGui::setRendererInfo(ramses::RamsesRenderer& renderer, ramses::displayId_t displayId, ramses::displayBufferId_t displayBufferId, const std::array<float, 4>& initialClearColor)
+    {
+        m_renderer = &renderer;
+        m_displayId = displayId;
+        m_displayBufferId = displayBufferId;
+        m_clearColor = initialClearColor;
     }
 
     void LogicViewerGui::drawMenuItemShowWindow()
@@ -386,12 +399,18 @@ namespace rlogic
             drawNodeBindings();
             drawCameraBindings();
             drawRenderPassBindings();
+            drawRenderGroupBindings();
             drawAnchorPoints();
         }
 
         if (m_settings.showUpdateReport)
         {
             drawUpdateReport();
+        }
+
+        if (m_settings.showDisplaySettings && m_renderer)
+        {
+            drawDisplaySettings();
         }
 
         ImGui::End();
@@ -429,6 +448,8 @@ namespace rlogic
                 ImGui::Separator();
                 changed = ImGui::MenuItem("Lua: prefer identifiers (scripts.foo)", nullptr, &m_settings.luaPreferIdentifiers) || changed;
                 changed = ImGui::MenuItem("Lua: prefer object ids (scripts[1])", nullptr, &m_settings.luaPreferObjectIds) || changed;
+                ImGui::Separator();
+                changed = ImGui::MenuItem("Show Display Settings", nullptr, &m_settings.showDisplaySettings) || changed;
                 ImGui::EndMenu();
 
                 if (changed)
@@ -696,6 +717,33 @@ namespace rlogic
         }
     }
 
+    void LogicViewerGui::drawRenderGroupBindings()
+    {
+        const bool openBindings = ImGui::CollapsingHeader("RenderGroup Bindings");
+        if (ImGui::BeginPopupContextItem("RenderGroupBindingsContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all RenderGroup Binding inputs"))
+            {
+                copyInputs(LogicViewer::ltnRenderGroup, m_logicEngine.getCollection<RamsesRenderGroupBinding>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openBindings)
+        {
+            for (auto* obj : m_logicEngine.getCollection<RamsesRenderGroupBinding>())
+            {
+                const bool open = DrawTreeNode(obj);
+                drawNodeContextMenu(obj, LogicViewer::ltnRenderGroup);
+                if (open)
+                {
+                    ImGui::TextUnformatted(fmt::format("Ramses RenderGroup: {}", obj->getRamsesRenderGroup().getName()).c_str());
+                    drawNode(obj);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
     void LogicViewerGui::drawAnchorPoints()
     {
         const bool openAnchors = ImGui::CollapsingHeader("Anchor Points");
@@ -822,6 +870,33 @@ namespace rlogic
                     drawNode(obj);
                     ImGui::TreePop();
                 }
+            }
+        }
+    }
+
+    void LogicViewerGui::drawDisplaySettings()
+    {
+        assert(m_renderer);
+        const bool openDisplaySettings = ImGui::CollapsingHeader("Display Settings");
+        if (openDisplaySettings)
+        {
+            if (ImGui::DragFloat4("Clear color", m_clearColor.data(), 0.1f, 0.f, 1.f))
+            {
+                m_renderer->setDisplayBufferClearColor(m_displayId, m_displayBufferId, m_clearColor[0], m_clearColor[1], m_clearColor[2], m_clearColor[3]);
+                m_renderer->flush();
+            }
+
+            float fps = m_renderer->getMaximumFramerate();
+            if (ImGui::DragFloat("Maximum FPS", &fps, 1.f, 1.f, 1000.f))
+            {
+                m_renderer->setMaximumFramerate(fps);
+                m_renderer->flush();
+            }
+
+            if (ImGui::Checkbox("Skip rendering of unmodified buffers", &m_skipUnmodifiedBuffers))
+            {
+                m_renderer->setSkippingOfUnmodifiedBuffers(m_skipUnmodifiedBuffers);
+                m_renderer->flush();
             }
         }
     }
@@ -1334,6 +1409,7 @@ namespace rlogic
         logAllInputs<RamsesAppearanceBinding>("--Appearance bindings\n", LogicViewer::ltnAppearance);
         logAllInputs<RamsesCameraBinding>("--Camera bindings\n", LogicViewer::ltnCamera);
         logAllInputs<RamsesRenderPassBinding>("--RenderPass bindings\n", LogicViewer::ltnRenderPass);
+        logAllInputs<RamsesRenderGroupBinding>("--RenderGroup bindings\n", LogicViewer::ltnRenderGroup);
         logAllInputs<AnchorPoint>("--Anchor points\n", LogicViewer::ltnRenderPass);
 
         LogText("end\n\n");

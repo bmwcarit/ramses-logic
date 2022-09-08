@@ -76,7 +76,7 @@ namespace rlogic::internal
         {
             RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -111,7 +111,7 @@ namespace rlogic::internal
         {
             RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -311,7 +311,7 @@ namespace rlogic::internal
         {
             RamsesAppearanceBindingImpl binding(*m_appearance, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesAppearanceBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -709,7 +709,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
-            ASSERT_TRUE(m_logicEngine.saveToFile("appearancebinding.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "appearancebinding.bin"));
         }
 
         {
@@ -750,7 +750,7 @@ namespace rlogic::internal
             inputs->getChild("vec2Array")->getChild(0)->set<vec2f>({ .11f, .12f });
             inputs->getChild("vec2Array")->getChild(1)->set<vec2f>({ .13f, .14f });
             m_logicEngine.update();
-            ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "logic.bin"));
         }
 
         {
@@ -812,7 +812,7 @@ namespace rlogic::internal
             auto& rAppearanceBinding = *m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "AppearanceBinding");
             rAppearanceBinding.getInputs()->getChild("floatUniform")->set(42.42f);
             m_logicEngine.update();
-            ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "logic.bin"));
         }
 
         recreate();
@@ -833,7 +833,7 @@ namespace rlogic::internal
         {
             LogicEngine tempEngineForSaving;
             tempEngineForSaving.createRamsesAppearanceBinding(*m_appearance, "AppBinding");
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("WithRamsesAppearance.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "WithRamsesAppearance.bin"));
         }
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesAppearance.bin"));
@@ -848,7 +848,7 @@ namespace rlogic::internal
         auto& appearance = createTestAppearance(createTestEffect(m_vertShader_simple, m_fragShader_trivial));
         auto* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(appearance, "AppearanceBinding");
 
-        ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
+        ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "logic.bin"));
 
         // Simulate that a difference appearance with the same ID was created, but with different inputs
         recreate();
@@ -872,7 +872,7 @@ namespace rlogic::internal
             // Set a different input over the binding object
             inputs->getChild("floatUniform")->set<float>(42.42f);
             m_logicEngine.update();
-            ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesSet.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "SomeValuesSet.bin"));
         }
 
         // Set uniform to a different value than the one set on the ramses binding
@@ -919,7 +919,7 @@ namespace rlogic::internal
             script->getInputs()->getChild("float")->set<float>(42.42f);
             ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("float"), *appearanceBinding.getInputs()->getChild("floatUniform1")));
             ASSERT_TRUE(m_logicEngine.update());
-            ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesLinked.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "SomeValuesLinked.bin"));
         }
 
         // Set uniform1 to a different value than the one set by the link

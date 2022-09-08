@@ -61,7 +61,8 @@ namespace rlogic::internal
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> Serialize(
             const RamsesNodeBindingImpl& nodeBinding,
             flatbuffers::FlatBufferBuilder& builder,
-            SerializationMap& serializationMap);
+            SerializationMap& serializationMap,
+            EFeatureLevel featureLevel);
 
         [[nodiscard]] static std::unique_ptr<RamsesNodeBindingImpl> Deserialize(
             const rlogic_serialization::RamsesNodeBinding& nodeBinding,

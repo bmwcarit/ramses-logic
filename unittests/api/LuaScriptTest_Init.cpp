@@ -219,7 +219,7 @@ namespace rlogic
             ASSERT_TRUE(tmpLogicEngine.update());
             ASSERT_EQ(5, *script->getOutputs()->getChild("globalValueBefore")->get<int32_t>());
             ASSERT_EQ(42, *script->getOutputs()->getChild("globalValueAfter")->get<int32_t>());
-            tmpLogicEngine.saveToFile("withGlobals.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "withGlobals.bin"));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("withGlobals.bin"));
@@ -423,7 +423,7 @@ namespace rlogic
                 end)", {}, "script");
             ASSERT_NE(nullptr, script);
             EXPECT_TRUE(otherLogic.update());
-            EXPECT_TRUE(otherLogic.saveToFile("intfInGlobal.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(otherLogic, "intfInGlobal.bin"));
         }
 
         EXPECT_TRUE(m_logicEngine.loadFromFile("intfInGlobal.bin"));

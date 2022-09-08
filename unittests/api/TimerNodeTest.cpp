@@ -143,7 +143,9 @@ namespace rlogic::internal
         {
             LogicEngine otherEngine;
             otherEngine.createTimerNode("timerNode");
-            ASSERT_TRUE(otherEngine.saveToFile("logic_timerNode.bin"));
+            SaveFileConfig configNoValidation;
+            configNoValidation.setValidationEnabled(false);
+            ASSERT_TRUE(otherEngine.saveToFile("logic_timerNode.bin", configNoValidation));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("logic_timerNode.bin"));

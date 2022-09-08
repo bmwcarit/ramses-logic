@@ -138,7 +138,7 @@ namespace rlogic::internal
         {
             AnchorPointImpl anchor(m_nodeBinding.m_nodeBinding, m_cameraBinding.m_cameraBinding, "name", 1u);
             anchor.createRootProperties();
-            (void)AnchorPointImpl::Serialize(anchor, m_flatBufferBuilder, m_serializationMap);
+            (void)AnchorPointImpl::Serialize(anchor, m_flatBufferBuilder, m_serializationMap, m_logicEngine.getFeatureLevel());
         }
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::AnchorPoint>(m_flatBufferBuilder.GetBufferPointer());
 

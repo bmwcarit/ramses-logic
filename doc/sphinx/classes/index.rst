@@ -36,6 +36,8 @@ Class Index
     RamsesCameraBinding
     RamsesNodeBinding
     RamsesRenderPassBinding
+    RamsesRenderGroupBinding
+    RamsesRenderGroupBindingElements
     SaveFileConfig
     TimerNode
     AnchorPoint

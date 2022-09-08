@@ -37,6 +37,8 @@ namespace rlogic::internal
             m_dataVec2 = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 2.f }, { 3.f, 4.f }, { 5.f, 6.f } });
             // Quaternions which are not normalized (ie. not of unit length). Used for tests to check they are normalized correctly
             m_dataVec4 = m_logicEngine.createDataArray(std::vector<vec4f>{ { 2.f, 0.f, 0.f, 0.f }, { 0.f, 2.f, 0.f, 0.f } , { 0.f, 0.f, 2.f, 0.f } });
+
+            m_saveFileConfigNoValidation.setValidationEnabled(false);
         }
 
     protected:
@@ -103,6 +105,7 @@ namespace rlogic::internal
         DataArray* m_dataFloat = nullptr;
         DataArray* m_dataVec2 = nullptr;
         DataArray* m_dataVec4 = nullptr;
+        SaveFileConfig m_saveFileConfigNoValidation;
     };
 
     INSTANTIATE_TEST_SUITE_P(
@@ -280,7 +283,7 @@ namespace rlogic::internal
             otherEngine.createAnimationNode(config1, "animNode1");
             otherEngine.createAnimationNode(config2, "animNode2");
 
-            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin"));
+            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin", m_saveFileConfigNoValidation));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("logic_animNodes.bin"));
@@ -365,7 +368,7 @@ namespace rlogic::internal
             EXPECT_TRUE(otherEngine.update());
             EXPECT_EQ(15, *animNode->getOutputs()->getChild("channel")->get<int32_t>());
 
-            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin"));
+            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin", m_saveFileConfigNoValidation));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("logic_animNodes.bin"));
@@ -663,7 +666,7 @@ namespace rlogic::internal
                     outputs.children.push_back(MakeType("channel", EPropertyType::Float));
                 auto outputsImpl = std::make_unique<PropertyImpl>(std::move(outputs), EPropertySemantics::AnimationOutput);
 
-                const auto dataFb = DataArrayImpl::Serialize(data->m_impl, flatBufferBuilder);
+                const auto dataFb = DataArrayImpl::Serialize(data->m_impl, flatBufferBuilder, serializationMap, m_logicEngine.getFeatureLevel());
                 flatBufferBuilder.Finish(dataFb);
                 const auto dataFbSerialized = flatbuffers::GetRoot<rlogic_serialization::DataArray>(flatBufferBuilder.GetBufferPointer());
                 deserializationMap.storeDataArray(*dataFbSerialized, *data);

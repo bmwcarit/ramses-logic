@@ -8,6 +8,7 @@
 
 #include "LogicViewerTestBase.h"
 #include "ramses-logic/AnimationNodeConfig.h"
+#include "ramses-logic/RamsesRenderGroupBindingElements.h"
 
 const char* const logicFile = "test.rlogic";
 
@@ -27,7 +28,7 @@ namespace rlogic::internal
 
         void createLogicFile()
         {
-            LogicEngine engine{ EFeatureLevel_02 };
+            LogicEngine engine{ EFeatureLevel_03 };
             auto *interface = engine.createLuaInterface(R"(
                 function interface(IN,OUT)
                     IN.paramInt32 = Type:Int32()
@@ -38,8 +39,12 @@ namespace rlogic::internal
                 function interface(IN,OUT)
                     IN.paramBool = Type:Bool()
                     IN.paramInt32 = Type:Int32()
+                    IN.paramInt32_2 = Type:Int32()
                     IN.paramInt64 = Type:Int64()
+                    IN.paramInt64_2 = Type:Int64()
                     IN.paramFloat = Type:Float()
+                    IN.paramFloat_2 = Type:Float()
+                    IN.paramFloat_3 = Type:Float()
                     IN.paramString = Type:String()
                     IN.paramVec2f = Type:Vec2f()
                     IN.paramVec3f = Type:Vec3f()
@@ -98,19 +103,25 @@ namespace rlogic::internal
             // make camera valid
             m_camera->setFrustum(-1.f, 1.f, -1.f, 1.f, 0.1f, 10.f);
 
-            engine.createRamsesAppearanceBinding(*m_appearance, "foo");
-            auto cameraBinding = engine.createRamsesCameraBinding(*m_camera, "foo");
-            engine.createRamsesRenderPassBinding(*m_renderPass, "foo");
-            engine.createTimerNode("foo");
-            engine.createAnchorPoint(*nodeBinding, *cameraBinding, "foo");
+            auto* appearanceBind = engine.createRamsesAppearanceBinding(*m_appearance, "foo");
+            auto* cameraBinding = engine.createRamsesCameraBinding(*m_camera, "foo");
+            auto* passBinding = engine.createRamsesRenderPassBinding(*m_renderPass, "foo");
+            auto* timer = engine.createTimerNode("foo");
+            auto* anchor = engine.createAnchorPoint(*nodeBinding, *cameraBinding, "foo");
+            m_renderGroup->addRenderGroup(*m_nestedRenderGroup);
+            rlogic::RamsesRenderGroupBindingElements elements;
+            elements.addElement(*m_nestedRenderGroup, "nestedRG");
+            auto rgBinding = engine.createRamsesRenderGroupBinding(*m_renderGroup, elements, "rg");
 
             rlogic::DataArray* animTimestamps = engine.createDataArray(std::vector<float>{ 0.f, 0.5f, 1.f, 1.5f }); // will be interpreted as seconds
             rlogic::DataArray* animKeyframes = engine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, {0.f, 0.f, 180.f}, {0.f, 0.f, 100.f}, {0.f, 0.f, 360.f} });
             const rlogic::AnimationChannel stepAnimChannel { "rotationZstep", animTimestamps, animKeyframes, rlogic::EInterpolationType::Step };
             rlogic::AnimationNodeConfig config;
             config.addChannel(stepAnimChannel);
-            engine.createAnimationNode(config, "foo");
+            auto* animation = engine.createAnimationNode(config, "foo");
 
+            // link some of the created objects' inputs and outputs, so that none of the scripts
+            // generate a warning for having unlinked inputs or outputs on saving to file
             engine.link(
                 *interface->getOutputs()->getChild("paramInt32"),
                 *script->getInputs()->getChild("paramInt32"));
@@ -119,8 +130,52 @@ namespace rlogic::internal
                 *script->getOutputs()->getChild("paramVec3f"),
                 *nodeBinding->getInputs()->getChild("rotation"));
 
+            engine.link(
+                *animation->getOutputs()->getChild("duration"),
+                *script->getInputs()->getChild("paramFloat_2"));
+
+            // use weak link because of circular dependency. The link has no meaning, it is just
+            // needed to make the setup valid (fee of dangling content)
+            engine.linkWeak(
+                *script->getOutputs()->getChild("paramFloat"),
+                *animation->getInputs()->getChild("progress"));
+
+            engine.link(
+                *script->getOutputs()->getChild("paramBool"),
+                *passBinding->getInputs()->getChild("enabled"));
+
+            engine.link(
+                *script->getOutputs()->getChild("paramInt32"),
+                *rgBinding->getInputs()->getChild("renderOrders")->getChild("nestedRG"));
+
+            engine.link(
+                *timer->getOutputs()->getChild("ticker_us"),
+                *script->getInputs()->getChild("paramInt64_2"));
+
+            engine.link(
+                *script->getOutputs()->getChild("paramFloat"),
+                *appearanceBind->getInputs()->getChild("floatUniform"));
+
+            engine.link(
+                *script->getOutputs()->getChild("paramFloat"),
+                *cameraBinding->getInputs()->getChild("frustum")->getChild("leftPlane"));
+
+            // use weak link because of circular dependency. The link has no meaning, it is just
+            // needed to make the setup valid (fee of dangling content)
+            engine.linkWeak(
+                *anchor->getOutputs()->getChild("depth"),
+                *script->getInputs()->getChild("paramFloat_3"));
+
             engine.update();
+
             engine.saveToFile(logicFile);
+        }
+
+        void unlinkInput(const rlogic::Property& inputProperty)
+        {
+            assert(inputProperty.hasIncomingLink());
+            const rlogic::Property& sourceProperty = *inputProperty.getIncomingLink()->source;
+            EXPECT_TRUE(viewer.getEngine().unlink(sourceProperty, inputProperty));
         }
     };
 
@@ -701,6 +756,9 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, appearanceBindingByName)
     {
         auto* floatUniform = getInput<rlogic::RamsesAppearanceBinding>("foo", "floatUniform");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*floatUniform);
+
         EXPECT_EQ(Result(), loadLua(R"(
             rlogic.appearanceBindings.foo.IN.floatUniform.value = 9.1
         )"));
@@ -725,6 +783,18 @@ namespace rlogic::internal
         EXPECT_EQ(42, renderOrder->get<int32_t>().value());
     }
 
+    TEST_F(ALogicViewerLua, renderGroupBindingByName)
+    {
+        auto* renderOrder = getInput<rlogic::RamsesRenderGroupBinding>("rg", "renderOrders")->getChild("nestedRG");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*renderOrder);
+
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.renderGroupBindings.rg.IN.renderOrders.nestedRG.value = 42
+        )"));
+        EXPECT_EQ(42, renderOrder->get<int32_t>().value());
+    }
+
     TEST_F(ALogicViewerLua, timerNodeByName)
     {
         auto* ticker = getInput<rlogic::TimerNode>("foo", "ticker_us");
@@ -737,6 +807,9 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, animationNodeByName)
     {
         auto* progress = getInput<rlogic::AnimationNode>("foo", "progress");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*progress);
+
         EXPECT_EQ(Result(), loadLua(R"(
             rlogic.animationNodes.foo.IN.progress.value = 198
         )"));
@@ -783,6 +856,9 @@ namespace rlogic::internal
         auto* node = getNode<rlogic::RamsesAppearanceBinding>("foo");
         ASSERT_EQ(4u, node->getId());
         auto* floatUniform = GetInput(node, "floatUniform");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*floatUniform);
+
         EXPECT_EQ(Result(), loadLua(R"(
             rlogic.appearanceBindings[4].IN.floatUniform.value = 9.1
         )"));
@@ -811,6 +887,20 @@ namespace rlogic::internal
         EXPECT_EQ(42, renderOrder->get<int32_t>().value());
     }
 
+    TEST_F(ALogicViewerLua, renderGroupBindingById)
+    {
+        auto* rg = getNode<rlogic::RamsesRenderGroupBinding>("rg");
+        ASSERT_EQ(9u, rg->getId());
+        auto* renderOrder = GetInput(rg, "renderOrders")->getChild("nestedRG");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*renderOrder);
+
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.renderGroupBindings[9].IN.renderOrders.nestedRG.value = 42
+        )"));
+        EXPECT_EQ(42, renderOrder->get<int32_t>().value());
+    }
+
     TEST_F(ALogicViewerLua, timerNodeById)
     {
         auto* node = getNode<rlogic::TimerNode>("foo");
@@ -833,10 +923,13 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, animationNodeById)
     {
         auto* node = getNode<rlogic::AnimationNode>("foo");
-        ASSERT_EQ(11u, node->getId());
+        ASSERT_EQ(12u, node->getId());
         auto* progress = GetInput(node, "progress");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*progress);
+
         EXPECT_EQ(Result(), loadLua(R"(
-            rlogic.animationNodes[11].IN.progress.value = 198
+            rlogic.animationNodes[12].IN.progress.value = 198
         )"));
         EXPECT_FLOAT_EQ(198.f, progress->get<float>().value());
     }
@@ -844,7 +937,7 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, animationNodeWrongId)
     {
         auto* node = getNode<rlogic::AnimationNode>("foo");
-        ASSERT_EQ(11u, node->getId());
+        ASSERT_EQ(12u, node->getId());
         EXPECT_THAT(loadLua(R"(
             rlogic.animationNodes[89032].IN.progress.value = 198
         )").getMessage(), testing::HasSubstr("attempt to index field '?' (a nil value)"));
@@ -853,6 +946,9 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, iterateAnimationNodes)
     {
         auto* progress = getInput<rlogic::AnimationNode>("foo", "progress");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*progress);
+
         EXPECT_EQ(Result(), loadLua(R"(
             for node in rlogic.animationNodes() do
                 node.IN.progress.value = 78.6
@@ -894,8 +990,8 @@ namespace rlogic::internal
 
         EXPECT_EQ(Result(), viewer.update());
 
-        EXPECT_EQ(0u, summary.getLinkActivations().maxValue);
-        EXPECT_EQ(6u, summary.getNodesExecuted().size());
-        EXPECT_EQ(3u, summary.getNodesSkippedExecution().size());
+        EXPECT_EQ(2u, summary.getLinkActivations().maxValue);
+        EXPECT_EQ(10u, summary.getNodesExecuted().size());
+        EXPECT_EQ(0u, summary.getNodesSkippedExecution().size());
     }
 }

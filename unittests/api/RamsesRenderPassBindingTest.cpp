@@ -139,7 +139,7 @@ namespace rlogic::internal
         {
             RamsesRenderPassBindingImpl binding(*m_renderPass, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesRenderPassBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesRenderPassBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -174,7 +174,7 @@ namespace rlogic::internal
         {
             RamsesRenderPassBindingImpl binding(*m_renderPass, "name", 1u);
             binding.createRootProperties();
-            (void)RamsesRenderPassBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesRenderPassBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -480,7 +480,7 @@ namespace rlogic::internal
     {
         {
             m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "renderPass");
-            ASSERT_TRUE(m_logicEngine.saveToFile("binding.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "binding.bin"));
         }
 
         {
@@ -510,7 +510,7 @@ namespace rlogic::internal
             binding.getInputs()->getChild("renderOrder")->set(42);
             m_logicEngine.update();
             EXPECT_EQ(42, m_renderPass->getRenderOrder());
-            ASSERT_TRUE(m_logicEngine.saveToFile("logic.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "logic.bin"));
         }
 
         {
@@ -530,7 +530,7 @@ namespace rlogic::internal
         {
             LogicEngine tempEngineForSaving{ EFeatureLevel_02 };
             tempEngineForSaving.createRamsesRenderPassBinding(*m_renderPass, "AppBinding");
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("WithRamsesRenderPass.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "WithRamsesRenderPass.bin"));
         }
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesRenderPass.bin"));
@@ -563,7 +563,7 @@ namespace rlogic::internal
 
             ASSERT_TRUE(m_logicEngine.link(*script->getOutputs()->getChild("val"), *renderPassBinding.getInputs()->getChild("renderOrder")));
             ASSERT_TRUE(m_logicEngine.update());
-            ASSERT_TRUE(m_logicEngine.saveToFile("SomeValuesLinked.bin"));
+            ASSERT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "SomeValuesLinked.bin"));
         }
 
         // Set renderOrder to a different value than the one set by the link

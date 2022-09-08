@@ -30,6 +30,7 @@ namespace ramses
     class Appearance;
     class Camera;
     class RenderPass;
+    class RenderGroup;
 }
 
 namespace rlogic_serialization
@@ -54,6 +55,8 @@ namespace rlogic
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
     class RamsesRenderPassBinding;
+    class RamsesRenderGroupBinding;
+    class RamsesRenderGroupBindingElements;
     class DataArray;
     class AnimationNode;
     class TimerNode;
@@ -66,6 +69,7 @@ namespace rlogic::internal
     class IRamsesObjectResolver;
     class AnimationNodeConfigImpl;
     class ValidationResults;
+    class SerializationMap;
     class RamsesNodeBindingImpl;
     class RamsesCameraBindingImpl;
 
@@ -88,11 +92,15 @@ namespace rlogic::internal
         ApiObjects(const ApiObjects& other) = delete;
         ApiObjects& operator=(const ApiObjects& other) = delete;
 
+        [[nodiscard]] size_t getTotalSerializedSize() const;
+
+        template<typename T>
+        [[nodiscard]] size_t getSerializedSize() const;
+
         // Serialization/Deserialization
         static flatbuffers::Offset<rlogic_serialization::ApiObjects> Serialize(
             const ApiObjects& apiObjects,
-            flatbuffers::FlatBufferBuilder& builder,
-            EFeatureLevel featureLevel);
+            flatbuffers::FlatBufferBuilder& builder);
         static std::unique_ptr<ApiObjects> Deserialize(
             const rlogic_serialization::ApiObjects& apiObjects,
             const IRamsesObjectResolver* ramsesResolver,
@@ -119,6 +127,7 @@ namespace rlogic::internal
         RamsesAppearanceBinding* createRamsesAppearanceBinding(ramses::Appearance& ramsesAppearance, std::string_view name);
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, bool withFrustumPlanes, std::string_view name);
         RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& renderPass, std::string_view name);
+        RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationNodeConfigImpl& config, std::string_view name);
@@ -129,6 +138,7 @@ namespace rlogic::internal
         // Invariance checks
         [[nodiscard]] bool checkBindingsReferToSameRamsesScene(ErrorReporting& errorReporting) const;
         void validateInterfaces(ValidationResults& validationResults) const;
+        void validateDanglingNodes(ValidationResults& validationResults) const;
 
         // Getters
         template <typename T>
@@ -172,6 +182,7 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(RamsesAppearanceBinding& ramsesAppearanceBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesRenderPassBinding& ramsesRenderPassBinding, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(RamsesRenderGroupBinding& ramsesRenderGroupBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(AnimationNode& node, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(TimerNode& node, ErrorReporting& errorReporting);
@@ -181,22 +192,23 @@ namespace rlogic::internal
 
         std::unique_ptr<SolState> m_solState {std::make_unique<SolState>()};
 
-        ApiObjectContainer<LuaScript>               m_scripts;
-        ApiObjectContainer<LuaInterface>            m_interfaces;
-        ApiObjectContainer<LuaModule>               m_luaModules;
-        ApiObjectContainer<RamsesNodeBinding>       m_ramsesNodeBindings;
-        ApiObjectContainer<RamsesAppearanceBinding> m_ramsesAppearanceBindings;
-        ApiObjectContainer<RamsesCameraBinding>     m_ramsesCameraBindings;
-        ApiObjectContainer<RamsesRenderPassBinding> m_ramsesRenderPassBindings;
-        ApiObjectContainer<DataArray>               m_dataArrays;
-        ApiObjectContainer<AnimationNode>           m_animationNodes;
-        ApiObjectContainer<TimerNode>               m_timerNodes;
-        ApiObjectContainer<AnchorPoint>             m_anchorPoints;
-        ApiObjectContainer<LogicObject>             m_logicObjects;
-        ApiObjectOwningContainer                    m_objectsOwningContainer;
+        ApiObjectContainer<LuaScript>                m_scripts;
+        ApiObjectContainer<LuaInterface>             m_interfaces;
+        ApiObjectContainer<LuaModule>                m_luaModules;
+        ApiObjectContainer<RamsesNodeBinding>        m_ramsesNodeBindings;
+        ApiObjectContainer<RamsesAppearanceBinding>  m_ramsesAppearanceBindings;
+        ApiObjectContainer<RamsesCameraBinding>      m_ramsesCameraBindings;
+        ApiObjectContainer<RamsesRenderPassBinding>  m_ramsesRenderPassBindings;
+        ApiObjectContainer<RamsesRenderGroupBinding> m_ramsesRenderGroupBindings;
+        ApiObjectContainer<DataArray>                m_dataArrays;
+        ApiObjectContainer<AnimationNode>            m_animationNodes;
+        ApiObjectContainer<TimerNode>                m_timerNodes;
+        ApiObjectContainer<AnchorPoint>              m_anchorPoints;
+        ApiObjectContainer<LogicObject>              m_logicObjects;
+        ApiObjectOwningContainer                     m_objectsOwningContainer;
 
-        LogicNodeDependencies                       m_logicNodeDependencies;
-        uint64_t                                    m_lastObjectId = 0;
+        LogicNodeDependencies                        m_logicNodeDependencies;
+        uint64_t                                     m_lastObjectId = 0;
 
         std::unordered_map<LogicNodeImpl*, LogicNode*> m_reverseImplMapping;
         std::unordered_map<uint64_t, LogicObject*>     m_logicObjectIdMapping;

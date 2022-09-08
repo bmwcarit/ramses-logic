@@ -19,6 +19,7 @@ namespace ramses
     class Appearance;
     class Camera;
     class RenderPass;
+    class RenderGroup;
 }
 
 namespace rlogic::internal
@@ -34,6 +35,8 @@ namespace rlogic::internal
         [[nodiscard]] virtual ramses::Appearance* findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
         [[nodiscard]] virtual ramses::Camera* findRamsesCameraInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
         [[nodiscard]] virtual ramses::RenderPass* findRamsesRenderPassInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
+        [[nodiscard]] virtual ramses::RenderGroup* findRamsesRenderGroupInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
+        [[nodiscard]] virtual ramses::SceneObject* findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const = 0;
     };
 
     class RamsesObjectResolver final : public IRamsesObjectResolver
@@ -45,6 +48,8 @@ namespace rlogic::internal
         [[nodiscard]] ramses::Appearance* findRamsesAppearanceInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
         [[nodiscard]] ramses::Camera* findRamsesCameraInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
         [[nodiscard]] ramses::RenderPass* findRamsesRenderPassInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
+        [[nodiscard]] ramses::RenderGroup* findRamsesRenderGroupInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
+        [[nodiscard]] ramses::SceneObject* findRamsesSceneObjectInScene(std::string_view logicNodeName, ramses::sceneObjectId_t objectId) const override;
 
     private:
         template <typename T>

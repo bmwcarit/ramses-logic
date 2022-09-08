@@ -13,6 +13,7 @@ include "RamsesNodeBinding.fbs";
 include "RamsesAppearanceBinding.fbs";
 include "RamsesCameraBinding.fbs";
 include "RamsesRenderPassBinding.fbs";
+include "RamsesRenderGroupBinding.fbs";
 include "Link.fbs";
 include "DataArray.fbs";
 include "AnimationNode.fbs";
@@ -36,4 +37,5 @@ table ApiObjects
     lastObjectId:uint64 = 0;
     renderPassBindings:[RamsesRenderPassBinding];
     anchorPoints:[AnchorPoint];
+    renderGroupBindings:[RamsesRenderGroupBinding];
 }

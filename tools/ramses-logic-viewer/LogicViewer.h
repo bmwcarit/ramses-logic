@@ -36,6 +36,7 @@ namespace rlogic
         static const char* const ltnAppearance;
         static const char* const ltnCamera;
         static const char* const ltnRenderPass;
+        static const char* const ltnRenderGroup;
         static const char* const ltnAnchorPoint;
         static const char* const ltnScreenshot;
         static const char* const ltnViews;

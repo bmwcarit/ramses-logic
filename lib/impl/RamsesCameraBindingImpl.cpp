@@ -71,10 +71,7 @@ namespace rlogic::internal
             }
         );
 
-        setRootProperties(
-            std::make_unique<Property>(std::make_unique<PropertyImpl>(cameraBindingInputs, EPropertySemantics::BindingInput)),
-            {} // No outputs
-        );
+        setRootInputs(std::make_unique<Property>(std::make_unique<PropertyImpl>(cameraBindingInputs, EPropertySemantics::BindingInput)));
 
         ApplyRamsesValuesToInputProperties(*this);
     }
@@ -82,7 +79,8 @@ namespace rlogic::internal
     flatbuffers::Offset<rlogic_serialization::RamsesCameraBinding> RamsesCameraBindingImpl::Serialize(
         const RamsesCameraBindingImpl& cameraBinding,
         flatbuffers::FlatBufferBuilder& builder,
-        SerializationMap& serializationMap)
+        SerializationMap& serializationMap,
+        EFeatureLevel /*featureLevel*/)
     {
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(cameraBinding.m_ramsesCamera, builder);
 
@@ -167,7 +165,7 @@ namespace rlogic::internal
 
         auto binding = std::make_unique<RamsesCameraBindingImpl>(*resolvedCamera, hasFrustumPlanesProperties, name, id);
         binding->setUserId(userIdHigh, userIdLow);
-        binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
+        binding->setRootInputs(std::make_unique<Property>(std::move(deserializedRootInput)));
 
         ApplyRamsesValuesToInputProperties(*binding);
 

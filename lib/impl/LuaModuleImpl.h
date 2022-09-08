@@ -48,8 +48,8 @@ namespace rlogic::internal
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LuaModule> Serialize(
             const LuaModuleImpl& module,
             flatbuffers::FlatBufferBuilder& builder,
-            EFeatureLevel featureLevel,
-            SerializationMap& serializationMap);
+            SerializationMap& serializationMap,
+            EFeatureLevel featureLevel);
 
         [[nodiscard]] static std::unique_ptr<LuaModuleImpl> Deserialize(
             SolState& solState,

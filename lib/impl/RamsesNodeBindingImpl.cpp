@@ -40,11 +40,11 @@ namespace rlogic::internal
                 TypeData{"translation", EPropertyType::Vec3f},
                 TypeData{"scaling", EPropertyType::Vec3f}
             });
-        if (m_featureLevel == EFeatureLevel_02)
+        if (m_featureLevel >= EFeatureLevel_02)
             inputsType.children.push_back({ TypeData{"enabled", EPropertyType::Bool}, {} });
         auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(inputsType, EPropertySemantics::BindingInput));
 
-        setRootProperties(std::move(inputs), {});
+        setRootInputs(std::move(inputs));
 
         ApplyRamsesValuesToInputProperties(*this, m_ramsesNode, m_featureLevel);
     }
@@ -52,7 +52,8 @@ namespace rlogic::internal
     flatbuffers::Offset<rlogic_serialization::RamsesNodeBinding> RamsesNodeBindingImpl::Serialize(
         const RamsesNodeBindingImpl& nodeBinding,
         flatbuffers::FlatBufferBuilder& builder,
-        SerializationMap& serializationMap)
+        SerializationMap& serializationMap,
+        EFeatureLevel /*featureLevel*/)
     {
         auto ramsesReference = RamsesBindingImpl::SerializeRamsesReference(nodeBinding.m_ramsesNode, builder);
 
@@ -141,7 +142,7 @@ namespace rlogic::internal
 
         auto binding = std::make_unique<RamsesNodeBindingImpl>(*ramsesNode, rotationType, name, id, featureLevel);
         binding->setUserId(userIdHigh, userIdLow);
-        binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
+        binding->setRootInputs(std::make_unique<Property>(std::move(deserializedRootInput)));
 
         ApplyRamsesValuesToInputProperties(*binding, *ramsesNode, featureLevel);
 

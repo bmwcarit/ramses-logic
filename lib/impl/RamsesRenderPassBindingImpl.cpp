@@ -38,7 +38,7 @@ namespace rlogic::internal
             });
         auto inputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(std::move(inputsType), EPropertySemantics::BindingInput));
 
-        setRootProperties(std::move(inputs), {});
+        setRootInputs(std::move(inputs));
 
         ApplyRamsesValuesToInputProperties(*this, m_ramsesRenderPass);
     }
@@ -46,7 +46,8 @@ namespace rlogic::internal
     flatbuffers::Offset<rlogic_serialization::RamsesRenderPassBinding> RamsesRenderPassBindingImpl::Serialize(
         const RamsesRenderPassBindingImpl& renderPassBinding,
         flatbuffers::FlatBufferBuilder& builder,
-        SerializationMap& serializationMap)
+        SerializationMap& serializationMap,
+        EFeatureLevel /*featureLevel*/)
     {
         const auto logicObject = LogicObjectImpl::Serialize(renderPassBinding, builder);
         const auto fbRamsesRef = RamsesBindingImpl::SerializeRamsesReference(renderPassBinding.m_ramsesRenderPass, builder);
@@ -120,7 +121,7 @@ namespace rlogic::internal
 
         auto binding = std::make_unique<RamsesRenderPassBindingImpl>(*ramsesRenderPass, name, id);
         binding->setUserId(userIdHigh, userIdLow);
-        binding->setRootProperties(std::make_unique<Property>(std::move(deserializedRootInput)), {});
+        binding->setRootInputs(std::make_unique<Property>(std::move(deserializedRootInput)));
 
         ApplyRamsesValuesToInputProperties(*binding, *ramsesRenderPass);
 

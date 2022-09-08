@@ -18,6 +18,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/AnchorPoint.h"
 #include "ramses-logic/Property.h"
 #include "internals/SolHelper.h"
@@ -308,6 +309,7 @@ namespace rlogic
     template struct NodeListWrapper<RamsesAppearanceBinding>;
     template struct NodeListWrapper<RamsesCameraBinding>;
     template struct NodeListWrapper<RamsesRenderPassBinding>;
+    template struct NodeListWrapper<RamsesRenderGroupBinding>;
     template struct NodeListWrapper<AnchorPoint>;
 } // namespace rlogic
 

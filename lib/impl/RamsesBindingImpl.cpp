@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "impl/RamsesBindingImpl.h"
+#include "ramses-logic/Property.h"
 
 #include "ramses-client-api/SceneObject.h"
 
@@ -34,5 +35,10 @@ namespace rlogic::internal
         builder.Finish(ramsesRef);
 
         return ramsesRef;
+    }
+
+    void RamsesBindingImpl::setRootInputs(std::unique_ptr<Property> rootInputs)
+    {
+        setRootProperties(std::move(rootInputs), {});
     }
 }

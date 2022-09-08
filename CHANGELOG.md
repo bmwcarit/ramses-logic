@@ -1,12 +1,31 @@
 # master
 
-# Ongoing
+# Unreleased
+
+**CHANGED**
+
+**ADDED**
+
+**FIXED**
+
+# v1.2.0
+
+**Features**
+
+* Added new Feature Level 03 with following features:
+    * Added RamsesRenderGroupBinding and RamsesRenderGroupBindingElements to control render order of elements in a ramses::RenderGroup
+
+**General Changes**
+
+* Upgrade ramses from 27.0.121 to 27.0.122 (patchfix)
+* ramses-logic-viewer: added GUI option to change clear the display color (both offscreen or not)
 
 # v1.1.1
 
 **API Changes**
 
 * Added Property::getOwningLogicNode to query which logic node the propery belongs to
+* Add new function to get the serialized size of ramses-logic objects
 * Added Property::getIncomingLink, Property::getOutogingLinksCount and Property::getOutogingLink to query which properties are linked to it
 * Added LogicEngine::getPropertyLinks to collect and retrieve all existing links between properties
 * Added static LogicEngine::GetFeatureLevelFromBuffer which can parse a rlogic data buffer and detect its feature level without having to instantiate LogicEngine first.

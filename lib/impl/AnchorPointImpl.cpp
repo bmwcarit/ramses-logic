@@ -45,7 +45,8 @@ namespace rlogic::internal
     flatbuffers::Offset<rlogic_serialization::AnchorPoint> AnchorPointImpl::Serialize(
         const AnchorPointImpl& anchorPoint,
         flatbuffers::FlatBufferBuilder& builder,
-        SerializationMap& serializationMap)
+        SerializationMap& serializationMap,
+        EFeatureLevel /*featureLevel*/)
     {
         const auto fbLogicObject = LogicObjectImpl::Serialize(anchorPoint, builder);
         const auto fbOutputs = PropertyImpl::Serialize(*anchorPoint.getOutputs()->m_impl, builder, serializationMap);

@@ -31,6 +31,7 @@ namespace ramses
     class Appearance;
     class Camera;
     class RenderPass;
+    class RenderGroup;
 }
 
 namespace rlogic::internal
@@ -49,6 +50,8 @@ namespace rlogic
     class RamsesAppearanceBinding;
     class RamsesCameraBinding;
     class RamsesRenderPassBinding;
+    class RamsesRenderGroupBinding;
+    class RamsesRenderGroupBindingElements;
     class DataArray;
     class AnimationNode;
     class AnimationNodeConfig;
@@ -286,7 +289,7 @@ namespace rlogic
          * for each frustum plane also for perspective camera. See #rlogic::RamsesCameraBinding for details.
          * Note that ramses::OrthographicCamera binding will always have frustum planes as properties whether #createRamsesCameraBinding
          * or #createRamsesCameraBindingWithFrustumPlanes is used to create it.
-         * #rlogic::RamsesCameraBinding with frustum planes can only be created with #rlogic::EFeatureLevel_02 enabled,
+         * #rlogic::RamsesCameraBinding with frustum planes can only be created with #rlogic::EFeatureLevel_02 or higher enabled,
          * see #LogicEngine(EFeatureLevel).
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
@@ -301,7 +304,7 @@ namespace rlogic
 
         /**
          * Creates a new #rlogic::RamsesRenderPassBinding which can be used to set the properties of a ramses::RenderPass object.
-         * #rlogic::RamsesRenderPassBinding can only be created with #rlogic::EFeatureLevel_02 enabled, see #LogicEngine(EFeatureLevel).
+         * #rlogic::RamsesRenderPassBinding can only be created with #rlogic::EFeatureLevel_02 or higher enabled, see #LogicEngine(EFeatureLevel).
          *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
@@ -312,6 +315,24 @@ namespace rlogic
          * The binding can be destroyed by calling the #destroy method
          */
         RLOGIC_API RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name ="");
+
+        /**
+         * Creates a new #rlogic::RamsesRenderGroupBinding which can be used to control some properties of a ramses::RenderGroup object.
+         * #rlogic::RamsesRenderGroupBinding can only be created with #rlogic::EFeatureLevel_03 or higher enabled, see #LogicEngine(EFeatureLevel).
+         * #rlogic::RamsesRenderGroupBinding can be used to control render order of elements it contains on Ramses side - ramses::MeshNode or ramses::RenderGroup,
+         * the elements to control must be provided explicitly at creation time, see #rlogic::RamsesRenderGroupBindingElements and #rlogic::RamsesRenderGroupBinding
+         * to learn how these elements form the binding's input properties.
+         *
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param ramsesRenderGroup the ramses::RenderGroup object to control with the binding.
+         * @param elements collection of elements (MeshNode or RenderGroup) to control with this #rlogic::RamsesRenderGroupBinding.
+         * @param name a name for the the new #rlogic::RamsesRenderGroupBinding.
+         * @return a pointer to the created object or nullptr if
+         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
+         */
+        RLOGIC_API RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name ="");
 
         /**
         * Creates a new #rlogic::DataArray to store data which can be used with animations.
@@ -359,7 +380,7 @@ namespace rlogic
         /**
         * Creates a new #rlogic::AnchorPoint that can be used to calculate projected coordinates of given ramses::Node when viewed using given ramses::Camera.
         * See #rlogic::AnchorPoint for more details and usage of this special purpose logic node.
-        * #rlogic::AnchorPoint can only be created with #rlogic::EFeatureLevel_02 enabled, see #LogicEngine(EFeatureLevel).
+        * #rlogic::AnchorPoint can only be created with #rlogic::EFeatureLevel_02 or higher enabled, see #LogicEngine(EFeatureLevel).
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
@@ -655,6 +676,22 @@ namespace rlogic
         RLOGIC_API bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
 
         /**
+         * Calculates the serialized size of all objects contained in this LogicEngine instance.
+         * @return size in bytes of the serialized LogicEngine.
+         */
+        [[nodiscard]] RLOGIC_API size_t getTotalSerializedSize() const;
+
+        /**
+        * Calculates the serialized size of a specific type of objects contained in this LogicEngine instance.
+        * \c T must be a concrete logic object type (e.g. #rlogic::LuaScript). For the logic type LogicObject the size of all logic objects will be returned.
+        *
+        * @tparam T Logic object type
+        * @return size in bytes of the serialized objects.
+        */
+        template<typename T>
+        [[nodiscard]] size_t getSerializedSize() const;
+
+        /**
         * Attempts to parse feature level from a Ramses Logic file.
         *
         * @param[in] filename file path to Ramses Logic file
@@ -714,6 +751,14 @@ namespace rlogic
         */
         template <typename T>
         [[nodiscard]] RLOGIC_API Collection<T> getLogicObjectsInternal() const;
+
+        /**
+        * Internal implementation of type specific size getter
+        * @tparam T Logic object type
+        * @return size in bytes of the serialized objects.
+        */
+        template<typename T>
+        [[nodiscard]] RLOGIC_API size_t getSerializedSizeInternal() const;
 
         /**
         * Internal implementation of object finder
@@ -787,10 +832,18 @@ namespace rlogic
             std::is_same_v<T, RamsesAppearanceBinding> ||
             std::is_same_v<T, RamsesCameraBinding> ||
             std::is_same_v<T, RamsesRenderPassBinding> ||
+            std::is_same_v<T, RamsesRenderGroupBinding> ||
             std::is_same_v<T, DataArray> ||
             std::is_same_v<T, AnimationNode> ||
             std::is_same_v<T, TimerNode> ||
             std::is_same_v<T, AnchorPoint>,
             "Attempting to retrieve invalid type of object.");
+    }
+
+    template<typename T>
+    size_t LogicEngine::getSerializedSize() const
+    {
+        StaticTypeCheck<T>();
+        return getSerializedSizeInternal<T>();
     }
 }

@@ -54,7 +54,9 @@ namespace rlogic
             }
         }
 
-        logicEngine.saveToFile(fileName);
+        SaveFileConfig configNoValidation;
+        configNoValidation.setValidationEnabled(false);
+        logicEngine.saveToFile(fileName, configNoValidation);
 
         std::ifstream fileStream(std::string(fileName), std::ifstream::binary);
         fileStream.seekg(0, std::ios::end);

@@ -101,6 +101,11 @@ namespace rlogic::internal
             const auto obj5 = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "");
             EXPECT_FALSE(obj5->m_impl.isDirty());
         }
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            const auto obj6 = createRenderGroupBinding();
+            EXPECT_FALSE(obj6->m_impl.isDirty());
+        }
     }
 
     TEST_P(ALogicEngine_Dirtiness, DirtyAfterCreatingNodeBinding_AndChangingInput)
@@ -134,6 +139,16 @@ namespace rlogic::internal
         EXPECT_TRUE(binding->m_impl.isDirty());
     }
 
+    TEST_P(ALogicEngine_Dirtiness, DirtyAfterCreatingRenderGroupBinding_AndChangingInput)
+    {
+        if (GetParam() < EFeatureLevel_03)
+            GTEST_SKIP();
+
+        auto binding = createRenderGroupBinding();
+        binding->getInputs()->getChild("renderOrders")->getChild("mesh")->set(42);
+        EXPECT_TRUE(binding->m_impl.isDirty());
+    }
+
     TEST_P(ALogicEngine_Dirtiness, NotDirty_AfterCreatingObjectsAndCallingUpdate)
     {
         const auto obj1 = m_logicEngine.createLuaScript(m_valid_empty_script);
@@ -142,8 +157,11 @@ namespace rlogic::internal
         const auto obj4 = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "");
         const auto obj5 = m_logicEngine.createRamsesCameraBinding(*m_camera, "");
         const RamsesRenderPassBinding* obj6 = nullptr;
+        const RamsesRenderGroupBinding* obj7 = nullptr;
         if (GetParam() >= EFeatureLevel_02)
             obj6 = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "");
+        if (GetParam() >= EFeatureLevel_03)
+            obj7 = createRenderGroupBinding();
 
         m_logicEngine.update();
         EXPECT_FALSE(obj1->m_impl.isDirty());
@@ -154,6 +172,10 @@ namespace rlogic::internal
         if (GetParam() >= EFeatureLevel_02)
         {
             EXPECT_FALSE(obj6->m_impl.isDirty());
+        }
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            EXPECT_FALSE(obj7->m_impl.isDirty());
         }
     }
 

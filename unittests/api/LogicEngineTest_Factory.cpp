@@ -20,6 +20,7 @@
 #include "FeatureLevelTestValues.h"
 #include "WithTempDirectory.h"
 
+#include <fmt/format.h>
 #include <fstream>
 
 namespace rlogic
@@ -262,7 +263,42 @@ namespace rlogic
         const auto binding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
         EXPECT_FALSE(binding);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesRenderPassBinding, feature level 02 is required, feature level in this runtime set to 01.");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create RamsesRenderPassBinding, feature level 02 or higher is required, feature level in this runtime set to 01.");
+    }
+
+    TEST_P(ALogicEngine_Factory, DestroysRamsesRenderGroupBindingWithoutErrors)
+    {
+        if (GetParam() < EFeatureLevel_03)
+            GTEST_SKIP();
+
+        auto binding = createRenderGroupBinding();
+        ASSERT_TRUE(binding);
+        ASSERT_TRUE(m_logicEngine.destroy(*binding));
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorsWhenDestroyingRamsesRenderGroupBindingFromAnotherEngineInstance)
+    {
+        if (GetParam() < EFeatureLevel_03)
+            GTEST_SKIP();
+
+        auto binding = createRenderGroupBinding();
+        ASSERT_TRUE(binding);
+
+        LogicEngine otherLogicEngine{ GetParam() };
+        ASSERT_FALSE(otherLogicEngine.destroy(*binding));
+        EXPECT_EQ(otherLogicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(otherLogicEngine.getErrors()[0].message, "Can't find RamsesRenderGroupBinding in logic engine!");
+    }
+
+    TEST_P(ALogicEngine_Factory, FailsToCreateRamsesRenderGroupBindingOnFeatureLevelBelow03)
+    {
+        if (GetParam() >= EFeatureLevel_03)
+            GTEST_SKIP();
+
+        const auto binding = createRenderGroupBinding();
+        EXPECT_FALSE(binding);
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, fmt::format("Cannot create RamsesRenderGroupBinding, feature level 03 or higher is required, feature level in this runtime set to 0{}.", GetParam()));
     }
 
     TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingAnchorPointAndNodeOrCameraFromAnotherInstance)
@@ -297,7 +333,7 @@ namespace rlogic
         const auto anchorPoint = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
         EXPECT_FALSE(anchorPoint);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
-        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create AnchorPoint, feature level 02 is required, feature level in this runtime set to 01.");
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create AnchorPoint, feature level 02 or higher is required, feature level in this runtime set to 01.");
     }
 
     TEST_P(ALogicEngine_Factory, RenamesObjectsAfterCreation)
@@ -322,6 +358,13 @@ namespace rlogic
             auto ramsesRenderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
             ramsesRenderPassBinding->setName("");
             EXPECT_EQ("", ramsesRenderPassBinding->getName());
+        }
+
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            auto ramsesRenderGroupBinding = createRenderGroupBinding();
+            ramsesRenderGroupBinding->setName("");
+            EXPECT_EQ("", ramsesRenderGroupBinding->getName());
         }
     }
 
@@ -358,6 +401,13 @@ namespace rlogic
             LogicObject* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rp");
             EXPECT_TRUE(renderPassBinding->as<RamsesRenderPassBinding>());
             EXPECT_FALSE(renderPassBinding->as<RamsesCameraBinding>());
+        }
+
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            LogicObject* renderGroupBinding = createRenderGroupBinding();
+            EXPECT_TRUE(renderGroupBinding->as<RamsesRenderGroupBinding>());
+            EXPECT_FALSE(renderGroupBinding->as<RamsesCameraBinding>());
         }
 
         //cast obj -> node -> binding -> appearanceBinding
@@ -429,6 +479,14 @@ namespace rlogic
             EXPECT_FALSE(renderPassBindingConst->as<LuaInterface>());
         }
 
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            createRenderGroupBinding();
+            const auto* renderGroupBindingConst = immutableLogicEngine.findByName<LogicObject>("renderGroupBinding");
+            EXPECT_TRUE(renderGroupBindingConst->as<RamsesRenderGroupBinding>());
+            EXPECT_FALSE(renderGroupBindingConst->as<LuaInterface>());
+        }
+
         // cast obj -> node -> binding -> appearanceBinding
         const auto* nodeCastFromObject = appearanceBindingConst->as<LogicNode>();
         EXPECT_TRUE(nodeCastFromObject);
@@ -490,6 +548,9 @@ namespace rlogic
         const RamsesRenderPassBinding* rpBinding = nullptr;
         if (GetParam() >= EFeatureLevel_02)
             rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "RenderPass");
+        const RamsesRenderGroupBinding* rgBinding = nullptr;
+        if (GetParam() >= EFeatureLevel_03)
+            rgBinding = createRenderGroupBinding();
 
         LogicEngine movedLogicEngine(std::move(m_logicEngine));
         EXPECT_EQ(script, movedLogicEngine.findByName<LuaScript>("Script"));
@@ -499,6 +560,10 @@ namespace rlogic
         if (GetParam() >= EFeatureLevel_02)
         {
             EXPECT_EQ(rpBinding, movedLogicEngine.findByName<RamsesRenderPassBinding>("RenderPass"));
+        }
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            EXPECT_EQ(rgBinding, movedLogicEngine.findByName<RamsesRenderGroupBinding>("renderGroupBinding"));
         }
 
         movedLogicEngine.update();
@@ -513,6 +578,10 @@ namespace rlogic
         if (GetParam() >= EFeatureLevel_02)
         {
             EXPECT_EQ(rpBinding, moveAssignedLogicEngine.findByName<RamsesRenderPassBinding>("RenderPass"));
+        }
+        if (GetParam() >= EFeatureLevel_03)
+        {
+            EXPECT_EQ(rgBinding, moveAssignedLogicEngine.findByName<RamsesRenderGroupBinding>("renderGroupBinding"));
         }
 
         moveAssignedLogicEngine.update();

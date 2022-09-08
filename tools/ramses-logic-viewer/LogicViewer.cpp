@@ -15,6 +15,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Property.h"
@@ -65,6 +66,7 @@ namespace rlogic
             , appearanceBindings(logicEngine)
             , cameraBindings(logicEngine)
             , renderPassBindings(logicEngine)
+            , renderGroupBindings(logicEngine)
             , anchorPoints(logicEngine)
         {
         }
@@ -79,6 +81,7 @@ namespace rlogic
         NodeListWrapper<RamsesAppearanceBinding> appearanceBindings;
         NodeListWrapper<RamsesCameraBinding> cameraBindings;
         NodeListWrapper<RamsesRenderPassBinding> renderPassBindings;
+        NodeListWrapper<RamsesRenderGroupBinding> renderGroupBindings;
         NodeListWrapper<AnchorPoint> anchorPoints;
     };
 
@@ -91,6 +94,7 @@ namespace rlogic
     const char* const LogicViewer::ltnAppearance = "appearanceBindings";
     const char* const LogicViewer::ltnCamera     = "cameraBindings";
     const char* const LogicViewer::ltnRenderPass = "renderPassBindings";
+    const char* const LogicViewer::ltnRenderGroup = "renderGroupBindings";
     const char* const LogicViewer::ltnAnchorPoint = "anchorPoints";
     const char* const LogicViewer::ltnScreenshot = "screenshot";
     const char* const LogicViewer::ltnViews      = "views";
@@ -133,6 +137,7 @@ namespace rlogic
         registerNodeListType<RamsesAppearanceBinding>(m_sol, "AppearanceBindings");
         registerNodeListType<RamsesCameraBinding>(m_sol, "CameraBindings");
         registerNodeListType<RamsesRenderPassBinding>(m_sol, "RenderPassBindings");
+        registerNodeListType<RamsesRenderGroupBinding>(m_sol, "RenderGroupBindings");
         registerNodeListType<AnchorPoint>(m_sol, "AnchorPoints");
         m_sol.new_usertype<LogicNodeWrapper>("LogicNode", sol::meta_function::index, &LogicNodeWrapper::get, sol::meta_function::to_string, &LogicNodeWrapper::toString);
         m_sol.new_usertype<PropertyWrapper>("LogicProperty",
@@ -168,6 +173,8 @@ namespace rlogic
             sol::readonly(&LogicWrapper::cameraBindings),
             ltnRenderPass,
             sol::readonly(&LogicWrapper::renderPassBindings),
+            ltnRenderGroup,
+            sol::readonly(&LogicWrapper::renderGroupBindings),
             ltnAnchorPoint,
             sol::readonly(&LogicWrapper::anchorPoints),
             ltnViews,

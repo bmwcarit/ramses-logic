@@ -37,6 +37,8 @@ content = [
         'RamsesCameraBinding',
         'RamsesNodeBinding',
         'RamsesRenderPassBinding',
+        'RamsesRenderGroupBinding',
+        'RamsesRenderGroupBindingElements',
         'SaveFileConfig',
         'TimerNode',
         'AnchorPoint',

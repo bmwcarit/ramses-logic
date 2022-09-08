@@ -92,6 +92,8 @@ namespace rlogic::internal
         [[nodiscard]] const Property* getChild(std::string_view name) const;
         [[nodiscard]] bool hasChild(std::string_view name) const;
 
+        [[nodiscard]] std::vector<const Property*> collectLeafChildren() const;
+
         // Public API access - only ever called by user, full error check and logs
         template <typename T>
         [[nodiscard]] std::optional<T> getValue_PublicApi() const;

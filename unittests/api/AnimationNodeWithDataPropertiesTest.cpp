@@ -25,6 +25,8 @@ namespace rlogic::internal
         {
             m_dataFloat1 = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f, 2.f });
             m_dataFloat2 = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 10.f, 20.f });
+
+            m_configSaveFileWithoutValidation.setValidationEnabled(false);
         }
 
     protected:
@@ -83,6 +85,7 @@ namespace rlogic::internal
         LogicEngine m_logicEngine;
         DataArray* m_dataFloat1 = nullptr;
         DataArray* m_dataFloat2 = nullptr;
+        SaveFileConfig m_configSaveFileWithoutValidation;
     };
 
     TEST_F(AnAnimationNodeWithDataProperties, HasAnimationDataProperties)
@@ -249,7 +252,7 @@ namespace rlogic::internal
             ASSERT_TRUE(config.addChannel(channel2));
             ASSERT_TRUE(otherEngine.createAnimationNode(config, "animNode"));
 
-            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin"));
+            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin", m_configSaveFileWithoutValidation));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("logic_animNodes.bin"));
@@ -302,7 +305,7 @@ namespace rlogic::internal
             animNode->getInputs()->getChild("channelsData")->getChild("channel")->getChild("keyframes")->getChild(2u)->set(1000.f);
             EXPECT_TRUE(otherEngine.update());
 
-            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin"));
+            ASSERT_TRUE(otherEngine.saveToFile("logic_animNodes.bin", m_configSaveFileWithoutValidation));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("logic_animNodes.bin"));

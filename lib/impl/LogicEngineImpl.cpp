@@ -16,6 +16,8 @@
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/AnchorPoint.h"
 #include "ramses-logic/AnimationNodeConfig.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesRenderGroupBindingElements.h"
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
@@ -23,11 +25,15 @@
 #include "impl/LuaConfigImpl.h"
 #include "impl/SaveFileConfigImpl.h"
 #include "impl/LogicEngineReportImpl.h"
+#include "impl/RamsesRenderGroupBindingElementsImpl.h"
 
 #include "internals/FileUtils.h"
 #include "internals/TypeUtils.h"
 #include "internals/RamsesObjectResolver.h"
 #include "internals/ApiObjects.h"
+
+#include "ramses-client-api/RenderGroup.h"
+#include "ramses-utils.h"
 
 #include "generated/LogicEngineGen.h"
 #include "ramses-logic-build-config.h"
@@ -50,7 +56,7 @@ namespace rlogic::internal
         : m_apiObjects{ std::make_unique<ApiObjects>(featureLevel) }
         , m_featureLevel{ featureLevel }
     {
-        if (m_featureLevel != EFeatureLevel_01 && m_featureLevel != EFeatureLevel_02)
+        if (m_featureLevel != EFeatureLevel_01 && m_featureLevel != EFeatureLevel_02 && m_featureLevel != EFeatureLevel_03)
         {
             LOG_ERROR("Unrecognized feature level '0{}' provided, falling back to feature level 01", m_featureLevel);
             m_featureLevel = EFeatureLevel_01;
@@ -113,7 +119,7 @@ namespace rlogic::internal
         m_errors.clear();
         if (m_featureLevel < EFeatureLevel_02)
         {
-            m_errors.add(fmt::format("Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            m_errors.add(fmt::format("Cannot create RamsesCameraBinding with frustum planes properties, feature level 02 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
             return nullptr;
         }
 
@@ -125,11 +131,48 @@ namespace rlogic::internal
         m_errors.clear();
         if (m_featureLevel < EFeatureLevel_02)
         {
-            m_errors.add(fmt::format("Cannot create RamsesRenderPassBinding, feature level 02 is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            m_errors.add(fmt::format("Cannot create RamsesRenderPassBinding, feature level 02 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
             return nullptr;
         }
 
         return m_apiObjects->createRamsesRenderPassBinding(ramsesRenderPass, name);
+    }
+
+    RamsesRenderGroupBinding* LogicEngineImpl::createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name)
+    {
+        m_errors.clear();
+        if (m_featureLevel < EFeatureLevel_03)
+        {
+            m_errors.add(fmt::format("Cannot create RamsesRenderGroupBinding, feature level 03 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        if (elements.m_impl->getElements().empty())
+        {
+            m_errors.add("Cannot create RamsesRenderGroupBinding, there were no elements provided.", nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        for (const auto& element : elements.m_impl->getElements())
+        {
+            bool isContained = false;
+            if (element.second->isOfType(ramses::ERamsesObjectType_MeshNode))
+            {
+                isContained = ramsesRenderGroup.containsMeshNode(*ramses::RamsesUtils::TryConvert<ramses::MeshNode>(*element.second));
+            }
+            else if (element.second->isOfType(ramses::ERamsesObjectType_RenderGroup))
+            {
+                isContained = ramsesRenderGroup.containsRenderGroup(*ramses::RamsesUtils::TryConvert<ramses::RenderGroup>(*element.second));
+            }
+
+            if (!isContained)
+            {
+                m_errors.add("Cannot create RamsesRenderGroupBinding, one or more of the provided elements is not contained in the RenderGroup to bind.", nullptr, EErrorType::Other);
+                return nullptr;
+            }
+        }
+
+        return m_apiObjects->createRamsesRenderGroupBinding(ramsesRenderGroup, elements, name);
     }
 
     template <typename T>
@@ -194,7 +237,7 @@ namespace rlogic::internal
         m_errors.clear();
         if (m_featureLevel < EFeatureLevel_02)
         {
-            m_errors.add(fmt::format("Cannot create AnchorPoint, feature level 02 is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            m_errors.add(fmt::format("Cannot create AnchorPoint, feature level 02 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
             return nullptr;
         }
 
@@ -366,6 +409,7 @@ namespace rlogic::internal
             m_validationResults.add("Saving logic engine content with manually updated binding values without calling update() will result in those values being lost!", nullptr, EWarningType::UnsafeDataState);
 
         m_apiObjects->validateInterfaces(m_validationResults);
+        m_apiObjects->validateDanglingNodes(m_validationResults);
 
         return m_validationResults.getWarnings();
     }
@@ -440,13 +484,13 @@ namespace rlogic::internal
     const char* LogicEngineImpl::getFileIdentifierMatchingFeatureLevel() const
     {
         // Solution (workaround) to make sure that previously released rlogic 1.x.x library will fail to load exported binary
-        // with any other than the base 01 feature level. Feature level 02 has its own file identifier which can be read
+        // with any other than the base 01 feature level. Feature level 02 or higher has its own file identifier which can be read
         // only by rlogic version that supports it.
         // TODO remove this with new major release, feature levels are stored in schema and checked when loading,
         // no need to use file identifier for it.
 
         assert(std::string(rlogic_serialization::LogicEngineIdentifier()) == fileIdFeatureLevel01);
-        assert(m_featureLevel == EFeatureLevel_01 || m_featureLevel == EFeatureLevel_02);
+        assert(m_featureLevel == EFeatureLevel_01 || m_featureLevel == EFeatureLevel_02 || m_featureLevel == EFeatureLevel_03);
         return m_featureLevel == EFeatureLevel_01 ? rlogic_serialization::LogicEngineIdentifier() : fileIdFeatureLevel02orHigher;
     }
 
@@ -568,7 +612,7 @@ namespace rlogic::internal
         }
 
         const uint32_t featureLevelInt = logicEngine->featureLevel();
-        if (featureLevelInt != EFeatureLevel_01 && featureLevelInt != EFeatureLevel_02)
+        if (featureLevelInt != EFeatureLevel_01 && featureLevelInt != EFeatureLevel_02 && featureLevelInt != EFeatureLevel_03)
         {
             LOG_ERROR("Could not recognize feature level in file '{}'", logname);
             return false;
@@ -641,7 +685,7 @@ namespace rlogic::internal
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
             ramsesVersionOffset,
             ramsesLogicVersionOffset,
-            ApiObjects::Serialize(*m_apiObjects, builder, m_featureLevel),
+            ApiObjects::Serialize(*m_apiObjects, builder),
             assetMetadataOffset,
             m_featureLevel);
 
@@ -723,6 +767,11 @@ namespace rlogic::internal
     void LogicEngineImpl::setStatisticsLogLevel(ELogMessageType logLevel)
     {
         m_statistics.setLogLevel(logLevel);
+    }
+
+    size_t LogicEngineImpl::getTotalSerializedSize() const
+    {
+        return m_apiObjects->getTotalSerializedSize();
     }
 
     template DataArray* LogicEngineImpl::createDataArray<float>(const std::vector<float>&, std::string_view name);

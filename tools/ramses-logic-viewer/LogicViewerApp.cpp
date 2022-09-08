@@ -61,7 +61,6 @@ namespace rlogic
         Arguments                     args;
         ramses::RamsesFrameworkConfig frameworkConfig;
         frameworkConfig.setPeriodicLogsEnabled(false);
-        ramses::RendererConfig rendererConfig;
         ramses::DisplayConfig  displayConfig(argc, argv);
         displayConfig.setResizable(true);
         bool autoDetectViewportSize = true;
@@ -115,12 +114,22 @@ namespace rlogic
         displayConfig.getWindowRectangle(winX, winY, m_width, m_height);
         m_imguiHelper = std::make_unique<rlogic::ImguiClientHelper>(*m_client, m_width, m_height, guiSceneId);
 
+        ramses::RamsesRenderer* renderer = nullptr;
+        ramses::displayId_t displayId;
         if (!args.headless())
         {
-            const auto errorCode = initDisplay(args, rendererConfig, displayConfig);
-            if (errorCode != 0)
+            renderer = m_framework->createRenderer({});
+            if (!renderer)
             {
-                return errorCode;
+                std::cerr << "Could not create ramses renderer" << std::endl;
+                return static_cast<int>(ExitCode::ErrorRamsesRenderer);
+            }
+
+            displayId = initDisplay(args, *renderer, displayConfig);
+            if (!displayId.isValid())
+            {
+                std::cerr << "Could not create ramses display" << std::endl;
+                return static_cast<int>(ExitCode::ErrorNoDisplay);
             }
         }
 
@@ -175,6 +184,8 @@ namespace rlogic
         {
             m_gui->setSceneTexture(m_sceneSetup->getTextureSampler(), m_width, m_height);
             m_sceneSetup->apply();
+
+            m_gui->setRendererInfo(*renderer, displayId, m_sceneSetup->getOffscreenBuffer(), m_defaultClearColor);
         }
 
         if (args.writeConfig())
@@ -226,31 +237,18 @@ namespace rlogic
         return 0;
     }
 
-    int LogicViewerApp::initDisplay(const Arguments& args, const ramses::RendererConfig& rendererConfig, const ramses::DisplayConfig& displayConfig)
+    ramses::displayId_t LogicViewerApp::initDisplay(const Arguments& args, ramses::RamsesRenderer& renderer, const ramses::DisplayConfig& displayConfig)
     {
-        ramses::RamsesRenderer* renderer = m_framework->createRenderer(rendererConfig);
-        if (!renderer)
-        {
-            std::cerr << "Could not create ramses renderer" << std::endl;
-            return static_cast<int>(ExitCode::ErrorRamsesRenderer);
-        }
+        renderer.startThread();
+        m_imguiHelper->setRenderer(&renderer);
 
-        ramses::RendererSceneControl* sceneControl = renderer->getSceneControlAPI();
-        if (!sceneControl)
-        {
-            std::cerr << "Could not create scene Control" << std::endl;
-            return static_cast<int>(ExitCode::ErrorSceneControl);
-        }
-        renderer->startThread();
-        m_imguiHelper->setRenderer(renderer);
-
-        auto display = renderer->createDisplay(displayConfig);
+        const auto display = renderer.createDisplay(displayConfig);
         m_imguiHelper->setDisplayId(display);
-        renderer->flush();
+        renderer.flush();
 
         if (!m_imguiHelper->waitForDisplay(display))
         {
-            return static_cast<int>(ExitCode::ErrorNoDisplay);
+            return {};
         }
 
         if (args.noOffscreen())
@@ -262,7 +260,10 @@ namespace rlogic
             m_sceneSetup = std::make_unique<OffscreenSetup>(*m_imguiHelper, renderer, m_scene, display, m_width, m_height);
         }
 
-        return 0;
+        renderer.setDisplayBufferClearColor(display, m_sceneSetup->getOffscreenBuffer(), m_defaultClearColor[0], m_defaultClearColor[1], m_defaultClearColor[2], m_defaultClearColor[3]);
+        renderer.flush();
+
+        return display;
     }
 
     bool LogicViewerApp::doOneLoop()

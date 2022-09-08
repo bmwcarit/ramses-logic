@@ -79,7 +79,7 @@ namespace rlogic
         m_logicEngine.createLuaScript(m_invalid_empty_script);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
 
-        EXPECT_TRUE(m_logicEngine.saveToFile("logic.bin"));
+        EXPECT_TRUE(SaveToFileWithoutValidation(m_logicEngine, "logic.bin"));
         EXPECT_EQ(m_logicEngine.getErrors().size(), 0u);
 
         // Generate error, so that we can test it's cleared by loadFromFile()

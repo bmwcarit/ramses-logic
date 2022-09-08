@@ -697,7 +697,7 @@ namespace rlogic::internal
         {
             RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "name", 1u, GetParam());
             binding.createRootProperties();
-            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -735,7 +735,7 @@ namespace rlogic::internal
         {
             RamsesNodeBindingImpl binding(*m_node, ERotationType::Euler_XYZ, "node", 1u, EFeatureLevel_01);
             binding.createRootProperties();
-            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         // Inspect flatbuffers data
@@ -764,7 +764,7 @@ namespace rlogic::internal
             // will re-load the values from ramses
             binding.getInputs()->getChild("rotation")->set<vec3f>({100, 200, 300});
             binding.update();
-            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap);
+            (void)RamsesNodeBindingImpl::Serialize(binding, m_flatBufferBuilder, m_serializationMap, EFeatureLevel_01);
         }
 
         const auto& serializedBinding = *flatbuffers::GetRoot<rlogic_serialization::RamsesNodeBinding>(m_flatBufferBuilder.GetBufferPointer());
@@ -1002,7 +1002,7 @@ namespace rlogic::internal
             if (GetParam() >= EFeatureLevel_02)
                 nodeBinding.getInputs()->getChild("enabled")->set(true);
             tempEngineForSaving.update();
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("OneBinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "OneBinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("OneBinding.bin", m_scene));
@@ -1062,7 +1062,7 @@ namespace rlogic::internal
         {
             LogicEngine tempEngineForSaving{ GetParam() };
             tempEngineForSaving.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("OneBinding.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "OneBinding.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("OneBinding.bin", m_scene));
@@ -1076,7 +1076,7 @@ namespace rlogic::internal
         {
             LogicEngine tempEngineForSaving{ GetParam() };
             tempEngineForSaving.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("WithRamsesNode.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "WithRamsesNode.bin"));
         }
         {
             EXPECT_FALSE(m_logicEngine.loadFromFile("WithRamsesNode.bin"));
@@ -1091,7 +1091,7 @@ namespace rlogic::internal
         {
             LogicEngine tempEngineForSaving{ GetParam() };
             tempEngineForSaving.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("RamsesNodeDeleted.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "RamsesNodeDeleted.bin"));
         }
 
         m_scene->destroy(*m_node);
@@ -1109,7 +1109,7 @@ namespace rlogic::internal
         {
             LogicEngine tempEngineForSaving{ GetParam() };
             tempEngineForSaving.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "NodeBinding");
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("NoValuesSet.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "NoValuesSet.bin"));
         }
         {
             EXPECT_TRUE(m_logicEngine.loadFromFile("NoValuesSet.bin", m_scene));
@@ -1134,7 +1134,7 @@ namespace rlogic::internal
             if (GetParam() >= EFeatureLevel_02)
                 nodeBinding.getInputs()->getChild("enabled")->set<bool>(false);
             tempEngineForSaving.update();
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("AllValuesSet.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "AllValuesSet.bin"));
         }
 
         // Set properties to other values to check if they are overwritten after load
@@ -1199,7 +1199,7 @@ namespace rlogic::internal
             ASSERT_TRUE(tempEngineForSaving.link(*script->getOutputs()->getChild("visibility"), *nodeBinding.getInputs()->getChild("visibility")));
 
             tempEngineForSaving.update();
-            EXPECT_TRUE(tempEngineForSaving.saveToFile("SomeInputsLinked.bin"));
+            EXPECT_TRUE(SaveToFileWithoutValidation(tempEngineForSaving, "SomeInputsLinked.bin"));
         }
 
         // Modify 'linked' properties before loading to check if logic will overwrite them after load + update

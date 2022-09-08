@@ -50,6 +50,10 @@ namespace rlogic
         /// - AnchorPoint
         /// - Lua source code serialized in precompiled binary form
         /// - LogicEngine::createRamsesCameraBindingWithFrustumPlanes
-        EFeatureLevel_02 = 2
+        EFeatureLevel_02 = 2,
+
+        /// Added features:
+        /// - RamsesRenderGroupBinding
+        EFeatureLevel_03 = 3,
     };
 }

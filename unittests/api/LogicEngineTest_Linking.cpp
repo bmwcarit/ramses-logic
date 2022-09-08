@@ -807,6 +807,38 @@ namespace rlogic
         EXPECT_EQ(-11, m_renderPass->getRenderOrder());
     }
 
+    TEST_P(ALogicEngine_Linking, PropagatesOutputsToInputsIfLinkedForRamsesRenderGroupBindings)
+    {
+        if (GetParam() < EFeatureLevel_03)
+            GTEST_SKIP();
+
+        const auto luaScriptSource = R"(
+            function interface(IN,OUT)
+                IN.val = Type:Int32()
+                OUT.val = Type:Int32()
+            end
+            function run(IN,OUT)
+                OUT.val = IN.val
+            end
+        )";
+
+        auto sourceScript = m_logicEngine.createLuaScript(luaScriptSource);
+        auto targetBinding = createRenderGroupBinding();
+
+        auto sourceInput = sourceScript->getInputs()->getChild("val");
+        auto sourceOutput = sourceScript->getOutputs()->getChild("val");
+        auto targetInput = targetBinding->getInputs()->getChild("renderOrders")->getChild("mesh");
+
+        m_logicEngine.link(*sourceOutput, *targetInput);
+
+        sourceInput->set(-11);
+        m_logicEngine.update();
+
+        int32_t actualRenderOrder = 0;
+        m_renderGroup->getMeshNodeOrder(*m_meshNode, actualRenderOrder);
+        EXPECT_EQ(-11, actualRenderOrder);
+    }
+
     TEST_P(ALogicEngine_Linking, NewLinkTransfersValue_SourceValueSet)
     {
         const auto  luaScriptSource1 = R"(
@@ -1489,7 +1521,7 @@ namespace rlogic
 
             ASSERT_EQ(std::string("A: forward 'From A' & B: forward forward 'From A'"), *scriptC_concatenate_AB->get<std::string>());
 
-            tmpLogicEngine.saveToFile("links.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "links.bin"));
         }
 
         {
@@ -1598,7 +1630,7 @@ namespace rlogic
             auto scriptB_concatenated = scriptB->getOutputs()->getChild("concat_all");
             ASSERT_EQ(std::string("str1 {foo, str2}"), *scriptB_concatenated->get<std::string>());
 
-            tmpLogicEngine.saveToFile("nested_links.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "nested_links.bin"));
         }
 
         {
@@ -1692,7 +1724,7 @@ namespace rlogic
             // during 1st update the weak link has no value yet so there is no concatenation from previous update
             EXPECT_STREQ("ABC", script3Output->get<std::string>()->c_str());
 
-            tmpLogicEngine.saveToFile("weaklinks.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "weaklinks.bin"));
         }
 
         ASSERT_TRUE(m_logicEngine.loadFromFile("weaklinks.bin"));
@@ -1714,16 +1746,6 @@ namespace rlogic
     class ALogicEngine_Linking_WithBindings : public ALogicEngine_Linking_WithFiles
     {
     protected:
-        ALogicEngine_Linking_WithBindings()
-        {
-            // TODO Violin clean this up once PR #305 went in
-            std::array<const char*, 3> commandLineConfigForTest = { "test", "-l", "off" };
-            ramses::RamsesFrameworkConfig frameworkConfig(static_cast<uint32_t>(commandLineConfigForTest.size()), commandLineConfigForTest.data());
-            m_ramsesFramework = std::make_unique<ramses::RamsesFramework>(frameworkConfig);
-            m_ramsesClient = m_ramsesFramework->createClient("TheClient");
-            m_scene = m_ramsesClient->createScene(ramses::sceneId_t(1));
-        }
-
         using ENodePropertyStaticIndex = rlogic::internal::ENodePropertyStaticIndex;
 
         static void ExpectValues(ramses::Node& node, ENodePropertyStaticIndex prop, vec3f expectedValues)
@@ -1787,10 +1809,6 @@ namespace rlogic
             {
                 color = vec4(1.0, 0.0, 0.0, 1.0);
             })";
-
-        std::unique_ptr<ramses::RamsesFramework> m_ramsesFramework;
-        ramses::RamsesClient* m_ramsesClient = nullptr;
-        ramses::Scene* m_scene = nullptr;
     };
 
     INSTANTIATE_TEST_SUITE_P(
@@ -1852,7 +1870,7 @@ namespace rlogic
             ExpectValues(*ramsesNode2, ENodePropertyStaticIndex::Translation, { 11.1f, 11.2f, 11.3f });
             EXPECT_EQ(ramsesNode2->getVisibility(), ramses::EVisibilityMode::Visible);
 
-            tmpLogicEngine.saveToFile("binding_links.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "binding_links.bin"));
         }
 
         // Make sure loading of bindings doesn't do anything to the node until update() is called
@@ -1949,7 +1967,7 @@ namespace rlogic
             ExpectVec3f(appearance2, "uniform1", { 100.0f, 200.0f, 300.0f });
             ExpectVec3f(appearance2, "uniform2", { 100.0f, 200.0f, 300.0f });
 
-            tmpLogicEngine.saveToFile("binding_links.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "binding_links.bin"));
         }
 
         // Make sure loading of bindings doesn't do anything to the appearance until update() is called
@@ -2035,7 +2053,7 @@ namespace rlogic
             EXPECT_EQ(camera2->getViewportX(), 19);
             EXPECT_EQ(camera2->getFarPlane(), 7.8f);
 
-            tmpLogicEngine.saveToFile("binding_links.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "binding_links.bin"));
         }
 
         // Make sure loading of bindings doesn't do anything to the camera until update() is called
@@ -2123,7 +2141,7 @@ namespace rlogic
             EXPECT_FALSE(rp2->isEnabled());
             EXPECT_EQ(rp2->getRenderOrder(), 33);
 
-            tmpLogicEngine.saveToFile("binding_links.bin");
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "binding_links.bin"));
         }
 
         // Make sure loading of bindings doesn't do anything to the render pass until update() is called
@@ -2161,6 +2179,62 @@ namespace rlogic
             EXPECT_EQ(rp1->getRenderOrder(), 100);
             EXPECT_FALSE(rp2->isEnabled());
             EXPECT_EQ(rp2->getRenderOrder(), 33);
+        }
+    }
+
+    TEST_P(ALogicEngine_Linking_WithBindings, PreservesLinksToRenderGroupBindingsAfterSavingAndLoadingFromFile)
+    {
+        if (GetParam() < EFeatureLevel_03)
+            GTEST_SKIP();
+
+        m_renderGroup->addMeshNode(*m_meshNode, 42);
+
+        {
+            LogicEngine tmpLogicEngine{ GetParam() };
+            const std::string_view scriptSrc = R"(
+            function interface(IN,OUT)
+                OUT.order = Type:Int32()
+                end
+                function run(IN,OUT)
+                    OUT.order = 33
+                end
+            )";
+
+            auto script = tmpLogicEngine.createLuaScript(scriptSrc);
+            RamsesRenderGroupBindingElements elements;
+            EXPECT_TRUE(elements.addElement(*m_meshNode));
+            auto binding = tmpLogicEngine.createRamsesRenderGroupBinding(*m_renderGroup, elements, "binding");
+            ASSERT_TRUE(tmpLogicEngine.link(*script->getOutputs()->getChild("order"), *binding->getInputs()->getChild("renderOrders")->getChild("meshNode")));
+
+            ASSERT_TRUE(tmpLogicEngine.update());
+
+            int32_t renderOrder = -1;
+            m_renderGroup->getMeshNodeOrder(*m_meshNode, renderOrder);
+            EXPECT_EQ(33, renderOrder);
+
+            // script has no inputs linked, validatation would fail
+            ASSERT_TRUE(SaveToFileWithoutValidation(tmpLogicEngine, "binding_links.bin"));
+        }
+
+        // Make sure loading of bindings doesn't do anything to the render group until update() is called
+        // To test that, we reset render group property
+        m_renderGroup->addMeshNode(*m_meshNode, 100);
+
+        {
+            ASSERT_TRUE(m_logicEngine.loadFromFile("binding_links.bin", m_scene));
+
+            int32_t renderOrder = -1;
+            m_renderGroup->getMeshNodeOrder(*m_meshNode, renderOrder);
+            EXPECT_EQ(100, renderOrder);
+
+            auto binding = m_logicEngine.findByName<RamsesRenderGroupBinding>("binding");
+
+            // This value should be overwritten by the link - set it to a different value to make sure that happens
+            binding->getInputs()->getChild("renderOrders")->getChild("meshNode")->set(222);
+            EXPECT_TRUE(m_logicEngine.update());
+
+            m_renderGroup->getMeshNodeOrder(*m_meshNode, renderOrder);
+            EXPECT_EQ(33, renderOrder);
         }
     }
 

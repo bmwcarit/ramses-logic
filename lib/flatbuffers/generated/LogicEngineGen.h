@@ -21,6 +21,7 @@
 #include "RamsesCameraBindingGen.h"
 #include "RamsesNodeBindingGen.h"
 #include "RamsesReferenceGen.h"
+#include "RamsesRenderGroupBindingGen.h"
 #include "RamsesRenderPassBindingGen.h"
 #include "TimerNodeGen.h"
 

@@ -22,6 +22,8 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
+#include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesRenderGroupBindingElements.h"
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-client.h"
@@ -71,6 +73,8 @@ const auto defaultLuaFile = R"(function default()
     rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOrder"].value = 0
     rlogic.renderPassBindings["myRenderPass"]["IN"]["clearColor"].value = { 0, 0, 0, 1 }
     rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false
+    --RenderGroup bindings
+    rlogic.renderGroupBindings["myRenderGroup"]["IN"]["renderOrders"]["myMeshNode"].value = 0
     --Anchor points
 end
 
@@ -97,7 +101,7 @@ end
 )";
 
 const auto iniFile = R"(
-[Window][Logic Viewer (FeatureLevel 02)]
+[Window][Logic Viewer (FeatureLevel 03)]
 Pos=0,0
 Size=540,720
 Collapsed=0
@@ -115,6 +119,7 @@ ShowLinkedInputs=1
 ShowOutputs=1
 LuaPreferObjectIds=0
 LuaPreferIdentifiers=0
+ShowDisplaySettings=0
 )";
 
 class UI
@@ -182,9 +187,20 @@ public:
         return cameraBindings() + buttonHeight;
     }
 
-    [[nodiscard]] int32_t anchorPoints() const
+    [[nodiscard]] int32_t renderGroupBindings() const
     {
         return renderPassBindings() + buttonHeight;
+    }
+
+    [[nodiscard]] int32_t anchorPoints() const
+    {
+        return renderGroupBindings() + buttonHeight;
+    }
+
+    [[nodiscard]] int32_t displaySettings() const
+    {
+        const bool showUpdateReport = m_settings ? m_settings->showUpdateReport : false;
+        return updateReport() + (showUpdateReport ? buttonHeight : 0);
     }
 
     [[nodiscard]] int32_t updateReport() const
@@ -268,7 +284,7 @@ namespace rlogic::internal
 
         void createLogicFile()
         {
-            LogicEngine engine{EFeatureLevel_02};
+            LogicEngine engine{EFeatureLevel_03};
 
             auto* interface = engine.createLuaInterface(R"(
                 function interface(IN,OUT)
@@ -348,6 +364,9 @@ namespace rlogic::internal
             engine.createRamsesAppearanceBinding(*m_scene.appearance, "myAppearance");
             engine.createRamsesCameraBinding(*m_scene.camera, "myCamera");
             engine.createRamsesRenderPassBinding(*m_scene.renderPass, "myRenderPass");
+            rlogic::RamsesRenderGroupBindingElements rgElements;
+            rgElements.addElement(*m_scene.meshNode, "myMeshNode");
+            engine.createRamsesRenderGroupBinding(*m_scene.renderGroup, rgElements, "myRenderGroup");
 
             engine.createTimerNode("myTimer");
 
@@ -362,7 +381,10 @@ namespace rlogic::internal
             engine.link(*script->getOutputs()->getChild("paramVec3f"), *nodeBinding->getInputs()->getChild("rotation"));
 
             engine.update();
-            engine.saveToFile(logicFile);
+
+            rlogic::SaveFileConfig noValidationConfig;
+            noValidationConfig.setValidationEnabled(false);
+            engine.saveToFile(logicFile, noValidationConfig);
         }
 
         template <typename... T> void createApp(T&&... arglist)
@@ -454,10 +476,17 @@ namespace rlogic::internal
     class ALogicViewerAppUIBase : public ALogicViewerApp
     {
     public:
-        void setup(std::string_view ini)
+        void setup(std::string_view ini, std::string_view args = {})
         {
             SaveFile(ini, "imgui.ini");
-            createApp("viewer", ramsesFile);
+            if (args.empty())
+            {
+                createApp("viewer", ramsesFile);
+            }
+            else
+            {
+                createApp("viewer", args.data(), ramsesFile);
+            }
             ui.setup(m_app->getSettings());
             ImGui::GetIO().GetClipboardTextFn = GetClipboardText;
             ImGui::GetIO().SetClipboardTextFn = SetClipboardText;
@@ -541,6 +570,15 @@ namespace rlogic::internal
         ALogicViewerAppUI()
         {
             setup(iniFile);
+        }
+    };
+
+    class ALogicViewerAppUINoOffscreen : public ALogicViewerAppUIBase
+    {
+    public:
+        ALogicViewerAppUINoOffscreen()
+        {
+            setup(iniFile, "--no-offscreen");
         }
     };
 
@@ -919,6 +957,21 @@ namespace rlogic::internal
         EXPECT_EQ(3, prop->get<int32_t>().value());
     }
 
+    TEST_F(ALogicViewerAppUI, modifyRenderGroup)
+    {
+        const int32_t mouseX = 100;
+        EXPECT_TRUE(click(mouseX, ui.renderGroupBindings()));
+        EXPECT_TRUE(click(mouseX, ui.renderGroupBindings() + ui.smallButtonHeight));
+        EXPECT_TRUE(click(mouseX, ui.renderGroupBindings() + 4 * ui.smallButtonHeight));
+        EXPECT_TRUE(dragX(mouseX, mouseX + 30, ui.renderGroupBindings() + ui.buttonHeight + 4 * ui.smallButtonHeight));
+
+        auto* renderGroup = m_app->getViewer()->getEngine().findByName<rlogic::RamsesRenderGroupBinding>("myRenderGroup");
+        ASSERT_TRUE(renderGroup != nullptr);
+        auto* prop = renderGroup->getInputs()->getChild("renderOrders")->getChild("myMeshNode");
+        ASSERT_TRUE(prop != nullptr);
+        EXPECT_EQ(3, prop->get<int32_t>().value());
+    }
+
     TEST_F(ALogicViewerAppUI, reloadConfiguration)
     {
         const int32_t xFile = 25;
@@ -996,6 +1049,10 @@ rlogic.cameraBindings["myCamera"]["IN"]["frustum"]["aspectRatio"].value = 1)", r
 rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOrder"].value = 0
 rlogic.renderPassBindings["myRenderPass"]["IN"]["clearColor"].value = { 0, 0, 0, 1 }
 rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", rtrim(ImGui::GetClipboardText()));
+
+        EXPECT_TRUE(contextMenuSelect(mouseX, ui.renderGroupBindings()));
+        EXPECT_EQ(R"(rlogic.renderGroupBindings["myRenderGroup"]["IN"]["renderOrders"]["myMeshNode"].value = 0)",
+            rtrim(ImGui::GetClipboardText()));
     }
 
     TEST_F(ALogicViewerAppUI, changeView)
@@ -1059,6 +1116,11 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
         EXPECT_TRUE(keyPress(ramses::EKeyCode_F11));
         EXPECT_TRUE(settings->showWindow);
 
+        EXPECT_FALSE(settings->showDisplaySettings);
+        EXPECT_TRUE(click(xSettings, ui.titleBar + ui.yMiddle));
+        EXPECT_TRUE(click(xSettings, ui.titleBar + ui.buttonHeight + 12 * ui.smallButtonHeight + 3 * ui.hline + ui.yMiddle));
+        EXPECT_TRUE(settings->showDisplaySettings);
+
         EXPECT_FALSE(settings->luaPreferObjectIds);
         EXPECT_TRUE(click(xSettings, ui.titleBar + ui.yMiddle));
         EXPECT_TRUE(click(xSettings, ui.titleBar + ui.buttonHeight + 11 * ui.smallButtonHeight + 3 * ui.hline + ui.yMiddle));
@@ -1102,7 +1164,7 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
         EXPECT_TRUE(settings->showAnimationNodes);
         EXPECT_TRUE(click(xSettings, ui.titleBar + ui.yMiddle));
         EXPECT_TRUE(click(xSettings, ui.titleBar + ui.buttonHeight + 3 * ui.smallButtonHeight + ui.hline + ui.yMiddle));
-        EXPECT_FALSE(settings->showTimerNodes);
+        EXPECT_FALSE(settings->showAnimationNodes);
 
         EXPECT_TRUE(settings->showScripts);
         EXPECT_TRUE(click(xSettings, ui.titleBar + ui.yMiddle));
@@ -1119,9 +1181,55 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
         EXPECT_FALSE(settings->showWindow);
     }
 
+    TEST_F(ALogicViewerAppUI, changeClearColor)
+    {
+        SaveFile(R"(
+            function screenshot()
+                rlogic.screenshot("screenshot.png")
+            end
+        )");
+        EXPECT_TRUE(keyPress(ramses::EKeyCode_F5)); // reload configuration
+
+        const int mouseX = 75;
+        // show display settings
+        EXPECT_TRUE(click(mouseX, ui.titleBar + ui.yMiddle));
+        EXPECT_TRUE(click(mouseX, ui.titleBar + ui.buttonHeight + 12 * ui.smallButtonHeight + 3 * ui.hline + ui.yMiddle));
+        EXPECT_TRUE(m_app->getSettings()->showDisplaySettings);
+        // change clear color
+        const int displaySettingsY = ui.displaySettings() - ui.buttonHeight;
+        EXPECT_TRUE(click(mouseX, displaySettingsY));
+        EXPECT_TRUE(dragX(mouseX + 50, mouseX + 55, displaySettingsY + ui.buttonHeight));
+
+        EXPECT_EQ(Result(), m_app->getViewer()->call("screenshot"));
+        EXPECT_TRUE(CompareImage("screenshot.png", "ALogicViewerApp_clearColor.png", 0.5f)); // increased tolerance due to some platforms being 1/255 off covering large area (as background)
+    }
+
+    TEST_F(ALogicViewerAppUINoOffscreen, changeClearColor)
+    {
+        const int mouseX = 75;
+        // show display settings
+        EXPECT_TRUE(click(mouseX, ui.titleBar + ui.yMiddle));
+        EXPECT_TRUE(click(mouseX, ui.titleBar + ui.buttonHeight + 12 * ui.smallButtonHeight + 3 * ui.hline + ui.yMiddle));
+        EXPECT_TRUE(m_app->getSettings()->showDisplaySettings);
+        // change clear color
+        EXPECT_TRUE(click(mouseX, ui.displaySettings()));
+        EXPECT_TRUE(dragX(mouseX + 50, mouseX + 55, ui.displaySettings() + ui.buttonHeight));
+
+        SaveFile(R"(
+            function screenshot()
+                rlogic.screenshot("screenshot.png")
+            end
+        )");
+        EXPECT_TRUE(keyPress(ramses::EKeyCode_F5)); // reload configuration
+        EXPECT_TRUE(keyPress(ramses::EKeyCode_F11)); // hide UI
+
+        EXPECT_EQ(Result(), m_app->getViewer()->call("screenshot"));
+        EXPECT_TRUE(CompareImage("screenshot.png", "ALogicViewerApp_clearColor.png", 0.5f)); // increased tolerance due to some platforms being 1/255 off covering large area (as background)
+    }
+
     TEST_F(ALogicViewerAppUIBase, updateReport)
     {
-        setup(R"([Window][Logic Viewer (FeatureLevel 02)]
+        setup(R"([Window][Logic Viewer (FeatureLevel 03)]
 Pos=0,0
 Size=540,720
 Collapsed=0
@@ -1138,7 +1246,8 @@ ShowUpdateReport=1
 ShowLinkedInputs=1
 ShowOutputs=1
 LuaPreferObjectIds=0
-LuaPreferIdentifiers=0)");
+LuaPreferIdentifiers=0
+ShowDisplaySettings=0)");
         const int32_t mouseX = 100;
         EXPECT_TRUE(click(mouseX, ui.updateReport()));
         EXPECT_TRUE(click(mouseX, ui.updateReport() + 2 * ui.buttonHeight + 7 * ui.smallButtonHeight + ui.hline));
@@ -1153,7 +1262,7 @@ LuaPreferIdentifiers=0)");
         EXPECT_EQ(1u, report.getInterval());
 
         EXPECT_EQ(1, report.getNodesExecuted().size());
-        EXPECT_EQ(8, report.getNodesSkippedExecution().size());
+        EXPECT_EQ(9, report.getNodesSkippedExecution().size());
 
         auto* interface = m_app->getViewer()->getEngine().findByName<rlogic::LuaInterface>("myInterface");
         ASSERT_TRUE(interface != nullptr);
@@ -1162,6 +1271,6 @@ LuaPreferIdentifiers=0)");
         prop->set(2.1f);
         EXPECT_TRUE(m_app->doOneLoop());
         EXPECT_EQ(4, report.getNodesExecuted().size());
-        EXPECT_EQ(5, report.getNodesSkippedExecution().size());
+        EXPECT_EQ(6, report.getNodesSkippedExecution().size());
     }
 } // namespace rlogic::internal

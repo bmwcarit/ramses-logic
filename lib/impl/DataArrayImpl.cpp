@@ -64,7 +64,7 @@ namespace rlogic::internal
         return dataFlattened;
     }
 
-    flatbuffers::Offset<rlogic_serialization::DataArray> DataArrayImpl::Serialize(const DataArrayImpl& data, flatbuffers::FlatBufferBuilder& builder)
+    flatbuffers::Offset<rlogic_serialization::DataArray> DataArrayImpl::Serialize(const DataArrayImpl& data, flatbuffers::FlatBufferBuilder& builder, SerializationMap& /*serializationMap*/, EFeatureLevel /*featureLevel*/)
     {
         rlogic_serialization::ArrayUnion unionType = rlogic_serialization::ArrayUnion::NONE;
         rlogic_serialization::EDataArrayType arrayType = rlogic_serialization::EDataArrayType::Float;

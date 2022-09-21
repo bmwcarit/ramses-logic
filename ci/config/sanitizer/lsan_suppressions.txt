@@ -1,2 +1,5 @@
 leak:libxcb.so
 leak:calloc
+
+# TODO(mirko) suppress leaks from swrast executables
+leak:ramses-logic-viewer-test_SWRAST

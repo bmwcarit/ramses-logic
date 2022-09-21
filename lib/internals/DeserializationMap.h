@@ -19,14 +19,12 @@ namespace rlogic_serialization
 namespace rlogic
 {
     class DataArray;
-    class LuaModule;
 }
 
 namespace rlogic::internal
 {
     class PropertyImpl;
-    class RamsesNodeBindingImpl;
-    class RamsesCameraBindingImpl;
+    class LogicObjectImpl;
 
     // Remembers flatbuffers pointers to deserialized objects temporarily during deserialization
     class DeserializationMap
@@ -52,34 +50,21 @@ namespace rlogic::internal
             return *Get(&flatbufferObject, m_dataArrays);
         }
 
-        void storeLuaModule(uint64_t luaModuleId, const LuaModule& luaModule)
+        void storeLogicObject(uint64_t id, LogicObjectImpl& obj)
         {
-            Store(luaModuleId, &luaModule, m_luaModules);
+            Store(id, &obj, m_logicObjects);
         }
 
-        const LuaModule* resolveLuaModule(uint64_t luaModuleId) const
+        template <typename ImplT>
+        ImplT* resolveLogicObject(uint64_t id) const
         {
-            return Get(luaModuleId, m_luaModules);
-        }
+            // fail queries using IDs gracefully if given ID not found
+            // file can be OK on flatbuffer schema level but might still contain corrupted ID value
+            const auto it = m_logicObjects.find(id);
+            if (it != m_logicObjects.cend())
+                return dynamic_cast<ImplT*>(it->second);
 
-        void storeNodeBinding(uint64_t id, RamsesNodeBindingImpl& nodeBinding)
-        {
-            Store(id, &nodeBinding, m_nodeBindings);
-        }
-
-        RamsesNodeBindingImpl* resolveNodeBinding(uint64_t id) const
-        {
-            return Get(id, m_nodeBindings);
-        }
-
-        void storeCameraBinding(uint64_t id, RamsesCameraBindingImpl& cameraBinding)
-        {
-            Store(id, &cameraBinding, m_cameraBindings);
-        }
-
-        RamsesCameraBindingImpl* resolveCameraBinding(uint64_t id) const
-        {
-            return Get(id, m_cameraBindings);
+            return nullptr;
         }
 
     private:
@@ -99,20 +84,9 @@ namespace rlogic::internal
             return it->second;
         }
 
-        // fail queries using IDs gracefully if given ID not found
-        // file can be OK on flatbuffer schema level but might still contain corrupted value
-        template <typename Value>
-        [[nodiscard]] static Value Get(uint64_t key, const std::unordered_map<uint64_t, Value>& container)
-        {
-            const auto it = container.find(key);
-            return (it == container.cend()) ? nullptr : it->second;
-        }
-
         std::unordered_map<const rlogic_serialization::Property*, PropertyImpl*> m_properties;
         std::unordered_map<const rlogic_serialization::DataArray*, const DataArray*> m_dataArrays;
-        std::unordered_map<uint64_t, const LuaModule*> m_luaModules;
-        std::unordered_map<uint64_t, RamsesNodeBindingImpl*> m_nodeBindings;
-        std::unordered_map<uint64_t, RamsesCameraBindingImpl*> m_cameraBindings;
+        std::unordered_map<uint64_t, LogicObjectImpl*> m_logicObjects;
     };
 
 }

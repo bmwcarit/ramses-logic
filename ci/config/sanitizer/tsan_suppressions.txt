@@ -1,0 +1,2 @@
+# Race in swrast_dri lib
+race:ramses_internal::Context_EGL::~Context_EGL

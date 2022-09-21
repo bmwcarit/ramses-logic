@@ -197,15 +197,14 @@ namespace rlogic::internal
                 errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: missing name!", name), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
-            const LuaModule* moduleUsed = deserializationMap.resolveLuaModule(module->moduleId());
-
+            const auto* moduleUsed = deserializationMap.resolveLogicObject<LuaModuleImpl>(module->moduleId());
             if (!moduleUsed)
             {
                 errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}' module data: could not resolve dependent module with id={}!", name, module->moduleId()), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
-            userModules.emplace(module->name()->str(), moduleUsed);
+            userModules.emplace(module->name()->str(), moduleUsed->getLogicObject().as<LuaModule>());
         }
 
         if (!luaScript.standardModules())

@@ -150,15 +150,14 @@ namespace rlogic::internal
                 errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' module data: missing name!", name), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
-            const LuaModule* moduleUsed = deserializationMap.resolveLuaModule(mod->moduleId());
-
+            const auto* moduleUsed = deserializationMap.resolveLogicObject<LuaModuleImpl>(mod->moduleId());
             if (!moduleUsed)
             {
                 errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}' module data: could not resolve dependent module with id={}!", name, mod->moduleId()), nullptr, EErrorType::BinaryVersionMismatch);
                 return nullptr;
             }
 
-            modulesUsed.emplace(mod->name()->str(), moduleUsed);
+            modulesUsed.emplace(mod->name()->str(), moduleUsed->getLogicObject().as<LuaModule>());
         }
 
         std::string source = (featureLevel == EFeatureLevel_01 ? module.source()->str() : "");

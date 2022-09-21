@@ -15,6 +15,8 @@
 #include "impl/LogicEngineImpl.h"
 #include "impl/AnchorPointImpl.h"
 #include "impl/PropertyImpl.h"
+#include "impl/RamsesNodeBindingImpl.h"
+#include "impl/RamsesCameraBindingImpl.h"
 #include "generated/AnchorPointGen.h"
 
 #include "ramses-logic/AnchorPoint.h"
@@ -119,9 +121,9 @@ namespace rlogic::internal
             }
 
             if (issue != ESerializationIssue::CannotResolveNodeBinding)
-                m_deserializationMap.storeNodeBinding(m_nodeBinding.getId(), m_nodeBinding.m_nodeBinding);
+                m_deserializationMap.storeLogicObject(m_nodeBinding.getId(), m_nodeBinding.m_nodeBinding);
             if (issue != ESerializationIssue::CannotResolveCameraBinding)
-                m_deserializationMap.storeCameraBinding(m_cameraBinding.getId(), m_cameraBinding.m_cameraBinding);
+                m_deserializationMap.storeLogicObject(m_cameraBinding.getId(), m_cameraBinding.m_cameraBinding);
 
             const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::AnchorPoint>(m_flatBufferBuilder.GetBufferPointer());
             return AnchorPointImpl::Deserialize(serialized, m_errorReporting, m_deserializationMap);
@@ -142,8 +144,8 @@ namespace rlogic::internal
         }
         const auto& serialized = *flatbuffers::GetRoot<rlogic_serialization::AnchorPoint>(m_flatBufferBuilder.GetBufferPointer());
 
-        m_deserializationMap.storeNodeBinding(m_nodeBinding.getId(), m_nodeBinding.m_nodeBinding);
-        m_deserializationMap.storeCameraBinding(m_cameraBinding.getId(), m_cameraBinding.m_cameraBinding);
+        m_deserializationMap.storeLogicObject(m_nodeBinding.getId(), m_nodeBinding.m_nodeBinding);
+        m_deserializationMap.storeLogicObject(m_cameraBinding.getId(), m_cameraBinding.m_cameraBinding);
 
         std::unique_ptr<AnchorPointImpl> deserialized = AnchorPointImpl::Deserialize(serialized, m_errorReporting, m_deserializationMap);
         ASSERT_TRUE(deserialized);

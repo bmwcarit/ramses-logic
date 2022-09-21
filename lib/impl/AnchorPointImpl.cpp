@@ -101,8 +101,8 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        RamsesNodeBindingImpl* nodeBinding = deserializationMap.resolveNodeBinding(anchorPoint.nodeBindingId());
-        RamsesCameraBindingImpl* cameraBinding = deserializationMap.resolveCameraBinding(anchorPoint.cameraBindingId());
+        auto* nodeBinding = deserializationMap.resolveLogicObject<RamsesNodeBindingImpl>(anchorPoint.nodeBindingId());
+        auto* cameraBinding = deserializationMap.resolveLogicObject<RamsesCameraBindingImpl>(anchorPoint.cameraBindingId());
         if (!nodeBinding || !cameraBinding)
         {
             errorReporting.add("Fatal error during loading of AnchorPoint: could not resolve NodeBinding and/or CameraBinding!", nullptr, EErrorType::BinaryVersionMismatch);

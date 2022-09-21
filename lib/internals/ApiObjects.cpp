@@ -1136,7 +1136,7 @@ namespace rlogic::internal
             LuaModule*                 luaModule = up.get();
             deserialized->m_luaModules.push_back(luaModule);
             deserialized->registerLogicObject(std::move(up));
-            deserializationMap.storeLuaModule(luaModule->getId(), *deserialized->m_luaModules.back());
+            deserializationMap.storeLogicObject(luaModule->getId(), deserialized->m_luaModules.back()->m_impl);
         }
 
         const auto& luascripts = *apiObjects.luaScripts();
@@ -1208,7 +1208,7 @@ namespace rlogic::internal
                 RamsesNodeBinding* nodeBinding = up.get();
                 deserialized->m_ramsesNodeBindings.push_back(nodeBinding);
                 deserialized->registerLogicObject(std::move(up));
-                deserializationMap.storeNodeBinding(nodeBinding->getId(), nodeBinding->m_nodeBinding);
+                deserializationMap.storeLogicObject(nodeBinding->getId(), nodeBinding->m_nodeBinding);
             }
             else
             {
@@ -1251,7 +1251,7 @@ namespace rlogic::internal
                 RamsesCameraBinding*                 camBinding = up.get();
                 deserialized->m_ramsesCameraBindings.push_back(camBinding);
                 deserialized->registerLogicObject(std::move(up));
-                deserializationMap.storeCameraBinding(camBinding->getId(), camBinding->m_cameraBinding);
+                deserializationMap.storeLogicObject(camBinding->getId(), camBinding->m_cameraBinding);
             }
             else
             {

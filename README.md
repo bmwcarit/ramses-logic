@@ -32,8 +32,15 @@ Prefer to learn by example? Have a look at our [self-contained example snippets]
 
 # Version matrix
 
-|Logic    | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
-|---------|-------------------------------|------------------------------------|------------------------------|
+The following matrix explains which versions of Ramses Logic are compatible with which versions of Ramses, and also
+to what extent binary files are supported. Read the table like this: `Logic` version **X** should be used with
+Ramses version **Y** (included Ramses version). If you need older Ramses, it must be at least **Z**
+(Minimum required Ramses version) - but keep in mind we don't test all combinations. You can also load
+existing files exported with Logic Engine version **W** or newer (Binary file compatibility).
+
+|Logic     | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
+|----------|-------------------------------|------------------------------------|------------------------------|
+|v1.2.1    | 27.0.125                      | 27.0.102                           | >= 1.0.0, F-Levels 01 - 03   |
 |v1.2.0    | 27.0.122                      | 27.0.102                           | >= 1.0.0, F-Levels 01 - 03   |
 |v1.1.x    | 27.0.121                      | 27.0.102                           | >= 1.0.0, F-Levels 01, 02    |
 |v1.0.x    | 27.0.119                      | 27.0.102                           | >= 1.0.0                     |

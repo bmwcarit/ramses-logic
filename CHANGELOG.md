@@ -8,6 +8,12 @@
 
 **FIXED**
 
+# v1.2.1
+
+**FIXED**
+
+* Upgrade ramses from 27.0.122 to 27.0.125 (patchfix)
+
 # v1.2.0
 
 **Features**

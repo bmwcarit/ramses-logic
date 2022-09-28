@@ -10,15 +10,12 @@
 
 set -e
 
-usage() { echo "Usage: $0 -t <tag> -r <root>]" 1>&2; exit 1; }
+usage() { echo "Usage: $0 -t <tag>]" 1>&2; exit 1; }
 
 while getopts ":t:r:" o; do
     case "${o}" in
         t)
             tag=${OPTARG}
-            ;;
-        r)
-            root=${OPTARG}
             ;;
         *)
             usage
@@ -27,32 +24,35 @@ while getopts ":t:r:" o; do
 done
 shift $((OPTIND-1))
 
-if [ -z "${tag}" ]; then
-    echo "Missing tag!"
-    usage
-fi
+SCRIPT_DIR=$( cd "$( dirname $(realpath "${BASH_SOURCE[0]}") )" && pwd )
+REPO_ROOT=$(realpath "${SCRIPT_DIR}/../..")
 
-cmakelists="${root}/CMakeLists.txt"
+cmakelists="${REPO_ROOT}/CMakeLists.txt"
 if [ -f "$cmakelists" ]; then
-    echo "Comparing $tag against version declared in $cmakelists"
-
     VERSION_MAJOR=`cat $cmakelists | grep "set(RLOGIC_VERSION_MAJOR" | sed 's/^[^0-9]*\([0-9]*\).*$/\1/'`
     VERSION_MINOR=`cat $cmakelists | grep "set(RLOGIC_VERSION_MINOR" | sed 's/^[^0-9]*\([0-9]*\).*$/\1/'`
     VERSION_PATCH=`cat $cmakelists | grep "set(RLOGIC_VERSION_PATCH" | sed 's/^[^0-9]*\([0-9]*\).*$/\1/'`
     cmake_version="v$VERSION_MAJOR.$VERSION_MINOR.$VERSION_PATCH"
 
-    if [ "$cmake_version" = "$tag" ]; then
-        echo "Tag $tag matches version in $cmakelists"
+    if [ -z "${tag}" ]; then
+        echo "No tag provided! Will use tag from CMakeLists.txt to check other files"
+        tag=$cmake_version
     else
-        echo "Tag $tag does not match the version in $cmakelists ($cmake_version)" 1>&2
-        exit 1
+        echo "Comparing $tag against version declared in $cmakelists"
+
+        if [ "$cmake_version" = "$tag" ]; then
+            echo "Tag $tag matches version in $cmakelists"
+        else
+            echo "Tag $tag does not match the version in $cmakelists ($cmake_version)" 1>&2
+            exit 1
+        fi
     fi
 else
     echo "Could not find CMakeLists ($cmakelists)!" 1>&2
     exit 1
 fi
 
-changelog="${root}/CHANGELOG.md"
+changelog="${REPO_ROOT}/CHANGELOG.md"
 if [ -f "$changelog" ]; then
     echo "Checking if version $tag is mentioned in $changelog"
 
@@ -68,7 +68,7 @@ else
     exit 1
 fi
 
-readme="${root}/README.md"
+readme="${REPO_ROOT}/README.md"
 if [ -f "$readme" ]; then
     echo "Checking if version $tag is mentioned in $readme"
 

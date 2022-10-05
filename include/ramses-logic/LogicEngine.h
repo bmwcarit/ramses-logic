@@ -659,6 +659,23 @@ namespace rlogic
         RLOGIC_API bool loadFromFile(std::string_view filename, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
 
         /**
+         * Loads the whole LogicEngine data from the given file descriptor. This method is equivalent to #loadFromFile().
+         *
+         * The file descriptor must be opened for read access and must support seeking.
+         * It will be in closed state after this call.
+         *
+         * @param[in] fd Open and readable filedescriptor.
+         * @param[in] offset Absolute starting position of LogicEngine data within fd.
+         * @param[in] length Size of the data within fd.
+         * @param ramsesScene pointer to the Ramses Scene which holds the objects referenced in the Ramses Logic file
+         * @param enableMemoryVerification flag to enable memory verifier (a flatbuffers feature which checks bounds and ranges).
+         *        Disable this only if the file comes from a trusted source and performance is paramount.
+         * @return true if deserialization was successful, false otherwise. To get more detailed
+         * error information use #getErrors()
+         */
+        RLOGIC_API bool loadFromFileDescriptor(int fd, size_t offset, size_t length, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
+
+        /**
         * Loads the whole LogicEngine data from the given memory buffer. This method is equivalent to
         * #loadFromFile but allows to have the file-opening
         * logic done by the user and only pass the data as a buffer. The logic engine only reads the

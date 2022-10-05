@@ -41,6 +41,7 @@
 #include "internals/ApiObjects.h"
 #include "internals/FileUtils.h"
 #include "LogTestUtils.h"
+#include "FileDescriptorHelper.h"
 
 #include "generated/LogicEngineGen.h"
 #include "ramses-logic-build-config.h"
@@ -212,6 +213,58 @@ namespace rlogic::internal
         fs::create_directories("folder");
         EXPECT_FALSE(m_logicEngine.loadFromFile("folder"));
         EXPECT_EQ("Failed to load file 'folder'", m_logicEngine.getErrors()[0].message);
+    }
+
+    TEST_P(ALogicEngine_Serialization, LoadFromFileDescriptor)
+    {
+        std::vector<char> bufferData = CreateTestBuffer();
+        SaveBufferToFile(bufferData, "LogicEngine.bin");
+        const int fd = FileDescriptorHelper::OpenFileDescriptorBinary("LogicEngine.bin");
+        EXPECT_LT(0, fd);
+        EXPECT_TRUE(m_logicEngine.loadFromFileDescriptor(fd, 0, bufferData.size()));
+    }
+
+    TEST_P(ALogicEngine_Serialization, LoadFromFileDescriptorWithOffset)
+    {
+        const size_t offset = 10;
+        std::vector<char> bufferData = CreateTestBuffer();
+        bufferData.insert(bufferData.begin(), offset, 'x');
+        SaveBufferToFile(bufferData, "LogicEngine.bin");
+        const int fd = FileDescriptorHelper::OpenFileDescriptorBinary("LogicEngine.bin");
+        EXPECT_LT(0, fd);
+        EXPECT_TRUE(m_logicEngine.loadFromFileDescriptor(fd, offset, bufferData.size()- offset));
+    }
+
+    TEST_P(ALogicEngine_Serialization, LoadFromFileDescriptor_InvalidFileDescriptor)
+    {
+        EXPECT_FALSE(m_logicEngine.loadFromFileDescriptor(0, 0, 1000));
+        EXPECT_EQ("Invalid file descriptor: 0", m_logicEngine.getErrors()[0].message);
+    }
+
+    TEST_P(ALogicEngine_Serialization, LoadFromFileDescriptor_ZeroSize)
+    {
+        EXPECT_FALSE(m_logicEngine.loadFromFileDescriptor(42, 0, 0));
+        EXPECT_EQ("Failed to load from file descriptor: size may not be 0", m_logicEngine.getErrors()[0].message);
+    }
+
+    TEST_P(ALogicEngine_Serialization, LoadFromFileDescriptor_InvalidOffset)
+    {
+        std::vector<char> bufferData = CreateTestBuffer();
+        SaveBufferToFile(bufferData, "LogicEngine.bin");
+        const int fd = FileDescriptorHelper::OpenFileDescriptorBinary("LogicEngine.bin");
+        EXPECT_FALSE(m_logicEngine.loadFromFileDescriptor(fd, bufferData.size(), bufferData.size()));
+        EXPECT_EQ(fmt::format("Failed to load from file descriptor: fd: {} offset: {} size: {}", fd, bufferData.size(), bufferData.size()),
+            m_logicEngine.getErrors()[0].message);
+    }
+
+    TEST_P(ALogicEngine_Serialization, LoadFromFileDescriptor_InvalidSize)
+    {
+        std::vector<char> bufferData = CreateTestBuffer();
+        SaveBufferToFile(bufferData, "LogicEngine.bin");
+        const int fd = FileDescriptorHelper::OpenFileDescriptorBinary("LogicEngine.bin");
+        EXPECT_FALSE(m_logicEngine.loadFromFileDescriptor(fd, 0, bufferData.size() + 1));
+        EXPECT_EQ(fmt::format("Failed to load from file descriptor: fd: {} offset: {} size: {}", fd, 0, bufferData.size() + 1),
+            m_logicEngine.getErrors()[0].message);
     }
 
     TEST_P(ALogicEngine_Serialization, DeserializesFromMemoryBuffer)

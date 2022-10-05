@@ -2,11 +2,16 @@
 
 # Unreleased
 
-**CHANGED**
+# v1.2.2
 
 **ADDED**
 
+* Added LogicEngine::loadFromFileDescriptor() to load logic files with an open file descriptor
+
 **FIXED**
+
+* Scripts (and other nodes) with no input or no output properties do not fail validation anymore,
+  only nodes with actual properties on each input/output side are checked if they are linked
 
 # v1.2.1
 

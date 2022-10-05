@@ -438,6 +438,27 @@ namespace rlogic::internal
         return loadFromByteData((*maybeBytesFromFile).data(), fileSize, scene, enableMemoryVerification, fmt::format("file '{}' (size: {})", filename, fileSize));
     }
 
+    bool LogicEngineImpl::loadFromFileDescriptor(int fd, size_t offset, size_t size, ramses::Scene* scene, bool enableMemoryVerification)
+    {
+        if (fd <= 0)
+        {
+            m_errors.add(fmt::format("Invalid file descriptor: {}", fd), nullptr, EErrorType::BinaryDataAccessError);
+            return false;
+        }
+        if (size == 0)
+        {
+            m_errors.add("Failed to load from file descriptor: size may not be 0", nullptr, EErrorType::BinaryDataAccessError);
+            return false;
+        }
+        std::optional<std::vector<char>> maybeBytesFromFile = FileUtils::LoadBinary(fd, offset, size);
+        if (!maybeBytesFromFile)
+        {
+            m_errors.add(fmt::format("Failed to load from file descriptor: fd: {} offset: {} size: {}", fd, offset, size), nullptr, EErrorType::BinaryDataAccessError);
+            return false;
+        }
+        return loadFromByteData((*maybeBytesFromFile).data(), size, scene, enableMemoryVerification, fmt::format("fd: {} (offset: {}, size: {})", fd, offset, size));
+    }
+
     bool LogicEngineImpl::checkFileIdentifierBytes(const std::string& dataSourceDescription, const std::string& fileIdBytes)
     {
         const std::string expected = getFileIdentifierMatchingFeatureLevel();

@@ -19,5 +19,6 @@ namespace rlogic::internal
     public:
         static bool SaveBinary(const std::string& filename, const void* binaryBuffer, size_t bufferLength);
         static std::optional<std::vector<char>> LoadBinary(const std::string& filename);
+        static std::optional<std::vector<char>> LoadBinary(int fd, size_t offset, size_t size);
     };
 }

@@ -219,6 +219,11 @@ namespace rlogic
         return m_impl->loadFromFile(filename, ramsesScene, enableMemoryVerification);
     }
 
+    bool LogicEngine::loadFromFileDescriptor(int fd, size_t offset, size_t length, ramses::Scene* ramsesScene /* = nullptr*/, bool enableMemoryVerification /* = true */)
+    {
+        return m_impl->loadFromFileDescriptor(fd, offset, length, ramsesScene, enableMemoryVerification);
+    }
+
     bool LogicEngine::loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* ramsesScene /* = nullptr*/, bool enableMemoryVerification /* = true */)
     {
         return m_impl->loadFromBuffer(rawBuffer, bufferSize, ramsesScene, enableMemoryVerification);

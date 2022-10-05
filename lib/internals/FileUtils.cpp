@@ -47,4 +47,28 @@ namespace rlogic::internal
 
         return byteBuffer;
     }
+
+    std::optional<std::vector<char>> FileUtils::LoadBinary(int fd, size_t offset, size_t size)
+    {
+        std::unique_ptr<FILE, decltype(&fclose)> file(fdopen(fd, "rb"), &fclose);
+        if (!file)
+        {
+            return std::nullopt;
+        }
+
+        // NOLINTNEXTLINE(google-runtime-int) long cast required to match with fseek declaration
+        if (fseek(file.get(), static_cast<long>(offset), SEEK_SET) != 0)
+        {
+            return std::nullopt;
+        }
+
+        std::vector<char> byteBuffer(size);
+
+        const auto bytesRead = fread(byteBuffer.data(), 1, size, file.get());
+        if (bytesRead != size)
+        {
+            return std::nullopt;
+        }
+        return byteBuffer;
+    }
 }

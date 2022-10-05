@@ -736,13 +736,16 @@ namespace rlogic::internal
                     continue;
 
                 assert(objAsNode->getOutputs() != nullptr);
+                // only check for unlinked outputs if there are any
+                if (objAsNode->getOutputs()->getChildCount() != 0u)
+                {
+                    bool anyOutputLinked = false;
+                    for (const auto* output : objAsNode->getOutputs()->m_impl->collectLeafChildren())
+                        anyOutputLinked |= (output->hasOutgoingLink());
 
-                bool anyOutputLinked = false;
-                for(const auto* output : objAsNode->getOutputs()->m_impl->collectLeafChildren())
-                    anyOutputLinked |= (output->hasOutgoingLink());
-
-                if (!anyOutputLinked)
-                    validationResults.add(fmt::format("Node [{}] has no outgoing links! Node should be deleted or properly linked!", objAsNode->getName()), objAsNode, EWarningType::UnusedContent);
+                    if (!anyOutputLinked)
+                        validationResults.add(fmt::format("Node [{}] has no outgoing links! Node should be deleted or properly linked!", objAsNode->getName()), objAsNode, EWarningType::UnusedContent);
+                }
             }
         }
 
@@ -760,13 +763,16 @@ namespace rlogic::internal
                     continue;
 
                 assert(objAsNode->getInputs() != nullptr);
+                // only check for unlinked inputs if there are any
+                if (objAsNode->getInputs()->getChildCount() != 0u)
+                {
+                    bool anyInputLinked = false;
+                    for (const auto* input : objAsNode->getInputs()->m_impl->collectLeafChildren())
+                        anyInputLinked |= (input->hasIncomingLink());
 
-                bool anyInputLinked = false;
-                for (const auto* input : objAsNode->getInputs()->m_impl->collectLeafChildren())
-                    anyInputLinked |= (input->hasIncomingLink());
-
-                if (!anyInputLinked)
-                    validationResults.add(fmt::format("Node [{}] has no ingoing links! Node should be deleted or properly linked!", objAsNode->getName()), objAsNode, EWarningType::UnusedContent);
+                    if (!anyInputLinked)
+                        validationResults.add(fmt::format("Node [{}] has no ingoing links! Node should be deleted or properly linked!", objAsNode->getName()), objAsNode, EWarningType::UnusedContent);
+                }
             }
         }
     }

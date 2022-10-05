@@ -1224,8 +1224,9 @@ namespace rlogic::internal
     TEST_P(AnApiObjects, ValidatesDanglingNodes_ProducesWarningIfNodeHasNoIngoingOrOutgoingLinks)
     {
         auto* script = m_apiObjects.createLuaScript(R"(
-            function interface(IN)
+            function interface(IN, OUT)
                 IN.param1 = Type:Int32()
+                OUT.param1 = Type:Int32()
             end
             function run(IN,OUT)
             end
@@ -1238,6 +1239,64 @@ namespace rlogic::internal
         EXPECT_THAT(validationResults.getWarnings()[0].message, ::testing::HasSubstr("Node [script name] has no outgoing links"));
         EXPECT_THAT(validationResults.getWarnings()[1].message, ::testing::HasSubstr("Node [script name] has no ingoing links"));
         EXPECT_THAT(validationResults.getWarnings(), ::testing::Each(::testing::Field(&WarningData::type, ::testing::Eq(EWarningType::UnusedContent))));
+    }
+
+    TEST_P(AnApiObjects, ValidatesDanglingNodes_DoesNotProduceWarningIfNodeHasNoInputs)
+    {
+        const auto script = m_apiObjects.createLuaScript(R"(
+            function interface(IN,OUT)
+                OUT.param1 = Type:Int32()
+            end
+            function run(IN,OUT)
+            end
+            )", {}, "script name", m_errorReporting);
+        ASSERT_NE(nullptr, script);
+
+        const auto dummyInputScript = m_apiObjects.createLuaScript(R"LUA_SCRIPT(
+            function interface(IN)
+                IN.param1 = Type:Int32()
+            end
+
+            function run(IN,OUT)
+            end
+            )LUA_SCRIPT", {}, "dummy script", m_errorReporting);
+        ASSERT_NE(nullptr, dummyInputScript);
+
+        // link script's output in order to pass outputs validation
+        m_apiObjects.getLogicNodeDependencies().link(*script->getOutputs()->getChild(0u)->m_impl, *dummyInputScript->getInputs()->getChild(0u)->m_impl, false, m_errorReporting);
+
+        ValidationResults validationResults;
+        m_apiObjects.validateDanglingNodes(validationResults);
+        EXPECT_TRUE(validationResults.getWarnings().empty());
+    }
+
+    TEST_P(AnApiObjects, ValidatesDanglingNodes_DoesNotProduceWarningIfNodeHasNoOutputs)
+    {
+        const auto script = m_apiObjects.createLuaScript(R"(
+            function interface(IN,OUT)
+                IN.param1 = Type:Int32()
+            end
+            function run(IN,OUT)
+            end
+            )", {}, "script name", m_errorReporting);
+        ASSERT_NE(nullptr, script);
+
+        const auto dummyOutputScript = m_apiObjects.createLuaScript(R"LUA_SCRIPT(
+            function interface(IN,OUT)
+                OUT.param1 = Type:Int32()
+            end
+
+            function run(IN,OUT)
+            end
+            )LUA_SCRIPT", {}, "dummy script", m_errorReporting);
+        ASSERT_NE(nullptr, dummyOutputScript);
+
+        // link script's input in order to pass inputs validation
+        m_apiObjects.getLogicNodeDependencies().link(*dummyOutputScript->getOutputs()->getChild(0u)->m_impl, *script->getInputs()->getChild(0u)->m_impl, false, m_errorReporting);
+
+        ValidationResults validationResults;
+        m_apiObjects.validateDanglingNodes(validationResults);
+        EXPECT_TRUE(validationResults.getWarnings().empty());
     }
 
     class AnApiObjects_SceneMismatch : public AnApiObjects

@@ -111,6 +111,7 @@ namespace rlogic::internal
         const std::vector<WarningData>& validate() const;
 
         bool loadFromFile(std::string_view filename, ramses::Scene* scene, bool enableMemoryVerification);
+        bool loadFromFileDescriptor(int fd, size_t offset, size_t size, ramses::Scene* scene, bool enableMemoryVerification);
         bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* scene, bool enableMemoryVerification);
         bool saveToFile(std::string_view filename, const SaveFileConfigImpl& config);
         [[nodiscard]] static bool GetFeatureLevelFromFile(std::string_view filename, EFeatureLevel& detectedFeatureLevel);

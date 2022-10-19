@@ -16,9 +16,12 @@ env:
 jobs:
   build:
     runs-on: ${{ matrix.os }}
+    # Strategy: builds on oldest and newest Ubuntu and on Windows
+    # Oldest -> because that's what is used to build backwards compatible packages (see release.yaml)
+    # Newest -> so that we can test with latest tools (clang-tidy) and use recent drivers/packages
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-18.04, ubuntu-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v2
@@ -28,7 +31,7 @@ jobs:
     - name: Install GL/X11 packages for rendering (Linux only)
       run: |
         sudo apt-get install libgles2-mesa-dev libx11-dev
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ contains(matrix.os, 'ubuntu') }}
 
     - name: Install clang and clang-tidy
       run: |
@@ -47,7 +50,7 @@ jobs:
             -DCMAKE_BUILD_TYPE=$BUILD_TYPE
       if: ${{ matrix.os == 'windows-latest' }}
 
-    - name: Configure CMake (Linux)
+    - name: Configure CMake (Latest Ubuntu + Clang)
       shell: bash
       working-directory: ${{runner.workspace}}/build
       run: |
@@ -56,6 +59,14 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain \
             -DCMAKE_BUILD_TYPE=$BUILD_TYPE
       if: ${{ matrix.os == 'ubuntu-latest' }}
+
+    - name: Configure CMake (Oldest Ubuntu + GCC)
+      shell: bash
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        cmake $GITHUB_WORKSPACE \
+            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
+      if: ${{ matrix.os == 'ubuntu-18.04' }}
 
     - name: Build
       working-directory: ${{runner.workspace}}/build

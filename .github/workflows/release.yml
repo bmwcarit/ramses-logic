@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ubuntu-18.04, windows-latest]
 
     steps:
     - uses: actions/checkout@v2
@@ -29,10 +29,9 @@ jobs:
       run: |
         sudo apt-get install libgles2-mesa-dev libx11-dev
         cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
-            -Dramses-logic_PACKAGE_TYPE=DEB \
-            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain
+            -Dramses-logic_PACKAGE_TYPE=DEB
         cmake --build . --target package --config $BUILD_TYPE
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ matrix.os == 'ubuntu-18.04' }}
 
     - name: Build and package (Windows)
       shell: bash

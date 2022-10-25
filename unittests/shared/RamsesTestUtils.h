@@ -144,11 +144,12 @@ namespace rlogic
                 #version 100
 
                 uniform highp float floatUniform;
+                uniform highp mat4 jointMat[1];
                 attribute vec3 a_position;
 
                 void main()
                 {
-                    gl_Position = floatUniform * vec4(a_position, 1.0);
+                    gl_Position = floatUniform * vec4(a_position, 1.0) * jointMat[0];
                 })";
 
             std::string_view fragShader = R"(

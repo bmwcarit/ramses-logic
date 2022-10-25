@@ -106,7 +106,7 @@ namespace rlogic
     template <typename T>
     const std::vector<T>* DataArray::getData() const
     {
-        static_assert(IsPrimitiveProperty<T>::value && CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE),
+        static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE),
             "Unsupported data type, see createDataArray API doc to see supported types.");
         return getDataInternal<T>();
     }

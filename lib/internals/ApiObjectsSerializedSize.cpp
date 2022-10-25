@@ -21,6 +21,7 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/TimerNode.h"
 
 #include "generated/ApiObjectsGen.h"
@@ -36,6 +37,7 @@
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesRenderPassBindingImpl.h"
 #include "impl/RamsesRenderGroupBindingImpl.h"
+#include "impl/SkinBindingImpl.h"
 #include "impl/TimerNodeImpl.h"
 
 namespace rlogic::internal
@@ -116,6 +118,12 @@ namespace rlogic::internal
     size_t ApiObjects::getSerializedSize<RamsesRenderGroupBinding>() const
     {
         return calculateSerializedSize<RamsesRenderGroupBinding, RamsesRenderGroupBindingImpl>(getApiObjectContainer<RamsesRenderGroupBinding>(), m_featureLevel);
+    }
+
+    template<>
+    size_t ApiObjects::getSerializedSize<SkinBinding>() const
+    {
+        return calculateSerializedSize<SkinBinding, SkinBindingImpl>(getApiObjectContainer<SkinBinding>(), m_featureLevel);
     }
 
     template<>

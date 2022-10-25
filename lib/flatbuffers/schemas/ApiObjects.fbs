@@ -14,6 +14,7 @@ include "RamsesAppearanceBinding.fbs";
 include "RamsesCameraBinding.fbs";
 include "RamsesRenderPassBinding.fbs";
 include "RamsesRenderGroupBinding.fbs";
+include "SkinBinding.fbs";
 include "Link.fbs";
 include "DataArray.fbs";
 include "AnimationNode.fbs";
@@ -38,4 +39,5 @@ table ApiObjects
     renderPassBindings:[RamsesRenderPassBinding];
     anchorPoints:[AnchorPoint];
     renderGroupBindings:[RamsesRenderGroupBinding];
+    skinBindings:[SkinBinding];
 }

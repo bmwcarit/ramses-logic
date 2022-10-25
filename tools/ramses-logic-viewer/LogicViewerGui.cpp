@@ -23,6 +23,7 @@
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/AnchorPoint.h"
+#include "ramses-logic/SkinBinding.h"
 #include "internals/StdFilesystemWrapper.h"
 #include "fmt/format.h"
 
@@ -156,6 +157,10 @@ namespace rlogic
             else if (node->as<AnchorPoint>() != nullptr)
             {
                 name = "AnchorPoint";
+            }
+            else if (node->as<SkinBinding>() != nullptr)
+            {
+                name = "SkinBinding";
             }
             return name;
         }
@@ -401,6 +406,7 @@ namespace rlogic
             drawRenderPassBindings();
             drawRenderGroupBindings();
             drawAnchorPoints();
+            drawSkinBindings();
         }
 
         if (m_settings.showUpdateReport)
@@ -765,6 +771,34 @@ namespace rlogic
                 {
                     ImGui::TextUnformatted(fmt::format("Ramses Node: {}", obj->getRamsesNode().getName()).c_str());
                     ImGui::TextUnformatted(fmt::format("Ramses Camera: {}", obj->getRamsesCamera().getName()).c_str());
+                    drawNode(obj);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
+    void LogicViewerGui::drawSkinBindings()
+    {
+        const bool openSkinBindings = ImGui::CollapsingHeader("Skin Bindings");
+        if (ImGui::BeginPopupContextItem("SkinBindingsContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all Skin Binding inputs"))
+            {
+                copyInputs(LogicViewer::ltnSkinBinding, m_logicEngine.getCollection<SkinBinding>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openSkinBindings)
+        {
+            for (auto* obj : m_logicEngine.getCollection<SkinBinding>())
+            {
+                const bool open = DrawTreeNode(obj);
+                drawNodeContextMenu(obj, LogicViewer::ltnSkinBinding);
+                if (open)
+                {
+                    ImGui::TextUnformatted(fmt::format("Ramses Appearance: {}", obj->getAppearanceBinding().getRamsesAppearance().getName()).c_str());
+                    ImGui::TextUnformatted(fmt::format("Ramses Uniform input: {}", obj->getAppearanceUniformInput().getName()).c_str());
                     drawNode(obj);
                     ImGui::TreePop();
                 }
@@ -1266,11 +1300,11 @@ namespace rlogic
             if (!context.empty())
             {
                 ImGui::TextUnformatted(
-                    fmt::format("{}: Name:{} Type:{}[{}]", context.data(), obj->getName(), GetLuaPrimitiveTypeName(obj->getDataType()), obj->getNumElements()).c_str());
+                    fmt::format("{}: [{}]: {} Type:{}[{}]", context.data(), obj->getId(), obj->getName(), GetLuaPrimitiveTypeName(obj->getDataType()), obj->getNumElements()).c_str());
             }
             else
             {
-                ImGui::TextUnformatted(fmt::format("Name:{} Type:{}[{}]", obj->getName(), GetLuaPrimitiveTypeName(obj->getDataType()), obj->getNumElements()).c_str());
+                ImGui::TextUnformatted(fmt::format("[{}]: {} Type:{}[{}]", obj->getId(), obj->getName(), GetLuaPrimitiveTypeName(obj->getDataType()), obj->getNumElements()).c_str());
             }
         }
     }
@@ -1294,9 +1328,12 @@ namespace rlogic
         PathVector propertyPath;
         propertyPath.push_back(LogicViewer::ltnIN);
         auto prop = obj->getInputs();
-        for (size_t i = 0U; i < prop->getChildCount(); ++i)
+        if (prop)
         {
-            logProperty(prop->getChild(i), prefix, propertyPath);
+            for (size_t i = 0U; i < prop->getChildCount(); ++i)
+            {
+                logProperty(prop->getChild(i), prefix, propertyPath);
+            }
         }
     }
 
@@ -1410,7 +1447,8 @@ namespace rlogic
         logAllInputs<RamsesCameraBinding>("--Camera bindings\n", LogicViewer::ltnCamera);
         logAllInputs<RamsesRenderPassBinding>("--RenderPass bindings\n", LogicViewer::ltnRenderPass);
         logAllInputs<RamsesRenderGroupBinding>("--RenderGroup bindings\n", LogicViewer::ltnRenderGroup);
-        logAllInputs<AnchorPoint>("--Anchor points\n", LogicViewer::ltnRenderPass);
+        logAllInputs<AnchorPoint>("--Anchor points\n", LogicViewer::ltnAnchorPoint);
+        logAllInputs<SkinBinding>("--Skin bindings\n", LogicViewer::ltnSkinBinding);
 
         LogText("end\n\n");
         const char* code = R"(

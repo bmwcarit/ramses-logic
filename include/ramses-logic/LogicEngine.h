@@ -20,6 +20,7 @@
 #include "ramses-logic/SaveFileConfig.h"
 #include "ramses-logic/WarningData.h"
 #include "ramses-logic/PropertyLink.h"
+#include "ramses-logic/DataTypes.h"
 
 #include <vector>
 #include <string_view>
@@ -32,6 +33,7 @@ namespace ramses
     class Camera;
     class RenderPass;
     class RenderGroup;
+    class UniformInput;
 }
 
 namespace rlogic::internal
@@ -52,6 +54,7 @@ namespace rlogic
     class RamsesRenderPassBinding;
     class RamsesRenderGroupBinding;
     class RamsesRenderGroupBindingElements;
+    class SkinBinding;
     class DataArray;
     class AnimationNode;
     class AnimationNodeConfig;
@@ -335,10 +338,42 @@ namespace rlogic
         RLOGIC_API RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name ="");
 
         /**
+         * Creates a new #rlogic::SkinBinding which can be used for vertex skinning (bone animations).
+         * #rlogic::SkinBinding can only be created with #rlogic::EFeatureLevel_04 or higher enabled, see #LogicEngine(EFeatureLevel).
+         * Refer to #rlogic::SkinBinding and examples for all the information needed how to use this object.
+         *
+         * These conditions must be met in order for the creation to succeed:
+         *  - \c joints must contain at least 1 joint and no null pointers
+         *  - \c inverseBindMatrices must be of equal size as \c joints (i.e. matrix per joint)
+         *  - \c jointMatInput must point to a valid uniform input of the ramses::Effect used in \c appearanceBinding
+         *  - the shader uniform that \c jointMatInput points to must be of type array of ramses::EEffectInputDataType_Matrix44F
+         *    with number of elements matching number of joints
+         *  - \c jointMatInput must not be bound to any data object in its Ramses appearance
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param joints bindings to Ramses nodes which will act as skeleton nodes.
+         * @param inverseBindMatrices inverse transformation matrices (one for each joint node), values are expected ordered in column-major fashion.
+         * @param appearanceBinding binding to Ramses appearance which specifies the effect/shader for vertex skinning.
+         * @param jointMatInput Ramses appearance uniform input for the resulting joint matrices to be set.
+         * @param name a name for the the new #rlogic::SkinBinding.
+         * @return a pointer to the created object or nullptr if
+         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
+         */
+        RLOGIC_API SkinBinding* createSkinBinding(
+            const std::vector<const RamsesNodeBinding*>& joints,
+            const std::vector<matrix44f>& inverseBindMatrices,
+            RamsesAppearanceBinding& appearanceBinding,
+            const ramses::UniformInput& jointMatInput,
+            std::string_view name = {});
+
+        /**
         * Creates a new #rlogic::DataArray to store data which can be used with animations.
         * Provided data must not be empty otherwise creation will fail.
         * See #rlogic::CanPropertyTypeBeStoredInDataArray and #rlogic::PropertyTypeToEnum
         * to determine supported types that can be used to create a #rlogic::DataArray.
+        * When using std::vector<float> as element data type (corresponds to #rlogic::EPropertyType::Array),
+        * the sizes of all the elements (std::vector<float> instances) must be equal, otherwise creation will fail.
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
@@ -832,7 +867,7 @@ namespace rlogic
     template <typename T>
     DataArray* LogicEngine::createDataArray(const std::vector<T>& data, std::string_view name)
     {
-        static_assert(IsPrimitiveProperty<T>::value && CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE),
+        static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE),
             "Unsupported data type, see createDataArray API doc to see supported types.");
         return createDataArrayInternal<T>(data, name);
     }
@@ -850,6 +885,7 @@ namespace rlogic
             std::is_same_v<T, RamsesCameraBinding> ||
             std::is_same_v<T, RamsesRenderPassBinding> ||
             std::is_same_v<T, RamsesRenderGroupBinding> ||
+            std::is_same_v<T, SkinBinding> ||
             std::is_same_v<T, DataArray> ||
             std::is_same_v<T, AnimationNode> ||
             std::is_same_v<T, TimerNode> ||

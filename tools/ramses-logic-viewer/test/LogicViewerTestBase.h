@@ -23,6 +23,7 @@
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/AnchorPoint.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-client.h"
 #include <fmt/format.h>
 
@@ -132,7 +133,7 @@ namespace rlogic::internal
 
     protected:
         WithTempDirectory m_withTempDirectory;
-        LogicViewer viewer{ EFeatureLevel_03, doScreenshot };
+        LogicViewer viewer{ EFeatureLevel_Latest, doScreenshot };
         RamsesTestSetup m_ramses;
         ramses::Scene* m_scene = { m_ramses.createScene() };
         ramses::Node* m_node = { m_scene->createNode() };

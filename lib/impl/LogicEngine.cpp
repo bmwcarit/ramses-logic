@@ -16,6 +16,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
@@ -157,10 +158,20 @@ namespace rlogic
         return m_impl->createRamsesRenderGroupBinding(ramsesRenderGroup, elements, name);
     }
 
+    SkinBinding* LogicEngine::createSkinBinding(
+        const std::vector<const RamsesNodeBinding*>& joints,
+        const std::vector<matrix44f>& inverseBindMatrices,
+        RamsesAppearanceBinding& appearanceBinding,
+        const ramses::UniformInput& jointMatInput,
+        std::string_view name)
+    {
+        return m_impl->createSkinBinding(joints, inverseBindMatrices, appearanceBinding, jointMatInput, name);
+    }
+
     template <typename T>
     DataArray* LogicEngine::createDataArrayInternal(const std::vector<T>& data, std::string_view name)
     {
-        static_assert(IsPrimitiveProperty<T>::value && CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
+        static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
         return m_impl->createDataArray(data, name);
     }
 
@@ -283,6 +294,7 @@ namespace rlogic
     template RLOGIC_API Collection<RamsesCameraBinding>      LogicEngine::getLogicObjectsInternal<RamsesCameraBinding>() const;
     template RLOGIC_API Collection<RamsesRenderPassBinding>  LogicEngine::getLogicObjectsInternal<RamsesRenderPassBinding>() const;
     template RLOGIC_API Collection<RamsesRenderGroupBinding> LogicEngine::getLogicObjectsInternal<RamsesRenderGroupBinding>() const;
+    template RLOGIC_API Collection<SkinBinding>              LogicEngine::getLogicObjectsInternal<SkinBinding>() const;
     template RLOGIC_API Collection<DataArray>                LogicEngine::getLogicObjectsInternal<DataArray>() const;
     template RLOGIC_API Collection<AnimationNode>            LogicEngine::getLogicObjectsInternal<AnimationNode>() const;
     template RLOGIC_API Collection<TimerNode>                LogicEngine::getLogicObjectsInternal<TimerNode>() const;
@@ -297,6 +309,7 @@ namespace rlogic
     template RLOGIC_API const RamsesCameraBinding*      LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view) const;
     template RLOGIC_API const RamsesRenderPassBinding*  LogicEngine::findLogicObjectInternal<RamsesRenderPassBinding>(std::string_view) const;
     template RLOGIC_API const RamsesRenderGroupBinding* LogicEngine::findLogicObjectInternal<RamsesRenderGroupBinding>(std::string_view) const;
+    template RLOGIC_API const SkinBinding*              LogicEngine::findLogicObjectInternal<SkinBinding>(std::string_view) const;
     template RLOGIC_API const DataArray*                LogicEngine::findLogicObjectInternal<DataArray>(std::string_view) const;
     template RLOGIC_API const AnimationNode*            LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view) const;
     template RLOGIC_API const TimerNode*                LogicEngine::findLogicObjectInternal<TimerNode>(std::string_view) const;
@@ -311,6 +324,7 @@ namespace rlogic
     template RLOGIC_API RamsesCameraBinding*      LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view);
     template RLOGIC_API RamsesRenderPassBinding*  LogicEngine::findLogicObjectInternal<RamsesRenderPassBinding>(std::string_view);
     template RLOGIC_API RamsesRenderGroupBinding* LogicEngine::findLogicObjectInternal<RamsesRenderGroupBinding>(std::string_view);
+    template RLOGIC_API SkinBinding*              LogicEngine::findLogicObjectInternal<SkinBinding>(std::string_view);
     template RLOGIC_API DataArray*                LogicEngine::findLogicObjectInternal<DataArray>(std::string_view);
     template RLOGIC_API AnimationNode*            LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view);
     template RLOGIC_API TimerNode*                LogicEngine::findLogicObjectInternal<TimerNode>(std::string_view);
@@ -324,6 +338,7 @@ namespace rlogic
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec2i>(const std::vector<vec2i>&, std::string_view);
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec3i>(const std::vector<vec3i>&, std::string_view);
     template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<vec4i>(const std::vector<vec4i>&, std::string_view);
+    template RLOGIC_API DataArray* LogicEngine::createDataArrayInternal<std::vector<float>>(const std::vector<std::vector<float>>&, std::string_view);
 
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<LogicObject>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<LuaScript>() const;
@@ -334,9 +349,9 @@ namespace rlogic
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesCameraBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesRenderPassBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesRenderGroupBinding>() const;
+    template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<SkinBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<DataArray>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<AnimationNode>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<TimerNode>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<AnchorPoint>() const;
-
 }

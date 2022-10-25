@@ -15,6 +15,8 @@
 #include "ramses-logic/LuaModule.h"
 #include "ramses-logic/AnimationNodeConfig.h"
 
+#include "ramses-client-api/DataFloat.h"
+
 #include "impl/LogicNodeImpl.h"
 
 #include "FeatureLevelTestValues.h"
@@ -334,6 +336,186 @@ namespace rlogic
         EXPECT_FALSE(anchorPoint);
         ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
         EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create AnchorPoint, feature level 02 or higher is required, feature level in this runtime set to 01.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndNodeOrAppearanceFromAnotherInstance)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance);
+
+        LogicEngine otherEngine;
+        const auto nodeBindingOther = otherEngine.createRamsesNodeBinding(*m_node);
+        const auto appearanceBindingOther = otherEngine.createRamsesAppearanceBinding(*m_appearance);
+
+        EXPECT_EQ(nullptr, createSkinBinding(*nodeBindingOther, *appearanceBinding, m_logicEngine));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Failed to create SkinBinding 'skin': one or more of the provided Ramses node bindings was not found in this logic instance.");
+
+        EXPECT_EQ(nullptr, createSkinBinding(*nodeBinding, *appearanceBindingOther, m_logicEngine));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Failed to create SkinBinding 'skin': provided Ramses appearance binding was not found in this logic instance.");
+    }
+
+    TEST_P(ALogicEngine_Factory, FailsToCreateSkinBindingOnFeatureLevelBelow04)
+    {
+        if (GetParam() >= EFeatureLevel_04)
+            GTEST_SKIP();
+
+        EXPECT_FALSE(createSkinBinding(m_logicEngine));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, fmt::format("Cannot create SkinBinding, feature level 04 or higher is required, feature level in this runtime set to 0{}.", GetParam()));
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndNodesEmptyOrNull)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance);
+        ramses::UniformInput uniform;
+        m_appearance->getEffect().findUniformInput("jointMat", uniform);
+        EXPECT_TRUE(uniform.isValid());
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({}, {}, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, no or null joint node bindings provided.");
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding, nullptr }, { matrix44f{ 0.f }, matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, no or null joint node bindings provided.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndNodesCountDifferentFromMatricesCount)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance);
+        ramses::UniformInput uniform;
+        m_appearance->getEffect().findUniformInput("jointMat", uniform);
+        EXPECT_TRUE(uniform.isValid());
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding }, { matrix44f{ 0.f }, matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, number of inverse matrices must match the number of joints.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndUniformInvalidOrFromAnotherEffect)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance);
+
+        // invalid uniform
+        ramses::UniformInput uniform;
+        EXPECT_FALSE(uniform.isValid());
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding }, { matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, provided uniform input must be pointing to valid uniform of the provided appearance's effect and must not be bound.");
+
+        // valid uniform but from other effect
+        const std::string_view vertShader = R"(
+                #version 100
+                uniform highp float someUniform;
+                attribute vec3 a_position;
+                void main()
+                {
+                    gl_Position = someUniform * vec4(a_position, 1.0);
+                })";
+        const std::string_view fragShader = R"(
+                #version 100
+                void main(void)
+                {
+                    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                })";
+        ramses::EffectDescription effectDesc;
+        effectDesc.setVertexShader(vertShader.data());
+        effectDesc.setFragmentShader(fragShader.data());
+        const auto otherEffect = m_scene->createEffect(effectDesc);
+        otherEffect->findUniformInput("someUniform", uniform);
+        EXPECT_TRUE(uniform.isValid());
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding }, { matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, provided uniform input must be pointing to valid uniform of the provided appearance's effect and must not be bound.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndUniformIsBoundInRamses)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance);
+
+        ramses::UniformInput uniform;
+        m_appearance->getEffect().findUniformInput("floatUniform", uniform);
+        EXPECT_TRUE(uniform.isValid());
+        EXPECT_EQ(ramses::StatusOK, m_appearance->bindInput(uniform, *m_scene->createDataFloat()));
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding }, { matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, provided uniform input must be pointing to valid uniform of the provided appearance's effect and must not be bound.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndUniformDataTypeWrong)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance);
+
+        ramses::UniformInput uniform;
+        m_appearance->getEffect().findUniformInput("floatUniform", uniform);
+        EXPECT_TRUE(uniform.isValid());
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding }, { matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, provided uniform input must be of type array of Matrix4x4 with element count matching number of joints.");
+    }
+
+    TEST_P(ALogicEngine_Factory, ProducesErrorWhenCreatingSkinBindingAndUniformPointsToArrayWithMismatchedSize)
+    {
+        if (GetParam() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node);
+
+        const std::string_view vertShader = R"(
+                #version 100
+                uniform highp mat4 someArray[3];
+                attribute vec3 a_position;
+                void main()
+                {
+                    gl_Position = someArray[0] * vec4(a_position, 1.0);
+                })";
+        const std::string_view fragShader = R"(
+                #version 100
+                void main(void)
+                {
+                    gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                })";
+        ramses::EffectDescription effectDesc;
+        effectDesc.setVertexShader(vertShader.data());
+        effectDesc.setFragmentShader(fragShader.data());
+        const auto otherEffect = m_scene->createEffect(effectDesc);
+        ramses::UniformInput uniform;
+        otherEffect->findUniformInput("someArray", uniform);
+        EXPECT_TRUE(uniform.isValid());
+        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_scene->createAppearance(*otherEffect));
+
+        EXPECT_FALSE(m_logicEngine.createSkinBinding({ nodeBinding }, { matrix44f{ 0.f } }, *appearanceBinding, uniform, "skin"));
+        ASSERT_EQ(m_logicEngine.getErrors().size(), 1u);
+        EXPECT_EQ(m_logicEngine.getErrors()[0].message, "Cannot create SkinBinding, provided uniform input must be of type array of Matrix4x4 with element count matching number of joints.");
     }
 
     TEST_P(ALogicEngine_Factory, RenamesObjectsAfterCreation)

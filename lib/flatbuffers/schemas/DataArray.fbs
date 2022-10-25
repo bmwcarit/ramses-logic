@@ -19,7 +19,8 @@ enum EDataArrayType:uint8
     Int32 = 4,
     Vec2i = 5,
     Vec3i = 6,
-    Vec4i = 7
+    Vec4i = 7,
+    FloatArray = 8
 }
 
 table floatArr { data:[float]; }
@@ -36,4 +37,5 @@ table DataArray
     base:LogicObject;
     type:EDataArrayType;
     data:ArrayUnion;
+    numElements:uint32;   // all vector and array types are stored as flattened arrays, store the total number of elements extra
 }

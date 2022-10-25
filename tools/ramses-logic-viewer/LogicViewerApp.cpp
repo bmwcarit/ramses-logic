@@ -70,9 +70,11 @@ namespace rlogic
             args.registerOptions(cli);
             auto setMsaa       = [&](uint32_t numSamples) { displayConfig.setMultiSampling(numSamples); };
             auto setWindowSize = [&](uint32_t /*unused*/) { autoDetectViewportSize = false; };
+            auto setClearColor = [&](const auto& clearColor) { m_defaultClearColor = clearColor; };
             cli.add_option_function<uint32_t>("--width", setWindowSize, "Window width (auto-detected by default)");   // value was already parsed by DisplayConfig
             cli.add_option_function<uint32_t>("--height", setWindowSize, "Window height (auto-detected by default)"); // value was already parsed by DisplayConfig
             cli.add_option_function<uint32_t>("--msaa", setMsaa, "Instructs the renderer to apply multisampling.")->check(CLI::IsMember({1, 2, 4, 8}));
+            cli.add_option_function<std::array<float, 4u>>("--clear-color", setClearColor, "Background clear color as RGBA (ex. --clearColor 0 0.5 0.8 1");
         }
         catch (const CLI::Error& err)
         {

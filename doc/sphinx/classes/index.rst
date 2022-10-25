@@ -38,6 +38,7 @@ Class Index
     RamsesRenderPassBinding
     RamsesRenderGroupBinding
     RamsesRenderGroupBindingElements
+    SkinBinding
     SaveFileConfig
     TimerNode
     AnchorPoint
@@ -87,5 +88,14 @@ Class Index
     EFeatureLevel
 
 
+.. toctree::
+    :maxdepth: 3
+    :caption: Typedefs
 
-
+    vec2f
+    vec3f
+    vec4f
+    vec2i
+    vec3i
+    vec4i
+    matrix44f

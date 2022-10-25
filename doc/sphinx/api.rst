@@ -715,3 +715,4 @@ List of all examples
     examples/11_interfaces
     examples/12_anchor_point
     examples/13_render_order
+    examples/14_skinbinding

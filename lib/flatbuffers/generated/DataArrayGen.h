@@ -34,11 +34,12 @@ enum class EDataArrayType : uint8_t {
   Vec2i = 5,
   Vec3i = 6,
   Vec4i = 7,
+  FloatArray = 8,
   MIN = Float,
-  MAX = Vec4i
+  MAX = FloatArray
 };
 
-inline const EDataArrayType (&EnumValuesEDataArrayType())[8] {
+inline const EDataArrayType (&EnumValuesEDataArrayType())[9] {
   static const EDataArrayType values[] = {
     EDataArrayType::Float,
     EDataArrayType::Vec2f,
@@ -47,13 +48,14 @@ inline const EDataArrayType (&EnumValuesEDataArrayType())[8] {
     EDataArrayType::Int32,
     EDataArrayType::Vec2i,
     EDataArrayType::Vec3i,
-    EDataArrayType::Vec4i
+    EDataArrayType::Vec4i,
+    EDataArrayType::FloatArray
   };
   return values;
 }
 
 inline const char * const *EnumNamesEDataArrayType() {
-  static const char * const names[9] = {
+  static const char * const names[10] = {
     "Float",
     "Vec2f",
     "Vec3f",
@@ -62,13 +64,14 @@ inline const char * const *EnumNamesEDataArrayType() {
     "Vec2i",
     "Vec3i",
     "Vec4i",
+    "FloatArray",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameEDataArrayType(EDataArrayType e) {
-  if (flatbuffers::IsOutRange(e, EDataArrayType::Float, EDataArrayType::Vec4i)) return "";
+  if (flatbuffers::IsOutRange(e, EDataArrayType::Float, EDataArrayType::FloatArray)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesEDataArrayType()[index];
 }
@@ -253,7 +256,8 @@ struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
     VT_BASE = 4,
     VT_TYPE = 6,
     VT_DATA_TYPE = 8,
-    VT_DATA = 10
+    VT_DATA = 10,
+    VT_NUMELEMENTS = 12
   };
   const rlogic_serialization::LogicObject *base() const {
     return GetPointer<const rlogic_serialization::LogicObject *>(VT_BASE);
@@ -274,6 +278,9 @@ struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const rlogic_serialization::intArr *data_as_intArr() const {
     return data_type() == rlogic_serialization::ArrayUnion::intArr ? static_cast<const rlogic_serialization::intArr *>(data()) : nullptr;
   }
+  uint32_t numElements() const {
+    return GetField<uint32_t>(VT_NUMELEMENTS, 0);
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyOffset(verifier, VT_BASE) &&
@@ -282,6 +289,7 @@ struct DataArray FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
            VerifyField<uint8_t>(verifier, VT_DATA_TYPE) &&
            VerifyOffset(verifier, VT_DATA) &&
            VerifyArrayUnion(verifier, data(), data_type()) &&
+           VerifyField<uint32_t>(verifier, VT_NUMELEMENTS) &&
            verifier.EndTable();
   }
 };
@@ -310,6 +318,9 @@ struct DataArrayBuilder {
   void add_data(flatbuffers::Offset<void> data) {
     fbb_.AddOffset(DataArray::VT_DATA, data);
   }
+  void add_numElements(uint32_t numElements) {
+    fbb_.AddElement<uint32_t>(DataArray::VT_NUMELEMENTS, numElements, 0);
+  }
   explicit DataArrayBuilder(flatbuffers::FlatBufferBuilder &_fbb)
         : fbb_(_fbb) {
     start_ = fbb_.StartTable();
@@ -327,8 +338,10 @@ inline flatbuffers::Offset<DataArray> CreateDataArray(
     flatbuffers::Offset<rlogic_serialization::LogicObject> base = 0,
     rlogic_serialization::EDataArrayType type = rlogic_serialization::EDataArrayType::Float,
     rlogic_serialization::ArrayUnion data_type = rlogic_serialization::ArrayUnion::NONE,
-    flatbuffers::Offset<void> data = 0) {
+    flatbuffers::Offset<void> data = 0,
+    uint32_t numElements = 0) {
   DataArrayBuilder builder_(_fbb);
+  builder_.add_numElements(numElements);
   builder_.add_data(data);
   builder_.add_base(base);
   builder_.add_data_type(data_type);
@@ -379,6 +392,7 @@ inline const flatbuffers::TypeTable *EDataArrayTypeTypeTable() {
     { flatbuffers::ET_UCHAR, 0, 0 },
     { flatbuffers::ET_UCHAR, 0, 0 },
     { flatbuffers::ET_UCHAR, 0, 0 },
+    { flatbuffers::ET_UCHAR, 0, 0 },
     { flatbuffers::ET_UCHAR, 0, 0 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
@@ -392,10 +406,11 @@ inline const flatbuffers::TypeTable *EDataArrayTypeTypeTable() {
     "Int32",
     "Vec2i",
     "Vec3i",
-    "Vec4i"
+    "Vec4i",
+    "FloatArray"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_ENUM, 8, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_ENUM, 9, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }
@@ -452,7 +467,8 @@ inline const flatbuffers::TypeTable *DataArrayTypeTable() {
     { flatbuffers::ET_SEQUENCE, 0, 0 },
     { flatbuffers::ET_UCHAR, 0, 1 },
     { flatbuffers::ET_UTYPE, 0, 2 },
-    { flatbuffers::ET_SEQUENCE, 0, 2 }
+    { flatbuffers::ET_SEQUENCE, 0, 2 },
+    { flatbuffers::ET_UINT, 0, -1 }
   };
   static const flatbuffers::TypeFunction type_refs[] = {
     rlogic_serialization::LogicObjectTypeTable,
@@ -463,10 +479,11 @@ inline const flatbuffers::TypeTable *DataArrayTypeTable() {
     "base",
     "type",
     "data_type",
-    "data"
+    "data",
+    "numElements"
   };
   static const flatbuffers::TypeTable tt = {
-    flatbuffers::ST_TABLE, 4, type_codes, type_refs, nullptr, names
+    flatbuffers::ST_TABLE, 5, type_codes, type_refs, nullptr, names
   };
   return &tt;
 }

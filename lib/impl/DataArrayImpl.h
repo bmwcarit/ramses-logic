@@ -61,7 +61,9 @@ namespace rlogic::internal
             std::vector<int32_t>,
             std::vector<vec2i>,
             std::vector<vec3i>,
-            std::vector<vec4i>>;
+            std::vector<vec4i>,
+            std::vector<std::vector<float>>
+        >;
         [[nodiscard]] const DataArrayVariant& getDataVariant() const;
 
     private:

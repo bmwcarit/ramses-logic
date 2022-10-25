@@ -26,6 +26,7 @@
 #include "ramses-logic/RamsesRenderGroupBindingElements.h"
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/LuaScript.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-client.h"
 #include "ImguiClientHelper.h"
 #include "fmt/format.h"
@@ -76,6 +77,7 @@ const auto defaultLuaFile = R"(function default()
     --RenderGroup bindings
     rlogic.renderGroupBindings["myRenderGroup"]["IN"]["renderOrders"]["myMeshNode"].value = 0
     --Anchor points
+    --Skin bindings
 end
 
 
@@ -101,7 +103,7 @@ end
 )";
 
 const auto iniFile = R"(
-[Window][Logic Viewer (FeatureLevel 03)]
+[Window][Logic Viewer (FeatureLevel 04)]
 Pos=0,0
 Size=540,720
 Collapsed=0
@@ -197,6 +199,11 @@ public:
         return renderGroupBindings() + buttonHeight;
     }
 
+    [[nodiscard]] int32_t skinBindings() const
+    {
+        return anchorPoints() + buttonHeight;
+    }
+
     [[nodiscard]] int32_t displaySettings() const
     {
         const bool showUpdateReport = m_settings ? m_settings->showUpdateReport : false;
@@ -205,7 +212,7 @@ public:
 
     [[nodiscard]] int32_t updateReport() const
     {
-        return anchorPoints() + buttonHeight;
+        return skinBindings() + buttonHeight;
     }
 
 private:
@@ -266,10 +273,10 @@ namespace rlogic::internal
     };
 
 
-    class ALogicViewerApp : public ::testing::Test
+    class ALogicViewerAppBase
     {
     public:
-        ALogicViewerApp()
+        ALogicViewerAppBase()
         {
             createLogicFile();
             m_scene.scene->saveToFile(ramsesFile, true);
@@ -277,14 +284,14 @@ namespace rlogic::internal
             ramses::RamsesFramework::SetLogHandler(handler);
         }
 
-        ~ALogicViewerApp() override
+        virtual ~ALogicViewerAppBase()
         {
             ramses::RamsesFramework::SetLogHandler(ramses::LogHandlerFunc());
         }
 
         void createLogicFile()
         {
-            LogicEngine engine{EFeatureLevel_03};
+            LogicEngine engine{ EFeatureLevel_Latest };
 
             auto* interface = engine.createLuaInterface(R"(
                 function interface(IN,OUT)
@@ -387,9 +394,12 @@ namespace rlogic::internal
             engine.saveToFile(logicFile, noValidationConfig);
         }
 
-        template <typename... T> void createApp(T&&... arglist)
+        void createApp(const std::vector<std::string>& argsList = {})
         {
-            const auto args = std::array<const char*, sizeof...(T)>{arglist...};
+            std::vector<const char*> args;
+            args.resize(argsList.size());
+            std::transform(argsList.begin(), argsList.end(), args.begin(), [](const auto& str) { return str.c_str(); });
+            args.insert(args.begin(), "viewer"); // 1st is executable name to comply with standard application args
             m_app = std::make_unique<LogicViewerApp>(static_cast<int>(args.size()), args.data());
         }
 
@@ -473,20 +483,19 @@ namespace rlogic::internal
         std::unique_ptr<LogicViewerApp> m_app;
     };
 
-    class ALogicViewerAppUIBase : public ALogicViewerApp
+    class ALogicViewerApp : public ALogicViewerAppBase, public ::testing::Test
+    {
+    };
+
+    class ALogicViewerAppUIBase : public ALogicViewerAppBase
     {
     public:
-        void setup(std::string_view ini, std::string_view args = {})
+        void setup(std::string_view ini, std::vector<std::string> args = {})
         {
             SaveFile(ini, "imgui.ini");
-            if (args.empty())
-            {
-                createApp("viewer", ramsesFile);
-            }
-            else
-            {
-                createApp("viewer", args.data(), ramsesFile);
-            }
+            args.emplace_back(ramsesFile);
+            createApp(args);
+
             ui.setup(m_app->getSettings());
             ImGui::GetIO().GetClipboardTextFn = GetClipboardText;
             ImGui::GetIO().SetClipboardTextFn = SetClipboardText;
@@ -564,21 +573,12 @@ namespace rlogic::internal
     // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables) must be static and non-const
     std::string ALogicViewerAppUIBase::s_clipboard;
 
-    class ALogicViewerAppUI : public ALogicViewerAppUIBase
+    class ALogicViewerAppUI : public ALogicViewerAppUIBase, public ::testing::Test
     {
     public:
         ALogicViewerAppUI()
         {
             setup(iniFile);
-        }
-    };
-
-    class ALogicViewerAppUINoOffscreen : public ALogicViewerAppUIBase
-    {
-    public:
-        ALogicViewerAppUINoOffscreen()
-        {
-            setup(iniFile, "--no-offscreen");
         }
     };
 
@@ -605,7 +605,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerApp, emptyParam)
     {
-        createApp("viewer");
+        createApp();
         EXPECT_EQ(static_cast<int>(CLI::ExitCodes::RequiredError), m_app->run());
         EXPECT_EQ(static_cast<int>(CLI::ExitCodes::RequiredError), m_app->exitCode());
     }
@@ -613,7 +613,7 @@ namespace rlogic::internal
     TEST_F(ALogicViewerApp, version)
     {
         testing::internal::CaptureStdout();
-        createApp("viewer", "--version");
+        createApp({ "--version" });
         EXPECT_THAT(testing::internal::GetCapturedStdout(), testing::StartsWith(rlogic::g_PROJECT_VERSION));
         EXPECT_EQ(0, m_app->run());
     }
@@ -621,7 +621,7 @@ namespace rlogic::internal
     TEST_F(ALogicViewerApp, ramsesFileDoesNotExist)
     {
         testing::internal::CaptureStderr();
-        createApp("viewer", "notExisting.ramses");
+        createApp({ "notExisting.ramses" });
         EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: notExisting.ramses"));
     }
@@ -629,7 +629,7 @@ namespace rlogic::internal
     TEST_F(ALogicViewerApp, logicFileDoesNotExist)
     {
         testing::internal::CaptureStderr();
-        createApp("viewer", ramsesFile, "notExisting.rlogic");
+        createApp({ ramsesFile, "notExisting.rlogic" });
         EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: notExisting.rlogic"));
     }
@@ -637,14 +637,14 @@ namespace rlogic::internal
     TEST_F(ALogicViewerApp, luaFileDoesNotExist)
     {
         testing::internal::CaptureStderr();
-        createApp("viewer", ramsesFile, logicFile, "notExisting.lua");
+        createApp({ ramsesFile, logicFile, "notExisting.lua" });
         EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: notExisting.lua"));
     }
 
     TEST_F(ALogicViewerApp, writeDefaultLuaConfiguration)
     {
-        createApp("viewer", "--write-config", ramsesFile);
+        createApp({ "--write-config", ramsesFile });
         auto* viewer = m_app->getViewer();
         ASSERT_TRUE(viewer != nullptr);
         EXPECT_EQ(Result(), viewer->update());
@@ -657,7 +657,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerApp, writeDefaultLuaConfigurationHeadless)
     {
-        createApp("viewer", "--write-config", "--headless", ramsesFile);
+        createApp({ "--write-config", "--headless", ramsesFile });
         auto* viewer = m_app->getViewer();
         ASSERT_TRUE(viewer != nullptr);
         EXPECT_EQ(Result(), viewer->update());
@@ -670,7 +670,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerApp, writeDefaultLuaConfigurationToOtherFile)
     {
-        createApp("viewer", "--write-config=foobar.lua", ramsesFile);
+        createApp({ "--write-config=foobar.lua", ramsesFile });
         auto* viewer = m_app->getViewer();
         ASSERT_TRUE(viewer != nullptr);
         EXPECT_EQ(Result(), viewer->update());
@@ -683,7 +683,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerApp, runInteractive)
     {
-        createApp("viewer", ramsesFile);
+        createApp({ ramsesFile });
         EXPECT_TRUE(runUntil("is in state RENDERED caused by command SHOW"));
         EXPECT_TRUE(m_app->doOneLoop());
         EXPECT_TRUE(m_app->doOneLoop());
@@ -698,12 +698,12 @@ namespace rlogic::internal
     {
         // implicit filename
         testing::internal::CaptureStderr();
-        createApp("viewer", "--exec=test_default", ramsesFile);
+        createApp({ "--exec=test_default", ramsesFile });
         EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("cannot open ALogicViewerAppTest.lua: No such file or directory"));
         // explicit filename
         testing::internal::CaptureStderr();
-        createApp("viewer", "--exec=test_default", "--lua=NotExistingLuaFile.lua", ramsesFile);
+        createApp({ "--exec=test_default", "--lua=NotExistingLuaFile.lua", ramsesFile });
         EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: NotExistingLuaFile.lua"));
     }
@@ -718,7 +718,7 @@ namespace rlogic::internal
                 rlogic.screenshot("test_yellow.png")
             end
         )");
-        createApp("viewer", "--exec=test_default", ramsesFile);
+        createApp({ "--exec=test_default", ramsesFile });
         EXPECT_EQ(0, m_app->run());
         EXPECT_TRUE(CompareImage("test_red.png", "ALogicViewerApp_red.png"));
         EXPECT_TRUE(CompareImage("test_yellow.png", "ALogicViewerApp_yellow.png"));
@@ -733,7 +733,7 @@ namespace rlogic::internal
                 rlogic.appearanceBindings.myAppearance.IN.green.value = 1
                 rlogic.screenshot("test_yellow.png")
         )");
-        createApp("viewer", "--exec=test_default", ramsesFile);
+        createApp({ "--exec=test_default", ramsesFile });
         EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
     }
 
@@ -745,7 +745,7 @@ namespace rlogic::internal
                 rlogic.screenshot(filename)
             end
         )");
-        createApp("viewer", R"(--exec-lua=test_default('almost_yellow.png', 0.9))", ramsesFile);
+        createApp({ R"(--exec-lua=test_default('almost_yellow.png', 0.9))", ramsesFile });
         EXPECT_EQ(0, m_app->run());
         auto appearance = m_app->getViewer()->getEngine().findByName<rlogic::RamsesAppearanceBinding>("myAppearance");
         ASSERT_TRUE(appearance != nullptr);
@@ -757,7 +757,7 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerApp, exec_lua_code)
     {
-        createApp("viewer", R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.44)", ramsesFile);
+        createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.44)", ramsesFile });
         EXPECT_EQ(0, m_app->run());
         auto appearance = m_app->getViewer()->getEngine().findByName<rlogic::RamsesAppearanceBinding>("myAppearance");
         ASSERT_TRUE(appearance != nullptr);
@@ -769,14 +769,14 @@ namespace rlogic::internal
     TEST_F(ALogicViewerApp, exec_lua_error)
     {
         testing::internal::CaptureStderr();
-        createApp("viewer", R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green = 0.44)", ramsesFile);
+        createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green = 0.44)", ramsesFile });
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("sol: cannot set (new_index) into this object"));
         EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
     }
 
     TEST_F(ALogicViewerApp, exec_lua_headless)
     {
-        createApp("viewer", R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.24)", "--headless", ramsesFile);
+        createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.24)", "--headless", ramsesFile });
         EXPECT_EQ(0, m_app->run());
         auto appearance = m_app->getViewer()->getEngine().findByName<rlogic::RamsesAppearanceBinding>("myAppearance");
         ASSERT_TRUE(appearance != nullptr);
@@ -788,7 +788,7 @@ namespace rlogic::internal
     TEST_F(ALogicViewerApp, exec_lua_screenshot_headless)
     {
         testing::internal::CaptureStderr();
-        createApp("viewer", R"(--exec-lua=rlogic.screenshot("screenshot.png"))", "--headless", ramsesFile);
+        createApp({ R"(--exec-lua=rlogic.screenshot("screenshot.png"))", "--headless", ramsesFile });
         EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("No screenshots available in current configuration"));
     }
@@ -802,7 +802,7 @@ namespace rlogic::internal
                 rlogic.appearanceBindings.myAppearance.IN.green.value = 1
                 rlogic.screenshot("test_yellow.png")
         )");
-        createApp("viewer", ramsesFile);
+        createApp({ ramsesFile });
         EXPECT_TRUE(runUntil("is in state RENDERED caused by command SHOW"));
         EXPECT_THAT(m_app->getViewer()->getLastResult().getMessage(), testing::HasSubstr("ALogicViewerAppTest.lua:7: 'end' expected"));
         EXPECT_TRUE(m_app->doOneLoop());
@@ -818,7 +818,7 @@ namespace rlogic::internal
                 rlogic.screenshot("test_red.png")
             end
         )");
-        createApp("viewer", "--exec=test_default", "--no-offscreen", ramsesFile);
+        createApp({ "--exec=test_default", "--no-offscreen", ramsesFile });
         EXPECT_EQ(0, m_app->run());
         EXPECT_TRUE(CompareImage("test_red.png", "ALogicViewerApp_red.png"));
     }
@@ -831,7 +831,7 @@ namespace rlogic::internal
                 rlogic.screenshot("test_red.png")
             end
         )");
-        createApp("viewer", "--exec=test_default", "--width", "500", "--height", "700", ramsesFile);
+        createApp({ "--exec=test_default", "--width", "500", "--height", "700", ramsesFile });
         EXPECT_EQ(0, m_app->run());
         EXPECT_TRUE(CompareImage("test_red.png", "ALogicViewerApp_red_500x700.png"));
     }
@@ -1181,7 +1181,45 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
         EXPECT_FALSE(settings->showWindow);
     }
 
-    TEST_F(ALogicViewerAppUI, changeClearColor)
+    class ALogicViewerAppUIClearColor : public ALogicViewerAppUIBase, public ::testing::TestWithParam<bool>
+    {
+    public:
+        ALogicViewerAppUIClearColor()
+        {
+            if (GetParam())
+            {
+                setup(iniFile, { "--clear-color", "0", "0", "0.5", "1" });
+            }
+            else
+            {
+                setup(iniFile, { "--no-offscreen", "--clear-color", "0", "0", "0.5", "1" });
+            }
+        }
+    };
+
+    INSTANTIATE_TEST_SUITE_P(
+        ALogicViewerAppUIClearColor_TestInstances,
+        ALogicViewerAppUIClearColor,
+        ::testing::Values(
+            false, // no offscreen
+            true)  // offscreen
+        );
+
+    TEST_P(ALogicViewerAppUIClearColor, usesClearColorFromCommandLine)
+    {
+        SaveFile(R"(
+            function screenshot()
+                rlogic.screenshot("screenshot.png")
+            end
+        )");
+        EXPECT_TRUE(keyPress(ramses::EKeyCode_F5)); // reload configuration
+        EXPECT_TRUE(keyPress(ramses::EKeyCode_F11)); // hide UI
+
+        EXPECT_EQ(Result(), m_app->getViewer()->call("screenshot"));
+        EXPECT_TRUE(CompareImage("screenshot.png", "ALogicViewerApp_clearColorCmdLine.png", 0.5f)); // increased tolerance due to some platforms being 1/255 off covering large area (as background)
+    }
+
+    TEST_P(ALogicViewerAppUIClearColor, changeClearColor)
     {
         SaveFile(R"(
             function screenshot()
@@ -1199,37 +1237,19 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
         const int displaySettingsY = ui.displaySettings() - ui.buttonHeight;
         EXPECT_TRUE(click(mouseX, displaySettingsY));
         EXPECT_TRUE(dragX(mouseX + 50, mouseX + 55, displaySettingsY + ui.buttonHeight));
-
-        EXPECT_EQ(Result(), m_app->getViewer()->call("screenshot"));
-        EXPECT_TRUE(CompareImage("screenshot.png", "ALogicViewerApp_clearColor.png", 0.5f)); // increased tolerance due to some platforms being 1/255 off covering large area (as background)
-    }
-
-    TEST_F(ALogicViewerAppUINoOffscreen, changeClearColor)
-    {
-        const int mouseX = 75;
-        // show display settings
-        EXPECT_TRUE(click(mouseX, ui.titleBar + ui.yMiddle));
-        EXPECT_TRUE(click(mouseX, ui.titleBar + ui.buttonHeight + 12 * ui.smallButtonHeight + 3 * ui.hline + ui.yMiddle));
-        EXPECT_TRUE(m_app->getSettings()->showDisplaySettings);
-        // change clear color
-        EXPECT_TRUE(click(mouseX, ui.displaySettings()));
-        EXPECT_TRUE(dragX(mouseX + 50, mouseX + 55, ui.displaySettings() + ui.buttonHeight));
-
-        SaveFile(R"(
-            function screenshot()
-                rlogic.screenshot("screenshot.png")
-            end
-        )");
-        EXPECT_TRUE(keyPress(ramses::EKeyCode_F5)); // reload configuration
         EXPECT_TRUE(keyPress(ramses::EKeyCode_F11)); // hide UI
 
         EXPECT_EQ(Result(), m_app->getViewer()->call("screenshot"));
         EXPECT_TRUE(CompareImage("screenshot.png", "ALogicViewerApp_clearColor.png", 0.5f)); // increased tolerance due to some platforms being 1/255 off covering large area (as background)
     }
 
-    TEST_F(ALogicViewerAppUIBase, updateReport)
+    class ALogicViewerAppUIUpdateReport : public ALogicViewerAppUIBase, public ::testing::Test
     {
-        setup(R"([Window][Logic Viewer (FeatureLevel 03)]
+    };
+
+    TEST_F(ALogicViewerAppUIUpdateReport, updateReport)
+    {
+        setup(R"([Window][Logic Viewer (FeatureLevel 04)]
 Pos=0,0
 Size=540,720
 Collapsed=0
@@ -1273,4 +1293,4 @@ ShowDisplaySettings=0)");
         EXPECT_EQ(4, report.getNodesExecuted().size());
         EXPECT_EQ(6, report.getNodesSkippedExecution().size());
     }
-} // namespace rlogic::internal
+}

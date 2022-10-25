@@ -13,11 +13,13 @@
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
+#include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/AnchorPoint.h"
 #include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/RamsesRenderGroupBindingElements.h"
+#include "ramses-logic/SkinBinding.h"
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
@@ -33,6 +35,9 @@
 #include "internals/ApiObjects.h"
 
 #include "ramses-client-api/RenderGroup.h"
+#include "ramses-client-api/UniformInput.h"
+#include "ramses-client-api/Appearance.h"
+#include "ramses-client-api/Effect.h"
 #include "ramses-utils.h"
 
 #include "generated/LogicEngineGen.h"
@@ -56,7 +61,7 @@ namespace rlogic::internal
         : m_apiObjects{ std::make_unique<ApiObjects>(featureLevel) }
         , m_featureLevel{ featureLevel }
     {
-        if (m_featureLevel != EFeatureLevel_01 && m_featureLevel != EFeatureLevel_02 && m_featureLevel != EFeatureLevel_03)
+        if (std::find(AllFeatureLevels.cbegin(), AllFeatureLevels.cend(), m_featureLevel) == AllFeatureLevels.cend())
         {
             LOG_ERROR("Unrecognized feature level '0{}' provided, falling back to feature level 01", m_featureLevel);
             m_featureLevel = EFeatureLevel_01;
@@ -175,17 +180,104 @@ namespace rlogic::internal
         return m_apiObjects->createRamsesRenderGroupBinding(ramsesRenderGroup, elements, name);
     }
 
+    SkinBinding* LogicEngineImpl::createSkinBinding(
+        const std::vector<const RamsesNodeBinding*>& joints,
+        const std::vector<matrix44f>& inverseBindMatrices,
+        RamsesAppearanceBinding& appearanceBinding,
+        const ramses::UniformInput& jointMatInput,
+        std::string_view name)
+    {
+        m_errors.clear();
+        if (m_featureLevel < EFeatureLevel_04)
+        {
+            m_errors.add(fmt::format("Cannot create SkinBinding, feature level 04 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        if (joints.empty() || std::find(joints.cbegin(), joints.cend(), nullptr) != joints.cend())
+        {
+            m_errors.add("Cannot create SkinBinding, no or null joint node bindings provided.", nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        if (joints.size() != inverseBindMatrices.size())
+        {
+            m_errors.add("Cannot create SkinBinding, number of inverse matrices must match the number of joints.", nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        for (const auto nodeBinding : joints)
+        {
+            const auto& nodeBindings = m_apiObjects->getApiObjectContainer<RamsesNodeBinding>();
+            if (std::find(nodeBindings.cbegin(), nodeBindings.cend(), nodeBinding) == nodeBindings.cend())
+            {
+                m_errors.add(fmt::format("Failed to create SkinBinding '{}': one or more of the provided Ramses node bindings was not found in this logic instance.", name), nullptr, EErrorType::IllegalArgument);
+                return nullptr;
+            }
+        }
+
+        const auto& appearanceBindings = m_apiObjects->getApiObjectContainer<RamsesAppearanceBinding>();
+        if (std::find(appearanceBindings.cbegin(), appearanceBindings.cend(), &appearanceBinding) == appearanceBindings.cend())
+        {
+            m_errors.add(fmt::format("Failed to create SkinBinding '{}': provided Ramses appearance binding was not found in this logic instance.", name), nullptr, EErrorType::IllegalArgument);
+            return nullptr;
+        }
+
+        ramses::UniformInput actualUniformInput;
+        appearanceBinding.getRamsesAppearance().getEffect().findUniformInput(jointMatInput.getName(), actualUniformInput);
+        if (!actualUniformInput.isValid() || appearanceBinding.getRamsesAppearance().isInputBound(actualUniformInput))
+        {
+            m_errors.add("Cannot create SkinBinding, provided uniform input must be pointing to valid uniform of the provided appearance's effect and must not be bound.",
+                nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        if (actualUniformInput.getDataType() != ramses::EEffectInputDataType_Matrix44F
+            || actualUniformInput.getElementCount() != joints.size())
+        {
+            m_errors.add("Cannot create SkinBinding, provided uniform input must be of type array of Matrix4x4 with element count matching number of joints.", nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        std::vector<const RamsesNodeBindingImpl*> jointsAsImpls;
+        jointsAsImpls.reserve(joints.size());
+        for (const auto j : joints)
+            jointsAsImpls.push_back(&j->m_nodeBinding);
+
+        return m_apiObjects->createSkinBinding(std::move(jointsAsImpls), inverseBindMatrices, appearanceBinding.m_appearanceBinding, actualUniformInput, name);
+    }
+
     template <typename T>
     DataArray* LogicEngineImpl::createDataArray(const std::vector<T>& data, std::string_view name)
     {
         static_assert(CanPropertyTypeBeStoredInDataArray(PropertyTypeToEnum<T>::TYPE));
         m_errors.clear();
+
         if (data.empty())
         {
             m_errors.add(fmt::format("Cannot create DataArray '{}' with empty data.", name), nullptr, EErrorType::IllegalArgument);
             return nullptr;
         }
 
+        if constexpr (std::is_same_v<T, std::vector<float>>)
+        {
+            if (m_featureLevel < EFeatureLevel_04)
+            {
+                m_errors.add(fmt::format("Cannot create DataArray of float arrays, feature level 04 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+                return nullptr;
+            }
+
+            for (const auto& vec : data)
+            {
+                if (vec.size() != data.front().size())
+                {
+                    m_errors.add("Failed to create DataArray of float arrays: all arrays must be of same size.", nullptr, EErrorType::Other);
+                    return nullptr;
+                }
+            }
+        }
+
+        // NOLINTNEXTLINE(readability-misleading-indentation) for some reason clang is confused about constexpr branch above
         return m_apiObjects->createDataArray(data, name);
     }
 
@@ -325,7 +417,7 @@ namespace rlogic::internal
         if (m_updateReportEnabled)
             m_updateReport.sectionFinished(UpdateReport::ETimingSection::TopologySort);
 
-        // force dirty all timer nodes and anchor points
+        // force dirty all timer nodes, anchor points and skinbindings
         setNodeToBeAlwaysUpdatedDirty();
 
         const bool success = updateNodes(*sortedNodes);
@@ -394,6 +486,9 @@ namespace rlogic::internal
         // force anchor points dirty because they depend on set of ramses states which cannot be monitored
         for (AnchorPoint* anchorPoint : m_apiObjects->getApiObjectContainer<AnchorPoint>())
             anchorPoint->m_impl.setDirty(true);
+        // force skinbindings dirty because they depend on set of ramses states which cannot be monitored
+        for (SkinBinding* skinBinding : m_apiObjects->getApiObjectContainer<SkinBinding>())
+            skinBinding->m_impl.setDirty(true);
     }
 
     const std::vector<ErrorData>& LogicEngineImpl::getErrors() const
@@ -511,7 +606,7 @@ namespace rlogic::internal
         // no need to use file identifier for it.
 
         assert(std::string(rlogic_serialization::LogicEngineIdentifier()) == fileIdFeatureLevel01);
-        assert(m_featureLevel == EFeatureLevel_01 || m_featureLevel == EFeatureLevel_02 || m_featureLevel == EFeatureLevel_03);
+        assert(std::find(AllFeatureLevels.cbegin(), AllFeatureLevels.cend(), m_featureLevel) != AllFeatureLevels.cend());
         return m_featureLevel == EFeatureLevel_01 ? rlogic_serialization::LogicEngineIdentifier() : fileIdFeatureLevel02orHigher;
     }
 
@@ -633,7 +728,7 @@ namespace rlogic::internal
         }
 
         const uint32_t featureLevelInt = logicEngine->featureLevel();
-        if (featureLevelInt != EFeatureLevel_01 && featureLevelInt != EFeatureLevel_02 && featureLevelInt != EFeatureLevel_03)
+        if (std::find(AllFeatureLevels.cbegin(), AllFeatureLevels.cend(), featureLevelInt) == AllFeatureLevels.cend())
         {
             LOG_ERROR("Could not recognize feature level in file '{}'", logname);
             return false;
@@ -803,4 +898,5 @@ namespace rlogic::internal
     template DataArray* LogicEngineImpl::createDataArray<vec2i>(const std::vector<vec2i>&, std::string_view name);
     template DataArray* LogicEngineImpl::createDataArray<vec3i>(const std::vector<vec3i>&, std::string_view name);
     template DataArray* LogicEngineImpl::createDataArray<vec4i>(const std::vector<vec4i>&, std::string_view name);
+    template DataArray* LogicEngineImpl::createDataArray<std::vector<float>>(const std::vector<std::vector<float>>&, std::string_view name);
 }

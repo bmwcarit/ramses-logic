@@ -9,8 +9,10 @@
 #pragma once
 
 #include "ramses-logic/APIExport.h"
+#include "ramses-logic/DataTypes.h"
 #include <array>
 #include <string>
+#include <vector>
 #include <cassert>
 
 namespace rlogic
@@ -33,15 +35,9 @@ namespace rlogic
         Struct, ///< Has no value itself, but can have named child properties
         String, ///< corresponds to std::string
         Bool,   ///< corresponds to bool
-        Array   ///< Has no value itself, but can have unnamed child properties of homogeneous types (primitive or structs)
+        Array   ///< Has no value itself, but can have unnamed child properties of homogeneous types (primitive or structs).
+                ///< When used in #rlogic::DataArray this type refers to an array of float arrays (std::vector<float> is the element type).
     };
-
-    using vec2f = std::array<float, 2>;
-    using vec3f = std::array<float, 3>;
-    using vec4f = std::array<float, 4>;
-    using vec2i = std::array<int, 2>;
-    using vec3i = std::array<int, 3>;
-    using vec4i = std::array<int, 4>;
 
     /**
     * Type trait which converts C++ types to #rlogic::EPropertyType enum for primitive types.
@@ -103,6 +99,11 @@ namespace rlogic
         static const EPropertyType TYPE = EPropertyType::Bool;
     };
 
+    template <> struct PropertyTypeToEnum<std::vector<float>>
+    {
+        static const EPropertyType TYPE = EPropertyType::Array;
+    };
+
     /**
     * Type trait which converts #rlogic::EPropertyType enum to a C++ type.
     */
@@ -161,6 +162,11 @@ namespace rlogic
     template <> struct PropertyEnumToType<EPropertyType::Bool>
     {
         using TYPE = bool;
+    };
+
+    template <> struct PropertyEnumToType<EPropertyType::Array>
+    {
+        using TYPE = std::vector<float>;
     };
 
     /**
@@ -245,11 +251,11 @@ namespace rlogic
         case EPropertyType::Vec2i:
         case EPropertyType::Vec3i:
         case EPropertyType::Vec4i:
+        case EPropertyType::Array:
             return true;
         case EPropertyType::Bool:
         case EPropertyType::Struct:
         case EPropertyType::String:
-        case EPropertyType::Array:
         case EPropertyType::Int64:
             return false;
         }
@@ -262,8 +268,8 @@ namespace rlogic
     */
     constexpr bool CanPropertyTypeBeAnimated(EPropertyType type)
     {
-        // currently all types that can be stored in DataArray
-        return CanPropertyTypeBeStoredInDataArray(type);
+        // for now animating of array data types is not implemented
+        return CanPropertyTypeBeStoredInDataArray(type) && (type != EPropertyType::Array);
     }
 
     /**

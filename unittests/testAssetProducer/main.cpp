@@ -33,11 +33,12 @@ ramses::Appearance* createTestAppearance(ramses::Scene& scene)
 
                 uniform highp float floatUniform;
                 uniform highp float animatedFloatUniform;
+                uniform highp mat4 jointMat[1];
                 attribute vec3 a_position;
 
                 void main()
                 {
-                    gl_Position = floatUniform * animatedFloatUniform * vec4(a_position, 1.0);
+                    gl_Position = floatUniform * animatedFloatUniform * vec4(a_position, 1.0) * jointMat[0];
                 })";
 
     const std::string_view fragShader = R"(
@@ -85,7 +86,7 @@ int main(int argc, char* argv[])
     }
 
     if (args.size() > 4u ||
-        (featureLevel != rlogic::EFeatureLevel_01 && featureLevel != rlogic::EFeatureLevel_02 && featureLevel != rlogic::EFeatureLevel_03))
+        (std::find(rlogic::AllFeatureLevels.cbegin(), rlogic::AllFeatureLevels.cend(), featureLevel) == rlogic::AllFeatureLevels.cend()))
     {
         std::cerr
             << "Generator of ramses and ramses logic test content.\n\n"
@@ -230,6 +231,14 @@ int main(int argc, char* argv[])
         elements.addElement(*meshNode, "mesh");
         elements.addElement(*nestedRenderGroup, "nestedRenderGroup");
         logicEngine.createRamsesRenderGroupBinding(*renderGroup, elements, "rendergroupbinding");
+    }
+
+    if (featureLevel >= rlogic::EFeatureLevel_04)
+    {
+        ramses::UniformInput uniform;
+        appearance->getEffect().findUniformInput("jointMat", uniform);
+        logicEngine.createSkinBinding({ nodeBinding }, { rlogic::matrix44f{ 0.f } }, *appBinding, uniform, "skin");
+        logicEngine.createDataArray(std::vector<std::vector<float>>{ { 1.f, 2.f, 3.f, 4.f, 5.f }, { 6.f, 7.f, 8.f, 9.f, 10.f } }, "dataarrayOfArrays");
     }
 
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");

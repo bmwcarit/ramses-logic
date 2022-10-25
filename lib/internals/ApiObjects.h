@@ -12,6 +12,7 @@
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/EFeatureLevel.h"
 #include "ramses-logic/PropertyLink.h"
+#include "ramses-logic/DataTypes.h"
 
 #include "impl/LuaConfigImpl.h"
 
@@ -31,6 +32,7 @@ namespace ramses
     class Camera;
     class RenderPass;
     class RenderGroup;
+    class UniformInput;
 }
 
 namespace rlogic_serialization
@@ -57,6 +59,7 @@ namespace rlogic
     class RamsesRenderPassBinding;
     class RamsesRenderGroupBinding;
     class RamsesRenderGroupBindingElements;
+    class SkinBinding;
     class DataArray;
     class AnimationNode;
     class TimerNode;
@@ -72,6 +75,7 @@ namespace rlogic::internal
     class SerializationMap;
     class RamsesNodeBindingImpl;
     class RamsesCameraBindingImpl;
+    class RamsesAppearanceBindingImpl;
 
     template <typename T>
     using ApiObjectContainer = std::vector<T*>;
@@ -128,6 +132,12 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, bool withFrustumPlanes, std::string_view name);
         RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& renderPass, std::string_view name);
         RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name);
+        SkinBinding* createSkinBinding(
+            std::vector<const RamsesNodeBindingImpl*> joints,
+            const std::vector<matrix44f>& inverseBindMatrices,
+            RamsesAppearanceBindingImpl& appearanceBinding,
+            const ramses::UniformInput& jointMatInput,
+            std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationNodeConfigImpl& config, std::string_view name);
@@ -183,6 +193,7 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesRenderPassBinding& ramsesRenderPassBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesRenderGroupBinding& ramsesRenderGroupBinding, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(SkinBinding& skinBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(AnimationNode& node, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(TimerNode& node, ErrorReporting& errorReporting);
@@ -200,6 +211,7 @@ namespace rlogic::internal
         ApiObjectContainer<RamsesCameraBinding>      m_ramsesCameraBindings;
         ApiObjectContainer<RamsesRenderPassBinding>  m_ramsesRenderPassBindings;
         ApiObjectContainer<RamsesRenderGroupBinding> m_ramsesRenderGroupBindings;
+        ApiObjectContainer<SkinBinding>              m_skinBindings;
         ApiObjectContainer<DataArray>                m_dataArrays;
         ApiObjectContainer<AnimationNode>            m_animationNodes;
         ApiObjectContainer<TimerNode>                m_timerNodes;

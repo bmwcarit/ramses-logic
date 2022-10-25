@@ -175,22 +175,54 @@ namespace rlogic::internal::math
     {
         float data[16]; // NOLINT(modernize-avoid-c-arrays) Ramses uses C array in matrix getters
         std::iota(data, data + 16, 1.f); // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic)
-        EXPECT_EQ(1.0f, m_mat.m11);
-        EXPECT_EQ(2.0f, m_mat.m12);
-        EXPECT_EQ(3.0f, m_mat.m13);
-        EXPECT_EQ(4.0f, m_mat.m14);
-        EXPECT_EQ(5.0f, m_mat.m21);
-        EXPECT_EQ(6.0f, m_mat.m22);
-        EXPECT_EQ(7.0f, m_mat.m23);
-        EXPECT_EQ(8.0f, m_mat.m24);
-        EXPECT_EQ(9.0f, m_mat.m31);
-        EXPECT_EQ(10.0f, m_mat.m32);
-        EXPECT_EQ(11.0f, m_mat.m33);
-        EXPECT_EQ(12.0f, m_mat.m34);
-        EXPECT_EQ(13.0f, m_mat.m41);
-        EXPECT_EQ(14.0f, m_mat.m42);
-        EXPECT_EQ(15.0f, m_mat.m43);
-        EXPECT_EQ(16.0f, m_mat.m44);
+        const Matrix44f mat{ data };
+        EXPECT_EQ(1.0f, mat.m11);
+        EXPECT_EQ(2.0f, mat.m21);
+        EXPECT_EQ(3.0f, mat.m31);
+        EXPECT_EQ(4.0f, mat.m41);
+        EXPECT_EQ(5.0f, mat.m12);
+        EXPECT_EQ(6.0f, mat.m22);
+        EXPECT_EQ(7.0f, mat.m32);
+        EXPECT_EQ(8.0f, mat.m42);
+        EXPECT_EQ(9.0f, mat.m13);
+        EXPECT_EQ(10.0f, mat.m23);
+        EXPECT_EQ(11.0f, mat.m33);
+        EXPECT_EQ(12.0f, mat.m43);
+        EXPECT_EQ(13.0f, mat.m14);
+        EXPECT_EQ(14.0f, mat.m24);
+        EXPECT_EQ(15.0f, mat.m34);
+        EXPECT_EQ(16.0f, mat.m44);
+    }
+
+    TEST_F(Matrix44Test, StdArrayConstructor)
+    {
+        std::array<float, 16> data{};
+        std::iota(data.begin(), data.end(), 1.f);
+        const Matrix44f mat{ data };
+        EXPECT_EQ(1.0f, mat.m11);
+        EXPECT_EQ(2.0f, mat.m21);
+        EXPECT_EQ(3.0f, mat.m31);
+        EXPECT_EQ(4.0f, mat.m41);
+        EXPECT_EQ(5.0f, mat.m12);
+        EXPECT_EQ(6.0f, mat.m22);
+        EXPECT_EQ(7.0f, mat.m32);
+        EXPECT_EQ(8.0f, mat.m42);
+        EXPECT_EQ(9.0f, mat.m13);
+        EXPECT_EQ(10.0f, mat.m23);
+        EXPECT_EQ(11.0f, mat.m33);
+        EXPECT_EQ(12.0f, mat.m43);
+        EXPECT_EQ(13.0f, mat.m14);
+        EXPECT_EQ(14.0f, mat.m24);
+        EXPECT_EQ(15.0f, mat.m34);
+        EXPECT_EQ(16.0f, mat.m44);
+    }
+
+    TEST_F(Matrix44Test, ToStdArrayConversion)
+    {
+        std::array<float, 16> data{};
+        std::iota(data.begin(), data.end(), 1.f);
+        const Matrix44f mat{ data };
+        EXPECT_EQ(data, mat.toStdArray());
     }
 
     TEST_F(Matrix44Test, VectorMultiplication)

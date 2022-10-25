@@ -21,13 +21,14 @@
 #include "impl/AnimationNodeImpl.h"
 #include "impl/TimerNodeImpl.h"
 #include "impl/AnchorPointImpl.h"
+#include "impl/SkinBindingImpl.h"
 
 namespace rlogic
 {
     class ALogicEngine_Lookup : public ALogicEngine
     {
     public:
-        ALogicEngine_Lookup() : ALogicEngine{ EFeatureLevel_03 } // test with latest feature level so all possible API objects are available
+        ALogicEngine_Lookup() : ALogicEngine{ EFeatureLevel_Latest } // test with latest feature level so all possible API objects are available
         {
         }
 
@@ -42,18 +43,19 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName)
     {
-        LuaModule* luaModule = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
-        LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
-        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
-        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
-        RamsesRenderPassBinding* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        const auto luaModule = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        const auto script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto renderGroupBinding = createRenderGroupBinding();
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
         const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         const auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto skin = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LuaModule>("luaModule"));
         EXPECT_EQ(script, m_logicEngine.findByName<LuaScript>("script"));
@@ -67,6 +69,7 @@ namespace rlogic
         EXPECT_EQ(timerNode, m_logicEngine.findByName<TimerNode>("timerNode"));
         EXPECT_EQ(intf, m_logicEngine.findByName<LuaInterface>("intf"));
         EXPECT_EQ(anchor, m_logicEngine.findByName<AnchorPoint>("anchor"));
+        EXPECT_EQ(skin, m_logicEngine.findByName<SkinBinding>("skin"));
 
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LogicObject>("luaModule"));
         EXPECT_EQ(script, m_logicEngine.findByName<LogicObject>("script"));
@@ -80,6 +83,7 @@ namespace rlogic
         EXPECT_EQ(timerNode, m_logicEngine.findByName<LogicObject>("timerNode"));
         EXPECT_EQ(intf, m_logicEngine.findByName<LogicObject>("intf"));
         EXPECT_EQ(anchor, m_logicEngine.findByName<LogicObject>("anchor"));
+        EXPECT_EQ(skin, m_logicEngine.findByName<LogicObject>("skin"));
 
         auto it = m_logicEngine.getCollection<LogicObject>().cbegin();
         EXPECT_EQ(*it++, luaModule);
@@ -94,22 +98,24 @@ namespace rlogic
         EXPECT_EQ(*it++, timerNode);
         EXPECT_EQ(*it++, intf);
         EXPECT_EQ(*it++, anchor);
+        EXPECT_EQ(*it++, skin);
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_Const)
     {
-        LuaModule* luaModule = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
-        LuaScript* script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
-        RamsesNodeBinding* nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
-        RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
-        RamsesRenderPassBinding* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        const auto luaModule = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        const auto script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto renderGroupBinding = createRenderGroupBinding();
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
         const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         const auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto skin = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         const LogicEngine& immutableLogicEngine = m_logicEngine;
         EXPECT_EQ(luaModule, immutableLogicEngine.findByName<LuaModule>("luaModule"));
@@ -124,6 +130,7 @@ namespace rlogic
         EXPECT_EQ(timerNode, immutableLogicEngine.findByName<TimerNode>("timerNode"));
         EXPECT_EQ(intf, immutableLogicEngine.findByName<LuaInterface>("intf"));
         EXPECT_EQ(anchor, immutableLogicEngine.findByName<AnchorPoint>("anchor"));
+        EXPECT_EQ(skin, immutableLogicEngine.findByName<SkinBinding>("skin"));
 
         EXPECT_EQ(luaModule, immutableLogicEngine.findByName<LogicObject>("luaModule"));
         EXPECT_EQ(script, immutableLogicEngine.findByName<LogicObject>("script"));
@@ -137,6 +144,7 @@ namespace rlogic
         EXPECT_EQ(timerNode, immutableLogicEngine.findByName<LogicObject>("timerNode"));
         EXPECT_EQ(intf, immutableLogicEngine.findByName<LogicObject>("intf"));
         EXPECT_EQ(anchor, immutableLogicEngine.findByName<LogicObject>("anchor"));
+        EXPECT_EQ(skin, immutableLogicEngine.findByName<LogicObject>("skin"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CanBeUsedWithRealType)
@@ -144,7 +152,7 @@ namespace rlogic
         m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
         m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         createRenderGroupBinding();
@@ -153,6 +161,7 @@ namespace rlogic
         m_logicEngine.createTimerNode("timerNode");
         m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         const auto* luaModuleFound         = m_logicEngine.findByName<LogicObject>("luaModule")->as<LuaModule>();
         const auto* luaScriptFound         = m_logicEngine.findByName<LogicObject>("script")->as<LuaScript>();
@@ -166,6 +175,7 @@ namespace rlogic
         const auto* timerNodeFound         = m_logicEngine.findByName<LogicObject>("timerNode")->as<TimerNode>();
         const auto* intfFound              = m_logicEngine.findByName<LogicObject>("intf")->as<LuaInterface>();
         const auto* anchorFound            = m_logicEngine.findByName<LogicObject>("anchor")->as<AnchorPoint>();
+        const auto* skinFound              = m_logicEngine.findByName<LogicObject>("skin")->as<SkinBinding>();
 
         ASSERT_NE(nullptr, luaModuleFound);
         ASSERT_NE(nullptr, luaScriptFound);
@@ -179,6 +189,7 @@ namespace rlogic
         ASSERT_NE(nullptr, timerNodeFound);
         ASSERT_NE(nullptr, intfFound);
         ASSERT_NE(nullptr, anchorFound);
+        ASSERT_NE(nullptr, skinFound);
 
         EXPECT_EQ(luaModuleFound->getName(), "luaModule");
         EXPECT_EQ(luaScriptFound->getName(), "script");
@@ -192,6 +203,7 @@ namespace rlogic
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
         EXPECT_EQ(intfFound->getName(), "intf");
         EXPECT_EQ(anchorFound->getName(), "anchor");
+        EXPECT_EQ(skinFound->getName(), "skin");
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CanBeUsedAsRealType_Const)
@@ -199,7 +211,7 @@ namespace rlogic
         m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
         m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         createRenderGroupBinding();
@@ -208,6 +220,7 @@ namespace rlogic
         m_logicEngine.createTimerNode("timerNode");
         m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         const LogicEngine& immutableLogicEngine   = m_logicEngine;
         const auto*        luaModuleFound         = immutableLogicEngine.findByName<LogicObject>("luaModule")->as<LuaModule>();
@@ -222,6 +235,7 @@ namespace rlogic
         const auto*        timerNodeFound         = immutableLogicEngine.findByName<LogicObject>("timerNode")->as<TimerNode>();
         const auto*        intfFound              = immutableLogicEngine.findByName<LogicObject>("intf")->as<LuaInterface>();
         const auto*        anchorFound            = immutableLogicEngine.findByName<LogicObject>("anchor")->as<AnchorPoint>();
+        const auto*        skinFound              = immutableLogicEngine.findByName<LogicObject>("skin")->as<SkinBinding>();
 
         ASSERT_NE(nullptr, luaModuleFound);
         ASSERT_NE(nullptr, luaScriptFound);
@@ -235,6 +249,7 @@ namespace rlogic
         ASSERT_NE(nullptr, timerNodeFound);
         ASSERT_NE(nullptr, intfFound);
         ASSERT_NE(nullptr, anchorFound);
+        ASSERT_NE(nullptr, skinFound);
 
         EXPECT_EQ(luaModuleFound->getName(), "luaModule");
         EXPECT_EQ(luaScriptFound->getName(), "script");
@@ -248,22 +263,24 @@ namespace rlogic
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
         EXPECT_EQ(intfFound->getName(), "intf");
         EXPECT_EQ(anchorFound->getName(), "anchor");
+        EXPECT_EQ(skinFound->getName(), "skin");
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId)
     {
-        LuaModule*               luaModule         = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
-        LuaScript*               script            = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
-        RamsesNodeBinding*       nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
-        RamsesCameraBinding*     cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
-        RamsesRenderPassBinding* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
-        const auto               renderGroupBinding = createRenderGroupBinding();
-        const auto               dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        const auto               animNode          = createAnimationNode(dataArray);
-        const auto               timerNode         = m_logicEngine.createTimerNode("timerNode");
-        const auto               intf              = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
-        const auto               anchor            = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto luaModule         = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        const auto script            = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        const auto nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        const auto renderGroupBinding = createRenderGroupBinding();
+        const auto dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
+        const auto animNode          = createAnimationNode(dataArray);
+        const auto timerNode         = m_logicEngine.createTimerNode("timerNode");
+        const auto intf              = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
+        const auto anchor            = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto skin              = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         EXPECT_EQ(luaModule, m_logicEngine.findLogicObjectById(1u));
         EXPECT_EQ(script, m_logicEngine.findLogicObjectById(2u));
@@ -277,22 +294,24 @@ namespace rlogic
         EXPECT_EQ(timerNode, m_logicEngine.findLogicObjectById(10u));
         EXPECT_EQ(intf, m_logicEngine.findLogicObjectById(11u));
         EXPECT_EQ(anchor, m_logicEngine.findLogicObjectById(12u));
+        EXPECT_EQ(skin, m_logicEngine.findLogicObjectById(13u));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId_Const)
     {
-        LuaModule*               luaModule         = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
-        LuaScript*               script            = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
-        RamsesNodeBinding*       nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        RamsesAppearanceBinding* appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
-        RamsesCameraBinding*     cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
-        RamsesRenderPassBinding* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
-        const auto               renderGroupBinding = createRenderGroupBinding();
-        const auto               dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
-        const auto               animNode          = createAnimationNode(dataArray);
-        const auto               timerNode         = m_logicEngine.createTimerNode("timerNode");
-        const auto               intf              = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
-        const auto               anchor            = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto luaModule         = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        const auto script            = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        const auto nodeBinding       = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        const auto renderGroupBinding = createRenderGroupBinding();
+        const auto dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
+        const auto animNode          = createAnimationNode(dataArray);
+        const auto timerNode         = m_logicEngine.createTimerNode("timerNode");
+        const auto intf              = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
+        const auto anchor            = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto skin              = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         const LogicEngine& immutableLogicEngine = m_logicEngine;
         EXPECT_EQ(luaModule, immutableLogicEngine.findLogicObjectById(1u));
@@ -307,6 +326,7 @@ namespace rlogic
         EXPECT_EQ(timerNode, immutableLogicEngine.findLogicObjectById(10u));
         EXPECT_EQ(intf, immutableLogicEngine.findLogicObjectById(11u));
         EXPECT_EQ(anchor, immutableLogicEngine.findLogicObjectById(12u));
+        EXPECT_EQ(skin, immutableLogicEngine.findLogicObjectById(13u));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CutsNameAtNullTermination)
@@ -329,6 +349,7 @@ namespace rlogic
         auto timerNode = m_logicEngine.createTimerNode("timerNode");
         auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        auto skin = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         // Rename
         luaModule->setName("L");
@@ -343,6 +364,7 @@ namespace rlogic
         timerNode->setName("TN");
         intf->setName("I");
         anchor->setName("A");
+        skin->setName("SB");
 
         // Can't find by old name
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("luaModule"));
@@ -357,6 +379,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<TimerNode>("timerNode"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaInterface>("intf"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnchorPoint>("anchor"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<SkinBinding>("skin"));
 
         // Found by new name
         EXPECT_EQ(luaModule, m_logicEngine.findByName<LuaModule>("L"));
@@ -371,6 +394,7 @@ namespace rlogic
         EXPECT_EQ(timerNode, m_logicEngine.findByName<TimerNode>("TN"));
         EXPECT_EQ(intf, m_logicEngine.findByName<LuaInterface>("I"));
         EXPECT_EQ(anchor, m_logicEngine.findByName<AnchorPoint>("A"));
+        EXPECT_EQ(skin, m_logicEngine.findByName<SkinBinding>("SB"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyIfTypeMatches)
@@ -378,7 +402,7 @@ namespace rlogic
         m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
         m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
         const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         createRenderGroupBinding();
@@ -387,6 +411,7 @@ namespace rlogic
         m_logicEngine.createTimerNode("timerNode");
         m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("dataarray"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaScript>("nodebinding"));
@@ -398,9 +423,10 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesRenderGroupBinding>("appbinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<DataArray>("renderGroupBinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("anchor"));
-        EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("timerNode"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<SkinBinding>("timerNode"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<TimerNode>("intf"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnchorPoint>("rpbinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("rpbinding"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyStringMatchesExactly)
@@ -416,18 +442,19 @@ namespace rlogic
 
     TEST_F(ALogicEngine_Lookup, GetHLObjectFromImpl)
     {
-        auto module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
-        auto script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
-        auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
-        auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
-        auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
-        auto rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
-        auto rgBinding = createRenderGroupBinding();
-        auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
-        auto animNode = createAnimationNode(dataArray);
-        auto timer = m_logicEngine.createTimerNode("timerNode");
-        auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
-        auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto module = m_logicEngine.createLuaModule(m_moduleSourceCode, {}, "luaModule");
+        const auto script = m_logicEngine.createLuaScript(m_valid_empty_script, {}, "script");
+        const auto nodeBinding = m_logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodebinding");
+        const auto appearanceBinding = m_logicEngine.createRamsesAppearanceBinding(*m_appearance, "appbinding");
+        const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
+        const auto rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
+        const auto rgBinding = createRenderGroupBinding();
+        const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
+        const auto animNode = createAnimationNode(dataArray);
+        const auto timer = m_logicEngine.createTimerNode("timerNode");
+        const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
+        const auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto skin = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         EXPECT_EQ(module, &module->m_impl.getLogicObject());
         EXPECT_EQ(script, &script->m_script.getLogicObject());
@@ -441,6 +468,7 @@ namespace rlogic
         EXPECT_EQ(timer, &timer->m_timerNodeImpl.getLogicObject());
         EXPECT_EQ(intf, &intf->m_interface.getLogicObject());
         EXPECT_EQ(anchor, &anchor->m_anchorPointImpl.getLogicObject());
+        EXPECT_EQ(skin, &skin->m_skinBinding.getLogicObject());
     }
 
     TEST_F(ALogicEngine_Lookup, GetHLObjectFromImpl_const)
@@ -457,6 +485,7 @@ namespace rlogic
         const auto timer = m_logicEngine.createTimerNode("timerNode");
         const auto intf = m_logicEngine.createLuaInterface(m_interfaceSourceCode, "intf");
         const auto anchor = m_logicEngine.createAnchorPoint(*nodeBinding, *cameraBinding, "anchor");
+        const auto skin = createSkinBinding(*nodeBinding, *appearanceBinding, m_logicEngine);
 
         const auto& moduleImpl = module->m_impl;
         const auto& scriptImpl = script->m_script;
@@ -470,6 +499,7 @@ namespace rlogic
         const auto& timerImpl = timer->m_timerNodeImpl;
         const auto& intfImpl = intf->m_interface;
         const auto& anchorImpl = anchor->m_anchorPointImpl;
+        const auto& skinImpl = skin->m_skinBinding;
 
         EXPECT_EQ(module, &moduleImpl.getLogicObject());
         EXPECT_EQ(script, &scriptImpl.getLogicObject());
@@ -483,6 +513,7 @@ namespace rlogic
         EXPECT_EQ(timer, &timerImpl.getLogicObject());
         EXPECT_EQ(intf, &intfImpl.getLogicObject());
         EXPECT_EQ(anchor, &anchorImpl.getLogicObject());
+        EXPECT_EQ(skin, &skinImpl.getLogicObject());
     }
 }
 

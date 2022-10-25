@@ -20,6 +20,7 @@
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/AnchorPoint.h"
+#include "ramses-logic/SkinBinding.h"
 #include "fmt/format.h"
 #include "internals/SolHelper.h"
 #include <iostream>
@@ -68,6 +69,7 @@ namespace rlogic
             , renderPassBindings(logicEngine)
             , renderGroupBindings(logicEngine)
             , anchorPoints(logicEngine)
+            , skinBindings(logicEngine)
         {
         }
 
@@ -83,6 +85,7 @@ namespace rlogic
         NodeListWrapper<RamsesRenderPassBinding> renderPassBindings;
         NodeListWrapper<RamsesRenderGroupBinding> renderGroupBindings;
         NodeListWrapper<AnchorPoint> anchorPoints;
+        NodeListWrapper<SkinBinding> skinBindings;
     };
 
     const char* const LogicViewer::ltnModule     = "rlogic";
@@ -96,6 +99,7 @@ namespace rlogic
     const char* const LogicViewer::ltnRenderPass = "renderPassBindings";
     const char* const LogicViewer::ltnRenderGroup = "renderGroupBindings";
     const char* const LogicViewer::ltnAnchorPoint = "anchorPoints";
+    const char* const LogicViewer::ltnSkinBinding = "skinBindings";
     const char* const LogicViewer::ltnScreenshot = "screenshot";
     const char* const LogicViewer::ltnViews      = "views";
     const char* const LogicViewer::ltnLink       = "link";
@@ -139,6 +143,7 @@ namespace rlogic
         registerNodeListType<RamsesRenderPassBinding>(m_sol, "RenderPassBindings");
         registerNodeListType<RamsesRenderGroupBinding>(m_sol, "RenderGroupBindings");
         registerNodeListType<AnchorPoint>(m_sol, "AnchorPoints");
+        registerNodeListType<SkinBinding>(m_sol, "SkinBindings");
         m_sol.new_usertype<LogicNodeWrapper>("LogicNode", sol::meta_function::index, &LogicNodeWrapper::get, sol::meta_function::to_string, &LogicNodeWrapper::toString);
         m_sol.new_usertype<PropertyWrapper>("LogicProperty",
                                             ltnPropertyValue,
@@ -177,6 +182,8 @@ namespace rlogic
             sol::readonly(&LogicWrapper::renderGroupBindings),
             ltnAnchorPoint,
             sol::readonly(&LogicWrapper::anchorPoints),
+            ltnSkinBinding,
+            sol::readonly(&LogicWrapper::skinBindings),
             ltnViews,
             &LogicWrapper::views,
             ltnScreenshot,

@@ -2,6 +2,23 @@
 
 # Unreleased
 
+# v1.3.0
+
+**ADDED**
+
+* Added new Feature Level 04 with following features:
+    * SkinBinding to calculate joint matrices for vertex skinning
+    * DataArray can contain arrays of floats as elements
+* Added command line argument '--clearColor' to LogicViewer to set background clear color
+
+**FIXED**
+
+* Anchor points with output properties not linked do not fail validation anymore,
+  this is to allow use cases where applications read output directly
+* Bindings which are used in Anchor points and have no input properties linked do not fail
+  validation anymore
+* Upgrade ramses from 27.0.125 to 27.0.126 (patchfix)
+
 # v1.2.2
 
 **ADDED**

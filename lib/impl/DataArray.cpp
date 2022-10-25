@@ -44,4 +44,5 @@ namespace rlogic
     template RLOGIC_API const std::vector<vec2i>* DataArray::getDataInternal() const;
     template RLOGIC_API const std::vector<vec3i>* DataArray::getDataInternal() const;
     template RLOGIC_API const std::vector<vec4i>* DataArray::getDataInternal() const;
+    template RLOGIC_API const std::vector<std::vector<float>>* DataArray::getDataInternal() const;
 }

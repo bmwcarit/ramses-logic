@@ -8,6 +8,8 @@
 
 #pragma once
 
+#include <array>
+
 namespace rlogic::internal::math
 {
     class Vector4
@@ -106,6 +108,36 @@ namespace rlogic::internal::math
             m24 = data[13];
             m34 = data[14];
             m44 = data[15];
+        }
+
+        explicit Matrix44f(const std::array<float, 16>& data)
+        {
+            m11 = data[0];
+            m21 = data[1];
+            m31 = data[2];
+            m41 = data[3];
+            m12 = data[4];
+            m22 = data[5];
+            m32 = data[6];
+            m42 = data[7];
+            m13 = data[8];
+            m23 = data[9];
+            m33 = data[10];
+            m43 = data[11];
+            m14 = data[12];
+            m24 = data[13];
+            m34 = data[14];
+            m44 = data[15];
+        }
+
+        [[nodiscard]] std::array<float, 16> toStdArray() const
+        {
+            return std::array<float, 16>{
+                m11, m21, m31, m41,
+                m12, m22, m32, m42,
+                m13, m23, m33, m43,
+                m14, m24, m34, m44
+            };
         }
 
         Matrix44f operator*(const Matrix44f& mat) const

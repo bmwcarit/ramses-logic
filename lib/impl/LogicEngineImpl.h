@@ -12,6 +12,7 @@
 #include "ramses-logic/ERotationType.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/LogicEngineReport.h"
+#include "ramses-logic/DataTypes.h"
 #include "internals/ApiObjects.h"
 #include "internals/LogicNodeDependencies.h"
 #include "internals/ErrorReporting.h"
@@ -35,6 +36,7 @@ namespace ramses
     class Camera;
     class RenderPass;
     class RenderGroup;
+    class UniformInput;
 }
 
 namespace rlogic
@@ -45,6 +47,7 @@ namespace rlogic
     class RamsesRenderPassBinding;
     class RamsesRenderGroupBinding;
     class RamsesRenderGroupBindingElements;
+    class SkinBinding;
     class DataArray;
     class AnimationNode;
     class AnimationNodeConfig;
@@ -97,6 +100,12 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name);
         RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name);
         RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name);
+        SkinBinding* createSkinBinding(
+            const std::vector<const RamsesNodeBinding*>& joints,
+            const std::vector<matrix44f>& inverseBindMatrices,
+            RamsesAppearanceBinding& appearanceBinding,
+            const ramses::UniformInput& jointMatInput,
+            std::string_view name);
         template <typename T>
         DataArray* createDataArray(const std::vector<T>& data, std::string_view name);
         AnimationNode* createAnimationNode(const AnimationNodeConfig& config, std::string_view name);

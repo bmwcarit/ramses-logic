@@ -20,6 +20,7 @@
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/AnchorPoint.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/Property.h"
 #include "internals/SolHelper.h"
 #include "fmt/format.h"
@@ -311,5 +312,6 @@ namespace rlogic
     template struct NodeListWrapper<RamsesRenderPassBinding>;
     template struct NodeListWrapper<RamsesRenderGroupBinding>;
     template struct NodeListWrapper<AnchorPoint>;
+    template struct NodeListWrapper<SkinBinding>;
 } // namespace rlogic
 

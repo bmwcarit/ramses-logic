@@ -14,17 +14,18 @@ namespace rlogic
 {
     TEST(PropertyTypeToEnumTypeTrait, ConvertsSupportedTypesToCorrectEnum)
     {
-        EPropertyType floatType = PropertyTypeToEnum<float>::TYPE;
-        EPropertyType vec2fType = PropertyTypeToEnum<vec2f>::TYPE;
-        EPropertyType vec3fType = PropertyTypeToEnum<vec3f>::TYPE;
-        EPropertyType vec4fType = PropertyTypeToEnum<vec4f>::TYPE;
-        EPropertyType int32Type = PropertyTypeToEnum<int32_t>::TYPE;
-        EPropertyType int64Type = PropertyTypeToEnum<int64_t>::TYPE;
-        EPropertyType vec2iType = PropertyTypeToEnum<vec2i>::TYPE;
-        EPropertyType vec3iType = PropertyTypeToEnum<vec3i>::TYPE;
-        EPropertyType vec4iType = PropertyTypeToEnum<vec4i>::TYPE;
-        EPropertyType boolType = PropertyTypeToEnum<bool>::TYPE;
-        EPropertyType stringType = PropertyTypeToEnum<std::string>::TYPE;
+        constexpr EPropertyType floatType = PropertyTypeToEnum<float>::TYPE;
+        constexpr EPropertyType vec2fType = PropertyTypeToEnum<vec2f>::TYPE;
+        constexpr EPropertyType vec3fType = PropertyTypeToEnum<vec3f>::TYPE;
+        constexpr EPropertyType vec4fType = PropertyTypeToEnum<vec4f>::TYPE;
+        constexpr EPropertyType int32Type = PropertyTypeToEnum<int32_t>::TYPE;
+        constexpr EPropertyType int64Type = PropertyTypeToEnum<int64_t>::TYPE;
+        constexpr EPropertyType vec2iType = PropertyTypeToEnum<vec2i>::TYPE;
+        constexpr EPropertyType vec3iType = PropertyTypeToEnum<vec3i>::TYPE;
+        constexpr EPropertyType vec4iType = PropertyTypeToEnum<vec4i>::TYPE;
+        constexpr EPropertyType boolType = PropertyTypeToEnum<bool>::TYPE;
+        constexpr EPropertyType stringType = PropertyTypeToEnum<std::string>::TYPE;
+        constexpr EPropertyType arrayType = PropertyTypeToEnum<std::vector<float>>::TYPE;
         EXPECT_EQ(floatType, EPropertyType::Float);
         EXPECT_EQ(vec2fType, EPropertyType::Vec2f);
         EXPECT_EQ(vec3fType, EPropertyType::Vec3f);
@@ -36,6 +37,7 @@ namespace rlogic
         EXPECT_EQ(vec4iType, EPropertyType::Vec4i);
         EXPECT_EQ(boolType, EPropertyType::Bool);
         EXPECT_EQ(stringType, EPropertyType::String);
+        EXPECT_EQ(arrayType, EPropertyType::Array);
     }
 
     TEST(PropertyTypeToEnumTypeTrait, ConvertsPropertyEnumToType)
@@ -51,6 +53,7 @@ namespace rlogic
         static_assert(std::is_same_v<vec4i, PropertyEnumToType<EPropertyType::Vec4i>::TYPE>, "wrong traits");
         static_assert(std::is_same_v<std::string, PropertyEnumToType<EPropertyType::String>::TYPE>, "wrong traits");
         static_assert(std::is_same_v<bool, PropertyEnumToType<EPropertyType::Bool>::TYPE>, "wrong traits");
+        static_assert(std::is_same_v<std::vector<float>, PropertyEnumToType<EPropertyType::Array>::TYPE>, "wrong traits");
     }
 
     TEST(IsPrimitivePropertyTypeTrait, IsTrueOnlyForPrimitiveProperties)
@@ -98,11 +101,11 @@ namespace rlogic
         EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec2i));
         EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec3i));
         EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Vec4i));
+        EXPECT_TRUE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Array));
 
         EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Bool));
         EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Struct));
         EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::String));
-        EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Array));
         EXPECT_FALSE(CanPropertyTypeBeStoredInDataArray(EPropertyType::Int64));
 
         auto invalidType(static_cast<EPropertyType>(10000));

@@ -9,6 +9,7 @@
 #pragma once
 
 #include <cstdint>
+#include <array>
 
 namespace rlogic
 {
@@ -45,15 +46,25 @@ namespace rlogic
         EFeatureLevel_01 = 1,
 
         /// Added features:
-        /// - RamsesRenderPassBinding
-        /// - RamsesNodeBinding 'enabled' property
-        /// - AnchorPoint
+        /// - #rlogic::RamsesRenderPassBinding
+        /// - #rlogic::RamsesNodeBinding 'enabled' property
+        /// - #rlogic::AnchorPoint
         /// - Lua source code serialized in precompiled binary form
-        /// - LogicEngine::createRamsesCameraBindingWithFrustumPlanes
+        /// - #rlogic::LogicEngine::createRamsesCameraBindingWithFrustumPlanes
         EFeatureLevel_02 = 2,
 
         /// Added features:
-        /// - RamsesRenderGroupBinding
+        /// - #rlogic::RamsesRenderGroupBinding
         EFeatureLevel_03 = 3,
+
+        /// Added features:
+        /// - #rlogic::DataArray can contain arrays of floats as elements
+        EFeatureLevel_04 = 4,
+
+        /// Equals to the latest feature level
+        EFeatureLevel_Latest = EFeatureLevel_04
     };
+
+    /// List of all supported feature levels
+    constexpr std::array<EFeatureLevel, 4u> AllFeatureLevels{ EFeatureLevel_01, EFeatureLevel_02, EFeatureLevel_03, EFeatureLevel_04 };
 }

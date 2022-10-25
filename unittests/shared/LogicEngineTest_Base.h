@@ -27,8 +27,10 @@
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/AnchorPoint.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-client-api/OrthographicCamera.h"
 #include "ramses-client-api/Appearance.h"
+#include "ramses-client-api/UniformInput.h"
 #include "ramses-utils.h"
 
 namespace rlogic
@@ -135,7 +137,22 @@ namespace rlogic
             return createRenderGroupBinding(m_logicEngine);
         }
 
-        size_t m_emptySerializedSizeTotal{144u};
+        static SkinBinding* createSkinBinding(const RamsesNodeBinding& nodeBinding, RamsesAppearanceBinding& appearanceBinding, LogicEngine& logicEngine)
+        {
+            ramses::UniformInput uniform;
+            appearanceBinding.getRamsesAppearance().getEffect().findUniformInput("jointMat", uniform);
+            EXPECT_TRUE(uniform.isValid());
+            return logicEngine.createSkinBinding({ &nodeBinding }, { matrix44f{ 0.f } }, appearanceBinding, uniform, "skin");
+        }
+
+        SkinBinding* createSkinBinding(LogicEngine& logicEngine)
+        {
+            const auto nodeBinding = logicEngine.createRamsesNodeBinding(*m_node, ERotationType::Euler_XYZ, "nodeForSkin");
+            auto appearanceBinding = logicEngine.createRamsesAppearanceBinding(*m_appearance, "appearanceForSkin");
+            return createSkinBinding(*nodeBinding, *appearanceBinding, logicEngine);
+        }
+
+        size_t m_emptySerializedSizeTotal{156u};
     };
 
     class ALogicEngine : public ALogicEngineBase, public ::testing::Test

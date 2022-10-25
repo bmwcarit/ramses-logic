@@ -136,7 +136,18 @@ namespace rlogic::internal
         // no clamping needed mathematically but to avoid float precision issues
         interpRatio = std::clamp(interpRatio, 0.f, 1.f);
 
-        PropertyValue interpolatedValue;
+        using DataVariant = std::variant<
+            float,
+            vec2f,
+            vec3f,
+            vec4f,
+            int32_t,
+            vec2i,
+            vec3i,
+            vec4i,
+            std::vector<float>
+        >;
+        DataVariant interpolatedValue;
         std::visit([&](const auto& v) {
             switch (channel.interpolationType)
             {
@@ -174,8 +185,19 @@ namespace rlogic::internal
             asQuaternion[3] *= normalizationFactor;
         }
 
-        // 'progress' is at index 0, channel outputs are shifted by one
-        getOutputs()->getChild(channelIdx + EOutputIdx_ChannelsBegin)->m_impl->setValue(std::move(interpolatedValue));
+        std::visit([&](const auto& v) {
+            using ValueType = std::remove_const_t<std::remove_reference_t<decltype(v)>>;
+            // array data type requires each array element to be set to individual output property
+            if constexpr (std::is_same_v<ValueType, std::vector<float>>)
+            {
+                assert(!"not implemented");
+            }
+            else
+            {
+                // 'progress' is at index 0, channel outputs are shifted by one
+                getOutputs()->getChild(channelIdx + EOutputIdx_ChannelsBegin)->m_impl->setValue(PropertyValue{ v });
+            }
+            }, interpolatedValue);
     }
 
     template <typename T>
@@ -428,8 +450,17 @@ namespace rlogic::internal
                 timestampsProp->getChild(i)->m_impl->setValue(timestamps[i]);
 
             std::visit([&](const auto& keyframes) {
-                for (size_t i = 0u; i < keyframes.size(); ++i)
-                    keyframesProp->getChild(i)->m_impl->setValue(keyframes[i]);
+                using ValueType = std::remove_const_t<std::remove_reference_t<decltype(keyframes.front())>>;
+                // array data type requires each array element of each keyframe element to be set to individual input property
+                if constexpr (std::is_same_v<ValueType, std::vector<float>>)
+                {
+                    assert(!"not implemented");
+                }
+                else
+                {
+                    for (size_t i = 0u; i < keyframes.size(); ++i)
+                        keyframesProp->getChild(i)->m_impl->setValue(keyframes[i]);
+                }
             }, channelData.keyframes);
         }
     }
@@ -454,8 +485,16 @@ namespace rlogic::internal
             auto& keyframesVariant = m_channelsWorkData[ch].keyframes;
             std::visit([&](auto& keyframes) {
                 using ValueType = std::remove_const_t<std::remove_reference_t<decltype(keyframes.front())>>;
-                for (size_t i = 0u; i < keyframes.size(); ++i)
-                    keyframes[i] = *keyframesProp->getChild(i)->get<ValueType>();
+                // array data type requires each array element of each keyframe element to be read from individual input property
+                if constexpr (std::is_same_v<ValueType, std::vector<float>>)
+                {
+                    assert(!"not implemented");
+                }
+                else
+                {
+                    for (size_t i = 0u; i < keyframes.size(); ++i)
+                        keyframes[i] = *keyframesProp->getChild(i)->get<ValueType>();
+                }
             }, keyframesVariant);
         }
 

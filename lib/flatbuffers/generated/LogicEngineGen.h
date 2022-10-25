@@ -23,6 +23,7 @@
 #include "RamsesReferenceGen.h"
 #include "RamsesRenderGroupBindingGen.h"
 #include "RamsesRenderPassBindingGen.h"
+#include "SkinBindingGen.h"
 #include "TimerNodeGen.h"
 
 namespace rlogic_serialization {

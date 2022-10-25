@@ -176,8 +176,10 @@ namespace rlogic::internal
         const std::vector<std::pair<EFeatureLevel, EFeatureLevel>> combinations{
             { EFeatureLevel_01, EFeatureLevel_02 },
             { EFeatureLevel_01, EFeatureLevel_03 },
+            { EFeatureLevel_01, EFeatureLevel_04 },
             { EFeatureLevel_02, EFeatureLevel_01 },
-            { EFeatureLevel_03, EFeatureLevel_01 }
+            { EFeatureLevel_03, EFeatureLevel_01 },
+            { EFeatureLevel_04, EFeatureLevel_01 }
         };
 
         for (const auto& comb : combinations)
@@ -212,7 +214,6 @@ namespace rlogic::internal
             GTEST_SKIP();
 
         // test all mismatching combinations
-        const std::array<EFeatureLevel, 3u> AllFeatureLevels = { EFeatureLevel_01, EFeatureLevel_02, EFeatureLevel_03 };
         for (EFeatureLevel fileFeatureLevel : AllFeatureLevels)
         {
             for (EFeatureLevel engineFeatureLevel : AllFeatureLevels)
@@ -410,6 +411,7 @@ namespace rlogic::internal
             EXPECT_EQ(nullptr, nodeBinding->getInputs()->getChild("enabled"));
             EXPECT_FALSE(logicEngine.findByName<LogicObject>("renderpassbinding"));
             EXPECT_FALSE(logicEngine.findByName<LogicObject>("anchorpoint"));
+            EXPECT_FALSE(logicEngine.findByName<LogicObject>("dataarrayOfArrays"));
         }
 
         static void expectFeatureLevel03Content(const LogicEngine& logicEngine)
@@ -420,6 +422,25 @@ namespace rlogic::internal
         static void expectFeatureLevel03ContentNotPresent(const LogicEngine& logicEngine)
         {
             EXPECT_FALSE(logicEngine.findByName<LogicObject>("rendergroupbinding"));
+            EXPECT_FALSE(logicEngine.findByName<LogicObject>("dataarrayOfArrays"));
+        }
+
+        static void expectFeatureLevel04Content(const LogicEngine& logicEngine)
+        {
+            EXPECT_TRUE(logicEngine.findByName<SkinBinding>("skin"));
+            const auto dataArray = logicEngine.findByName<DataArray>("dataarrayOfArrays");
+            ASSERT_TRUE(dataArray);
+            EXPECT_EQ(EPropertyType::Array, dataArray->getDataType());
+            EXPECT_EQ(2u, dataArray->getNumElements());
+            const auto data = dataArray->getData<std::vector<float>>();
+            ASSERT_TRUE(data);
+            const std::vector<std::vector<float>> expectedData{ { 1.f, 2.f, 3.f, 4.f, 5.f }, { 6.f, 7.f, 8.f, 9.f, 10.f } };
+            EXPECT_EQ(expectedData, *data);
+        }
+
+        static void expectFeatureLevel04ContentNotPresent(const LogicEngine& logicEngine)
+        {
+            EXPECT_FALSE(logicEngine.findByName<LogicObject>("skin"));
         }
 
         RamsesTestSetup m_ramses;
@@ -439,6 +460,7 @@ namespace rlogic::internal
         checkBaseContents(logicEngine);
         expectFeatureLevel02ContentNotPresent(logicEngine);
         expectFeatureLevel03ContentNotPresent(logicEngine);
+        expectFeatureLevel04ContentNotPresent(logicEngine);
     }
 
     TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel02)
@@ -454,6 +476,7 @@ namespace rlogic::internal
         checkBaseContents(logicEngine);
         expectFeatureLevel02Content(logicEngine);
         expectFeatureLevel03ContentNotPresent(logicEngine);
+        expectFeatureLevel04ContentNotPresent(logicEngine);
     }
 
     TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel03)
@@ -469,5 +492,22 @@ namespace rlogic::internal
         checkBaseContents(logicEngine);
         expectFeatureLevel02Content(logicEngine);
         expectFeatureLevel03Content(logicEngine);
+        expectFeatureLevel04ContentNotPresent(logicEngine);
+    }
+
+    TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel04)
+    {
+        EFeatureLevel featureLevel = EFeatureLevel_01;
+        EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic_04.rlogic", featureLevel));
+        EXPECT_EQ(EFeatureLevel_04, featureLevel);
+
+        LogicEngine logicEngine{ EFeatureLevel_04 };
+        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_04.rlogic", m_scene));
+        EXPECT_TRUE(logicEngine.update());
+
+        checkBaseContents(logicEngine);
+        expectFeatureLevel02Content(logicEngine);
+        expectFeatureLevel03Content(logicEngine);
+        expectFeatureLevel04Content(logicEngine);
     }
 }

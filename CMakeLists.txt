@@ -14,8 +14,8 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 1)
-set(RLOGIC_VERSION_MINOR 2)
-set(RLOGIC_VERSION_PATCH 2)
+set(RLOGIC_VERSION_MINOR 3)
+set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
 set(ramses-logic_VERSION "${RLOGIC_VERSION}" CACHE STRING "Ramses Logic version" FORCE)

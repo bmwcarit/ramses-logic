@@ -41,15 +41,17 @@ namespace rlogic::internal
     }
 
     template <typename T>
-    constexpr size_t getNumElements()
+    constexpr size_t getNumComponents(const std::vector<T>& data)
     {
         if constexpr (std::is_arithmetic_v<T>)
         {
+            (void)data;
             return 1u;
         }
         else
         {
-            return std::tuple_size_v<T>;
+            assert(!data.empty());
+            return data.front().size();
         }
     }
 
@@ -58,7 +60,7 @@ namespace rlogic::internal
     {
         const auto& dataVec = std::get<std::vector<T>>(data);
         std::vector<fbT> dataFlattened;
-        dataFlattened.reserve(dataVec.size() * getNumElements<T>());
+        dataFlattened.reserve(dataVec.size() * getNumComponents(dataVec));
         for (const auto& v : dataVec)
             dataFlattened.insert(dataFlattened.end(), v.cbegin(), v.cend());
         return dataFlattened;
@@ -112,6 +114,11 @@ namespace rlogic::internal
             arrayType = rlogic_serialization::EDataArrayType::Vec4i;
             dataOffset = rlogic_serialization::CreateintArr(builder, builder.CreateVector(flattenArrayOfVec<vec4i, int32_t>(data.m_data))).Union();
             break;
+        case EPropertyType::Array:
+            unionType = rlogic_serialization::ArrayUnion::floatArr;
+            arrayType = rlogic_serialization::EDataArrayType::FloatArray;
+            dataOffset = rlogic_serialization::CreatefloatArr(builder, builder.CreateVector(flattenArrayOfVec<std::vector<float>, float>(data.m_data))).Union();
+            break;
         case EPropertyType::Bool:
         default:
             assert(!"missing implementation");
@@ -124,14 +131,15 @@ namespace rlogic::internal
             logicObject,
             arrayType,
             unionType,
-            dataOffset
+            dataOffset,
+            static_cast<uint32_t>(data.getNumElements())
         );
 
         return animDataFB;
     }
 
     template <typename T, typename fbT, typename fbArrayT>
-    bool checkFlatbufferVectorValidity(const rlogic_serialization::DataArray& data, ErrorReporting& errorReporting)
+    bool checkFlatbufferVectorValidity(const rlogic_serialization::DataArray& data, ErrorReporting& errorReporting, uint32_t numComponents)
     {
         if (!data.data_as<fbArrayT>() || !data.data_as<fbArrayT>()->data())
         {
@@ -140,7 +148,7 @@ namespace rlogic::internal
         }
         const auto fbVec = data.data_as<fbArrayT>()->data();
         static_assert(std::is_arithmetic_v<fbT>, "wrong base type used");
-        if (fbVec->size() % getNumElements<T>() != 0)
+        if (numComponents == 0u || fbVec->size() == 0u || (fbVec->size() % numComponents != 0))
         {
             errorReporting.add("Fatal error during loading of DataArray from serialized data: unexpected data size!", nullptr, EErrorType::BinaryVersionMismatch);
             return false;
@@ -150,15 +158,49 @@ namespace rlogic::internal
     }
 
     template <typename T, typename fbT>
-    std::vector<T> unflattenIntoArrayOfVec(const flatbuffers::Vector<fbT>& fbDataFlattened)
+    std::vector<T> unflattenIntoArrayOfVec(const flatbuffers::Vector<fbT>& fbDataFlattened, uint32_t numComponents)
     {
-        constexpr size_t numElementsInT = getNumElements<T>();
         std::vector<T> dataVec;
-        dataVec.resize(fbDataFlattened.size() / numElementsInT);
+        assert(fbDataFlattened.size() % numComponents == 0u); //checked in validation above
+        dataVec.resize(fbDataFlattened.size() / numComponents);
         auto destIt = dataVec.begin();
-        for (auto it = fbDataFlattened.cbegin(); it != fbDataFlattened.cend(); it += numElementsInT, ++destIt)
-            std::copy(it, it + numElementsInT, destIt->data());
+        for (auto it = fbDataFlattened.cbegin(); it != fbDataFlattened.cend(); it += numComponents, ++destIt)
+        {
+            if constexpr(std::is_same_v<T, std::vector<float>>)
+            {
+                destIt->insert(destIt->end(), it, it + numComponents);
+            }
+            else
+            {
+                std::copy(it, it + numComponents, destIt->begin());
+            }
+        }
         return dataVec;
+    }
+
+    template <typename T, typename fbArrayT>
+    uint32_t determineNumComponentsPerDataElement(const rlogic_serialization::DataArray& data)
+    {
+        if constexpr (std::is_same_v<T, std::vector<float>>)
+        {
+            if (!data.data_as<fbArrayT>() || !data.data_as<fbArrayT>()->data() || data.numElements() == 0u)
+                return 0u;
+
+            const auto numSerializedElements = data.data_as<fbArrayT>()->data()->size();
+            // NOLINTNEXTLINE(clang-analyzer-core.DivideZero) wrong assumption from clang, tested right above for zero
+            return numSerializedElements / data.numElements();
+        }
+        else
+        {
+            if constexpr (std::is_arithmetic_v<T>)
+            {
+                return 1u;
+            }
+            else
+            {
+                return std::tuple_size_v<T>;
+            }
+        }
     }
 
     std::unique_ptr<DataArrayImpl> DataArrayImpl::Deserialize(const rlogic_serialization::DataArray& data, ErrorReporting& errorReporting)
@@ -178,7 +220,8 @@ namespace rlogic::internal
         {
         case rlogic_serialization::EDataArrayType::Float:
         {
-            if (!checkFlatbufferVectorValidity<float, float, rlogic_serialization::floatArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<float, rlogic_serialization::floatArr>(data);
+            if (!checkFlatbufferVectorValidity<float, float, rlogic_serialization::floatArr>(data, errorReporting, numComponents))
                 return nullptr;
             const auto& fbData = *data.data_as<rlogic_serialization::floatArr>()->data();
             auto dataVec = std::vector<float>{ fbData.cbegin(), fbData.cend() };
@@ -187,30 +230,34 @@ namespace rlogic::internal
         }
         case rlogic_serialization::EDataArrayType::Vec2f:
         {
-            if (!checkFlatbufferVectorValidity<vec2f, float, rlogic_serialization::floatArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<vec2f, rlogic_serialization::floatArr>(data);
+            if (!checkFlatbufferVectorValidity<vec2f, float, rlogic_serialization::floatArr>(data, errorReporting, numComponents))
                 return nullptr;
-            auto dataVec = unflattenIntoArrayOfVec<vec2f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
+            auto dataVec = unflattenIntoArrayOfVec<vec2f, float>(*data.data_as<rlogic_serialization::floatArr>()->data(), numComponents);
             return std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
         }
         case rlogic_serialization::EDataArrayType::Vec3f:
         {
-            if (!checkFlatbufferVectorValidity<vec3f, float, rlogic_serialization::floatArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<vec3f, rlogic_serialization::floatArr>(data);
+            if (!checkFlatbufferVectorValidity<vec3f, float, rlogic_serialization::floatArr>(data, errorReporting, numComponents))
                 return nullptr;
-            auto dataVec = unflattenIntoArrayOfVec<vec3f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
+            auto dataVec = unflattenIntoArrayOfVec<vec3f, float>(*data.data_as<rlogic_serialization::floatArr>()->data(), numComponents);
             deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
             break;
         }
         case rlogic_serialization::EDataArrayType::Vec4f:
         {
-            if (!checkFlatbufferVectorValidity<vec4f, float, rlogic_serialization::floatArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<vec4f, rlogic_serialization::floatArr>(data);
+            if (!checkFlatbufferVectorValidity<vec4f, float, rlogic_serialization::floatArr>(data, errorReporting, numComponents))
                 return nullptr;
-            auto dataVec = unflattenIntoArrayOfVec<vec4f, float>(*data.data_as<rlogic_serialization::floatArr>()->data());
+            auto dataVec = unflattenIntoArrayOfVec<vec4f, float>(*data.data_as<rlogic_serialization::floatArr>()->data(), numComponents);
             deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
             break;
         }
         case rlogic_serialization::EDataArrayType::Int32:
         {
-            if (!checkFlatbufferVectorValidity<int32_t, int32_t, rlogic_serialization::intArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<int32_t, rlogic_serialization::intArr>(data);
+            if (!checkFlatbufferVectorValidity<int32_t, int32_t, rlogic_serialization::intArr>(data, errorReporting, numComponents))
                 return nullptr;
             const auto& fbData = *data.data_as<rlogic_serialization::intArr>()->data();
             auto dataVec = std::vector<int32_t>{ fbData.cbegin(), fbData.cend() };
@@ -219,25 +266,37 @@ namespace rlogic::internal
         }
         case rlogic_serialization::EDataArrayType::Vec2i:
         {
-            if (!checkFlatbufferVectorValidity<vec2i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<vec2i, rlogic_serialization::intArr>(data);
+            if (!checkFlatbufferVectorValidity<vec2i, int32_t, rlogic_serialization::intArr>(data, errorReporting, numComponents))
                 return nullptr;
-            auto dataVec = unflattenIntoArrayOfVec<vec2i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
+            auto dataVec = unflattenIntoArrayOfVec<vec2i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data(), numComponents);
             deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
             break;
         }
         case rlogic_serialization::EDataArrayType::Vec3i:
         {
-            if (!checkFlatbufferVectorValidity<vec3i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<vec3i, rlogic_serialization::intArr>(data);
+            if (!checkFlatbufferVectorValidity<vec3i, int32_t, rlogic_serialization::intArr>(data, errorReporting, numComponents))
                 return nullptr;
-            auto dataVec = unflattenIntoArrayOfVec<vec3i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
+            auto dataVec = unflattenIntoArrayOfVec<vec3i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data(), numComponents);
             deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
             break;
         }
         case rlogic_serialization::EDataArrayType::Vec4i:
         {
-            if (!checkFlatbufferVectorValidity<vec4i, int32_t, rlogic_serialization::intArr>(data, errorReporting))
+            const uint32_t numComponents = determineNumComponentsPerDataElement<vec4i, rlogic_serialization::intArr>(data);
+            if (!checkFlatbufferVectorValidity<vec4i, int32_t, rlogic_serialization::intArr>(data, errorReporting, numComponents))
                 return nullptr;
-            auto dataVec = unflattenIntoArrayOfVec<vec4i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data());
+            auto dataVec = unflattenIntoArrayOfVec<vec4i, int32_t>(*data.data_as<rlogic_serialization::intArr>()->data(), numComponents);
+            deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
+            break;
+        }
+        case rlogic_serialization::EDataArrayType::FloatArray:
+        {
+            const uint32_t numComponents = determineNumComponentsPerDataElement<std::vector<float>, rlogic_serialization::floatArr>(data);
+            if (!checkFlatbufferVectorValidity<std::vector<float>, float, rlogic_serialization::floatArr>(data, errorReporting, numComponents))
+                return nullptr;
+            auto dataVec = unflattenIntoArrayOfVec<std::vector<float>, float>(*data.data_as<rlogic_serialization::floatArr>()->data(), numComponents);
             deserialized = std::make_unique<DataArrayImpl>(std::move(dataVec), name, id);
             break;
         }
@@ -271,6 +330,7 @@ namespace rlogic::internal
     template DataArrayImpl::DataArrayImpl(std::vector<vec2i>&& data, std::string_view name, uint64_t id);
     template DataArrayImpl::DataArrayImpl(std::vector<vec3i>&& data, std::string_view name, uint64_t id);
     template DataArrayImpl::DataArrayImpl(std::vector<vec4i>&& data, std::string_view name, uint64_t id);
+    template DataArrayImpl::DataArrayImpl(std::vector<std::vector<float>>&& data, std::string_view name, uint64_t id);
 
     template const std::vector<float>* DataArrayImpl::getData<float>() const;
     template const std::vector<vec2f>* DataArrayImpl::getData<vec2f>() const;
@@ -280,4 +340,5 @@ namespace rlogic::internal
     template const std::vector<vec2i>* DataArrayImpl::getData<vec2i>() const;
     template const std::vector<vec3i>* DataArrayImpl::getData<vec3i>() const;
     template const std::vector<vec4i>* DataArrayImpl::getData<vec4i>() const;
+    template const std::vector<std::vector<float>>* DataArrayImpl::getData<std::vector<float>>() const;
 }

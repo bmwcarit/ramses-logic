@@ -21,6 +21,7 @@
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/RamsesRenderGroupBindingElements.h"
+#include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationTypes.h"
 #include "ramses-logic/AnimationNode.h"
@@ -36,6 +37,7 @@
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/RamsesRenderPassBindingImpl.h"
 #include "impl/RamsesRenderGroupBindingImpl.h"
+#include "impl/SkinBindingImpl.h"
 #include "impl/DataArrayImpl.h"
 #include "impl/AnimationNodeImpl.h"
 #include "impl/AnimationNodeConfigImpl.h"
@@ -233,6 +235,23 @@ namespace rlogic::internal
         return binding;
     }
 
+    SkinBinding* ApiObjects::createSkinBinding(
+        std::vector<const RamsesNodeBindingImpl*> joints,
+        const std::vector<matrix44f>& inverseBindMatrices,
+        RamsesAppearanceBindingImpl& appearanceBinding,
+        const ramses::UniformInput& jointMatInput,
+        std::string_view name)
+    {
+        assert(m_featureLevel >= EFeatureLevel_04);
+        std::unique_ptr<SkinBinding> up = std::make_unique<SkinBinding>(std::make_unique<SkinBindingImpl>(std::move(joints), inverseBindMatrices, appearanceBinding, jointMatInput, name, getNextLogicObjectId()));
+        SkinBinding* binding = up.get();
+        m_skinBindings.push_back(binding);
+        registerLogicObject(std::move(up));
+        binding->m_impl.createRootProperties();
+
+        return binding;
+    }
+
     template <typename T>
     DataArray* ApiObjects::createDataArray(const std::vector<T>& data, std::string_view name)
     {
@@ -334,6 +353,10 @@ namespace rlogic::internal
         auto ramsesRenderGroupBinding = dynamic_cast<RamsesRenderGroupBinding*>(&object);
         if (ramsesRenderGroupBinding)
             return destroyInternal(*ramsesRenderGroupBinding, errorReporting);
+
+        auto skinBinding = dynamic_cast<SkinBinding*>(&object);
+        if (skinBinding)
+            return destroyInternal(*skinBinding, errorReporting);
 
         auto animNode = dynamic_cast<AnimationNode*>(&object);
         if (animNode)
@@ -454,6 +477,18 @@ namespace rlogic::internal
             }
         }
 
+        for (const auto& skin : m_skinBindings)
+        {
+            for (const auto node : skin->m_skinBinding.getJoints())
+            {
+                if (node->getId() == ramsesNodeBinding.getId())
+                {
+                    errorReporting.add(fmt::format("Failed to destroy Ramses node binding '{}', it is used in skin binding '{}'", ramsesNodeBinding.getName(), skin->getName()), &ramsesNodeBinding, EErrorType::Other);
+                    return false;
+                }
+            }
+        }
+
         unregisterLogicObject(ramsesNodeBinding);
         m_ramsesNodeBindings.erase(nodeIter);
 
@@ -467,6 +502,15 @@ namespace rlogic::internal
         {
             errorReporting.add("Can't find RamsesAppearanceBinding in logic engine!", &ramsesAppearanceBinding, EErrorType::IllegalArgument);
             return false;
+        }
+
+        for (const auto& skin : m_skinBindings)
+        {
+            if (skin->m_skinBinding.getAppearanceBinding().getId() == ramsesAppearanceBinding.getId())
+            {
+                errorReporting.add(fmt::format("Failed to destroy Ramses appearance binding '{}', it is used in skin binding '{}'", ramsesAppearanceBinding.getName(), skin->getName()), &ramsesAppearanceBinding, EErrorType::Other);
+                return false;
+            }
         }
 
         unregisterLogicObject(ramsesAppearanceBinding);
@@ -527,6 +571,22 @@ namespace rlogic::internal
 
         unregisterLogicObject(ramsesRenderGroupBinding);
         m_ramsesRenderGroupBindings.erase(bindingIter);
+
+        return true;
+    }
+
+    bool ApiObjects::destroyInternal(SkinBinding& skinBinding, ErrorReporting& errorReporting)
+    {
+        assert(m_featureLevel >= EFeatureLevel_04);
+        auto bindingIter = std::find(m_skinBindings.begin(), m_skinBindings.end(), &skinBinding);
+        if (bindingIter == m_skinBindings.end())
+        {
+            errorReporting.add("Can't find SkinBinding in logic engine!", &skinBinding, EErrorType::IllegalArgument);
+            return false;
+        }
+
+        unregisterLogicObject(skinBinding);
+        m_skinBindings.erase(bindingIter);
 
         return true;
     }
@@ -729,10 +789,9 @@ namespace rlogic::internal
             const auto* objAsNode = dynamic_cast<const rlogic::LogicNode*>(logicObj);
             if (objAsNode != nullptr)
             {
-                const auto* nodeAsIntf = dynamic_cast<const rlogic::LuaInterface*>(logicObj);
-                const auto* nodeAsBinding = dynamic_cast<const rlogic::RamsesBinding*>(logicObj);
-
-                if (nodeAsIntf != nullptr || nodeAsBinding != nullptr)
+                if (dynamic_cast<const rlogic::LuaInterface*>(logicObj) ||  // interfaces have their own validation logic in ApiObjects::validateInterfaces
+                    dynamic_cast<const rlogic::RamsesBinding*>(logicObj) || // bindings have no outputs
+                    dynamic_cast<const rlogic::AnchorPoint*>(logicObj))     // anchor points are being used in special way which sometimes involves reading output value directly by application only
                     continue;
 
                 assert(objAsNode->getOutputs() != nullptr);
@@ -749,17 +808,34 @@ namespace rlogic::internal
             }
         }
 
+        // collect node bindings used in anchor points and skin bindings
+        // - these are allowed to have no incoming links because they are being read from
+        std::unordered_set<const RamsesBinding*> bindingsInUse;
+        for (const auto* anchor : m_anchorPoints)
+        {
+            bindingsInUse.insert(anchor->m_anchorPointImpl.getRamsesNodeBinding().getLogicObject().as<RamsesBinding>());
+            bindingsInUse.insert(anchor->m_anchorPointImpl.getRamsesCameraBinding().getLogicObject().as<RamsesBinding>());
+        }
+        for (const auto* skin : m_skinBindings)
+        {
+            bindingsInUse.insert(skin->m_skinBinding.getAppearanceBinding().getLogicObject().as<RamsesBinding>());
+            for (const auto* joint : skin->m_skinBinding.getJoints())
+                bindingsInUse.insert(joint->getLogicObject().as<RamsesBinding>());
+        }
+
         //nodes with no linked inputs
         for (const auto* logicObj : m_logicObjects)
         {
             const auto* objAsNode = dynamic_cast<const rlogic::LogicNode*>(logicObj);
             if (objAsNode != nullptr)
             {
-                const auto* nodeAsIntf = dynamic_cast<const rlogic::LuaInterface*>(logicObj);
-                const auto* nodeAsAnchorPoint = dynamic_cast<const rlogic::AnchorPoint*>(logicObj);
-                const auto* nodeAsTimer = dynamic_cast<const rlogic::TimerNode*>(logicObj);
+                if (dynamic_cast<const rlogic::LuaInterface*>(logicObj) ||  // interfaces have their own validation logic in ApiObjects::validateInterfaces
+                    dynamic_cast<const rlogic::TimerNode*>(logicObj) ||     // timer not having input is valid use case which enables internal clock ticker
+                    dynamic_cast<const rlogic::AnchorPoint*>(logicObj) ||   // anchor points have no inputs
+                    dynamic_cast<const rlogic::SkinBinding*>(logicObj))     // skinbinding has no inputs
+                    continue;
 
-                if (nodeAsIntf != nullptr || nodeAsAnchorPoint != nullptr || nodeAsTimer != nullptr)
+                if (bindingsInUse.count(dynamic_cast<const rlogic::RamsesBinding*>(logicObj)) != 0) // bindings in use by other rlogic objects can be without incoming links
                     continue;
 
                 assert(objAsNode->getInputs() != nullptr);
@@ -815,6 +891,10 @@ namespace rlogic::internal
         else if constexpr (std::is_same_v<T, RamsesRenderGroupBinding>)
         {
             return m_ramsesRenderGroupBindings;
+        }
+        else if constexpr (std::is_same_v<T, SkinBinding>)
+        {
+            return m_skinBindings;
         }
         else if constexpr (std::is_same_v<T, DataArray>)
         {
@@ -971,6 +1051,12 @@ namespace rlogic::internal
             ramsesRenderGroupBindings.push_back(RamsesRenderGroupBindingImpl::Serialize(rgBinding->m_renderGroupBinding, builder, serializationMap, apiObjects.m_featureLevel));
         assert(apiObjects.m_featureLevel >= EFeatureLevel_03 || ramsesRenderGroupBindings.empty());
 
+        std::vector<flatbuffers::Offset<rlogic_serialization::SkinBinding>> skinBindings;
+        skinBindings.reserve(apiObjects.m_skinBindings.size());
+        for (const auto& skinBinding : apiObjects.m_skinBindings)
+            skinBindings.push_back(SkinBindingImpl::Serialize(skinBinding->m_skinBinding, builder, serializationMap, apiObjects.m_featureLevel));
+        assert(apiObjects.m_featureLevel >= EFeatureLevel_04 || skinBindings.empty());
+
         // links must go last due to dependency on serialized properties
         const auto collectedLinks = apiObjects.collectPropertyLinks();
         std::vector<flatbuffers::Offset<rlogic_serialization::Link>> links;
@@ -996,6 +1082,7 @@ namespace rlogic::internal
         const auto fbRenderPasses = builder.CreateVector(ramsesrenderpassbindings);
         const auto fbAnchorPoints = builder.CreateVector(anchorPoints);
         const auto fbRenderGroupBindings = builder.CreateVector(ramsesRenderGroupBindings);
+        const auto fbSkinBindings = builder.CreateVector(skinBindings);
 
         const auto logicEngine = rlogic_serialization::CreateApiObjects(
             builder,
@@ -1012,7 +1099,8 @@ namespace rlogic::internal
             apiObjects.m_lastObjectId,
             fbRenderPasses,
             fbAnchorPoints,
-            fbRenderGroupBindings
+            fbRenderGroupBindings,
+            fbSkinBindings
             );
 
         builder.Finish(logicEngine);
@@ -1111,6 +1199,12 @@ namespace rlogic::internal
             return nullptr;
         }
 
+        if (featureLevel >= EFeatureLevel_04 && !apiObjects.skinBindings())
+        {
+            errorReporting.add("Fatal error during loading from serialized data: missing skin bindings container!", nullptr, EErrorType::BinaryVersionMismatch);
+            return nullptr;
+        }
+
         deserialized->m_lastObjectId = apiObjects.lastObjectId();
 
         const size_t logicObjectsTotalSize =
@@ -1125,7 +1219,8 @@ namespace rlogic::internal
             static_cast<size_t>(apiObjects.animationNodes()->size()) +
             static_cast<size_t>(apiObjects.timerNodes()->size()) +
             (featureLevel >= EFeatureLevel_02 ? static_cast<size_t>(apiObjects.anchorPoints()->size()) : 0u) +
-            (featureLevel >= EFeatureLevel_03 ? static_cast<size_t>(apiObjects.renderGroupBindings()->size()) : 0u);
+            (featureLevel >= EFeatureLevel_03 ? static_cast<size_t>(apiObjects.renderGroupBindings()->size()) : 0u) +
+            (featureLevel >= EFeatureLevel_04 ? static_cast<size_t>(apiObjects.skinBindings()->size()) : 0u);
 
         deserialized->m_objectsOwningContainer.reserve(logicObjectsTotalSize);
         deserialized->m_logicObjects.reserve(logicObjectsTotalSize);
@@ -1236,6 +1331,7 @@ namespace rlogic::internal
                 RamsesAppearanceBinding*                 appBinding = up.get();
                 deserialized->m_ramsesAppearanceBindings.push_back(appBinding);
                 deserialized->registerLogicObject(std::move(up));
+                deserializationMap.storeLogicObject(appBinding->getId(), appBinding->m_appearanceBinding);
             }
             else
             {
@@ -1384,6 +1480,30 @@ namespace rlogic::internal
             }
         }
 
+        // skin bindings must go after node and appearance bindings because they need to resolve references
+        if (featureLevel >= EFeatureLevel_04)
+        {
+            const auto& skinBindings = *apiObjects.skinBindings();
+            deserialized->m_skinBindings.reserve(skinBindings.size());
+            for (const auto* binding : skinBindings)
+            {
+                assert(binding);
+                std::unique_ptr<SkinBindingImpl> deserializedBinding = SkinBindingImpl::Deserialize(*binding, errorReporting, deserializationMap);
+
+                if (deserializedBinding)
+                {
+                    std::unique_ptr<SkinBinding> up = std::make_unique<SkinBinding>(std::move(deserializedBinding));
+                    SkinBinding* skinBinding = up.get();
+                    deserialized->m_skinBindings.push_back(skinBinding);
+                    deserialized->registerLogicObject(std::move(up));
+                }
+                else
+                {
+                    return nullptr;
+                }
+            }
+        }
+
         // links must go last due to dependency on deserialized properties
         const auto& links = *apiObjects.links();
         // TODO Violin move this code (serialization parts too) to LogicNodeDependencies
@@ -1436,7 +1556,8 @@ namespace rlogic::internal
             std::any_of(m_ramsesAppearanceBindings.cbegin(), m_ramsesAppearanceBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
             std::any_of(m_ramsesCameraBindings.cbegin(), m_ramsesCameraBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
             std::any_of(m_ramsesRenderPassBindings.cbegin(), m_ramsesRenderPassBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
-            std::any_of(m_ramsesRenderGroupBindings.cbegin(), m_ramsesRenderGroupBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); });
+            std::any_of(m_ramsesRenderGroupBindings.cbegin(), m_ramsesRenderGroupBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); }) ||
+            std::any_of(m_skinBindings.cbegin(), m_skinBindings.cend(), [](const auto& b) { return b->m_impl.isDirty(); });
     }
 
     uint64_t ApiObjects::getNextLogicObjectId()
@@ -1496,6 +1617,7 @@ namespace rlogic::internal
     template DataArray* ApiObjects::createDataArray<vec2i>(const std::vector<vec2i>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec3i>(const std::vector<vec3i>&, std::string_view);
     template DataArray* ApiObjects::createDataArray<vec4i>(const std::vector<vec4i>&, std::string_view);
+    template DataArray* ApiObjects::createDataArray<std::vector<float>>(const std::vector<std::vector<float>>&, std::string_view);
 
     template ApiObjectContainer<LogicObject>&              ApiObjects::getApiObjectContainer<LogicObject>();
     template ApiObjectContainer<LuaScript>&                ApiObjects::getApiObjectContainer<LuaScript>();
@@ -1506,6 +1628,7 @@ namespace rlogic::internal
     template ApiObjectContainer<RamsesCameraBinding>&      ApiObjects::getApiObjectContainer<RamsesCameraBinding>();
     template ApiObjectContainer<RamsesRenderPassBinding>&  ApiObjects::getApiObjectContainer<RamsesRenderPassBinding>();
     template ApiObjectContainer<RamsesRenderGroupBinding>& ApiObjects::getApiObjectContainer<RamsesRenderGroupBinding>();
+    template ApiObjectContainer<SkinBinding>&              ApiObjects::getApiObjectContainer<SkinBinding>();
     template ApiObjectContainer<DataArray>&                ApiObjects::getApiObjectContainer<DataArray>();
     template ApiObjectContainer<AnimationNode>&            ApiObjects::getApiObjectContainer<AnimationNode>();
     template ApiObjectContainer<TimerNode>&                ApiObjects::getApiObjectContainer<TimerNode>();
@@ -1520,6 +1643,7 @@ namespace rlogic::internal
     template const ApiObjectContainer<RamsesCameraBinding>&      ApiObjects::getApiObjectContainer<RamsesCameraBinding>() const;
     template const ApiObjectContainer<RamsesRenderPassBinding>&  ApiObjects::getApiObjectContainer<RamsesRenderPassBinding>() const;
     template const ApiObjectContainer<RamsesRenderGroupBinding>& ApiObjects::getApiObjectContainer<RamsesRenderGroupBinding>() const;
+    template const ApiObjectContainer<SkinBinding>&              ApiObjects::getApiObjectContainer<SkinBinding>() const;
     template const ApiObjectContainer<DataArray>&                ApiObjects::getApiObjectContainer<DataArray>() const;
     template const ApiObjectContainer<AnimationNode>&            ApiObjects::getApiObjectContainer<AnimationNode>() const;
     template const ApiObjectContainer<TimerNode>&                ApiObjects::getApiObjectContainer<TimerNode>() const;

@@ -28,7 +28,7 @@ namespace rlogic::internal
 
         void createLogicFile()
         {
-            LogicEngine engine{ EFeatureLevel_03 };
+            LogicEngine engine{ EFeatureLevel_Latest };
             auto *interface = engine.createLuaInterface(R"(
                 function interface(IN,OUT)
                     IN.paramInt32 = Type:Int32()

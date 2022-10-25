@@ -519,7 +519,7 @@ namespace rlogic
 
     // -- anchor points -- //
 
-    TEST_P(ALogicEngine_ValidatingDanglingNodes, ProducesWarningIfAnchorPointHasNoOutgoingLinks)
+    TEST_P(ALogicEngine_ValidatingDanglingNodes, DoesNotProduceWarningIfAnchorPointHasNoOutgoingLinksAndItsBindingsNoIncomingLinks)
     {
         if (m_logicEngine.getFeatureLevel() < EFeatureLevel_02)
             GTEST_SKIP();
@@ -529,18 +529,11 @@ namespace rlogic
         auto* anchor = m_logicEngine.createAnchorPoint(*nodeBind, *cameraBind, "anchorBinding");
         ASSERT_NE(nullptr, anchor);
 
-        //link node and camera bindings to avoid interfering with behavior regarding anchor points
-        linkNodeInput(*nodeBind, "scaling", "paramVec3f");
-        m_logicEngine.link(*m_testScript->getOutputs()->getChild("paramInt32"), *cameraBind->getInputs()->getChild("viewport")->getChild("offsetX"));
         m_logicEngine.update();
-
-        auto warnings = m_logicEngine.validate();
-        ASSERT_EQ(1u, warnings.size());
-        EXPECT_THAT(warnings, ::testing::ElementsAre(::testing::Field(&WarningData::message, ::testing::StrEq("Node [anchorBinding] has no outgoing links! Node should be deleted or properly linked!"))));
-        EXPECT_THAT(warnings, ::testing::Each(::testing::Field(&WarningData::type, ::testing::Eq(EWarningType::UnusedContent))));
+        EXPECT_TRUE(m_logicEngine.validate().empty());
     }
 
-    TEST_P(ALogicEngine_ValidatingDanglingNodes, DoesNotProduceWarningIfAnchorPointHasOutgoingLinks)
+    TEST_P(ALogicEngine_ValidatingDanglingNodes, DoesNotProduceWarningIfAnchorPointHasOutgoingLink)
     {
         if (m_logicEngine.getFeatureLevel() < EFeatureLevel_02)
             GTEST_SKIP();
@@ -550,22 +543,24 @@ namespace rlogic
         auto* anchor = m_logicEngine.createAnchorPoint(*nodeBind, *cameraBind, "anchorBinding");
         ASSERT_NE(nullptr, anchor);
 
-        //link node and camera bindings to avoid interfering with behavior regarding anchor points
-        LuaInterface* intf = m_logicEngine.createLuaInterface(R"(
-            function interface(IN)
-                IN.paramVec3f = Type:Vec3f()
-                IN.paramInt32 = Type:Int32()
-            end
-        )", "intf name");
-        ASSERT_NE(nullptr, intf);
-        m_logicEngine.link(*intf->getOutputs()->getChild("paramVec3f"), *nodeBind->getInputs()->getChild("scaling"));
-        m_logicEngine.link(*intf->getOutputs()->getChild("paramInt32"), *cameraBind->getInputs()->getChild("viewport")->getChild("offsetX"));
-
         linkNodeOutput(*anchor, "depth", "paramFloat");
-        m_logicEngine.update();
 
-        auto warnings = m_logicEngine.validate();
-        ASSERT_EQ(0u, warnings.size());
+        m_logicEngine.update();
+        EXPECT_TRUE(m_logicEngine.validate().empty());
+    }
+
+    // -- skin bindings -- //
+
+    TEST_P(ALogicEngine_ValidatingDanglingNodes, DoesNotProduceWarningWhenCheckingSkinBindingAndItsBindingsHaveNoIncomingLinks)
+    {
+        if (m_logicEngine.getFeatureLevel() < EFeatureLevel_04)
+            GTEST_SKIP();
+
+        const auto skin = createSkinBinding(m_logicEngine);
+        ASSERT_NE(nullptr, skin);
+
+        m_logicEngine.update();
+        EXPECT_TRUE(m_logicEngine.validate().empty());
     }
 
     TEST(GetVerboseDescriptionFunction, ReturnsCorrectString)

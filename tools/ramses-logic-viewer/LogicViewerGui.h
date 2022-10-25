@@ -68,6 +68,7 @@ namespace rlogic
         void drawRenderPassBindings();
         void drawRenderGroupBindings();
         void drawAnchorPoints();
+        void drawSkinBindings();
         void drawUpdateReport();
         void drawAppearanceBindings();
         void drawDisplaySettings();

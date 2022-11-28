@@ -37,6 +37,7 @@ namespace ramses
     class RenderPass;
     class RenderGroup;
     class UniformInput;
+    class MeshNode;
 }
 
 namespace rlogic
@@ -47,6 +48,7 @@ namespace rlogic
     class RamsesRenderPassBinding;
     class RamsesRenderGroupBinding;
     class RamsesRenderGroupBindingElements;
+    class RamsesMeshNodeBinding;
     class SkinBinding;
     class DataArray;
     class AnimationNode;
@@ -91,7 +93,7 @@ namespace rlogic::internal
 
         // Public API
         LuaScript* createLuaScript(std::string_view source, const LuaConfigImpl& config, std::string_view scriptName);
-        LuaInterface* createLuaInterface(std::string_view source, std::string_view interfaceName);
+        LuaInterface* createLuaInterface(std::string_view source, const LuaConfigImpl& config, std::string_view interfaceName);
         LuaModule* createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName);
         bool extractLuaDependencies(std::string_view source, const std::function<void(const std::string&)>& callbackFunc);
         RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);
@@ -100,6 +102,7 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBindingWithFrustumPlanes(ramses::Camera& ramsesCamera, std::string_view name);
         RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& ramsesRenderPass, std::string_view name);
         RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name);
+        RamsesMeshNodeBinding* createRamsesMeshNodeBinding(ramses::MeshNode& ramsesMeshNode, std::string_view name);
         SkinBinding* createSkinBinding(
             const std::vector<const RamsesNodeBinding*>& joints,
             const std::vector<matrix44f>& inverseBindMatrices,

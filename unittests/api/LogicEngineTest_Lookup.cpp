@@ -17,6 +17,7 @@
 #include "impl/RamsesCameraBindingImpl.h"
 #include "impl/RamsesRenderPassBindingImpl.h"
 #include "impl/RamsesRenderGroupBindingImpl.h"
+#include "impl/RamsesMeshNodeBindingImpl.h"
 #include "impl/DataArrayImpl.h"
 #include "impl/AnimationNodeImpl.h"
 #include "impl/TimerNodeImpl.h"
@@ -50,6 +51,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto renderGroupBinding = createRenderGroupBinding();
+        const auto meshNodeBinding = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "mb");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
@@ -64,6 +66,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, m_logicEngine.findByName<RamsesCameraBinding>("camerabinding"));
         EXPECT_EQ(renderPassBinding, m_logicEngine.findByName<RamsesRenderPassBinding>("rpbinding"));
         EXPECT_EQ(renderGroupBinding, m_logicEngine.findByName<RamsesRenderGroupBinding>("renderGroupBinding"));
+        EXPECT_EQ(meshNodeBinding, m_logicEngine.findByName<RamsesMeshNodeBinding>("mb"));
         EXPECT_EQ(dataArray, m_logicEngine.findByName<DataArray>("dataarray"));
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("animNode"));
         EXPECT_EQ(timerNode, m_logicEngine.findByName<TimerNode>("timerNode"));
@@ -78,6 +81,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, m_logicEngine.findByName<LogicObject>("camerabinding"));
         EXPECT_EQ(renderPassBinding, m_logicEngine.findByName<LogicObject>("rpbinding"));
         EXPECT_EQ(renderGroupBinding, m_logicEngine.findByName<LogicObject>("renderGroupBinding"));
+        EXPECT_EQ(meshNodeBinding, m_logicEngine.findByName<LogicObject>("mb"));
         EXPECT_EQ(dataArray, m_logicEngine.findByName<LogicObject>("dataarray"));
         EXPECT_EQ(animNode, m_logicEngine.findByName<LogicObject>("animNode"));
         EXPECT_EQ(timerNode, m_logicEngine.findByName<LogicObject>("timerNode"));
@@ -93,6 +97,7 @@ namespace rlogic
         EXPECT_EQ(*it++, cameraBinding);
         EXPECT_EQ(*it++, renderPassBinding);
         EXPECT_EQ(*it++, renderGroupBinding);
+        EXPECT_EQ(*it++, meshNodeBinding);
         EXPECT_EQ(*it++, dataArray);
         EXPECT_EQ(*it++, animNode);
         EXPECT_EQ(*it++, timerNode);
@@ -110,6 +115,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto renderGroupBinding = createRenderGroupBinding();
+        const auto meshNodeBinding = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "mb");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timerNode = m_logicEngine.createTimerNode("timerNode");
@@ -125,6 +131,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, immutableLogicEngine.findByName<RamsesCameraBinding>("camerabinding"));
         EXPECT_EQ(renderPassBinding, immutableLogicEngine.findByName<RamsesRenderPassBinding>("rpbinding"));
         EXPECT_EQ(renderGroupBinding, immutableLogicEngine.findByName<RamsesRenderGroupBinding>("renderGroupBinding"));
+        EXPECT_EQ(meshNodeBinding, immutableLogicEngine.findByName<RamsesMeshNodeBinding>("mb"));
         EXPECT_EQ(dataArray, immutableLogicEngine.findByName<DataArray>("dataarray"));
         EXPECT_EQ(animNode, immutableLogicEngine.findByName<AnimationNode>("animNode"));
         EXPECT_EQ(timerNode, immutableLogicEngine.findByName<TimerNode>("timerNode"));
@@ -139,6 +146,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, immutableLogicEngine.findByName<LogicObject>("camerabinding"));
         EXPECT_EQ(renderPassBinding, immutableLogicEngine.findByName<LogicObject>("rpbinding"));
         EXPECT_EQ(renderGroupBinding, immutableLogicEngine.findByName<LogicObject>("renderGroupBinding"));
+        EXPECT_EQ(meshNodeBinding, immutableLogicEngine.findByName<LogicObject>("mb"));
         EXPECT_EQ(dataArray, immutableLogicEngine.findByName<LogicObject>("dataarray"));
         EXPECT_EQ(animNode, immutableLogicEngine.findByName<LogicObject>("animNode"));
         EXPECT_EQ(timerNode, immutableLogicEngine.findByName<LogicObject>("timerNode"));
@@ -156,6 +164,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         createRenderGroupBinding();
+        m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "mb");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
@@ -170,6 +179,7 @@ namespace rlogic
         const auto* cameraBindingFound     = m_logicEngine.findByName<LogicObject>("camerabinding")->as<RamsesCameraBinding>();
         const auto* renderPassBindingFound = m_logicEngine.findByName<LogicObject>("rpbinding")->as<RamsesRenderPassBinding>();
         const auto* renderGroupBindingFound = m_logicEngine.findByName<LogicObject>("renderGroupBinding")->as<RamsesRenderGroupBinding>();
+        const auto* meshNodeBindingFound   = m_logicEngine.findByName<LogicObject>("mb")->as<RamsesMeshNodeBinding>();
         const auto* dataArrayFound         = m_logicEngine.findByName<LogicObject>("dataarray")->as<DataArray>();
         const auto* animNodeFound          = m_logicEngine.findByName<LogicObject>("animNode")->as<AnimationNode>();
         const auto* timerNodeFound         = m_logicEngine.findByName<LogicObject>("timerNode")->as<TimerNode>();
@@ -184,6 +194,7 @@ namespace rlogic
         ASSERT_NE(nullptr, cameraBindingFound);
         ASSERT_NE(nullptr, renderPassBindingFound);
         ASSERT_NE(nullptr, renderGroupBindingFound);
+        ASSERT_NE(nullptr, meshNodeBindingFound);
         ASSERT_NE(nullptr, dataArrayFound);
         ASSERT_NE(nullptr, animNodeFound);
         ASSERT_NE(nullptr, timerNodeFound);
@@ -198,6 +209,7 @@ namespace rlogic
         EXPECT_EQ(cameraBindingFound->getName(), "camerabinding");
         EXPECT_EQ(renderPassBindingFound->getName(), "rpbinding");
         EXPECT_EQ(renderGroupBindingFound->getName(), "renderGroupBinding");
+        EXPECT_EQ(meshNodeBindingFound->getName(), "mb");
         EXPECT_EQ(dataArrayFound->getName(), "dataarray");
         EXPECT_EQ(animNodeFound->getName(), "animNode");
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
@@ -215,6 +227,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         createRenderGroupBinding();
+        m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "mb");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
@@ -230,6 +243,7 @@ namespace rlogic
         const auto*        cameraBindingFound     = immutableLogicEngine.findByName<LogicObject>("camerabinding")->as<RamsesCameraBinding>();
         const auto*        renderPassBindingFound = immutableLogicEngine.findByName<LogicObject>("rpbinding")->as<RamsesRenderPassBinding>();
         const auto*        renderGroupBindingFound = immutableLogicEngine.findByName<LogicObject>("renderGroupBinding")->as<RamsesRenderGroupBinding>();
+        const auto*        meshNodeBindingFound   = immutableLogicEngine.findByName<LogicObject>("mb")->as<RamsesMeshNodeBinding>();
         const auto*        dataArrayFound         = immutableLogicEngine.findByName<LogicObject>("dataarray")->as<DataArray>();
         const auto*        animNodeFound          = immutableLogicEngine.findByName<LogicObject>("animNode")->as<AnimationNode>();
         const auto*        timerNodeFound         = immutableLogicEngine.findByName<LogicObject>("timerNode")->as<TimerNode>();
@@ -244,6 +258,7 @@ namespace rlogic
         ASSERT_NE(nullptr, cameraBindingFound);
         ASSERT_NE(nullptr, renderPassBindingFound);
         ASSERT_NE(nullptr, renderGroupBindingFound);
+        ASSERT_NE(nullptr, meshNodeBindingFound);
         ASSERT_NE(nullptr, dataArrayFound);
         ASSERT_NE(nullptr, animNodeFound);
         ASSERT_NE(nullptr, timerNodeFound);
@@ -258,6 +273,7 @@ namespace rlogic
         EXPECT_EQ(cameraBindingFound->getName(), "camerabinding");
         EXPECT_EQ(renderPassBindingFound->getName(), "rpbinding");
         EXPECT_EQ(renderGroupBindingFound->getName(), "renderGroupBinding");
+        EXPECT_EQ(meshNodeBindingFound->getName(), "mb");
         EXPECT_EQ(dataArrayFound->getName(), "dataarray");
         EXPECT_EQ(animNodeFound->getName(), "animNode");
         EXPECT_EQ(timerNodeFound->getName(), "timerNode");
@@ -275,6 +291,7 @@ namespace rlogic
         const auto cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto renderGroupBinding = createRenderGroupBinding();
+        const auto meshBinding       = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "mb");
         const auto dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         const auto animNode          = createAnimationNode(dataArray);
         const auto timerNode         = m_logicEngine.createTimerNode("timerNode");
@@ -289,12 +306,13 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, m_logicEngine.findLogicObjectById(5u));
         EXPECT_EQ(renderPassBinding, m_logicEngine.findLogicObjectById(6u));
         EXPECT_EQ(renderGroupBinding, m_logicEngine.findLogicObjectById(7u));
-        EXPECT_EQ(dataArray, m_logicEngine.findLogicObjectById(8u));
-        EXPECT_EQ(animNode, m_logicEngine.findLogicObjectById(9u));
-        EXPECT_EQ(timerNode, m_logicEngine.findLogicObjectById(10u));
-        EXPECT_EQ(intf, m_logicEngine.findLogicObjectById(11u));
-        EXPECT_EQ(anchor, m_logicEngine.findLogicObjectById(12u));
-        EXPECT_EQ(skin, m_logicEngine.findLogicObjectById(13u));
+        EXPECT_EQ(meshBinding, m_logicEngine.findLogicObjectById(8u));
+        EXPECT_EQ(dataArray, m_logicEngine.findLogicObjectById(9u));
+        EXPECT_EQ(animNode, m_logicEngine.findLogicObjectById(10u));
+        EXPECT_EQ(timerNode, m_logicEngine.findLogicObjectById(11u));
+        EXPECT_EQ(intf, m_logicEngine.findLogicObjectById(12u));
+        EXPECT_EQ(anchor, m_logicEngine.findLogicObjectById(13u));
+        EXPECT_EQ(skin, m_logicEngine.findLogicObjectById(14u));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirId_Const)
@@ -306,6 +324,7 @@ namespace rlogic
         const auto cameraBinding     = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto renderGroupBinding = createRenderGroupBinding();
+        const auto meshBinding       = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "mb");
         const auto dataArray         = m_logicEngine.createDataArray(std::vector<float>{1.f, 2.f, 3.f}, "dataarray");
         const auto animNode          = createAnimationNode(dataArray);
         const auto timerNode         = m_logicEngine.createTimerNode("timerNode");
@@ -321,12 +340,13 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, immutableLogicEngine.findLogicObjectById(5u));
         EXPECT_EQ(renderPassBinding, immutableLogicEngine.findLogicObjectById(6u));
         EXPECT_EQ(renderGroupBinding, immutableLogicEngine.findLogicObjectById(7u));
-        EXPECT_EQ(dataArray, immutableLogicEngine.findLogicObjectById(8u));
-        EXPECT_EQ(animNode, immutableLogicEngine.findLogicObjectById(9u));
-        EXPECT_EQ(timerNode, immutableLogicEngine.findLogicObjectById(10u));
-        EXPECT_EQ(intf, immutableLogicEngine.findLogicObjectById(11u));
-        EXPECT_EQ(anchor, immutableLogicEngine.findLogicObjectById(12u));
-        EXPECT_EQ(skin, immutableLogicEngine.findLogicObjectById(13u));
+        EXPECT_EQ(meshBinding, immutableLogicEngine.findLogicObjectById(8u));
+        EXPECT_EQ(dataArray, immutableLogicEngine.findLogicObjectById(9u));
+        EXPECT_EQ(animNode, immutableLogicEngine.findLogicObjectById(10u));
+        EXPECT_EQ(timerNode, immutableLogicEngine.findLogicObjectById(11u));
+        EXPECT_EQ(intf, immutableLogicEngine.findLogicObjectById(12u));
+        EXPECT_EQ(anchor, immutableLogicEngine.findLogicObjectById(13u));
+        EXPECT_EQ(skin, immutableLogicEngine.findLogicObjectById(14u));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectsByTheirName_CutsNameAtNullTermination)
@@ -344,6 +364,7 @@ namespace rlogic
         RamsesCameraBinding* cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         RamsesRenderPassBinding* renderPassBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         auto renderGroupBinding = createRenderGroupBinding();
+        auto meshBinding = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "meshbinding");
         auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         auto animNode = createAnimationNode(dataArray);
         auto timerNode = m_logicEngine.createTimerNode("timerNode");
@@ -359,6 +380,7 @@ namespace rlogic
         cameraBinding->setName("CB");
         renderPassBinding->setName("RPB");
         renderGroupBinding->setName("RGB");
+        meshBinding->setName("MB");
         dataArray->setName("DA");
         animNode->setName("AN");
         timerNode->setName("TN");
@@ -374,6 +396,7 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesCameraBinding>("camerabinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesRenderPassBinding>("rpbinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesRenderGroupBinding>("renderGroupBinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesMeshNodeBinding>("meshbinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<DataArray>("dataarray"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("animNode"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<TimerNode>("timerNode"));
@@ -389,6 +412,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, m_logicEngine.findByName<RamsesCameraBinding>("CB"));
         EXPECT_EQ(renderPassBinding, m_logicEngine.findByName<RamsesRenderPassBinding>("RPB"));
         EXPECT_EQ(renderGroupBinding, m_logicEngine.findByName<RamsesRenderGroupBinding>("RGB"));
+        EXPECT_EQ(meshBinding, m_logicEngine.findByName<RamsesMeshNodeBinding>("MB"));
         EXPECT_EQ(dataArray, m_logicEngine.findByName<DataArray>("DA"));
         EXPECT_EQ(animNode, m_logicEngine.findByName<AnimationNode>("AN"));
         EXPECT_EQ(timerNode, m_logicEngine.findByName<TimerNode>("TN"));
@@ -406,6 +430,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         createRenderGroupBinding();
+        m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "meshbinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         createAnimationNode(dataArray);
         m_logicEngine.createTimerNode("timerNode");
@@ -421,12 +446,13 @@ namespace rlogic
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesCameraBinding>("script"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesRenderPassBinding>("luaModule"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesRenderGroupBinding>("appbinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("meshbinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<DataArray>("renderGroupBinding"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnimationNode>("anchor"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<SkinBinding>("timerNode"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<TimerNode>("intf"));
         EXPECT_EQ(nullptr, m_logicEngine.findByName<AnchorPoint>("rpbinding"));
-        EXPECT_EQ(nullptr, m_logicEngine.findByName<LuaModule>("rpbinding"));
+        EXPECT_EQ(nullptr, m_logicEngine.findByName<RamsesMeshNodeBinding>("skin"));
     }
 
     TEST_F(ALogicEngine_Lookup, FindsObjectByNameOnlyStringMatchesExactly)
@@ -449,6 +475,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto rgBinding = createRenderGroupBinding();
+        const auto meshBinding = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "meshbinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timer = m_logicEngine.createTimerNode("timerNode");
@@ -463,6 +490,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, &cameraBinding->m_cameraBinding.getLogicObject());
         EXPECT_EQ(rpBinding, &rpBinding->m_renderPassBinding.getLogicObject());
         EXPECT_EQ(rgBinding, &rgBinding->m_renderGroupBinding.getLogicObject());
+        EXPECT_EQ(meshBinding, &meshBinding->m_meshNodeBinding.getLogicObject());
         EXPECT_EQ(dataArray, &dataArray->m_impl.getLogicObject());
         EXPECT_EQ(animNode, &animNode->m_animationNodeImpl.getLogicObject());
         EXPECT_EQ(timer, &timer->m_timerNodeImpl.getLogicObject());
@@ -480,6 +508,7 @@ namespace rlogic
         const auto cameraBinding = m_logicEngine.createRamsesCameraBinding(*m_camera, "camerabinding");
         const auto rpBinding = m_logicEngine.createRamsesRenderPassBinding(*m_renderPass, "rpbinding");
         const auto rgBinding = createRenderGroupBinding();
+        const auto meshBinding = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "meshbinding");
         const auto dataArray = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f }, "dataarray");
         const auto animNode = createAnimationNode(dataArray);
         const auto timer = m_logicEngine.createTimerNode("timerNode");
@@ -494,6 +523,7 @@ namespace rlogic
         const auto& cameraBindingImpl = cameraBinding->m_cameraBinding;
         const auto& rpBindingImpl = rpBinding->m_renderPassBinding;
         const auto& rgBindingImpl = rgBinding->m_renderGroupBinding;
+        const auto& meshBindingImpl = meshBinding->m_meshNodeBinding;
         const auto& dataArrayImpl = dataArray->m_impl;
         const auto& animNodeImpl = animNode->m_animationNodeImpl;
         const auto& timerImpl = timer->m_timerNodeImpl;
@@ -508,6 +538,7 @@ namespace rlogic
         EXPECT_EQ(cameraBinding, &cameraBindingImpl.getLogicObject());
         EXPECT_EQ(rpBinding, &rpBindingImpl.getLogicObject());
         EXPECT_EQ(rgBinding, &rgBindingImpl.getLogicObject());
+        EXPECT_EQ(meshBinding, &meshBindingImpl.getLogicObject());
         EXPECT_EQ(dataArray, &dataArrayImpl.getLogicObject());
         EXPECT_EQ(animNode, &animNodeImpl.getLogicObject());
         EXPECT_EQ(timer, &timerImpl.getLogicObject());

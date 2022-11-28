@@ -14,7 +14,7 @@ cmake_minimum_required(VERSION 3.13)
 #==========================================================================
 
 set(RLOGIC_VERSION_MAJOR 1)
-set(RLOGIC_VERSION_MINOR 3)
+set(RLOGIC_VERSION_MINOR 4)
 set(RLOGIC_VERSION_PATCH 0)
 
 set(RLOGIC_VERSION ${RLOGIC_VERSION_MAJOR}.${RLOGIC_VERSION_MINOR}.${RLOGIC_VERSION_PATCH})
@@ -72,7 +72,7 @@ if(ramses-logic_FIND_RAMSES_FROM_SYSTEM AND ramses-logic_BUILD_RAMSES_RENDERER)
 endif()
 
 if(ramses-logic_BUILD_TOOLS AND NOT ramses-logic_BUILD_RAMSES_RENDERER)
-    message(FATAL_ERROR "Can't build tools without also having a ramses renderer. Enable a renderer or disable the tools!")
+    message(WARNING "Some tools require a ramses renderer. Enable ramses-logic_BUILD_RAMSES_RENDERER to build all tools!")
 endif()
 
 if(ramses-logic_BUILD_RAMSES_RENDERER)

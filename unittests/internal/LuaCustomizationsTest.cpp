@@ -539,7 +539,7 @@ namespace rlogic::internal
             local mod = {}
             mod.mytable = {nested = {a = 42}}
             return mod
-            )", "", errors, {}, EFeatureLevel_01);
+            )", "", errors, {}, EFeatureLevel_01, false);
         ASSERT_TRUE(errors.getErrors().empty());
 
         sol::load_result loadResult = solState.loadScript(R"(
@@ -570,7 +570,7 @@ namespace rlogic::internal
 
         // Apply environment, same as for real modules
         sol::protected_function mainFunction = loadResult;
-        sol::environment env = solState.createEnvironment({EStandardModule::Base}, {});
+        sol::environment env = solState.createEnvironment({EStandardModule::Base}, {}, false);
         env.set_on(mainFunction);
         env["mod"] = mod->moduleTable;
 
@@ -755,7 +755,7 @@ namespace rlogic::internal
             mod.mytable = {
                 nested = {a = 11, b = 12}}
             return mod
-            )", "", errors, {}, EFeatureLevel_01);
+            )", "", errors, {}, EFeatureLevel_01, false);
         ASSERT_TRUE(errors.getErrors().empty());
 
         sol::load_result loadResult = solState.loadScript(R"(
@@ -776,7 +776,7 @@ namespace rlogic::internal
 
         // Apply environment, same as for real modules
         sol::protected_function mainFunction = loadResult;
-        sol::environment env = solState.createEnvironment({ EStandardModule::Base }, {});
+        sol::environment env = solState.createEnvironment({ EStandardModule::Base }, {}, false);
         env.set_on(mainFunction);
         env["mod"] = mod->moduleTable;
 
@@ -964,7 +964,7 @@ namespace rlogic::internal
             mod.mytable = {
                 nested = {[1] = 11, [2] = 12}}
             return mod
-            )", "", errors, {}, EFeatureLevel_01);
+            )", "", errors, {}, EFeatureLevel_01, false);
         ASSERT_TRUE(errors.getErrors().empty());
 
         // Check that iterating over custom indexed table works and the order is the same (ascending by numeric index)
@@ -979,7 +979,7 @@ namespace rlogic::internal
 
         // Apply environment, same as for real modules
         sol::protected_function mainFunction = loadResult;
-        sol::environment env = solState.createEnvironment({ EStandardModule::Base }, {});
+        sol::environment env = solState.createEnvironment({ EStandardModule::Base }, {}, false);
         env.set_on(mainFunction);
         env["mod"] = mod->moduleTable;
 

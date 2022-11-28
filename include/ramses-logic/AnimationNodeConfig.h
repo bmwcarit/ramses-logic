@@ -61,6 +61,7 @@ namespace rlogic
         * was created) when loading from a file.
         *
         * By default this feature is disabled.
+        * This feature cannot be enabled (this call will fail) if the #AnimationNodeConfig contains a channel with #rlogic::DataArray using data type #rlogic::EPropertyType::Array.
         *
         * @param enabled flag to enable or disable exposing of channels data as properties.
         * @return \c true if enabled successfully, \c false otherwise.

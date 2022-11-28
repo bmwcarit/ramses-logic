@@ -60,7 +60,7 @@ namespace rlogic::internal
                     ramsesVersion.major, ramsesVersion.minor, ramsesVersion.patch, m_fbBuilder.CreateString(ramsesVersion.string)),
                 rlogic_serialization::CreateVersion(m_fbBuilder,
                     logicVersion.major, logicVersion.minor, logicVersion.patch, m_fbBuilder.CreateString(logicVersion.string)),
-                ApiObjects::Serialize(emptyApiObjects, m_fbBuilder),
+                ApiObjects::Serialize(emptyApiObjects, m_fbBuilder, ELuaSavingMode::ByteCodeOnly),
                 0,
                 featureLevel
             );
@@ -177,9 +177,11 @@ namespace rlogic::internal
             { EFeatureLevel_01, EFeatureLevel_02 },
             { EFeatureLevel_01, EFeatureLevel_03 },
             { EFeatureLevel_01, EFeatureLevel_04 },
+            { EFeatureLevel_01, EFeatureLevel_05 },
             { EFeatureLevel_02, EFeatureLevel_01 },
             { EFeatureLevel_03, EFeatureLevel_01 },
-            { EFeatureLevel_04, EFeatureLevel_01 }
+            { EFeatureLevel_04, EFeatureLevel_01 },
+            { EFeatureLevel_05, EFeatureLevel_01 }
         };
 
         for (const auto& comb : combinations)
@@ -280,11 +282,10 @@ namespace rlogic::internal
     }
 
     // These tests will always break on incompatible file format changes.
-    // Run the testAssetProducer with corresponding feature level to re-generate the test files used in these tests.
     class ALogicEngine_Binary_Compatibility : public ::testing::Test
     {
     protected:
-        void checkBaseContents(LogicEngine& logicEngine)
+        static void checkBaseContents(LogicEngine& logicEngine, ramses::Scene& ramsesScene)
         {
             ASSERT_NE(nullptr, logicEngine.findByName<LuaModule>("nestedModuleMath"));
             ASSERT_NE(nullptr, logicEngine.findByName<LuaModule>("moduleMath"));
@@ -331,12 +332,27 @@ namespace rlogic::internal
             const auto appearanceBinding = logicEngine.findByName<RamsesAppearanceBinding>("appearancebinding");
             ASSERT_NE(nullptr, appearanceBinding);
             EXPECT_NE(nullptr, logicEngine.findByName<DataArray>("dataarray"));
-            const auto intf = logicEngine.findByName<LuaInterface>("intf");
-            ASSERT_NE(nullptr, intf);
 
-            // Check all links
             std::vector<PropertyLink> expectedLinks;
-            expectedLinks.push_back({ intf->getOutputs()->getChild("struct")->getChild("floatInput"), script1->getInputs()->getChild("floatInput"), false });
+
+            // VersionBreak There was a mess up with the test content, this is a workaround for it until next breaking change on logic engine
+            if(logicEngine.getFeatureLevel() == EFeatureLevel_01)
+            {
+                script1->getInputs()->getChild("floatInput")->set<float>(42.5f);
+            }
+            else
+            {
+                const auto intf = logicEngine.findByName<LuaInterface>("intf");
+                ASSERT_NE(nullptr, intf);
+                intf->getInputs()->getChild("struct")->getChild("floatInput")->set<float>(42.5f);
+                expectedLinks.push_back({ intf->getOutputs()->getChild("struct")->getChild("floatInput"), script1->getInputs()->getChild("floatInput"), false });
+            }
+
+            if (logicEngine.getFeatureLevel() >= EFeatureLevel_02)
+            {
+                expectedLinks.push_back({ script1->getOutputs()->getChild("boolOutput"), nodeBinding->getInputs()->getChild("enabled"), false });
+            }
+
             expectedLinks.push_back({ script1->getOutputs()->getChild("floatOutput"), script2->getInputs()->getChild("floatInput"), false });
             expectedLinks.push_back({ script1->getOutputs()->getChild("nodeTranslation"), nodeBinding->getInputs()->getChild("translation"), false });
             expectedLinks.push_back({ script2->getOutputs()->getChild("cameraViewport")->getChild("offsetX"), cameraBinding->getInputs()->getChild("viewport")->getChild("offsetX"), false });
@@ -345,20 +361,15 @@ namespace rlogic::internal
             expectedLinks.push_back({ script2->getOutputs()->getChild("cameraViewport")->getChild("height"), cameraBinding->getInputs()->getChild("viewport")->getChild("height"), false });
             expectedLinks.push_back({ script2->getOutputs()->getChild("floatUniform"), appearanceBinding->getInputs()->getChild("floatUniform"), false });
             expectedLinks.push_back({ animNode->getOutputs()->getChild("channel"), appearanceBinding->getInputs()->getChild("animatedFloatUniform"), false });
-            if (logicEngine.getFeatureLevel() >= rlogic::EFeatureLevel_02)
-            {
-                expectedLinks.push_back({ script1->getOutputs()->getChild("boolOutput"), nodeBinding->getInputs()->getChild("enabled"), false });
-            }
+
             PropertyLinkTestUtils::ExpectLinks(logicEngine, expectedLinks);
 
-            // Can set new value via interface and update()
-            intf->getInputs()->getChild("struct")->getChild("floatInput")->set<float>(42.5f);
             EXPECT_TRUE(logicEngine.update());
 
             // Values on Ramses are updated according to expectations
             vec3f translation;
-            auto node = ramses::RamsesUtils::TryConvert<ramses::Node>(*m_scene->findObjectByName("test node"));
-            auto camera = ramses::RamsesUtils::TryConvert<ramses::OrthographicCamera>(*m_scene->findObjectByName("test camera"));
+            auto node = ramses::RamsesUtils::TryConvert<ramses::Node>(*ramsesScene.findObjectByName("test node"));
+            auto camera = ramses::RamsesUtils::TryConvert<ramses::OrthographicCamera>(*ramsesScene.findObjectByName("test camera"));
             node->getTranslation(translation[0], translation[1], translation[2]);
             EXPECT_THAT(translation, ::testing::ElementsAre(42.5f, 2.f, 3.f));
 
@@ -373,7 +384,7 @@ namespace rlogic::internal
             EXPECT_TRUE(logicEngine.update());
 
             ramses::UniformInput uniform;
-            auto appearance = ramses::RamsesUtils::TryConvert<ramses::Appearance>(*m_scene->findObjectByName("test appearance"));
+            auto appearance = ramses::RamsesUtils::TryConvert<ramses::Appearance>(*ramsesScene.findObjectByName("test appearance"));
             appearance->getEffect().getUniformInput(1, uniform);
             float floatValue = 0.f;
             appearance->getInputValueFloat(uniform, floatValue);
@@ -382,7 +393,7 @@ namespace rlogic::internal
             EXPECT_EQ(957, *logicEngine.findByName<LuaScript>("script2")->getOutputs()->getChild("nestedModulesResult")->get<int32_t>());
         }
 
-        void expectFeatureLevel02Content(const LogicEngine& logicEngine)
+        static void expectFeatureLevel02Content(const LogicEngine& logicEngine, ramses::Scene& ramsesScene)
         {
             const auto nodeBinding = logicEngine.findByName<RamsesNodeBinding>("nodebinding");
             ASSERT_TRUE(nodeBinding);
@@ -399,7 +410,7 @@ namespace rlogic::internal
             EXPECT_EQ(6u, cameraBindingPerspWithFrustumPlanes->getInputs()->getChild("frustum")->getChildCount());
 
             // test that linked value from script propagated to ramses scene
-            const auto node = ramses::RamsesUtils::TryConvert<ramses::Node>(*m_scene->findObjectByName("test node"));
+            const auto node = ramses::RamsesUtils::TryConvert<ramses::Node>(*ramsesScene.findObjectByName("test node"));
             ASSERT_TRUE(node);
             EXPECT_EQ(ramses::EVisibilityMode::Off, node->getVisibility());
         }
@@ -443,24 +454,109 @@ namespace rlogic::internal
             EXPECT_FALSE(logicEngine.findByName<LogicObject>("skin"));
         }
 
+        static void expectFeatureLevel05Content(const LogicEngine& logicEngine)
+        {
+            EXPECT_TRUE(logicEngine.findByName<RamsesMeshNodeBinding>("meshnodebinding"));
+        }
+
+        static void expectFeatureLevel05ContentNotPresent(const LogicEngine& logicEngine)
+        {
+            EXPECT_FALSE(logicEngine.findByName<LogicObject>("meshnodebinding"));
+        }
+
+        static void checkContents(LogicEngine& logicEngine, ramses::Scene& scene)
+        {
+            // check for content expected to exist
+            // higher feature level always contains content supported by lower level
+            switch (logicEngine.getFeatureLevel())
+            {
+            case EFeatureLevel_05:
+                expectFeatureLevel05Content(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_04:
+                expectFeatureLevel04Content(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_03:
+                expectFeatureLevel03Content(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_02:
+                expectFeatureLevel02Content(logicEngine, scene);
+                [[fallthrough]];
+            case EFeatureLevel_01:
+                checkBaseContents(logicEngine, scene);
+                break;
+            }
+
+            // check for content expected to not exist
+            // lower feature level never contains content supported only in higher level
+            switch (logicEngine.getFeatureLevel())
+            {
+            case EFeatureLevel_01:
+                expectFeatureLevel02ContentNotPresent(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_02:
+                expectFeatureLevel03ContentNotPresent(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_03:
+                expectFeatureLevel04ContentNotPresent(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_04:
+                expectFeatureLevel05ContentNotPresent(logicEngine);
+                [[fallthrough]];
+            case EFeatureLevel_05:
+                break;
+            }
+        }
+
+        static void saveAndReloadAndCheckContents(LogicEngine& logicEngine, ramses::Scene& scene)
+        {
+            WithTempDirectory tempDir;
+
+            rlogic::SaveFileConfig noValidationConfig;
+            noValidationConfig.setValidationEnabled(false);
+            logicEngine.saveToFile("temp.rlogic", noValidationConfig);
+
+            LogicEngine logicEngineAnother{ logicEngine.getFeatureLevel() };
+            ASSERT_TRUE(logicEngineAnother.loadFromFile("temp.rlogic", &scene));
+            EXPECT_TRUE(logicEngineAnother.update());
+
+            checkContents(logicEngineAnother, scene);
+        }
+
+        ramses::Scene* loadRamsesScene(EFeatureLevel featureLevel) {
+            switch(featureLevel)
+            {
+            case EFeatureLevel_01:
+                return &m_ramses.loadSceneFromFile("res/unittests/testScene_01.ramses");
+            case EFeatureLevel_02:
+                return &m_ramses.loadSceneFromFile("res/unittests/testScene_02.ramses");
+            case EFeatureLevel_03:
+                return &m_ramses.loadSceneFromFile("res/unittests/testScene_03.ramses");
+            case EFeatureLevel_04:
+                return &m_ramses.loadSceneFromFile("res/unittests/testScene_04.ramses");
+            case EFeatureLevel_05:
+                return &m_ramses.loadSceneFromFile("res/unittests/testScene_05.ramses");
+            }
+            return nullptr;
+        }
+
         RamsesTestSetup m_ramses;
-        ramses::Scene* m_scene = &m_ramses.loadSceneFromFile("res/unittests/testScene.ramses");
     };
 
     TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel01)
     {
         EFeatureLevel featureLevel = EFeatureLevel_02;
-        EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic.rlogic", featureLevel));
+        EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic_01.rlogic", featureLevel));
         EXPECT_EQ(EFeatureLevel_01, featureLevel);
 
+        ramses::Scene* scene = loadRamsesScene(EFeatureLevel_01);
+        ASSERT_TRUE(scene);
         LogicEngine logicEngine;
-        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic.rlogic", m_scene));
+        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_01.rlogic", scene));
         EXPECT_TRUE(logicEngine.update());
 
-        checkBaseContents(logicEngine);
-        expectFeatureLevel02ContentNotPresent(logicEngine);
-        expectFeatureLevel03ContentNotPresent(logicEngine);
-        expectFeatureLevel04ContentNotPresent(logicEngine);
+        checkContents(logicEngine, *scene);
+        saveAndReloadAndCheckContents(logicEngine, *scene);
     }
 
     TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel02)
@@ -469,14 +565,14 @@ namespace rlogic::internal
         EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic_02.rlogic", featureLevel));
         EXPECT_EQ(EFeatureLevel_02, featureLevel);
 
+        ramses::Scene* scene = loadRamsesScene(EFeatureLevel_02);
+        ASSERT_TRUE(scene);
         LogicEngine logicEngine{ EFeatureLevel_02 };
-        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_02.rlogic", m_scene));
+        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_02.rlogic", scene));
         EXPECT_TRUE(logicEngine.update());
 
-        checkBaseContents(logicEngine);
-        expectFeatureLevel02Content(logicEngine);
-        expectFeatureLevel03ContentNotPresent(logicEngine);
-        expectFeatureLevel04ContentNotPresent(logicEngine);
+        checkContents(logicEngine, *scene);
+        saveAndReloadAndCheckContents(logicEngine, *scene);
     }
 
     TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel03)
@@ -485,14 +581,14 @@ namespace rlogic::internal
         EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic_03.rlogic", featureLevel));
         EXPECT_EQ(EFeatureLevel_03, featureLevel);
 
+        ramses::Scene* scene = loadRamsesScene(EFeatureLevel_03);
+        ASSERT_TRUE(scene);
         LogicEngine logicEngine{ EFeatureLevel_03 };
-        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_03.rlogic", m_scene));
+        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_03.rlogic", scene));
         EXPECT_TRUE(logicEngine.update());
 
-        checkBaseContents(logicEngine);
-        expectFeatureLevel02Content(logicEngine);
-        expectFeatureLevel03Content(logicEngine);
-        expectFeatureLevel04ContentNotPresent(logicEngine);
+        checkContents(logicEngine, *scene);
+        saveAndReloadAndCheckContents(logicEngine, *scene);
     }
 
     TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel04)
@@ -501,13 +597,29 @@ namespace rlogic::internal
         EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic_04.rlogic", featureLevel));
         EXPECT_EQ(EFeatureLevel_04, featureLevel);
 
+        ramses::Scene* scene = loadRamsesScene(EFeatureLevel_04);
+        ASSERT_TRUE(scene);
         LogicEngine logicEngine{ EFeatureLevel_04 };
-        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_04.rlogic", m_scene));
+        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_04.rlogic", scene));
         EXPECT_TRUE(logicEngine.update());
 
-        checkBaseContents(logicEngine);
-        expectFeatureLevel02Content(logicEngine);
-        expectFeatureLevel03Content(logicEngine);
-        expectFeatureLevel04Content(logicEngine);
+        checkContents(logicEngine, *scene);
+        saveAndReloadAndCheckContents(logicEngine, *scene);
+    }
+
+    TEST_F(ALogicEngine_Binary_Compatibility, CanLoadAndUpdateABinaryFileExportedWithLastCompatibleVersionOfEngine_FeatureLevel05)
+    {
+        EFeatureLevel featureLevel = EFeatureLevel_01;
+        EXPECT_TRUE(LogicEngine::GetFeatureLevelFromFile("res/unittests/testLogic_05.rlogic", featureLevel));
+        EXPECT_EQ(EFeatureLevel_05, featureLevel);
+
+        ramses::Scene* scene = loadRamsesScene(EFeatureLevel_05);
+        ASSERT_TRUE(scene);
+        LogicEngine logicEngine{ EFeatureLevel_05 };
+        ASSERT_TRUE(logicEngine.loadFromFile("res/unittests/testLogic_05.rlogic", scene));
+        EXPECT_TRUE(logicEngine.update());
+
+        checkContents(logicEngine, *scene);
+        saveAndReloadAndCheckContents(logicEngine, *scene);
     }
 }

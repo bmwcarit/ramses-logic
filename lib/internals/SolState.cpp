@@ -81,7 +81,7 @@ namespace rlogic::internal
         return m_solState.safe_script(byteCode, env, sol::script_pass_on_error, std::string(scriptName));
     }
 
-    sol::environment SolState::createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules)
+    sol::environment SolState::createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules, bool exposeDebugLogFunctions)
     {
         sol::environment protectedEnv(m_solState, sol::create);
 
@@ -101,6 +101,9 @@ namespace rlogic::internal
         protectedEnv["modules"] = dummyFunc;
 
         LuaCustomizations::MapToEnvironment(m_solState, protectedEnv);
+
+        if (exposeDebugLogFunctions)
+            LuaCustomizations::MapDebugLogFunctions(protectedEnv);
 
         EnvironmentProtection::AddProtectedEnvironmentTable(protectedEnv, m_solState);
 

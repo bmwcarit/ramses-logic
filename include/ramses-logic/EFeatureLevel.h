@@ -42,9 +42,10 @@ namespace rlogic
      */
     enum EFeatureLevel : uint32_t
     {
-        /// Base level of features for this major release of RamsesLogic
+        /// Base level of features released with version 1.0
         EFeatureLevel_01 = 1,
 
+        /// Released with version 1.1.0
         /// Added features:
         /// - #rlogic::RamsesRenderPassBinding
         /// - #rlogic::RamsesNodeBinding 'enabled' property
@@ -53,18 +54,26 @@ namespace rlogic
         /// - #rlogic::LogicEngine::createRamsesCameraBindingWithFrustumPlanes
         EFeatureLevel_02 = 2,
 
+        /// Released with version 1.2.0
         /// Added features:
         /// - #rlogic::RamsesRenderGroupBinding
         EFeatureLevel_03 = 3,
 
+        /// Released with version 1.3.0
         /// Added features:
+        /// - SkinBinding
         /// - #rlogic::DataArray can contain arrays of floats as elements
         EFeatureLevel_04 = 4,
 
+        /// Released with version 1.4.0
+        /// Added features:
+        /// - RamsesMeshNodeBinding
+        EFeatureLevel_05 = 5,
+
         /// Equals to the latest feature level
-        EFeatureLevel_Latest = EFeatureLevel_04
+        EFeatureLevel_Latest = EFeatureLevel_05
     };
 
     /// List of all supported feature levels
-    constexpr std::array<EFeatureLevel, 4u> AllFeatureLevels{ EFeatureLevel_01, EFeatureLevel_02, EFeatureLevel_03, EFeatureLevel_04 };
+    constexpr std::array<EFeatureLevel, 5u> AllFeatureLevels{ EFeatureLevel_01, EFeatureLevel_02, EFeatureLevel_03, EFeatureLevel_04, EFeatureLevel_05 };
 }

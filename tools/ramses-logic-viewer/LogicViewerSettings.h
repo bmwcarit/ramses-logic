@@ -8,9 +8,9 @@
 
 #pragma once
 
-#include "ImguiClientHelper.h"
-
 struct ImGuiSettingsHandler;
+struct ImGuiContext;
+struct ImGuiTextBuffer;
 
 namespace rlogic
 {

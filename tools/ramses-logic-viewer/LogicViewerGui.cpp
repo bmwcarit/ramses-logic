@@ -8,6 +8,7 @@
 
 #include "LogicViewerGui.h"
 #include "LogicViewer.h"
+#include "LogicViewerLog.h"
 #include "LogicViewerSettings.h"
 #include "ramses-client-api/Scene.h"
 #include "ramses-logic/LogicEngine.h"
@@ -20,6 +21,7 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/Property.h"
 #include "ramses-logic/AnchorPoint.h"
@@ -97,12 +99,6 @@ namespace rlogic
             return "";
         }
 
-        void LogText(const std::string& text)
-        {
-            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
-            ImGui::LogText("%s", text.c_str());
-        }
-
         bool TreeNode(const void* ptr_id, const std::string_view& text)
         {
             // NOLINTNEXTLINE(cppcoreguidelines-pro-type-vararg) 3rd party interface
@@ -149,6 +145,10 @@ namespace rlogic
             else if (node->as<RamsesRenderGroupBinding>() != nullptr)
             {
                 name = "RenderGroupBinding";
+            }
+            else if (node->as<RamsesMeshNodeBinding>() != nullptr)
+            {
+                name = "MeshNodeBinding";
             }
             else if (node->as<TimerNode>() != nullptr)
             {
@@ -294,15 +294,15 @@ namespace rlogic
     template <class T>
     void LogicViewerGui::copyInputs(const std::string_view& ns, Collection<T> collection)
     {
-        PathVector path;
+        LogicViewerLog::PathVector path;
         path.push_back(LogicViewer::ltnModule);
         path.push_back(ns);
-        ImGui::LogToClipboard();
+        LogicViewerLog log(m_logicEngine, m_settings);
         for (auto* node : collection)
         {
-            logInputs(node, path);
+            log.logInputs(node, path);
         }
-        ImGui::LogFinish();
+        ImGui::SetClipboardText(log.getText().c_str());
     }
 
     void LogicViewerGui::copyScriptInputs()
@@ -351,9 +351,7 @@ namespace rlogic
             ImGui::SameLine();
             if (ImGui::Button("Copy Message", ImVec2(120, 0)))
             {
-                ImGui::LogToClipboard();
-                LogText(m_lastErrorMessage);
-                ImGui::LogFinish();
+                ImGui::SetClipboardText(m_lastErrorMessage.c_str());
             }
             ImGui::EndPopup();
         }
@@ -405,6 +403,7 @@ namespace rlogic
             drawCameraBindings();
             drawRenderPassBindings();
             drawRenderGroupBindings();
+            drawMeshNodeBindings();
             drawAnchorPoints();
             drawSkinBindings();
         }
@@ -750,6 +749,33 @@ namespace rlogic
         }
     }
 
+    void LogicViewerGui::drawMeshNodeBindings()
+    {
+        const bool openBindings = ImGui::CollapsingHeader("MeshNode Bindings");
+        if (ImGui::BeginPopupContextItem("MeshNodeBindingsContextMenu"))
+        {
+            if (ImGui::MenuItem("Copy all MeshNode Binding inputs"))
+            {
+                copyInputs(LogicViewer::ltnMeshNode, m_logicEngine.getCollection<RamsesMeshNodeBinding>());
+            }
+            ImGui::EndPopup();
+        }
+        if (openBindings)
+        {
+            for (auto* obj : m_logicEngine.getCollection<RamsesMeshNodeBinding>())
+            {
+                const bool open = DrawTreeNode(obj);
+                drawNodeContextMenu(obj, LogicViewer::ltnMeshNode);
+                if (open)
+                {
+                    ImGui::TextUnformatted(fmt::format("Ramses MeshNode: {}", obj->getRamsesMeshNode().getName()).c_str());
+                    drawNode(obj);
+                    ImGui::TreePop();
+                }
+            }
+        }
+    }
+
     void LogicViewerGui::drawAnchorPoints()
     {
         const bool openAnchors = ImGui::CollapsingHeader("Anchor Points");
@@ -993,12 +1019,12 @@ namespace rlogic
         {
             if (ImGui::MenuItem(fmt::format("Copy {} inputs", obj->getName()).c_str()))
             {
-                PathVector path;
+                LogicViewerLog::PathVector path;
                 path.push_back(LogicViewer::ltnModule);
                 path.push_back(ns);
-                ImGui::LogToClipboard();
-                logInputs(obj, path);
-                ImGui::LogFinish();
+                LogicViewerLog log(m_logicEngine, m_settings);
+                log.logInputs(obj, path);
+                ImGui::SetClipboardText(log.getText().c_str());
             }
             ImGui::EndPopup();
         }
@@ -1309,171 +1335,17 @@ namespace rlogic
         }
     }
 
-    void LogicViewerGui::logInputs(rlogic::LogicNode* obj, const PathVector& path)
-    {
-        const auto joinedPath = fmt::format("{}", fmt::join(path.begin(), path.end(), "."));
-        std::string prefix;
-        if ((m_settings.luaPreferObjectIds) || obj->getName().empty())
-        {
-            prefix = fmt::format("{}[{}]", joinedPath, obj->getId());
-        }
-        else if (m_settings.luaPreferIdentifiers)
-        {
-            prefix = fmt::format("{}.{}", joinedPath, obj->getName());
-        }
-        else
-        {
-            prefix = fmt::format("{}[\"{}\"]", joinedPath, obj->getName());
-        }
-        PathVector propertyPath;
-        propertyPath.push_back(LogicViewer::ltnIN);
-        auto prop = obj->getInputs();
-        if (prop)
-        {
-            for (size_t i = 0U; i < prop->getChildCount(); ++i)
-            {
-                logProperty(prop->getChild(i), prefix, propertyPath);
-            }
-        }
-    }
-
-    void LogicViewerGui::logProperty(rlogic::Property* prop, const std::string& prefix, PathVector& path)
-    {
-        if (prop->hasIncomingLink())
-            return;
-
-        path.push_back(prop->getName());
-
-        std::string strPath;
-        if (m_settings.luaPreferIdentifiers)
-        {
-            strPath = fmt::format("{}.{}.value", prefix, fmt::join(path.begin(), path.end(), "."));
-        }
-        else
-        {
-            strPath = fmt::format("{}[\"{}\"].value", prefix, fmt::join(path.begin(), path.end(), "\"][\""));
-        }
-
-        switch (prop->getType())
-        {
-        case rlogic::EPropertyType::Int32:
-            LogText(fmt::format("{} = {}\n", strPath, prop->get<int32_t>().value()));
-            break;
-        case rlogic::EPropertyType::Int64:
-            LogText(fmt::format("{} = {}\n", strPath, prop->get<int64_t>().value()));
-            break;
-        case rlogic::EPropertyType::Float:
-            LogText(fmt::format("{} = {}\n", strPath, prop->get<float>().value()));
-            break;
-        case rlogic::EPropertyType::Vec2f: {
-            auto val = prop->get<rlogic::vec2f>().value();
-            LogText(fmt::format("{} = {{ {}, {} }}\n", strPath, val[0], val[1]));
-            break;
-        }
-        case rlogic::EPropertyType::Vec3f: {
-            auto val = prop->get<rlogic::vec3f>().value();
-            LogText(fmt::format("{} = {{ {}, {}, {} }}\n", strPath, val[0], val[1], val[2]));
-            break;
-        }
-        case rlogic::EPropertyType::Vec4f: {
-            auto val = prop->get<rlogic::vec4f>().value();
-            LogText(fmt::format("{} = {{ {}, {}, {}, {} }}\n", strPath, val[0], val[1], val[2], val[3]));
-            break;
-        }
-        case rlogic::EPropertyType::Vec2i: {
-            auto val = prop->get<rlogic::vec2i>().value();
-            LogText(fmt::format("{} = {{ {}, {} }}\n", strPath, val[0], val[1]));
-            break;
-        }
-        case rlogic::EPropertyType::Vec3i: {
-            auto val = prop->get<rlogic::vec3i>().value();
-            LogText(fmt::format("{} = {{ {}, {}, {} }}\n", strPath, val[0], val[1], val[2]));
-            break;
-        }
-        case rlogic::EPropertyType::Vec4i: {
-            auto val = prop->get<rlogic::vec4i>().value();
-            LogText(fmt::format("{} = {{ {}, {}, {}, {} }}\n", strPath, val[0], val[1], val[2], val[3]));
-            break;
-        }
-        case rlogic::EPropertyType::Struct:
-            for (size_t i = 0U; i < prop->getChildCount(); ++i)
-            {
-                logProperty(prop->getChild(i), prefix, path);
-            }
-            break;
-        case rlogic::EPropertyType::Bool: {
-            LogText(fmt::format("{} = {}\n", strPath, prop->get<bool>().value()));
-            break;
-        }
-        case rlogic::EPropertyType::String:
-            LogText(fmt::format("{} = '{}'\n", strPath, prop->get<std::string>().value()));
-            break;
-        case rlogic::EPropertyType::Array:
-            break;
-        }
-        path.pop_back();
-    }
-
-    template<class T>
-    void LogicViewerGui::logAllInputs(std::string_view headline, std::string_view ltn)
-    {
-        PathVector path;
-        const std::string indent = "    ";
-        std::string name = indent + LogicViewer::ltnModule + "." + ltn.data();
-        path.push_back(name);
-        LogText(indent + headline.data());
-        for (auto* node : m_logicEngine.getCollection<T>())
-        {
-            logInputs(node, path);
-        }
-    }
-
     void LogicViewerGui::saveDefaultLuaFile()
     {
-        std::error_code ec;
-        fs::remove(m_filename, ec);
-        if (ec)
+        const auto result = m_viewer.saveDefaultLuaFile(m_filename, m_settings);
+        if (result.ok())
         {
-            m_lastErrorMessage = ec.message();
-            return;
+            loadLuaFile(m_filename);
         }
-        ImGui::LogToFile(-1, m_filename.c_str());
-        LogText("function default()\n");
-
-        logAllInputs<LuaInterface>("--Interfaces\n", LogicViewer::ltnInterface);
-        logAllInputs<LuaScript>("--Scripts\n", LogicViewer::ltnScript);
-        logAllInputs<RamsesNodeBinding>("--Node bindings\n", LogicViewer::ltnNode);
-        logAllInputs<RamsesAppearanceBinding>("--Appearance bindings\n", LogicViewer::ltnAppearance);
-        logAllInputs<RamsesCameraBinding>("--Camera bindings\n", LogicViewer::ltnCamera);
-        logAllInputs<RamsesRenderPassBinding>("--RenderPass bindings\n", LogicViewer::ltnRenderPass);
-        logAllInputs<RamsesRenderGroupBinding>("--RenderGroup bindings\n", LogicViewer::ltnRenderGroup);
-        logAllInputs<AnchorPoint>("--Anchor points\n", LogicViewer::ltnAnchorPoint);
-        logAllInputs<SkinBinding>("--Skin bindings\n", LogicViewer::ltnSkinBinding);
-
-        LogText("end\n\n");
-        const char* code = R"(
-defaultView = {
-    name = "Default",
-    description = "",
-    update = function(time_ms)
-        default()
-    end
-}
-
-rlogic.views = {defaultView}
-
--- sample test function for automated image base tests
--- can be executed by command line parameter --exec=test_default
-function test_default()
-    -- modify properties
-    default()
-    -- stores a screenshot (relative to the working directory)
-    rlogic.screenshot("test_default.png")
-end
-)";
-        LogText(code);
-        ImGui::LogFinish();
-        loadLuaFile(m_filename);
+        else
+        {
+            m_lastErrorMessage = result.getMessage();
+        }
     }
 }
 

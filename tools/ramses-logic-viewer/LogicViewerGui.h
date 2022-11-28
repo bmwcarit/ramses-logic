@@ -43,11 +43,6 @@ namespace rlogic
         void setSceneTexture(ramses::TextureSampler* sampler, uint32_t width, uint32_t height);
         void setRendererInfo(ramses::RamsesRenderer& renderer, ramses::displayId_t displayId, ramses::displayBufferId_t displayBufferId, const std::array<float, 4>& initialClearColor);
 
-        /**
-         * saves a simple default lua configuration that can be used as a starting point
-         */
-        void saveDefaultLuaFile();
-
     private:
         void drawMenuItemShowWindow();
         void drawMenuItemReload();
@@ -67,6 +62,7 @@ namespace rlogic
         void drawCameraBindings();
         void drawRenderPassBindings();
         void drawRenderGroupBindings();
+        void drawMeshNodeBindings();
         void drawAnchorPoints();
         void drawSkinBindings();
         void drawUpdateReport();
@@ -84,6 +80,7 @@ namespace rlogic
 
         void reloadConfiguration();
         void loadLuaFile(const std::string& filename);
+        void saveDefaultLuaFile();
 
         /**
          * copies all node inputs to clipboard (lua syntax)
@@ -91,11 +88,6 @@ namespace rlogic
         template <class T>
         void copyInputs(const std::string_view& ns, Collection<T> collection);
         void copyScriptInputs();
-
-        using PathVector = std::vector<std::string_view>;
-        template<class T> void logAllInputs(std::string_view headline, std::string_view ltn);
-        void logInputs(rlogic::LogicNode* obj, const PathVector& path);
-        void logProperty(rlogic::Property* prop, const std::string& prefix, PathVector& path);
 
         LogicViewerSettings& m_settings;
         rlogic::LogicViewer& m_viewer;

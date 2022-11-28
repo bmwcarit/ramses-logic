@@ -28,8 +28,9 @@ namespace rlogic::internal
         , m_sourceCode{ std::move(module.source.sourceCode) }
         , m_byteCode{ std::move(module.source.byteCode) }
         , m_module{ std::move(module.moduleTable) }
-        , m_dependencies{std::move(module.source.userModules)}
-        , m_stdModules {std::move(module.source.stdModules)}
+        , m_dependencies{ std::move(module.source.userModules) }
+        , m_stdModules{ std::move(module.source.stdModules) }
+        , m_hasDebugLogFunctions{ module.source.hasDebugLogFunctions }
     {
         assert(m_module != sol::nil);
     }
@@ -39,8 +40,15 @@ namespace rlogic::internal
         return m_module;
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(const LuaModuleImpl& module, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap, EFeatureLevel featureLevel)
+    flatbuffers::Offset<rlogic_serialization::LuaModule> LuaModuleImpl::Serialize(
+        const LuaModuleImpl& module,
+        flatbuffers::FlatBufferBuilder& builder,
+        SerializationMap& serializationMap,
+        ELuaSavingMode luaSavingMode)
     {
+        // serialization with debug logs is forbidden
+        assert(!module.hasDebugLogFunctions());
+
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> modulesFB;
         modulesFB.reserve(module.m_dependencies.size());
         for (const auto& dependency : module.m_dependencies)
@@ -62,21 +70,20 @@ namespace rlogic::internal
         const auto fbModulesVec = builder.CreateVector(modulesFB);
         const auto fbStdModulesVec = builder.CreateVector(stdModules);
 
-        if (featureLevel == EFeatureLevel_01)
-        {
-            const auto fbSrcCode = builder.CreateString(module.m_sourceCode);
-            return rlogic_serialization::CreateLuaModule(builder,
-                fbLogicObject,
-                fbSrcCode,
-                fbModulesVec,
-                fbStdModulesVec,
-                0);
-        }
+        const bool hasSourceCode = !module.m_sourceCode.empty();
+        const bool hasByteCode = !module.m_byteCode.empty();
+        assert(hasSourceCode || hasByteCode);
+        const bool serializeSourceCode = hasSourceCode && !((luaSavingMode == ELuaSavingMode::ByteCodeOnly) && hasByteCode);
+        const bool serializeByteCode = hasByteCode && !((luaSavingMode == ELuaSavingMode::SourceCodeOnly) && hasSourceCode);
+        assert(serializeSourceCode || serializeByteCode);
 
-        if (featureLevel >= EFeatureLevel_02)
+        const auto fbSrcCode = (serializeSourceCode ? builder.CreateString(module.m_sourceCode) : 0);
+
+        flatbuffers::Offset<flatbuffers::Vector<uint8_t>> byteCodeOffset{};
+        if (serializeByteCode)
         {
             std::string byteCodeString{ module.m_byteCode.as_string_view() };
-            auto byteCodeOffset = serializationMap.resolveByteCodeOffsetIfFound(byteCodeString);
+            byteCodeOffset = serializationMap.resolveByteCodeOffsetIfFound(byteCodeString);
             if (byteCodeOffset.IsNull())
             {
                 std::vector<uint8_t> byteCodeAsVectorUInt8;
@@ -86,17 +93,14 @@ namespace rlogic::internal
                 byteCodeOffset = builder.CreateVector(byteCodeAsVectorUInt8);
                 serializationMap.storeByteCodeOffset(std::move(byteCodeString), byteCodeOffset);
             }
-
-            return rlogic_serialization::CreateLuaModule(builder,
-                fbLogicObject,
-                0, //no source
-                fbModulesVec,
-                fbStdModulesVec,
-                byteCodeOffset);
         }
 
-        assert(false);
-        return {};
+        return rlogic_serialization::CreateLuaModule(builder,
+            fbLogicObject,
+            fbSrcCode,
+            fbModulesVec,
+            fbStdModulesVec,
+            byteCodeOffset);
     }
 
     std::unique_ptr<LuaModuleImpl> LuaModuleImpl::Deserialize(
@@ -116,15 +120,11 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        if (featureLevel == EFeatureLevel_01 && (!module.source() || module.source()->size() == 0))
+        const bool hasSourceCode = (module.source() != nullptr && module.source()->size() > 0);
+        const bool hasBytecode = (module.luaByteCode() != nullptr && module.luaByteCode()->size() > 0);
+        if (!hasSourceCode && !hasBytecode)
         {
-            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing source code!", nullptr, EErrorType::BinaryVersionMismatch);
-            return nullptr;
-        }
-
-        if (featureLevel >= EFeatureLevel_02 && (!module.luaByteCode() || module.luaByteCode()->size() == 0))
-        {
-            errorReporting.add("Fatal error during loading of LuaModule from serialized data: missing byte code!", nullptr, EErrorType::BinaryVersionMismatch);
+            errorReporting.add("Fatal error during loading of LuaModule from serialized data: has neither Lua source code nor bytecode!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -160,16 +160,15 @@ namespace rlogic::internal
             modulesUsed.emplace(mod->name()->str(), moduleUsed->getLogicObject().as<LuaModule>());
         }
 
-        std::string source = (featureLevel == EFeatureLevel_01 ? module.source()->str() : "");
-
-        sol::bytecode byteCode;
-        if (featureLevel >= EFeatureLevel_02)
+        std::string source = (hasSourceCode ? module.source()->str() : "");
+        sol::bytecode byteCode{};
+        if (hasBytecode)
         {
             byteCode.reserve(module.luaByteCode()->size());
             std::transform(module.luaByteCode()->cbegin(), module.luaByteCode()->cend(), std::back_inserter(byteCode), [](uint8_t b) { return std::byte(b); });
         }
 
-        auto compiledModule = LuaCompilationUtils::CompileModuleOrImportPrecompiled(solState, modulesUsed, stdModules, source, name, errorReporting, byteCode, featureLevel);
+        auto compiledModule = LuaCompilationUtils::CompileModuleOrImportPrecompiled(solState, modulesUsed, stdModules, std::move(source), name, errorReporting, std::move(byteCode), featureLevel, false);
 
         if (!compiledModule)
         {
@@ -189,5 +188,10 @@ namespace rlogic::internal
     const ModuleMapping& LuaModuleImpl::getDependencies() const
     {
         return m_dependencies;
+    }
+
+    bool LuaModuleImpl::hasDebugLogFunctions() const
+    {
+        return m_hasDebugLogFunctions;
     }
 }

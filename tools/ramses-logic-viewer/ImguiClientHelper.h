@@ -8,18 +8,7 @@
 
 #pragma once
 
-#ifndef _MSC_VER
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wold-style-cast"
-#endif
-
-#include "imgui.h"
-#include "misc/cpp/imgui_stdlib.h"
-
-#ifndef _MSC_VER
-#pragma GCC diagnostic pop
-#endif
-
+#include "ImguiWrapper.h"
 #include "ramses-client.h"
 #include "ramses-utils.h"
 #include "ramses-renderer-api/RamsesRenderer.h"

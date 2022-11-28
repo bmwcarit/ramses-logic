@@ -47,6 +47,18 @@ namespace rlogic::internal
             return false;
         }
 
+        if (channelData.keyframes->getDataType() == EPropertyType::Array)
+        {
+            const size_t elementArraySize = channelData.keyframes->getData<std::vector<float>>()->front().size();
+            if (elementArraySize > MaxArrayPropertySize)
+            {
+                LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}',"
+                    " when using elements of data type float array, the float array size ({}) cannot exceed {}.",
+                    channelData.name, elementArraySize, MaxArrayPropertySize);
+                return false;
+            }
+        }
+
         if ((channelData.interpolationType == EInterpolationType::Linear_Quaternions || channelData.interpolationType == EInterpolationType::Cubic_Quaternions) &&
             channelData.keyframes->getDataType() != EPropertyType::Vec4f)
         {
@@ -73,6 +85,16 @@ namespace rlogic::internal
                 LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', number of tangents in/out must be same as number of keyframes.", channelData.name);
                 return false;
             }
+            if (channelData.keyframes->getDataType() == EPropertyType::Array)
+            {
+                const size_t elementArraySize = channelData.keyframes->getData<std::vector<float>>()->front().size();
+                if (channelData.tangentsIn->getData<std::vector<float>>()->front().size() != elementArraySize ||
+                    channelData.tangentsOut->getData<std::vector<float>>()->front().size() != elementArraySize)
+                {
+                    LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', tangents must have same array element size as keyframes.", channelData.name);
+                    return false;
+                }
+            }
         }
         else if (channelData.tangentsIn || channelData.tangentsOut)
         {
@@ -80,11 +102,20 @@ namespace rlogic::internal
             return false;
         }
 
-        if (m_exposeChannelDataAsProperties && channelData.keyframes->getNumElements() > MaxArrayPropertySize)
+        if (m_exposeChannelDataAsProperties)
         {
-            LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', number of keyframes ({}) cannot exceed {} when animation data exposed as properties.",
-                channelData.name, channelData.keyframes->getNumElements(), MaxArrayPropertySize);
-            return false;
+            if (channelData.keyframes->getNumElements() > MaxArrayPropertySize)
+            {
+                LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', number of keyframes ({}) cannot exceed {} when animation data exposed as properties.",
+                    channelData.name, channelData.keyframes->getNumElements(), MaxArrayPropertySize);
+                return false;
+            }
+
+            if (channelData.keyframes->getDataType() == EPropertyType::Array)
+            {
+                LOG_ERROR("AnimationNodeConfig::addChannel: Cannot add channelData data '{}', elements of data type float arrays cannot be exposed as properties.", channelData.name);
+                return false;
+            }
         }
 
         m_channels.push_back(channelData);
@@ -111,6 +142,13 @@ namespace rlogic::internal
                 LOG_ERROR("AnimationNodeConfig::setExposingOfChannelDataAsProperties: Cannot enable channel data properties for channel '{}',"
                     " number of keyframes ({}) cannot exceed {} when animation data exposed as properties.",
                     channelData.name, channelData.keyframes->getNumElements(), MaxArrayPropertySize);
+                return false;
+            }
+
+            if (channelData.keyframes->getDataType() == EPropertyType::Array)
+            {
+                LOG_ERROR("AnimationNodeConfig::setExposingOfChannelDataAsProperties: Cannot enable channel data properties for channel '{}',"
+                    " elements of data type float arrays cannot be exposed as properties.", channelData.name);
                 return false;
             }
         }

@@ -13,8 +13,10 @@
 
 namespace rlogic::internal
 {
-    static ::testing::internal::ValueArray<rlogic::EFeatureLevel, rlogic::EFeatureLevel, rlogic::EFeatureLevel, rlogic::EFeatureLevel> GetFeatureLevelTestValues()
+    static
+        ::testing::internal::ValueArray<rlogic::EFeatureLevel, rlogic::EFeatureLevel, rlogic::EFeatureLevel, rlogic::EFeatureLevel, rlogic::EFeatureLevel>
+        GetFeatureLevelTestValues()
     {
-        return ::testing::Values(rlogic::EFeatureLevel_01, rlogic::EFeatureLevel_02, rlogic::EFeatureLevel_03, rlogic::EFeatureLevel_04);
+        return ::testing::Values(rlogic::EFeatureLevel_01, rlogic::EFeatureLevel_02, rlogic::EFeatureLevel_03, rlogic::EFeatureLevel_04, rlogic::EFeatureLevel_05);
     }
 }

@@ -63,4 +63,13 @@ namespace rlogic::internal
         return m_metadata;
     }
 
+    void SaveFileConfigImpl::setLuaSavingMode(ELuaSavingMode mode)
+    {
+        m_luaSavingMode = mode;
+    }
+
+    ELuaSavingMode SaveFileConfigImpl::getLuaSavingMode() const
+    {
+        return m_luaSavingMode;
+    }
 }

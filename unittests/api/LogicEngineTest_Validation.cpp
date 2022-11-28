@@ -421,6 +421,35 @@ namespace rlogic
         ASSERT_EQ(0u, warnings.size());
     }
 
+    // -- mesh node bindings -- //
+
+    TEST_P(ALogicEngine_ValidatingDanglingNodes, ProducesWarningIfMeshNodeBindingHasNoIngoingLinks)
+    {
+        if (m_logicEngine.getFeatureLevel() < EFeatureLevel_05)
+            GTEST_SKIP();
+
+        m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "binding");
+
+        auto warnings = m_logicEngine.validate();
+        ASSERT_EQ(1u, warnings.size());
+        EXPECT_THAT(warnings, ::testing::ElementsAre(::testing::Field(&WarningData::message, ::testing::StrEq("Node [binding] has no ingoing links! Node should be deleted or properly linked!"))));
+        EXPECT_THAT(warnings, ::testing::Each(::testing::Field(&WarningData::type, ::testing::Eq(EWarningType::UnusedContent))));
+    }
+
+    TEST_P(ALogicEngine_ValidatingDanglingNodes, DoesNotProduceWarningIfMeshNodeBindingHasIngoingLinks)
+    {
+        if (m_logicEngine.getFeatureLevel() < EFeatureLevel_05)
+            GTEST_SKIP();
+
+        const auto binding = m_logicEngine.createRamsesMeshNodeBinding(*m_meshNode, "binding");
+        ASSERT_NE(nullptr, binding);
+
+        linkNodeInput(*binding->getInputs()->getChild("indexOffset"), "paramInt32");
+        EXPECT_TRUE(m_logicEngine.update());
+
+        EXPECT_TRUE(m_logicEngine.validate().empty());
+    }
+
     // -- animations -- //
 
     TEST_P(ALogicEngine_ValidatingDanglingNodes, ProducesWarningIfAnimationHasNoLinks)

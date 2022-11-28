@@ -21,6 +21,7 @@ namespace rlogic::internal
         {
             m_dataFloat = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f });
             m_dataVec2 = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 2.f }, { 3.f, 4.f }, { 5.f, 6.f } });
+            m_dataVecVec = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 1.f, 2.f }, { 3.f, 4.f }, { 5.f, 6.f } });
         }
 
         static bool createConfig(const std::initializer_list<AnimationChannel> channels)
@@ -36,22 +37,26 @@ namespace rlogic::internal
         }
 
     protected:
-        LogicEngine m_logicEngine;
+        LogicEngine m_logicEngine{ EFeatureLevel_Latest };
         DataArray* m_dataFloat = nullptr;
         DataArray* m_dataVec2 = nullptr;
+        DataArray* m_dataVecVec = nullptr;
     };
 
     TEST_F(AnAnimationNodeConfig, CanBeCreatedWithValidChannels)
     {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
-        EXPECT_TRUE(createConfig({ validChannel }));
+        const AnimationChannel validChannel1{ "ok1", m_dataFloat, m_dataVec2 };
+        const AnimationChannel validChannel2{ "ok2", m_dataFloat, m_dataVecVec };
+        EXPECT_TRUE(createConfig({ validChannel1, validChannel2 }));
     }
 
     TEST_F(AnAnimationNodeConfig, CanBeCopiedAndMoved)
     {
-        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
+        const AnimationChannel validChannel1{ "ok1", m_dataFloat, m_dataVec2 };
+        const AnimationChannel validChannel2{ "ok2", m_dataFloat, m_dataVecVec };
         AnimationNodeConfig config;
-        EXPECT_TRUE(config.addChannel(validChannel));
+        EXPECT_TRUE(config.addChannel(validChannel1));
+        EXPECT_TRUE(config.addChannel(validChannel2));
 
         // assign
         AnimationNodeConfig config2;
@@ -147,6 +152,35 @@ namespace rlogic::internal
         EXPECT_FALSE(createConfig({ validChannel, { "channel", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, dataVec2OtherSize, m_dataVec2 } }));
     }
 
+    TEST_F(AnAnimationNodeConfig, FailsToAddChannelIfElementArraysTooBig)
+    {
+        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2 };
+
+        std::vector<std::vector<float>> tooBigArrays;
+        tooBigArrays.resize(3u);
+        for (auto& elementArray : tooBigArrays)
+            elementArray.resize(MaxArrayPropertySize + 1u, 0.f);
+        const auto invalidData = m_logicEngine.createDataArray(tooBigArrays, "invalid");
+
+        EXPECT_FALSE(createConfig({ validChannel, { "channel", m_dataFloat, invalidData } }));
+        EXPECT_FALSE(createConfig({ { "channel", m_dataFloat, invalidData }, validChannel }));
+    }
+
+    TEST_F(AnAnimationNodeConfig, FailsToAddChannelIfElementArraysSizeMismatchBetweenKeyframesAndTangents)
+    {
+        auto dataWithLargerElementArrays = *m_dataVecVec->getData<std::vector<float>>();
+        for (auto& elementArray : dataWithLargerElementArrays)
+            elementArray.push_back(0.f);
+        const auto largerData = m_logicEngine.createDataArray(dataWithLargerElementArrays, "invalid");
+
+        const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVecVec, EInterpolationType::Cubic, m_dataVecVec, m_dataVecVec };
+        const AnimationChannel invalidChannel1{ "invalid", m_dataFloat, m_dataVecVec, EInterpolationType::Cubic, m_dataVecVec, largerData };
+        const AnimationChannel invalidChannel2{ "invalid", m_dataFloat, largerData, EInterpolationType::Cubic, m_dataVecVec, m_dataVecVec };
+
+        EXPECT_FALSE(createConfig({ validChannel, invalidChannel1 }));
+        EXPECT_FALSE(createConfig({ invalidChannel2, validChannel }));
+    }
+
     TEST_F(AnAnimationNodeConfig, CanEnableAndDisableDataExposingAsPropeties)
     {
         const AnimationChannel validChannel{ "ok", m_dataFloat, m_dataVec2, EInterpolationType::Cubic, m_dataVec2, m_dataVec2 };
@@ -209,6 +243,27 @@ namespace rlogic::internal
 
         EXPECT_FALSE(config.setExposingOfChannelDataAsProperties(true));
         // stays disabled
+        EXPECT_FALSE(config.getExposingOfChannelDataAsProperties());
+    }
+
+    TEST_F(AnAnimationNodeConfig, FailsToAddChannelIfDataExposeEnabledAndAddingElementsOfArrayType)
+    {
+        AnimationNodeConfig config;
+        EXPECT_TRUE(config.setExposingOfChannelDataAsProperties(true));
+        EXPECT_TRUE(config.getExposingOfChannelDataAsProperties());
+
+        EXPECT_FALSE(config.addChannel({ "channel", m_dataFloat, m_dataVecVec }));
+
+        // stays enabled
+        EXPECT_TRUE(config.getExposingOfChannelDataAsProperties());
+    }
+
+    TEST_F(AnAnimationNodeConfig, FailsToEnableDataExposeIfContainingElementsOfArrayType)
+    {
+        AnimationNodeConfig config;
+        EXPECT_TRUE(config.addChannel({ "channel", m_dataFloat, m_dataVecVec }));
+
+        EXPECT_FALSE(config.setExposingOfChannelDataAsProperties(true));
         EXPECT_FALSE(config.getExposingOfChannelDataAsProperties());
     }
 }

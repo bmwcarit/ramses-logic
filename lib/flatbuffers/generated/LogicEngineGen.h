@@ -19,6 +19,7 @@
 #include "RamsesAppearanceBindingGen.h"
 #include "RamsesBindingGen.h"
 #include "RamsesCameraBindingGen.h"
+#include "RamsesMeshNodeBindingGen.h"
 #include "RamsesNodeBindingGen.h"
 #include "RamsesReferenceGen.h"
 #include "RamsesRenderGroupBindingGen.h"

@@ -37,6 +37,7 @@ namespace rlogic::internal
             m_dataVec2 = m_logicEngine.createDataArray(std::vector<vec2f>{ { 1.f, 2.f }, { 3.f, 4.f }, { 5.f, 6.f } });
             // Quaternions which are not normalized (ie. not of unit length). Used for tests to check they are normalized correctly
             m_dataVec4 = m_logicEngine.createDataArray(std::vector<vec4f>{ { 2.f, 0.f, 0.f, 0.f }, { 0.f, 2.f, 0.f, 0.f } , { 0.f, 0.f, 2.f, 0.f } });
+            m_dataVecVec = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 1.f, 2.f, 3.f, 4.f, 5.f }, { 3.f, 4.f, 5.f, 6.f, 7.f }, { 5.f, 6.f, 7.f, 8.f, 9.f } });
 
             m_saveFileConfigNoValidation.setValidationEnabled(false);
         }
@@ -61,31 +62,42 @@ namespace rlogic::internal
         {
             EXPECT_TRUE(animNode.getInputs()->getChild("progress")->set(progress));
             EXPECT_TRUE(m_logicEngine.update());
-            const auto val = *animNode.getOutputs()->getChild("channel")->get<T>();
-            if constexpr (std::is_same_v<T, vec2f>)
+
+            if constexpr (std::is_same_v<T, std::vector<float>>)
             {
-                EXPECT_FLOAT_EQ(expectedValue[0], val[0]);
-                EXPECT_FLOAT_EQ(expectedValue[1], val[1]);
-            }
-            else if constexpr (std::is_same_v<T, vec2i>)
-            {
-                EXPECT_EQ(expectedValue[0], val[0]);
-                EXPECT_EQ(expectedValue[1], val[1]);
-            }
-            else if constexpr (std::is_same_v<T, vec4f>)
-            {
-                EXPECT_FLOAT_EQ(expectedValue[0], val[0]);
-                EXPECT_FLOAT_EQ(expectedValue[1], val[1]);
-                EXPECT_FLOAT_EQ(expectedValue[2], val[2]);
-                EXPECT_FLOAT_EQ(expectedValue[3], val[3]);
-            }
-            else if constexpr (std::is_arithmetic_v<T>)
-            {
-                EXPECT_EQ(expectedValue, val);
+                const auto outputArrayProp = animNode.getOutputs()->getChild("channel");
+                ASSERT_EQ(outputArrayProp->getChildCount(), expectedValue.size());
+                for (size_t i = 0u; i < outputArrayProp->getChildCount(); ++i)
+                    EXPECT_FLOAT_EQ(expectedValue[i], *outputArrayProp->getChild(i)->get<float>());
             }
             else
             {
-                ASSERT_TRUE(false) << "test missing for type";
+                const auto val = *animNode.getOutputs()->getChild("channel")->get<T>();
+                if constexpr (std::is_same_v<T, vec2f>)
+                {
+                    EXPECT_FLOAT_EQ(expectedValue[0], val[0]);
+                    EXPECT_FLOAT_EQ(expectedValue[1], val[1]);
+                }
+                else if constexpr (std::is_same_v<T, vec2i>)
+                {
+                    EXPECT_EQ(expectedValue[0], val[0]);
+                    EXPECT_EQ(expectedValue[1], val[1]);
+                }
+                else if constexpr (std::is_same_v<T, vec4f>)
+                {
+                    EXPECT_FLOAT_EQ(expectedValue[0], val[0]);
+                    EXPECT_FLOAT_EQ(expectedValue[1], val[1]);
+                    EXPECT_FLOAT_EQ(expectedValue[2], val[2]);
+                    EXPECT_FLOAT_EQ(expectedValue[3], val[3]);
+                }
+                else if constexpr (std::is_arithmetic_v<T>)
+                {
+                    EXPECT_EQ(expectedValue, val);
+                }
+                else
+                {
+                    ASSERT_TRUE(false) << "test missing for type";
+                }
             }
         }
 
@@ -101,10 +113,11 @@ namespace rlogic::internal
             EXPECT_FLOAT_EQ(expectedValue2[1], val2[1]);
         }
 
-        LogicEngine m_logicEngine;
+        LogicEngine m_logicEngine{ EFeatureLevel_Latest };
         DataArray* m_dataFloat = nullptr;
         DataArray* m_dataVec2 = nullptr;
         DataArray* m_dataVec4 = nullptr;
+        DataArray* m_dataVecVec = nullptr;
         SaveFileConfig m_saveFileConfigNoValidation;
     };
 
@@ -217,6 +230,28 @@ namespace rlogic::internal
         EXPECT_EQ(EPropertyType::Vec4f, rootOut->getChild(2u)->getType());
     }
 
+    TEST_P(AnAnimationNode, HasPropertiesMatchingChannelsWithFloatArrays)
+    {
+        if (GetParam()) // cannot use float arrays exposed as input properties
+            GTEST_SKIP();
+
+        const AnimationChannel channel1{ "channel1", m_dataFloat, m_dataFloat };
+        const AnimationChannel channel2{ "channel2", m_dataFloat, m_dataVecVec };
+        const auto animNode = createAnimationNode({ channel1, channel2 }, "animNode");
+
+        const auto rootOut = animNode->getOutputs();
+        ASSERT_EQ(3u, rootOut->getChildCount());
+        EXPECT_EQ("channel1", rootOut->getChild(1u)->getName());
+        EXPECT_EQ("channel2", rootOut->getChild(2u)->getName());
+        EXPECT_EQ(EPropertyType::Float, rootOut->getChild(1u)->getType());
+        EXPECT_EQ(EPropertyType::Array, rootOut->getChild(2u)->getType());
+
+        const auto arrayOutProp = rootOut->getChild(2u);
+        ASSERT_EQ(5u, arrayOutProp->getChildCount());
+        for (size_t i = 0u; i < 5u; ++i)
+            EXPECT_EQ(EPropertyType::Float, arrayOutProp->getChild(i)->getType());
+    }
+
     TEST_P(AnAnimationNode, DeterminesDurationFromHighestTimestamp)
     {
         const auto timeStamps1 = m_logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f, 3.f });
@@ -254,23 +289,29 @@ namespace rlogic::internal
         WithTempDirectory tempDir;
 
         {
-            LogicEngine otherEngine;
+            LogicEngine otherEngine{ EFeatureLevel_Latest };
 
             const auto timeStamps1 = otherEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "ts1");
             const auto timeStamps2 = otherEngine.createDataArray(std::vector<float>{ 3.f, 4.f, 5.f }, "ts2");
             const auto data1 = otherEngine.createDataArray(std::vector<vec2i>{ { 11, 22 }, { 33, 44 } }, "data1");
             const auto data2 = otherEngine.createDataArray(std::vector<vec2i>{ { 11, 22 }, { 44, 55 }, { 66, 77 } }, "data2");
+            const auto data3 = otherEngine.createDataArray(*m_dataVecVec->getData<std::vector<float>>(), "data3");
 
             const AnimationChannel channel1{ "channel1", timeStamps1, data1, EInterpolationType::Step };
             const AnimationChannel channel2{ "channel2", timeStamps1, data1, EInterpolationType::Linear };
             const AnimationChannel channel3{ "channel3", timeStamps2, data2, EInterpolationType::Linear };
             const AnimationChannel channel4{ "channel4", timeStamps1, data1, EInterpolationType::Cubic, data1, data1 };
+            const AnimationChannel channel5{ "channel5", timeStamps2, data3, EInterpolationType::Cubic, data3, data3 };
 
             AnimationNodeConfig config1;
             EXPECT_TRUE(config1.addChannel(channel1));
             EXPECT_TRUE(config1.addChannel(channel2));
             EXPECT_TRUE(config1.addChannel(channel3));
             EXPECT_TRUE(config1.addChannel(channel4));
+            if (!GetParam())
+            {
+                EXPECT_TRUE(config1.addChannel(channel5));
+            }
             EXPECT_TRUE(config1.setExposingOfChannelDataAsProperties(GetParam()));
 
             AnimationNodeConfig config2;
@@ -278,6 +319,10 @@ namespace rlogic::internal
             EXPECT_TRUE(config2.addChannel(channel3));
             EXPECT_TRUE(config2.addChannel(channel2));
             EXPECT_TRUE(config2.addChannel(channel1));
+            if (!GetParam())
+            {
+                EXPECT_TRUE(config2.addChannel(channel5));
+            }
             EXPECT_TRUE(config2.setExposingOfChannelDataAsProperties(GetParam()));
 
             otherEngine.createAnimationNode(config1, "animNode1");
@@ -304,12 +349,19 @@ namespace rlogic::internal
         const auto ts2 = m_logicEngine.findByName<DataArray>("ts2");
         const auto data1 = m_logicEngine.findByName<DataArray>("data1");
         const auto data2 = m_logicEngine.findByName<DataArray>("data2");
+        const auto data3 = m_logicEngine.findByName<DataArray>("data3");
         const AnimationChannel channel1{ "channel1", ts1, data1, EInterpolationType::Step };
         const AnimationChannel channel2{ "channel2", ts1, data1, EInterpolationType::Linear };
         const AnimationChannel channel3{ "channel3", ts2, data2, EInterpolationType::Linear };
         const AnimationChannel channel4{ "channel4", ts1, data1, EInterpolationType::Cubic, data1, data1 };
-        const AnimationChannels expectedChannels1{ channel1, channel2, channel3, channel4 };
-        const AnimationChannels expectedChannels2{ channel4, channel3, channel2, channel1 };
+        const AnimationChannel channel5{ "channel5", ts2, data3, EInterpolationType::Cubic, data3, data3 };
+        AnimationChannels expectedChannels1{ channel1, channel2, channel3, channel4 };
+        AnimationChannels expectedChannels2{ channel4, channel3, channel2, channel1 };
+        if (!GetParam())
+        {
+            expectedChannels1.push_back(channel5);
+            expectedChannels2.push_back(channel5);
+        }
 
         EXPECT_EQ(expectedChannels1, animNode1->getChannels());
         EXPECT_EQ(expectedChannels2, animNode2->getChannels());
@@ -326,7 +378,7 @@ namespace rlogic::internal
 
             const auto rootOut = animNode->getOutputs();
             EXPECT_EQ("", rootOut->getName());
-            ASSERT_EQ(5u, rootOut->getChildCount());
+            ASSERT_EQ((GetParam() ? 5u : 6u), rootOut->getChildCount());
             ASSERT_EQ("duration", rootOut->getChild(0u)->getName());
             ASSERT_EQ(EPropertyType::Float, rootOut->getChild(0u)->getType());
             EXPECT_FLOAT_EQ(5.f, *animNode->getOutputs()->getChild("duration")->get<float>());
@@ -335,6 +387,15 @@ namespace rlogic::internal
             EXPECT_EQ(EPropertyType::Vec2i, rootOut->getChild(2u)->getType());
             EXPECT_EQ(EPropertyType::Vec2i, rootOut->getChild(3u)->getType());
             EXPECT_EQ(EPropertyType::Vec2i, rootOut->getChild(4u)->getType());
+
+            if (!GetParam())
+            {
+                const auto arrayOutProp = rootOut->getChild(5u);
+                EXPECT_EQ(EPropertyType::Array, arrayOutProp->getType());
+                ASSERT_EQ(5u, arrayOutProp->getChildCount());
+                for (size_t i = 0u; i < 5u; ++i)
+                    EXPECT_EQ(EPropertyType::Float, arrayOutProp->getChild(i)->getType());
+            }
         }
         // check output names separately
         const auto rootOut1 = animNode1->getOutputs();
@@ -342,11 +403,20 @@ namespace rlogic::internal
         EXPECT_EQ("channel2", rootOut1->getChild(2u)->getName());
         EXPECT_EQ("channel3", rootOut1->getChild(3u)->getName());
         EXPECT_EQ("channel4", rootOut1->getChild(4u)->getName());
+        if (!GetParam())
+        {
+            EXPECT_EQ("channel5", rootOut1->getChild(5u)->getName());
+        }
+
         const auto rootOut2 = animNode2->getOutputs();
         EXPECT_EQ("channel4", rootOut2->getChild(1u)->getName());
         EXPECT_EQ("channel3", rootOut2->getChild(2u)->getName());
         EXPECT_EQ("channel2", rootOut2->getChild(3u)->getName());
         EXPECT_EQ("channel1", rootOut2->getChild(4u)->getName());
+        if (!GetParam())
+        {
+            EXPECT_EQ("channel5", rootOut2->getChild(5u)->getName());
+        }
     }
 
     TEST_P(AnAnimationNode, WillSerializeAnimationIncludingProgress)
@@ -354,7 +424,7 @@ namespace rlogic::internal
         WithTempDirectory tempDir;
 
         {
-            LogicEngine otherEngine;
+            LogicEngine otherEngine{ EFeatureLevel_Latest };
 
             const auto timeStamps = otherEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "ts");
             const auto data = otherEngine.createDataArray(std::vector<int32_t>{ 10, 20 }, "data");
@@ -425,6 +495,21 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // no change pass end of animation
     }
 
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_step_vecvec)
+    {
+        if (GetParam())
+            GTEST_SKIP();
+
+        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
+        const auto data = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 0.f, 10.f }, { 1.f, 20.f } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Step } });
+
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.f, { 0.f, 10.f });
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.99f, { 0.f, 10.f }); // still no change
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 1.000001f, { 1.f, 20.f }); // step to next keyframe value at its timestamp
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 100.f, { 1.f, 20.f }); // no change pass end of animation
+    }
+
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_vec2f)
     {
         const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
@@ -451,6 +536,23 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues<vec2i>(*animNode, 0.9f, { 1, 19 }); // time 0.9
         advanceAnimationAndExpectValues<vec2i>(*animNode, 1.0f, { 1, 20 }); // time 1.0
         advanceAnimationAndExpectValues<vec2i>(*animNode, 100.f, { 1, 20 }); // stays at last keyframe after animation end
+    }
+
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_vecvec)
+    {
+        if (GetParam())
+            GTEST_SKIP();
+
+        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
+        const auto data = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 0.f, 10.f }, { 1.f, 20.f } });
+        const auto animNode = createAnimationNode({ { "channel", timeStamps, data, EInterpolationType::Linear } });
+
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.f, { 0.f, 10.f });
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.1f, { 0.1f, 11.f }); // time 0.1
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.5f, { 0.5f, 15.f }); // time 0.5
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.9f, { 0.9f, 19.f }); // time 0.9
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 1.0f, { 1.f, 20.f }); // time 1.0
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 100.f, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_linear_quaternions)
@@ -484,6 +586,25 @@ namespace rlogic::internal
         advanceAnimationAndExpectValues_twoChannels(*animNode, 0.9f, { 0.972f, 19.72f }, { 1.071f, 19.927f }); // time 0.9
         advanceAnimationAndExpectValues_twoChannels(*animNode, 1.0f, { 1.f, 20.f }, { 1.f, 20.f }); // time 1.0
         advanceAnimationAndExpectValues_twoChannels(*animNode, 100.f, { 1.f, 20.f }, { 1.f, 20.f }); // stays at last keyframe after animation end
+    }
+
+    TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_vecvec)
+    {
+        if (GetParam())
+            GTEST_SKIP();
+
+        const auto timeStamps = m_logicEngine.createDataArray(std::vector<float>{ 0.f, 1.f });
+        const auto data = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 0.f, 10.f }, { 1.f, 20.f } });
+        const auto tangentsIn = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 0.f, 0.f }, { -1.f, -2.f } });
+        const auto tangentsOut = m_logicEngine.createDataArray(std::vector<std::vector<float>>{ { 2.f, 5.f }, { 0.f, 0.f } });
+        const auto animNode = createAnimationNode({{ "channel", timeStamps, data, EInterpolationType::Cubic, tangentsIn, tangentsOut }});
+
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.f, { 0.f, 10.f });
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.1f, { 0.199f, 10.703f }); // time 0.1
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.5f, { 0.875f, 15.875f }); // time 0.5
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 0.9f, { 1.071f, 19.927f }); // time 0.9
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 1.0f, { 1.f, 20.f }); // time 1.0
+        advanceAnimationAndExpectValues<std::vector<float>>(*animNode, 100.f, { 1.f, 20.f }); // stays at last keyframe after animation end
     }
 
     TEST_P(AnAnimationNode, InterpolatesKeyframeValues_cubic_quaternions)

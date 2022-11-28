@@ -10,6 +10,7 @@
 
 #include <string>
 #include <string_view>
+#include "ramses-logic/ELuaSavingMode.h"
 
 namespace rlogic
 {
@@ -24,6 +25,7 @@ namespace rlogic::internal
         void setMetadataString(std::string_view metadata);
         void setExporterVersion(uint32_t major, uint32_t minor, uint32_t patch, uint32_t fileFormatVersion);
         void setValidationEnabled(bool validationEnabled);
+        void setLuaSavingMode(ELuaSavingMode mode);
 
         [[nodiscard]] const std::string& getMetadataString() const;
         [[nodiscard]] uint32_t getExporterMajorVersion() const;
@@ -31,6 +33,7 @@ namespace rlogic::internal
         [[nodiscard]] uint32_t getExporterPatchVersion() const;
         [[nodiscard]] uint32_t getExporterFileFormatVersion() const;
         [[nodiscard]] bool getValidationEnabled() const;
+        [[nodiscard]] ELuaSavingMode getLuaSavingMode() const;
 
     private:
         std::string m_metadata;
@@ -39,5 +42,6 @@ namespace rlogic::internal
         uint32_t m_exporterPatchVersion = 0u;
         uint32_t m_exporterFileFormatVersion = 0u;
         bool m_validationEnabled = true;
+        ELuaSavingMode m_luaSavingMode = ELuaSavingMode::SourceAndByteCode;
     };
 }

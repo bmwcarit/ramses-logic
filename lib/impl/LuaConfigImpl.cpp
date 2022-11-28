@@ -74,4 +74,13 @@ namespace rlogic::internal
         return m_stdModules;
     }
 
+    void LuaConfigImpl::enableDebugLogFunctions()
+    {
+        m_debugLogFunctionsEnabled = true;
+    }
+
+    bool LuaConfigImpl::hasDebugLogFunctionsEnabled() const
+    {
+        return m_debugLogFunctionsEnabled;
+    }
 }

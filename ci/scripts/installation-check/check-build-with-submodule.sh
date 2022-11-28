@@ -8,12 +8,13 @@
 #  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 #  -------------------------------------------------------------------------
 
-if [ $# -eq 3 ]; then
-    TEST_DIR=$1
-    SRC_DIR=$2
-    RAMSES_INSTALL=$3
+if [ $# -eq 4 ]; then
+    TEST_DIR_NAME=$1
+    BUILD_DIR=$2
+    SRC_DIR=$3
+    RAMSES_INSTALL=$4
 else
-    echo "Usage: $0 <temp-build-dir> <src-dir> <ramses-install-dir>"
+    echo "Usage: $0 <temp-build-dir> <test-dir-name> <src-dir> <ramses-install-dir>"
     exit 1
 fi
 
@@ -23,13 +24,13 @@ SCRIPT_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 
 echo "++++ Create test environment for building statically ++++"
 
-rm -rf $TEST_DIR
+rm -rf $BUILD_DIR
 
 # Create temporary build directory
-mkdir -p $TEST_DIR/ramses-logic
-cd $TEST_DIR
+mkdir -p $BUILD_DIR/ramses-logic
+cd $BUILD_DIR
 # Base project setup
-cp -r $SCRIPT_DIR/submodule-check/* .
+cp -r $SCRIPT_DIR/$TEST_DIR_NAME/* .
 # Add ramses logic as submodule to folder ramses-logic
 cp -r $SRC_DIR/* ./ramses-logic/
 

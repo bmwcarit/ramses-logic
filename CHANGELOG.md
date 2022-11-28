@@ -2,6 +2,24 @@
 
 # Unreleased
 
+# v1.4.0
+
+**ADDED**
+
+* Added new Feature Level 05 with following features:
+    * AnimationNode can animate DataArray containing arrays of floats as elements
+    * RamsesMeshNodeBinding to control vertrex/index offsets and instance count
+* Added support for LuaModules in LuaInterfaces (added optional argument LuaConfig to LogicEngine::createLuaInterface)
+* Added Lua debug log functions, see LuaConfig::enableDebugLogFunctions
+* Added SaveFileConfig::setLuaSavingMode to set different saving modes when serializing scripts and modules
+    * This can be used in all feature levels (bytecode supported only in feature level 02 and higher)
+* When loading of Lua byte code during deserialization of a LuaScript or LuaModule fails (typically due to mismatching
+  architecture when exporting vs loading), it will be attempted to be recompiled from source code if available
+    * This change affects all feature levels that support storing Lua byte code (feature level 02 and above)
+    * Thanks to the new saving mode above also assets from older feature levels can be reexported to contain source code
+      so they can be used on other architecture (be aware of performance impact!)
+* Added `ramses-logic-viewer-headless` executable that runs with ramses client-only lib
+
 # v1.3.0
 
 **ADDED**

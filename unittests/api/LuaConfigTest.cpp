@@ -44,6 +44,7 @@ namespace rlogic::internal
     {
         LuaConfig config;
         EXPECT_TRUE(config.m_impl->getModuleMapping().empty());
+        EXPECT_FALSE(config.m_impl->hasDebugLogFunctionsEnabled());
     }
 
     TEST_F(ALuaConfig, IsCopied)
@@ -52,10 +53,12 @@ namespace rlogic::internal
         config.addDependency("mod1", *m_module);
         config.addDependency("mod2", *m_module);
         config.addStandardModuleDependency(EStandardModule::Debug);
+        config.enableDebugLogFunctions();
 
         LuaConfig configCopy(config);
         EXPECT_EQ(config.m_impl->getModuleMapping(), configCopy.m_impl->getModuleMapping());
         EXPECT_EQ(config.m_impl->getStandardModules(), configCopy.m_impl->getStandardModules());
+        EXPECT_EQ(config.m_impl->hasDebugLogFunctionsEnabled(), configCopy.m_impl->hasDebugLogFunctionsEnabled());
     }
 
     TEST_F(ALuaConfig, IsCopyAssigned)
@@ -70,6 +73,7 @@ namespace rlogic::internal
         configCopy = config;
         EXPECT_EQ(config.m_impl->getModuleMapping(), configCopy.m_impl->getModuleMapping());
         EXPECT_EQ(config.m_impl->getStandardModules(), configCopy.m_impl->getStandardModules());
+        EXPECT_EQ(config.m_impl->hasDebugLogFunctionsEnabled(), configCopy.m_impl->hasDebugLogFunctionsEnabled());
     }
 
     TEST_F(ALuaConfig, IsMoved)
@@ -77,11 +81,13 @@ namespace rlogic::internal
         LuaConfig config;
         config.addDependency("mod1", *m_module);
         config.addStandardModuleDependency(EStandardModule::Debug);
+        config.enableDebugLogFunctions();
 
         LuaConfig movedConfig(std::move(config));
 
         EXPECT_EQ(movedConfig.m_impl->getModuleMapping().at("mod1"), m_module);
         EXPECT_THAT(movedConfig.m_impl->getStandardModules(), ::testing::ElementsAre(EStandardModule::Debug));
+        EXPECT_TRUE(movedConfig.m_impl->hasDebugLogFunctionsEnabled());
     }
 
     TEST_F(ALuaConfig, IsMoveAssigned)
@@ -95,6 +101,7 @@ namespace rlogic::internal
 
         EXPECT_EQ(movedAssigned.m_impl->getModuleMapping().at("mod1"), m_module);
         EXPECT_THAT(movedAssigned.m_impl->getStandardModules(), ::testing::ElementsAre(EStandardModule::Debug));
+        EXPECT_FALSE(movedAssigned.m_impl->hasDebugLogFunctionsEnabled());
     }
 
     TEST_F(ALuaConfig, ProducesErrorWhenCreatingLuaScriptUsingModuleUnderInvalidName)
@@ -139,6 +146,14 @@ namespace rlogic::internal
         EXPECT_EQ("Failed to add dependency 'debug'! The alias collides with a standard library name!", m_errorMessage);
         EXPECT_FALSE(config.addDependency("table", *m_module));
         EXPECT_EQ("Failed to add dependency 'table'! The alias collides with a standard library name!", m_errorMessage);
+    }
+
+    TEST_F(ALuaConfig, CanEnableDebugLogFunctions)
+    {
+        LuaConfig config;
+        EXPECT_FALSE(config.m_impl->hasDebugLogFunctionsEnabled());
+        config.enableDebugLogFunctions();
+        EXPECT_TRUE(config.m_impl->hasDebugLogFunctionsEnabled());
     }
 
     class ALuaConfig_StdModules : public ::testing::Test

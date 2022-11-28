@@ -19,6 +19,7 @@
 namespace rlogic
 {
     class LogicEngine;
+    struct LogicViewerSettings;
     class Property;
 
     class LogicViewer
@@ -37,6 +38,7 @@ namespace rlogic
         static const char* const ltnCamera;
         static const char* const ltnRenderPass;
         static const char* const ltnRenderGroup;
+        static const char* const ltnMeshNode;
         static const char* const ltnAnchorPoint;
         static const char* const ltnSkinBinding;
         static const char* const ltnScreenshot;
@@ -144,6 +146,11 @@ namespace rlogic
         [[nodiscard]] bool isUpdateReportEnabled() const;
 
         [[nodiscard]] const UpdateReportSummary& getUpdateReport() const;
+
+        /**
+         * saves a simple default lua configuration that can be used as a starting point
+         */
+        [[nodiscard]] Result saveDefaultLuaFile(const std::string& filename, const LogicViewerSettings& settings);
 
     private:
         void updateEngine();

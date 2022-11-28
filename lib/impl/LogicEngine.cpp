@@ -16,6 +16,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
@@ -108,9 +109,9 @@ namespace rlogic
         return m_impl->createLuaScript(source, *config.m_impl, scriptName);
     }
 
-    LuaInterface* LogicEngine::createLuaInterface(std::string_view source, std::string_view interfaceName)
+    LuaInterface* LogicEngine::createLuaInterface(std::string_view source, std::string_view interfaceName, const LuaConfig& config)
     {
-        return m_impl->createLuaInterface(source, interfaceName);
+        return m_impl->createLuaInterface(source, *config.m_impl, interfaceName);
     }
 
     LuaModule* LogicEngine::createLuaModule(std::string_view source, const LuaConfig& config, std::string_view moduleName)
@@ -156,6 +157,11 @@ namespace rlogic
     RamsesRenderGroupBinding* LogicEngine::createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name)
     {
         return m_impl->createRamsesRenderGroupBinding(ramsesRenderGroup, elements, name);
+    }
+
+    RamsesMeshNodeBinding* LogicEngine::createRamsesMeshNodeBinding(ramses::MeshNode& ramsesMeshNode, std::string_view name)
+    {
+        return m_impl->createRamsesMeshNodeBinding(ramsesMeshNode, name);
     }
 
     SkinBinding* LogicEngine::createSkinBinding(
@@ -294,6 +300,7 @@ namespace rlogic
     template RLOGIC_API Collection<RamsesCameraBinding>      LogicEngine::getLogicObjectsInternal<RamsesCameraBinding>() const;
     template RLOGIC_API Collection<RamsesRenderPassBinding>  LogicEngine::getLogicObjectsInternal<RamsesRenderPassBinding>() const;
     template RLOGIC_API Collection<RamsesRenderGroupBinding> LogicEngine::getLogicObjectsInternal<RamsesRenderGroupBinding>() const;
+    template RLOGIC_API Collection<RamsesMeshNodeBinding>    LogicEngine::getLogicObjectsInternal<RamsesMeshNodeBinding>() const;
     template RLOGIC_API Collection<SkinBinding>              LogicEngine::getLogicObjectsInternal<SkinBinding>() const;
     template RLOGIC_API Collection<DataArray>                LogicEngine::getLogicObjectsInternal<DataArray>() const;
     template RLOGIC_API Collection<AnimationNode>            LogicEngine::getLogicObjectsInternal<AnimationNode>() const;
@@ -309,6 +316,7 @@ namespace rlogic
     template RLOGIC_API const RamsesCameraBinding*      LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view) const;
     template RLOGIC_API const RamsesRenderPassBinding*  LogicEngine::findLogicObjectInternal<RamsesRenderPassBinding>(std::string_view) const;
     template RLOGIC_API const RamsesRenderGroupBinding* LogicEngine::findLogicObjectInternal<RamsesRenderGroupBinding>(std::string_view) const;
+    template RLOGIC_API const RamsesMeshNodeBinding*    LogicEngine::findLogicObjectInternal<RamsesMeshNodeBinding>(std::string_view) const;
     template RLOGIC_API const SkinBinding*              LogicEngine::findLogicObjectInternal<SkinBinding>(std::string_view) const;
     template RLOGIC_API const DataArray*                LogicEngine::findLogicObjectInternal<DataArray>(std::string_view) const;
     template RLOGIC_API const AnimationNode*            LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view) const;
@@ -324,6 +332,7 @@ namespace rlogic
     template RLOGIC_API RamsesCameraBinding*      LogicEngine::findLogicObjectInternal<RamsesCameraBinding>(std::string_view);
     template RLOGIC_API RamsesRenderPassBinding*  LogicEngine::findLogicObjectInternal<RamsesRenderPassBinding>(std::string_view);
     template RLOGIC_API RamsesRenderGroupBinding* LogicEngine::findLogicObjectInternal<RamsesRenderGroupBinding>(std::string_view);
+    template RLOGIC_API RamsesMeshNodeBinding*    LogicEngine::findLogicObjectInternal<RamsesMeshNodeBinding>(std::string_view);
     template RLOGIC_API SkinBinding*              LogicEngine::findLogicObjectInternal<SkinBinding>(std::string_view);
     template RLOGIC_API DataArray*                LogicEngine::findLogicObjectInternal<DataArray>(std::string_view);
     template RLOGIC_API AnimationNode*            LogicEngine::findLogicObjectInternal<AnimationNode>(std::string_view);
@@ -349,6 +358,7 @@ namespace rlogic
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesCameraBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesRenderPassBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesRenderGroupBinding>() const;
+    template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<RamsesMeshNodeBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<SkinBinding>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<DataArray>() const;
     template RLOGIC_API size_t LogicEngine::getSerializedSizeInternal<AnimationNode>() const;

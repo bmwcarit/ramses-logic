@@ -467,6 +467,530 @@ namespace rlogic::internal
         EXPECT_TRUE(unlinkedOutputs.empty());
     }
 
+    class ALuaInterfaceWithModule : public ALuaInterface
+    {
+    protected:
+        const std::string_view m_moduleSrc1 = R"(
+            local mymodule = {}
+            function mymodule.colorType()
+                return {
+                    red = Type:Int32(),
+                    blue = Type:Int32(),
+                    green = Type:Int32()
+                }
+            end
+
+            return mymodule
+        )";
+
+        const std::string_view m_moduleSrc2 = R"(
+            local mymodule = {}
+            function mymodule.otherType()
+                return Type:Float()
+            end
+
+            return mymodule
+        )";
+    };
+
+    TEST_F(ALuaInterfaceWithModule, UsesModule)
+    {
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.color = mymod.colorType()
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        const auto colorProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorProp);
+        EXPECT_EQ("color", colorProp->getName());
+        ASSERT_EQ(3u, colorProp->getChildCount());
+        ASSERT_TRUE(colorProp->getChild("red"));
+        ASSERT_TRUE(colorProp->getChild("blue"));
+        ASSERT_TRUE(colorProp->getChild("green"));
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("red")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("blue")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesTwoModules)
+    {
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod1", "mymod2")
+            function interface(IN)
+                IN.color = mymod1.colorType()
+                IN.val = mymod2.otherType()
+            end
+        )";
+
+        const LuaModule* mod1 = m_logicEngine.createLuaModule(m_moduleSrc1);
+        const LuaModule* mod2 = m_logicEngine.createLuaModule(m_moduleSrc2);
+        LuaConfig config;
+        config.addDependency("mymod1", *mod1);
+        config.addDependency("mymod2", *mod2);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        const auto colorProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorProp);
+        ASSERT_EQ(3u, colorProp->getChildCount());
+        ASSERT_TRUE(colorProp->getChild("red"));
+        ASSERT_TRUE(colorProp->getChild("blue"));
+        ASSERT_TRUE(colorProp->getChild("green"));
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("red")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("blue")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
+
+        const auto valProp = intf->getInputs()->getChild(1);
+        ASSERT_TRUE(valProp);
+        EXPECT_EQ(EPropertyType::Float, valProp->getType());
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesSameModuleUnderMultipleNames)
+    {
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod1", "mymod2")
+            function interface(IN)
+                IN.color1 = mymod1.colorType()
+                IN.color2 = mymod2.colorType()
+            end
+        )";
+
+        const LuaModule* mod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("mymod1", *mod);
+        config.addDependency("mymod2", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        for (size_t i = 0u; i < 2; ++i)
+        {
+            const auto colorProp = intf->getInputs()->getChild(i);
+            ASSERT_TRUE(colorProp);
+            ASSERT_EQ(3u, colorProp->getChildCount());
+            ASSERT_TRUE(colorProp->getChild("red"));
+            ASSERT_TRUE(colorProp->getChild("blue"));
+            ASSERT_TRUE(colorProp->getChild("green"));
+            EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("red")->getType());
+            EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("blue")->getType());
+            EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
+        }
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesTypeFromModule_StructAsTableField)
+    {
+        constexpr std::string_view moduleSrc = R"(
+            local mymodule = {}
+            mymodule.colorType = {
+                    red = Type:Int32(),
+                    blue = Type:Int32(),
+                    green = Type:Int32()
+            }
+            return mymodule
+        )";
+
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.color = mymod.colorType
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(moduleSrc);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        const auto colorProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorProp);
+        EXPECT_EQ("color", colorProp->getName());
+        ASSERT_EQ(3u, colorProp->getChildCount());
+        ASSERT_TRUE(colorProp->getChild("red"));
+        ASSERT_TRUE(colorProp->getChild("blue"));
+        ASSERT_TRUE(colorProp->getChild("green"));
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("red")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("blue")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesTypeFromModule_MakesArrayFromIt)
+    {
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.colors = Type:Array(2, mymod.colorType())
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        ASSERT_EQ(1u, intf->getInputs()->getChildCount());
+        const auto colorsProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorsProp);
+        EXPECT_EQ("colors", colorsProp->getName());
+        ASSERT_EQ(2u, colorsProp->getChildCount());
+        for (size_t i = 0u; i < 2u; ++i)
+        {
+            const auto elementProp = colorsProp->getChild(i);
+            ASSERT_TRUE(elementProp->getChild("red"));
+            ASSERT_TRUE(elementProp->getChild("blue"));
+            ASSERT_TRUE(elementProp->getChild("green"));
+            EXPECT_EQ(EPropertyType::Int32, elementProp->getChild("red")->getType());
+            EXPECT_EQ(EPropertyType::Int32, elementProp->getChild("blue")->getType());
+            EXPECT_EQ(EPropertyType::Int32, elementProp->getChild("green")->getType());
+        }
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesTypeFromModule_ArrayOfStructs)
+    {
+        constexpr std::string_view moduleSrc = R"(
+            local mymodule = {}
+            mymodule.colorsType = Type:Array(2, {
+                    red = Type:Int32(),
+                    blue = Type:Int32(),
+                    green = Type:Int32()
+            })
+            return mymodule
+        )";
+
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.colors = mymod.colorsType
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(moduleSrc);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        ASSERT_EQ(1u, intf->getInputs()->getChildCount());
+        const auto colorsProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorsProp);
+        EXPECT_EQ("colors", colorsProp->getName());
+        ASSERT_EQ(2u, colorsProp->getChildCount());
+        for (size_t i = 0u; i < 2u; ++i)
+        {
+            const auto elementProp = colorsProp->getChild(i);
+            ASSERT_TRUE(elementProp->getChild("red"));
+            ASSERT_TRUE(elementProp->getChild("blue"));
+            ASSERT_TRUE(elementProp->getChild("green"));
+            EXPECT_EQ(EPropertyType::Int32, elementProp->getChild("red")->getType());
+            EXPECT_EQ(EPropertyType::Int32, elementProp->getChild("blue")->getType());
+            EXPECT_EQ(EPropertyType::Int32, elementProp->getChild("green")->getType());
+        }
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesTypeFromModule_StructWithArray)
+    {
+        constexpr std::string_view moduleSrc = R"(
+            local mymodule = {}
+            mymodule.type = {
+                    arr = Type:Array(2, Type:Float()),
+                    val = Type:Int32()
+            }
+            return mymodule
+        )";
+
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.structWithArray = mymod.type
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(moduleSrc);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        ASSERT_EQ(1u, intf->getInputs()->getChildCount());
+        const auto structWithArrayProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(structWithArrayProp);
+        EXPECT_EQ("structWithArray", structWithArrayProp->getName());
+        ASSERT_EQ(2u, structWithArrayProp->getChildCount());
+        const auto arrProp = structWithArrayProp->getChild("arr");
+        ASSERT_TRUE(arrProp);
+        ASSERT_EQ(2u, arrProp->getChildCount());
+        for (size_t i = 0u; i < 2u; ++i)
+        {
+            EXPECT_EQ(EPropertyType::Float, arrProp->getChild(i)->getType());
+        }
+        const auto valProp = structWithArrayProp->getChild("val");
+        ASSERT_TRUE(valProp);
+        EXPECT_EQ(EPropertyType::Int32, valProp->getType());
+    }
+
+    TEST_F(ALuaInterfaceWithModule, CanGetTableSizeWithCustomMethod)
+    {
+        constexpr std::string_view moduleSrc = R"(
+            local mod = {}
+            mod.table1 = { a=1, b=2 }
+            mod.table2 = { 4, 5, 6, 7 }
+            mod.table3 = { a=1, b=2, 42 } -- expected size 1, according to Lua semantics
+            return mod
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(moduleSrc);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+        config.addStandardModuleDependency(EStandardModule::Base);
+
+        const auto intf = m_logicEngine.createLuaInterface(R"(
+            modules("mymod")
+            function interface(IN)
+                IN.dummy = Type:Int32()
+                assert(rl_len(mymod.table1) == 0)
+                assert(rl_len(mymod.table2) == 4)
+                assert(rl_len(mymod.table3) == 1)
+            end
+        )", "intf", config);
+        ASSERT_TRUE(intf);
+    }
+
+    TEST_F(ALuaInterfaceWithModule, UsesModuleWhichDependsOnAnotherModule)
+    {
+        constexpr std::string_view wrapModuleSrc = R"(
+            modules("originalMod")
+            local mod = {}
+            mod.wrappedColorType = originalMod.colorType()
+            return mod
+        )";
+
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.color = mymod.wrappedColorType
+            end
+        )";
+
+        const LuaModule* originalMod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig modConfig;
+        modConfig.addDependency("originalMod", *originalMod);
+        const LuaModule* wrapMod = m_logicEngine.createLuaModule(wrapModuleSrc, modConfig);
+
+        LuaConfig config;
+        config.addDependency("mymod", *wrapMod);
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        const auto colorProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorProp);
+        EXPECT_EQ("color", colorProp->getName());
+        ASSERT_EQ(3u, colorProp->getChildCount());
+        ASSERT_TRUE(colorProp->getChild("red"));
+        ASSERT_TRUE(colorProp->getChild("blue"));
+        ASSERT_TRUE(colorProp->getChild("green"));
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("red")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("blue")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
+    }
+
+    TEST_F(ALuaInterfaceWithModule, CanUseStandardModule)
+    {
+        constexpr std::string_view intfSrc = R"(
+            function interface(IN)
+                IN.vals = Type:Array(math.floor(2.3), Type:Int32())
+            end
+        )";
+
+        LuaConfig config;
+        config.addStandardModuleDependency(EStandardModule::Math);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        ASSERT_NE(intf, nullptr);
+
+        ASSERT_EQ(1u, intf->getInputs()->getChildCount());
+        const auto valsProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(valsProp);
+        EXPECT_EQ("vals", valsProp->getName());
+        ASSERT_EQ(2u, valsProp->getChildCount());
+        for (size_t i = 0u; i < 2u; ++i)
+        {
+            EXPECT_EQ(EPropertyType::Int32, valsProp->getChild(i)->getType());
+        }
+    }
+
+    TEST_F(ALuaInterfaceWithModule, FailsToBeCreatedIfDeclaredDependencyDoesNotMatchProvidedDependency_NotProvidedButDeclared)
+    {
+        constexpr std::string_view src = R"(
+            modules("dep1", "dep2")
+            function interface(IN)
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("dep2", *mod);
+
+        EXPECT_EQ(nullptr, m_logicEngine.createLuaInterface(src, "intf", config));
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Module dependencies declared in source code: dep1, dep2\n  Module dependencies provided on create API: dep2"));
+    }
+
+    TEST_F(ALuaInterfaceWithModule, FailsToBeCreatedIfDeclaredDependencyDoesNotMatchProvidedDependency_ProvidedButNotDeclared)
+    {
+        constexpr std::string_view src = R"(
+            modules("dep1", "dep2")
+            function interface(IN)
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("dep1", *mod);
+        config.addDependency("dep2", *mod);
+        config.addDependency("dep3", *mod);
+
+        EXPECT_EQ(nullptr, m_logicEngine.createLuaInterface(src, "intf", config));
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Module dependencies declared in source code: dep1, dep2\n  Module dependencies provided on create API: dep1, dep2, dep3"));
+    }
+
+    TEST_F(ALuaInterfaceWithModule, FailsToBeCreatedIfDeclaredDependencyDoesNotMatchProvidedDependency_ExractionError)
+    {
+        constexpr std::string_view src = R"(
+            modules("dep1", "dep1") -- duplicate dependency
+            function interface(IN)
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("dep1", *mod);
+
+        EXPECT_EQ(nullptr, m_logicEngine.createLuaInterface(src, "intf", config));
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Error while extracting module dependencies: 'dep1' appears more than once in dependency list"));
+    }
+
+    TEST_F(ALuaInterfaceWithModule, FailsToBeCreatedWhenOverwritingModuleData)
+    {
+        constexpr std::string_view moduleSrc = R"(
+            local mymodule = {}
+            mymodule.val = 100
+            return mymodule
+        )";
+
+        constexpr std::string_view intfSrc = R"(
+            modules("mymod")
+            function interface(IN)
+                IN.dummy = Type:Int32()
+                mymod.val = 42
+            end
+        )";
+
+        LuaModule* mod = m_logicEngine.createLuaModule(moduleSrc);
+        LuaConfig config;
+        config.addDependency("mymod", *mod);
+
+        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf", config);
+        EXPECT_EQ(nullptr, intf);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Modifying module data is not allowed!"));
+    }
+
+    TEST_F(ALuaInterfaceWithModule, FailsToBeCreatedWhenUsingModuleOverwritingTypeSymbols)
+    {
+        constexpr std::string_view modSrc = R"(
+            local m = {}
+            function m.killTypes()
+                Type = {}
+            end
+            return m
+        )";
+        const auto luaModule = m_logicEngine.createLuaModule(modSrc);
+        LuaConfig config;
+        config.addDependency("mymod", *luaModule);
+
+        const auto intf = m_logicEngine.createLuaInterface(R"(
+            modules("mymod")
+            function interface(IN)
+                IN.dummy = Type:Int32()
+                mymod.killTypes()
+            end
+        )", "intf", config);
+        EXPECT_EQ(nullptr, intf);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Special global 'Type' symbol should not be overwritten in modules!"));
+    }
+
+    TEST_F(ALuaInterfaceWithModule, FailsToBeCreatedWhenUsingModuleFromAnotherLogicInstance)
+    {
+        LogicEngine otherLogicEngine;
+        const auto luaModule = otherLogicEngine.createLuaModule(m_moduleSrc1);
+        LuaConfig config;
+        config.addDependency("mymod", *luaModule);
+
+        const auto intf = m_logicEngine.createLuaInterface(R"(
+            modules("mymod")
+            function interface(IN)
+                IN.dummy = Type:Int32()
+            end
+        )", "intf", config);
+        EXPECT_EQ(nullptr, intf);
+        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
+        EXPECT_EQ(m_logicEngine.getErrors().front().message, "Failed to map Lua module 'mymod'! It was created on a different instance of LogicEngine.");
+    }
+
+    TEST_F(ALuaInterfaceWithModule, CanBeSerializedAndLoadedInBaseFeatureLevel_confidenceTest) // just to verify that module dependency does not affect serialized interface
+    {
+        WithTempDirectory tempDir;
+        {
+            LogicEngine logicEngine{ EFeatureLevel_01 };
+            const auto luaModule = logicEngine.createLuaModule(m_moduleSrc1);
+            LuaConfig config;
+            config.addDependency("mymod", *luaModule);
+
+            logicEngine.createLuaInterface(R"(
+                modules("mymod")
+                function interface(IN)
+                    IN.color = mymod.colorType()
+                end
+            )", "intf", config);
+
+            SaveFileConfig configNoValidation;
+            configNoValidation.setValidationEnabled(false);
+            EXPECT_TRUE(logicEngine.saveToFile("temp.rlogic", configNoValidation));
+        }
+
+        EXPECT_TRUE(m_logicEngine.loadFromFile("temp.rlogic"));
+        const auto intf = m_logicEngine.findByName<LuaInterface>("intf");
+        ASSERT_NE(intf, nullptr);
+
+        const auto colorProp = intf->getInputs()->getChild(0);
+        ASSERT_TRUE(colorProp);
+        ASSERT_EQ(3u, colorProp->getChildCount());
+        ASSERT_TRUE(colorProp->getChild("red"));
+        ASSERT_TRUE(colorProp->getChild("blue"));
+        ASSERT_TRUE(colorProp->getChild("green"));
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("red")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("blue")->getType());
+        EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
+    }
+
     class ALuaInterface_Serialization : public ALuaInterface
     {
     protected:

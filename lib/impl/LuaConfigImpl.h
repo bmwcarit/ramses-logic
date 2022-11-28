@@ -30,12 +30,15 @@ namespace rlogic::internal
     public:
         bool addDependency(std::string_view aliasName, const LuaModule& moduleInstance);
         bool addStandardModuleDependency(EStandardModule stdModule);
+        void enableDebugLogFunctions();
 
         [[nodiscard]] const ModuleMapping& getModuleMapping() const;
         [[nodiscard]] const StandardModules& getStandardModules() const;
+        [[nodiscard]] bool hasDebugLogFunctionsEnabled() const;
 
     private:
         ModuleMapping m_modulesMapping;
         StandardModules m_stdModules;
+        bool m_debugLogFunctionsEnabled = false;
     };
 }

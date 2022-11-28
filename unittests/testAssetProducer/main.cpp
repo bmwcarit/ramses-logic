@@ -65,18 +65,10 @@ int main(int argc, char* argv[])
     std::string basePath {"."};
     std::string ramsesFilename = "testScene.ramses";
     std::string logicFilename = "testLogic.rlogic";
-    rlogic::EFeatureLevel featureLevel = rlogic::EFeatureLevel_01;
 
     if (args.size() == 2u)
     {
         basePath = args[1];
-    }
-    else if (args.size() == 3u)
-    {
-        basePath = args[1];
-        featureLevel = static_cast<rlogic::EFeatureLevel>(std::stoi(args[2]));
-        if (featureLevel > rlogic::EFeatureLevel_01)
-            logicFilename = std::string("testLogic_0") + args[2] + ".rlogic";
     }
     else if (args.size() == 4u)
     {
@@ -85,17 +77,14 @@ int main(int argc, char* argv[])
         logicFilename = args[3];
     }
 
-    if (args.size() > 4u ||
-        (std::find(rlogic::AllFeatureLevels.cbegin(), rlogic::AllFeatureLevels.cend(), featureLevel) == rlogic::AllFeatureLevels.cend()))
+    if (args.size() == 3 || args.size() > 4u)
     {
         std::cerr
             << "Generator of ramses and ramses logic test content.\n\n"
             << "Synopsis:\n"
             << "  testAssetProducer\n"
             << "  testAssetProducer <basePath>\n"
-            << "  testAssetProducer <basePath> <featureLevel>\n"
-            << "  testAssetProducer <basePath> <ramsesFileName> <logicFileName>\n\n"
-            << "<featureLevel> must be integer matching one of existing feature levels";
+            << "  testAssetProducer <basePath> <ramsesFileName> <logicFileName>\n\n";
         return 1;
     }
 
@@ -104,7 +93,7 @@ int main(int argc, char* argv[])
 
     ramses::Scene* scene = ramsesClient->createScene(ramses::sceneId_t(123u), ramses::SceneConfig(), "");
     scene->flush();
-    rlogic::LogicEngine logicEngine{ featureLevel };
+    rlogic::LogicEngine logicEngine{ rlogic::EFeatureLevel_05 };
 
     rlogic::LuaScript* script1 = logicEngine.createLuaScript(R"(
         function interface(IN,OUT)
@@ -218,28 +207,21 @@ int main(int argc, char* argv[])
     rlogic::RamsesCameraBinding* camBindingOrtho = logicEngine.createRamsesCameraBinding(*cameraOrtho, "camerabinding");
     rlogic::RamsesAppearanceBinding* appBinding = logicEngine.createRamsesAppearanceBinding(*appearance, "appearancebinding");
     logicEngine.createRamsesCameraBinding(*cameraPersp, "camerabindingPersp");
-    if (featureLevel >= rlogic::EFeatureLevel_02)
-    {
-        logicEngine.createRamsesRenderPassBinding(*renderPass, "renderpassbinding");
-        logicEngine.createAnchorPoint(*nodeBinding, *camBindingOrtho, "anchorpoint");
-        logicEngine.createRamsesCameraBindingWithFrustumPlanes(*cameraPersp, "camerabindingPerspWithFrustumPlanes");
-    }
+    logicEngine.createRamsesRenderPassBinding(*renderPass, "renderpassbinding");
+    logicEngine.createAnchorPoint(*nodeBinding, *camBindingOrtho, "anchorpoint");
+    logicEngine.createRamsesCameraBindingWithFrustumPlanes(*cameraPersp, "camerabindingPerspWithFrustumPlanes");
 
-    if (featureLevel >= rlogic::EFeatureLevel_03)
-    {
-        rlogic::RamsesRenderGroupBindingElements elements;
-        elements.addElement(*meshNode, "mesh");
-        elements.addElement(*nestedRenderGroup, "nestedRenderGroup");
-        logicEngine.createRamsesRenderGroupBinding(*renderGroup, elements, "rendergroupbinding");
-    }
+    rlogic::RamsesRenderGroupBindingElements elements;
+    elements.addElement(*meshNode, "mesh");
+    elements.addElement(*nestedRenderGroup, "nestedRenderGroup");
+    logicEngine.createRamsesRenderGroupBinding(*renderGroup, elements, "rendergroupbinding");
 
-    if (featureLevel >= rlogic::EFeatureLevel_04)
-    {
-        ramses::UniformInput uniform;
-        appearance->getEffect().findUniformInput("jointMat", uniform);
-        logicEngine.createSkinBinding({ nodeBinding }, { rlogic::matrix44f{ 0.f } }, *appBinding, uniform, "skin");
-        logicEngine.createDataArray(std::vector<std::vector<float>>{ { 1.f, 2.f, 3.f, 4.f, 5.f }, { 6.f, 7.f, 8.f, 9.f, 10.f } }, "dataarrayOfArrays");
-    }
+    ramses::UniformInput uniform;
+    appearance->getEffect().findUniformInput("jointMat", uniform);
+    logicEngine.createSkinBinding({ nodeBinding }, { rlogic::matrix44f{ 0.f } }, * appBinding, uniform, "skin");
+    logicEngine.createDataArray(std::vector<std::vector<float>>{ { 1.f, 2.f, 3.f, 4.f, 5.f }, { 6.f, 7.f, 8.f, 9.f, 10.f } }, "dataarrayOfArrays");
+
+    logicEngine.createRamsesMeshNodeBinding(*meshNode, "meshnodebinding");
 
     const auto dataArray = logicEngine.createDataArray(std::vector<float>{ 1.f, 2.f }, "dataarray");
     rlogic::AnimationNodeConfig animConfig;
@@ -259,10 +241,7 @@ int main(int argc, char* argv[])
     logicEngine.link(*script2->getOutputs()->getChild("floatUniform"), *appBinding->getInputs()->getChild("floatUniform"));
     logicEngine.link(*animNode->getOutputs()->getChild("channel"), *appBinding->getInputs()->getChild("animatedFloatUniform"));
 
-    if (featureLevel >= rlogic::EFeatureLevel_02)
-    {
-        logicEngine.link(*script1->getOutputs()->getChild("boolOutput"), *nodeBinding->getInputs()->getChild("enabled"));
-    }
+    logicEngine.link(*script1->getOutputs()->getChild("boolOutput"), *nodeBinding->getInputs()->getChild("enabled"));
 
     if (!logicEngine.update())
         return 1;

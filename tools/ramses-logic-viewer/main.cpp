@@ -6,10 +6,10 @@
 //  file, You can obtain one at https://mozilla.org/MPL/2.0/.
 //  -------------------------------------------------------------------------
 
-#include "LogicViewerApp.h"
+#include "LogicViewerGuiApp.h"
 
 int main(int argc, char* argv[])
 {
-    rlogic::LogicViewerApp app(argc, argv);
+    rlogic::LogicViewerGuiApp app(argc, argv);
     return app.run();
 }

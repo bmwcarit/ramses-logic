@@ -61,3 +61,5 @@ add_example(NAME 12_anchor_point          FILES 12_anchor_point/main.cpp)
 add_example(NAME 13_render_order          FILES 13_render_order/main.cpp)
 # Can't execute ramses runtime example as test - it has a loop which blocks test automation and wastes resources
 add_example(NAME 14_skinbinding           FILES 14_skinbinding/main.cpp)
+# Can't execute ramses runtime example as test - it has a loop which blocks test automation and wastes resources
+add_example(NAME 15_meshnodebinding       FILES 15_meshnodebinding/main.cpp)

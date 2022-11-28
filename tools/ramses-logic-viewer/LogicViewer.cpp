@@ -8,6 +8,7 @@
 
 #include "LogicViewer.h"
 #include "LogicViewerLuaTypes.h"
+#include "LogicViewerLog.h"
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
@@ -16,6 +17,7 @@
 #include "ramses-logic/RamsesCameraBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/Property.h"
@@ -24,6 +26,7 @@
 #include "fmt/format.h"
 #include "internals/SolHelper.h"
 #include <iostream>
+#include <fstream>
 
 namespace rlogic
 {
@@ -68,6 +71,7 @@ namespace rlogic
             , cameraBindings(logicEngine)
             , renderPassBindings(logicEngine)
             , renderGroupBindings(logicEngine)
+            , meshNodeBindings(logicEngine)
             , anchorPoints(logicEngine)
             , skinBindings(logicEngine)
         {
@@ -84,29 +88,31 @@ namespace rlogic
         NodeListWrapper<RamsesCameraBinding> cameraBindings;
         NodeListWrapper<RamsesRenderPassBinding> renderPassBindings;
         NodeListWrapper<RamsesRenderGroupBinding> renderGroupBindings;
+        NodeListWrapper<RamsesMeshNodeBinding> meshNodeBindings;
         NodeListWrapper<AnchorPoint> anchorPoints;
         NodeListWrapper<SkinBinding> skinBindings;
     };
 
-    const char* const LogicViewer::ltnModule     = "rlogic";
-    const char* const LogicViewer::ltnScript     = "scripts";
-    const char* const LogicViewer::ltnInterface  = "interfaces";
-    const char* const LogicViewer::ltnAnimation  = "animationNodes";
-    const char* const LogicViewer::ltnTimer      = "timerNodes";
-    const char* const LogicViewer::ltnNode       = "nodeBindings";
-    const char* const LogicViewer::ltnAppearance = "appearanceBindings";
-    const char* const LogicViewer::ltnCamera     = "cameraBindings";
-    const char* const LogicViewer::ltnRenderPass = "renderPassBindings";
+    const char* const LogicViewer::ltnModule      = "rlogic";
+    const char* const LogicViewer::ltnScript      = "scripts";
+    const char* const LogicViewer::ltnInterface   = "interfaces";
+    const char* const LogicViewer::ltnAnimation   = "animationNodes";
+    const char* const LogicViewer::ltnTimer       = "timerNodes";
+    const char* const LogicViewer::ltnNode        = "nodeBindings";
+    const char* const LogicViewer::ltnAppearance  = "appearanceBindings";
+    const char* const LogicViewer::ltnCamera      = "cameraBindings";
+    const char* const LogicViewer::ltnRenderPass  = "renderPassBindings";
     const char* const LogicViewer::ltnRenderGroup = "renderGroupBindings";
+    const char* const LogicViewer::ltnMeshNode    = "meshNodeBindings";
     const char* const LogicViewer::ltnAnchorPoint = "anchorPoints";
     const char* const LogicViewer::ltnSkinBinding = "skinBindings";
-    const char* const LogicViewer::ltnScreenshot = "screenshot";
-    const char* const LogicViewer::ltnViews      = "views";
-    const char* const LogicViewer::ltnLink       = "link";
-    const char* const LogicViewer::ltnUnlink     = "unlink";
-    const char* const LogicViewer::ltnUpdate     = "update";
-    const char* const LogicViewer::ltnIN         = "IN";
-    const char* const LogicViewer::ltnOUT        = "OUT";
+    const char* const LogicViewer::ltnScreenshot  = "screenshot";
+    const char* const LogicViewer::ltnViews       = "views";
+    const char* const LogicViewer::ltnLink        = "link";
+    const char* const LogicViewer::ltnUnlink      = "unlink";
+    const char* const LogicViewer::ltnUpdate      = "update";
+    const char* const LogicViewer::ltnIN          = "IN";
+    const char* const LogicViewer::ltnOUT         = "OUT";
 
     const char* const LogicViewer::ltnPropertyValue   = "value";
     const char* const LogicViewer::ltnViewUpdate      = "update";
@@ -142,6 +148,7 @@ namespace rlogic
         registerNodeListType<RamsesCameraBinding>(m_sol, "CameraBindings");
         registerNodeListType<RamsesRenderPassBinding>(m_sol, "RenderPassBindings");
         registerNodeListType<RamsesRenderGroupBinding>(m_sol, "RenderGroupBindings");
+        registerNodeListType<RamsesMeshNodeBinding>(m_sol, "MeshNodeBindings");
         registerNodeListType<AnchorPoint>(m_sol, "AnchorPoints");
         registerNodeListType<SkinBinding>(m_sol, "SkinBindings");
         m_sol.new_usertype<LogicNodeWrapper>("LogicNode", sol::meta_function::index, &LogicNodeWrapper::get, sol::meta_function::to_string, &LogicNodeWrapper::toString);
@@ -180,6 +187,8 @@ namespace rlogic
             sol::readonly(&LogicWrapper::renderPassBindings),
             ltnRenderGroup,
             sol::readonly(&LogicWrapper::renderGroupBindings),
+            ltnMeshNode,
+            sol::readonly(&LogicWrapper::meshNodeBindings),
             ltnAnchorPoint,
             sol::readonly(&LogicWrapper::anchorPoints),
             ltnSkinBinding,
@@ -307,6 +316,59 @@ namespace rlogic
         {
             m_updateReportSummary.add(m_logicEngine.getLastUpdateReport());
         }
+    }
+
+    Result LogicViewer::saveDefaultLuaFile(const std::string& filename, const LogicViewerSettings& settings)
+    {
+        std::ofstream outfile;
+        outfile.open(filename, std::ios::out | std::ios::binary);
+        if (!outfile.is_open())
+        {
+            return Result(fmt::format("Could not open file: {}", filename));
+        }
+        LogicViewerLog log(m_logicEngine, settings);
+        log.logText("function default()\n");
+
+        log.logAllInputs<LuaInterface>("--Interfaces\n", LogicViewer::ltnInterface);
+        log.logAllInputs<LuaScript>("--Scripts\n", LogicViewer::ltnScript);
+        log.logAllInputs<RamsesNodeBinding>("--Node bindings\n", LogicViewer::ltnNode);
+        log.logAllInputs<RamsesAppearanceBinding>("--Appearance bindings\n", LogicViewer::ltnAppearance);
+        log.logAllInputs<RamsesCameraBinding>("--Camera bindings\n", LogicViewer::ltnCamera);
+        log.logAllInputs<RamsesRenderPassBinding>("--RenderPass bindings\n", LogicViewer::ltnRenderPass);
+        log.logAllInputs<RamsesRenderGroupBinding>("--RenderGroup bindings\n", LogicViewer::ltnRenderGroup);
+        log.logAllInputs<RamsesMeshNodeBinding>("--MeshNode bindings\n", LogicViewer::ltnMeshNode);
+        log.logAllInputs<AnchorPoint>("--Anchor points\n", LogicViewer::ltnAnchorPoint);
+        log.logAllInputs<SkinBinding>("--Skin bindings\n", LogicViewer::ltnSkinBinding);
+
+        log.logText("end\n\n");
+        const char* code = R"(
+defaultView = {
+    name = "Default",
+    description = "",
+    update = function(time_ms)
+        default()
+    end
+}
+
+rlogic.views = {defaultView}
+
+-- sample test function for automated image base tests
+-- can be executed by command line parameter --exec=test_default
+function test_default()
+    -- modify properties
+    default()
+    -- stores a screenshot (relative to the working directory)
+    rlogic.screenshot("test_default.png")
+end
+)";
+        log.logText(code);
+        outfile << log.getText();
+        if (outfile.bad())
+        {
+            return Result(fmt::format("Could not write to file: {}", filename));
+        }
+        outfile.close();
+        return Result();
     }
 }
 

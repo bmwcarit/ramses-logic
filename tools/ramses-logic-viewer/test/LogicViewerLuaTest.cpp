@@ -112,6 +112,7 @@ namespace rlogic::internal
             rlogic::RamsesRenderGroupBindingElements elements;
             elements.addElement(*m_nestedRenderGroup, "nestedRG");
             auto rgBinding = engine.createRamsesRenderGroupBinding(*m_renderGroup, elements, "rg");
+            auto meshBinding = engine.createRamsesMeshNodeBinding(*m_meshNode, "mn");
 
             rlogic::DataArray* animTimestamps = engine.createDataArray(std::vector<float>{ 0.f, 0.5f, 1.f, 1.5f }); // will be interpreted as seconds
             rlogic::DataArray* animKeyframes = engine.createDataArray(std::vector<rlogic::vec3f>{ {0.f, 0.f, 0.f}, {0.f, 0.f, 180.f}, {0.f, 0.f, 100.f}, {0.f, 0.f, 360.f} });
@@ -147,6 +148,10 @@ namespace rlogic::internal
             engine.link(
                 *script->getOutputs()->getChild("paramInt32"),
                 *rgBinding->getInputs()->getChild("renderOrders")->getChild("nestedRG"));
+
+            engine.link(
+                *script->getOutputs()->getChild("paramInt32"),
+                *meshBinding->getInputs()->getChild("vertexOffset"));
 
             engine.link(
                 *timer->getOutputs()->getChild("ticker_us"),
@@ -795,6 +800,27 @@ namespace rlogic::internal
         EXPECT_EQ(42, renderOrder->get<int32_t>().value());
     }
 
+    TEST_F(ALogicViewerLua, meshNodeBindingByName)
+    {
+        auto* vertexOffset = getInput<rlogic::RamsesMeshNodeBinding>("mn", "vertexOffset");
+        auto* indexOffset = getInput<rlogic::RamsesMeshNodeBinding>("mn", "indexOffset");
+        auto* indexCount = getInput<rlogic::RamsesMeshNodeBinding>("mn", "indexCount");
+        auto* instanceCount = getInput<rlogic::RamsesMeshNodeBinding>("mn", "instanceCount");
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*vertexOffset);
+
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.meshNodeBindings.mn.IN.vertexOffset.value = 42
+            rlogic.meshNodeBindings.mn.IN.indexOffset.value = 43
+            rlogic.meshNodeBindings.mn.IN.indexCount.value = 44
+            rlogic.meshNodeBindings.mn.IN.instanceCount.value = 45
+        )"));
+        EXPECT_EQ(42, vertexOffset->get<int32_t>().value());
+        EXPECT_EQ(43, indexOffset->get<int32_t>().value());
+        EXPECT_EQ(44, indexCount->get<int32_t>().value());
+        EXPECT_EQ(45, instanceCount->get<int32_t>().value());
+    }
+
     TEST_F(ALogicViewerLua, timerNodeByName)
     {
         auto* ticker = getInput<rlogic::TimerNode>("foo", "ticker_us");
@@ -901,6 +927,30 @@ namespace rlogic::internal
         EXPECT_EQ(42, renderOrder->get<int32_t>().value());
     }
 
+    TEST_F(ALogicViewerLua, meshNodeBindingById)
+    {
+        auto* mn = getNode<rlogic::RamsesMeshNodeBinding>("mn");
+        ASSERT_EQ(10u, mn->getId());
+        auto* vertexOffset = GetInput(mn, "vertexOffset");
+        auto* indexOffset = GetInput(mn, "indexOffset");
+        auto* indexCount = GetInput(mn, "indexCount");
+        auto* instanceCount = GetInput(mn, "instanceCount");
+
+        //unlink input to avoid generating error for setting value for a linked input
+        unlinkInput(*vertexOffset);
+
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.meshNodeBindings[10].IN.vertexOffset.value = 42
+            rlogic.meshNodeBindings[10].IN.indexOffset.value = 43
+            rlogic.meshNodeBindings[10].IN.indexCount.value = 44
+            rlogic.meshNodeBindings[10].IN.instanceCount.value = 45
+        )"));
+        EXPECT_EQ(42, vertexOffset->get<int32_t>().value());
+        EXPECT_EQ(43, indexOffset->get<int32_t>().value());
+        EXPECT_EQ(44, indexCount->get<int32_t>().value());
+        EXPECT_EQ(45, instanceCount->get<int32_t>().value());
+    }
+
     TEST_F(ALogicViewerLua, timerNodeById)
     {
         auto* node = getNode<rlogic::TimerNode>("foo");
@@ -923,13 +973,13 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, animationNodeById)
     {
         auto* node = getNode<rlogic::AnimationNode>("foo");
-        ASSERT_EQ(12u, node->getId());
+        ASSERT_EQ(13u, node->getId());
         auto* progress = GetInput(node, "progress");
         //unlink input to avoid generating error for setting value for a linked input
         unlinkInput(*progress);
 
         EXPECT_EQ(Result(), loadLua(R"(
-            rlogic.animationNodes[12].IN.progress.value = 198
+            rlogic.animationNodes[13].IN.progress.value = 198
         )"));
         EXPECT_FLOAT_EQ(198.f, progress->get<float>().value());
     }
@@ -937,7 +987,7 @@ namespace rlogic::internal
     TEST_F(ALogicViewerLua, animationNodeWrongId)
     {
         auto* node = getNode<rlogic::AnimationNode>("foo");
-        ASSERT_EQ(12u, node->getId());
+        ASSERT_EQ(13u, node->getId());
         EXPECT_THAT(loadLua(R"(
             rlogic.animationNodes[89032].IN.progress.value = 198
         )").getMessage(), testing::HasSubstr("attempt to index field '?' (a nil value)"));
@@ -991,7 +1041,7 @@ namespace rlogic::internal
         EXPECT_EQ(Result(), viewer.update());
 
         EXPECT_EQ(2u, summary.getLinkActivations().maxValue);
-        EXPECT_EQ(10u, summary.getNodesExecuted().size());
+        EXPECT_EQ(11u, summary.getNodesExecuted().size());
         EXPECT_EQ(0u, summary.getNodesSkippedExecution().size());
     }
 }

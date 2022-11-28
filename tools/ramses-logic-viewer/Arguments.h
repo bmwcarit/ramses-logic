@@ -35,7 +35,6 @@ Loads and shows a ramses scene from the <ramsesfile>.
             m_luaFile     = filename;
             m_writeConfig = true;
         };
-        cli.add_flag("--headless", m_headless, "Runs without user interface and renderer. Disables screenshots.");
         cli.add_option_function<std::string>("--write-config", setWriteConfig, "Writes the default lua configuration file and exits")
             ->expected(0, 1)
             ->type_name("[FILE]")
@@ -91,11 +90,6 @@ Loads and shows a ramses scene from the <ramsesfile>.
         return m_noOffscreen;
     }
 
-    bool headless() const
-    {
-        return m_headless;
-    }
-
     bool writeConfig() const
     {
         return m_writeConfig;
@@ -144,7 +138,6 @@ private:
     std::string m_exec;
     bool m_noOffscreen = false;
     bool m_writeConfig = false;
-    bool m_headless    = false;
     ramses::ELogLevel m_ramsesLogLevel = ramses::ELogLevel::Error;
 };
 

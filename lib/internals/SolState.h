@@ -51,7 +51,7 @@ namespace rlogic::internal
 
         sol::load_result loadScript(std::string_view source, std::string_view scriptName);
         sol::protected_function_result loadScriptByteCode(std::string_view byteCode, std::string_view scriptName, sol::environment& env);
-        sol::environment createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules);
+        sol::environment createEnvironment(const StandardModules& stdModules, const ModuleMapping& userModules, bool exposeDebugLogFunctions);
         void copyTableIntoEnvironment(const sol::table& table, std::string_view name, sol::environment& env);
         sol::table createTable();
 

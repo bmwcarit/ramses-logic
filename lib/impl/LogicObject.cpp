@@ -15,6 +15,7 @@
 #include "ramses-logic/RamsesAppearanceBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
@@ -79,6 +80,7 @@ namespace rlogic
     template RLOGIC_API const RamsesCameraBinding*      LogicObject::internalCast() const;
     template RLOGIC_API const RamsesRenderPassBinding*  LogicObject::internalCast() const;
     template RLOGIC_API const RamsesRenderGroupBinding* LogicObject::internalCast() const;
+    template RLOGIC_API const RamsesMeshNodeBinding*    LogicObject::internalCast() const;
     template RLOGIC_API const SkinBinding*              LogicObject::internalCast() const;
     template RLOGIC_API const DataArray*                LogicObject::internalCast() const;
     template RLOGIC_API const AnimationNode*            LogicObject::internalCast() const;
@@ -96,6 +98,7 @@ namespace rlogic
     template RLOGIC_API RamsesCameraBinding*      LogicObject::internalCast();
     template RLOGIC_API RamsesRenderPassBinding*  LogicObject::internalCast();
     template RLOGIC_API RamsesRenderGroupBinding* LogicObject::internalCast();
+    template RLOGIC_API RamsesMeshNodeBinding*    LogicObject::internalCast();
     template RLOGIC_API SkinBinding*              LogicObject::internalCast();
     template RLOGIC_API DataArray*                LogicObject::internalCast();
     template RLOGIC_API AnimationNode*            LogicObject::internalCast();

@@ -17,6 +17,11 @@ namespace rlogic
     {
     }
 
+    void LuaConfig::enableDebugLogFunctions()
+    {
+        m_impl->enableDebugLogFunctions();
+    }
+
     LuaConfig::~LuaConfig() noexcept = default;
 
     LuaConfig& LuaConfig::operator=(const LuaConfig& other)

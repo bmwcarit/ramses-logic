@@ -21,6 +21,7 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/SkinBinding.h"
 #include "ramses-logic/TimerNode.h"
 
@@ -37,6 +38,7 @@
 #include "impl/RamsesNodeBindingImpl.h"
 #include "impl/RamsesRenderPassBindingImpl.h"
 #include "impl/RamsesRenderGroupBindingImpl.h"
+#include "impl/RamsesMeshNodeBindingImpl.h"
 #include "impl/SkinBindingImpl.h"
 #include "impl/TimerNodeImpl.h"
 
@@ -83,8 +85,31 @@ namespace rlogic::internal
             {
                 serializationMap.storeDataArray(id, 0u);
             }
-            /* NOLINTNEXTLINE(cppcoreguidelines-pro-type-static-cast-downcast) */
-            (void)AnimationNodeImpl::Serialize(static_cast<AnimationNodeImpl&>(element->m_impl), builder, serializationMap);
+            (void)AnimationNodeImpl::Serialize(element->m_animationNodeImpl, builder, serializationMap);
+        }
+        return static_cast<size_t>(builder.GetSize());
+    }
+
+    template<>
+    size_t calculateSerializedSize<LuaScript, LuaScriptImpl>(const ApiObjectContainer<LuaScript>& container, EFeatureLevel /*featureLevel*/)
+    {
+        flatbuffers::FlatBufferBuilder builder{};
+        SerializationMap serializationMap{};
+        for (const auto& element : container)
+        {
+            (void)LuaScriptImpl::Serialize(element->m_script, builder, serializationMap, ELuaSavingMode::ByteCodeOnly);
+        }
+        return static_cast<size_t>(builder.GetSize());
+    }
+
+    template<>
+    size_t calculateSerializedSize<LuaModule, LuaModuleImpl>(const ApiObjectContainer<LuaModule>& container, EFeatureLevel /*featureLevel*/)
+    {
+        flatbuffers::FlatBufferBuilder builder{};
+        SerializationMap serializationMap{};
+        for (const auto& element : container)
+        {
+            (void)LuaModuleImpl::Serialize(element->m_impl, builder, serializationMap, ELuaSavingMode::ByteCodeOnly);
         }
         return static_cast<size_t>(builder.GetSize());
     }
@@ -92,7 +117,7 @@ namespace rlogic::internal
     size_t ApiObjects::getTotalSerializedSize() const
     {
         flatbuffers::FlatBufferBuilder builder{};
-        (void)Serialize(*this, builder);
+        (void)Serialize(*this, builder, ELuaSavingMode::ByteCodeOnly); // TODO vaclav allow specification of lua saving mode for file size estimation
         return static_cast<size_t>(builder.GetSize());
     }
 
@@ -118,6 +143,12 @@ namespace rlogic::internal
     size_t ApiObjects::getSerializedSize<RamsesRenderGroupBinding>() const
     {
         return calculateSerializedSize<RamsesRenderGroupBinding, RamsesRenderGroupBindingImpl>(getApiObjectContainer<RamsesRenderGroupBinding>(), m_featureLevel);
+    }
+
+    template<>
+    size_t ApiObjects::getSerializedSize<RamsesMeshNodeBinding>() const
+    {
+        return calculateSerializedSize<RamsesMeshNodeBinding, RamsesMeshNodeBindingImpl>(getApiObjectContainer<RamsesMeshNodeBinding>(), m_featureLevel);
     }
 
     template<>

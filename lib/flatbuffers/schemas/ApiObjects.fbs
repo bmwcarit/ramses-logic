@@ -14,6 +14,7 @@ include "RamsesAppearanceBinding.fbs";
 include "RamsesCameraBinding.fbs";
 include "RamsesRenderPassBinding.fbs";
 include "RamsesRenderGroupBinding.fbs";
+include "RamsesMeshNodeBinding.fbs";
 include "SkinBinding.fbs";
 include "Link.fbs";
 include "DataArray.fbs";
@@ -40,4 +41,5 @@ table ApiObjects
     anchorPoints:[AnchorPoint];
     renderGroupBindings:[RamsesRenderGroupBinding];
     skinBindings:[SkinBinding];
+    meshNodeBindings:[RamsesMeshNodeBinding];
 }

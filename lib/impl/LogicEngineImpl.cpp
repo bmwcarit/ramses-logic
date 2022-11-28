@@ -10,6 +10,8 @@
 
 #include "ramses-framework-api/RamsesVersion.h"
 #include "ramses-logic/LogicNode.h"
+#include "ramses-logic/LuaScript.h"
+#include "ramses-logic/LuaModule.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesCameraBinding.h"
@@ -19,10 +21,12 @@
 #include "ramses-logic/AnimationNodeConfig.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/RamsesRenderGroupBindingElements.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/SkinBinding.h"
 
 #include "impl/LogicNodeImpl.h"
 #include "impl/LoggerImpl.h"
+#include "impl/LuaScriptImpl.h"
 #include "impl/LuaModuleImpl.h"
 #include "impl/LuaConfigImpl.h"
 #include "impl/SaveFileConfigImpl.h"
@@ -76,10 +80,10 @@ namespace rlogic::internal
         return m_apiObjects->createLuaScript(source, config, scriptName, m_errors);
     }
 
-    LuaInterface* LogicEngineImpl::createLuaInterface(std::string_view source, std::string_view interfaceName)
+    LuaInterface* LogicEngineImpl::createLuaInterface(std::string_view source, const LuaConfigImpl& config, std::string_view interfaceName)
     {
         m_errors.clear();
-        return m_apiObjects->createLuaInterface(source, interfaceName, m_errors);
+        return m_apiObjects->createLuaInterface(source, config, interfaceName, m_errors);
     }
 
     LuaModule* LogicEngineImpl::createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName)
@@ -178,6 +182,18 @@ namespace rlogic::internal
         }
 
         return m_apiObjects->createRamsesRenderGroupBinding(ramsesRenderGroup, elements, name);
+    }
+
+    RamsesMeshNodeBinding* LogicEngineImpl::createRamsesMeshNodeBinding(ramses::MeshNode& ramsesMeshNode, std::string_view name)
+    {
+        m_errors.clear();
+        if (m_featureLevel < EFeatureLevel_05)
+        {
+            m_errors.add(fmt::format("Cannot create RamsesMeshNodeBinding, feature level 05 or higher is required, feature level in this runtime set to 0{}.", m_featureLevel), nullptr, EErrorType::Other);
+            return nullptr;
+        }
+
+        return m_apiObjects->createRamsesMeshNodeBinding(ramsesMeshNode, name);
     }
 
     SkinBinding* LogicEngineImpl::createSkinBinding(
@@ -748,6 +764,12 @@ namespace rlogic::internal
             return false;
         }
 
+        if (config.getLuaSavingMode() == ELuaSavingMode::ByteCodeOnly && m_featureLevel == EFeatureLevel_01)
+        {
+            m_errors.add("Can't save logic content for feature level in binary mode, binary Lua support was introduced with FeatureLevel_02!", nullptr, EErrorType::IllegalArgument);
+            return false;
+        }
+
         // Refuse save() if logic graph has loops
         if (!m_apiObjects->getLogicNodeDependencies().getTopologicallySortedNodes())
         {
@@ -766,6 +788,21 @@ namespace rlogic::internal
                     "Refer to the documentation of saveToFile() for details how to address these gracefully.", nullptr, EErrorType::ContentStateError);
                 return false;
             }
+        }
+
+        const auto& scripts = m_apiObjects->getApiObjectContainer<LuaScript>();
+        const auto sIt = std::find_if(scripts.cbegin(), scripts.cend(), [](const LuaScript* s) { return s->m_script.hasDebugLogFunctions(); });
+        if (sIt != scripts.cend())
+        {
+            m_errors.add(fmt::format("Cannot save to file, Lua script '{}' has enabled debug log functions, remove this script before saving.", (*sIt)->m_impl.getIdentificationString()), *sIt, EErrorType::ContentStateError);
+            return false;
+        }
+        const auto& modules = m_apiObjects->getApiObjectContainer<LuaModule>();
+        const auto mIt = std::find_if(modules.cbegin(), modules.cend(), [](const LuaModule* m) { return m->m_impl.hasDebugLogFunctions(); });
+        if (mIt != modules.cend())
+        {
+            m_errors.add(fmt::format("Cannot save to file, Lua module '{}' has enabled debug log functions, remove this module before saving.", (*mIt)->m_impl.getIdentificationString()), *mIt, EErrorType::ContentStateError);
+            return false;
         }
 
         flatbuffers::FlatBufferBuilder builder;
@@ -801,7 +838,7 @@ namespace rlogic::internal
         const auto logicEngine = rlogic_serialization::CreateLogicEngine(builder,
             ramsesVersionOffset,
             ramsesLogicVersionOffset,
-            ApiObjects::Serialize(*m_apiObjects, builder),
+            ApiObjects::Serialize(*m_apiObjects, builder, config.getLuaSavingMode()),
             assetMetadataOffset,
             m_featureLevel);
 

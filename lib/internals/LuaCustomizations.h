@@ -20,6 +20,7 @@ namespace rlogic::internal
     public:
         static void RegisterTypes(sol::state& state);
         static void MapToEnvironment(sol::state& state, sol::environment& env);
+        static void MapDebugLogFunctions(sol::environment& env);
 
     private:
         [[nodiscard]] static size_t rl_len(const sol::object& obj);

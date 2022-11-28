@@ -20,21 +20,19 @@ def main():
     parser.add_argument('--src-dir', required=True, help='Ramses logic source dir')
     parser.add_argument('--install-dir', required=True, help='Directory where ramses logic was installed')
     parser.add_argument('--ignore', required=False, action='append', nargs='*', help='Ignore file patterns from the installation folder')
+    parser.add_argument('--headless', required=False, action='store_true', help='Check for headless binaries (no ramses renderer)')
     args = parser.parse_args()
 
     # Expect exactly these files after installation (don't list header files here, they are cross-checked with source tree)
     expectNonheaderFiles = [
         # Ramses
-        r"^bin/ramses-renderer-[\w-]+$",
         r"^lib/libramses-shared-lib-[\w-]+\.so$",
         r"^lib/libramses-shared-lib-[\w-]+\.so\.\d+\.\d+$",
-        r"^lib/cmake/ramses-shared-lib-\d+\.\d+/ramses-shared-libConfigVersion\.cmake$",
-        r"^lib/cmake/ramses-shared-lib-\d+\.\d+/ramses-shared-libConfig\.cmake$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/LICENSE\.txt$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/CHANGELOG\.txt$",
         r"^share/doc/ramses-sdk-\d+\.\d+\.\d+/README\.md$",
         # Ramses Logic
-        r"^bin/ramses-logic-viewer$",
+        r"^bin/ramses-logic-viewer-headless$",
         r"^lib/libramses-logic\.so$",
         r"^lib/libramses-logic\.so\.\d+$",
         r"^lib/cmake/ramses-logic-\d+\.\d+/ramses-logicConfig\.cmake$",
@@ -43,6 +41,19 @@ def main():
         r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/README\.md$",
         r"^share/doc/RamsesLogic-\d+\.\d+\.\d+/LICENSE\.txt$",
     ]
+
+    if args.headless:
+        expectNonheaderFiles += [
+            r"^lib/cmake/ramses-shared-lib-client-only-\d+\.\d+/ramses-shared-lib-client-onlyConfigVersion\.cmake$",
+            r"^lib/cmake/ramses-shared-lib-client-only-\d+\.\d+/ramses-shared-lib-client-onlyConfig\.cmake$",
+        ]
+    else:
+        expectNonheaderFiles += [
+            r"^bin/ramses-logic-viewer$",
+            r"^bin/ramses-renderer-[\w-]+$",
+            r"^lib/cmake/ramses-shared-lib-\d+\.\d+/ramses-shared-libConfigVersion\.cmake$",
+            r"^lib/cmake/ramses-shared-lib-\d+\.\d+/ramses-shared-libConfig\.cmake$",
+        ]
 
     installPath = Path(args.install_dir)
     includePath = installPath / "include"

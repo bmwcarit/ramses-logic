@@ -34,6 +34,7 @@ namespace ramses
     class RenderPass;
     class RenderGroup;
     class UniformInput;
+    class MeshNode;
 }
 
 namespace rlogic::internal
@@ -54,6 +55,7 @@ namespace rlogic
     class RamsesRenderPassBinding;
     class RamsesRenderGroupBinding;
     class RamsesRenderGroupBindingElements;
+    class RamsesMeshNodeBinding;
     class SkinBinding;
     class DataArray;
     class AnimationNode;
@@ -173,18 +175,23 @@ namespace rlogic
         * #rlogic::LuaInterface can be created with any non-empty name but if two or more instances
         * share same name there will be a warning during validation (#validate) as it is advised
         * for every Lua interface to have a unique name for clear identification from application logic.
+        * You can optionally provide Lua module dependencies via the \p config, they will be accessible
+        * under their configured alias name for use in the interface source. The provided module dependencies
+        * must exactly match the declared dependencies in source code (see #extractLuaDependencies).
         *
         * Attention! This method clears all previous errors! See also docs of #getErrors()
         *
         * @param source the Lua source code
         * @param interfaceName name to assign to the interface once it's created. This name must be unique!
+        * @param config configuration options, e.g. for module dependencies
         * @return a pointer to the created object or nullptr if
         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
         * The interface can be destroyed by calling the #destroy method
         */
         RLOGIC_API LuaInterface* createLuaInterface(
             std::string_view source,
-            std::string_view interfaceName);
+            std::string_view interfaceName,
+            const LuaConfig& config = {});
 
         /**
          * Creates a new #rlogic::LuaModule from Lua source code.
@@ -209,10 +216,10 @@ namespace rlogic
             std::string_view moduleName = "");
 
         /**
-         * Extracts dependencies from a Lua script or module source code so that the corresponding
-         * modules can be provided when creating #rlogic::LuaScript or #rlogic::LuaModule.
+         * Extracts dependencies from a Lua script, module or interface source code so that the corresponding
+         * modules can be provided when creating #rlogic::LuaScript, #rlogic::LuaModule or #rlogic::LuaInterface.
          *
-         * Any #rlogic::LuaScript or #rlogic::LuaModule which has a module dependency,
+         * Any #rlogic::LuaScript, #rlogic::LuaModule or #rlogic::LuaInterface which has a module dependency,
          * i.e. it requires another #rlogic::LuaModule for it to work, must explicitly declare these
          * dependencies directly in their source code by calling function 'modules' in global space
          * and pass list of module names it depends on, for example:
@@ -336,6 +343,20 @@ namespace rlogic
          * The binding can be destroyed by calling the #destroy method
          */
         RLOGIC_API RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name ="");
+
+        /**
+         * Creates a new #rlogic::RamsesMeshNodeBinding which can be used to control some properties of a ramses::MeshNode object.
+         * #rlogic::RamsesMeshNodeBinding can only be created with #rlogic::EFeatureLevel_04 or higher enabled, see #LogicEngine(EFeatureLevel).
+         *
+         * Attention! This method clears all previous errors! See also docs of #getErrors()
+         *
+         * @param ramsesMeshNode the ramses::MeshNode object to control with the binding.
+         * @param name a name for the the new #rlogic::RamsesMeshNodeBinding.
+         * @return a pointer to the created object or nullptr if
+         * something went wrong during creation. In that case, use #getErrors() to obtain errors.
+         * The binding can be destroyed by calling the #destroy method
+         */
+        RLOGIC_API RamsesMeshNodeBinding* createRamsesMeshNodeBinding(ramses::MeshNode& ramsesMeshNode, std::string_view name ="");
 
         /**
          * Creates a new #rlogic::SkinBinding which can be used for vertex skinning (bone animations).
@@ -660,6 +681,9 @@ namespace rlogic
          * Note: This method fails and reports error if validation failed and was not disabled by
          * calling #rlogic::SaveFileConfig::setValidationEnabled with false
          *
+         * Note: This method fails and reports error if there is any Lua script or module with debug log functions,
+         * (see #rlogic::LuaConfig::enableDebugLogFunctions), these must be destroyed before saving to file.
+         *
          * Attention! This method clears all previous errors! See also docs of #getErrors()
          *
          * @param filename path to file to save the data (relative or absolute). The file will be created or overwritten if it exists!
@@ -728,14 +752,16 @@ namespace rlogic
         RLOGIC_API bool loadFromBuffer(const void* rawBuffer, size_t bufferSize, ramses::Scene* ramsesScene = nullptr, bool enableMemoryVerification = true);
 
         /**
-         * Calculates the serialized size of all objects contained in this LogicEngine instance.
-         * @return size in bytes of the serialized LogicEngine.
-         */
+        * Calculates the serialized size of all objects contained in this LogicEngine instance.
+        * Note that size of scripts and modules will be estimated as if using the default #rlogic::ELuaSavingMode::ByteCodeOnly in #rlogic::SaveFileConfig::setLuaSavingMode.
+        * @return size in bytes of the serialized LogicEngine.
+        */
         [[nodiscard]] RLOGIC_API size_t getTotalSerializedSize() const;
 
         /**
         * Calculates the serialized size of a specific type of objects contained in this LogicEngine instance.
         * \c T must be a concrete logic object type (e.g. #rlogic::LuaScript). For the logic type LogicObject the size of all logic objects will be returned.
+        * Note that size of scripts or modules will be estimated as if using the default #rlogic::ELuaSavingMode::ByteCodeOnly in #rlogic::SaveFileConfig::setLuaSavingMode.
         *
         * @tparam T Logic object type
         * @return size in bytes of the serialized objects.
@@ -885,6 +911,7 @@ namespace rlogic
             std::is_same_v<T, RamsesCameraBinding> ||
             std::is_same_v<T, RamsesRenderPassBinding> ||
             std::is_same_v<T, RamsesRenderGroupBinding> ||
+            std::is_same_v<T, RamsesMeshNodeBinding> ||
             std::is_same_v<T, SkinBinding> ||
             std::is_same_v<T, DataArray> ||
             std::is_same_v<T, AnimationNode> ||

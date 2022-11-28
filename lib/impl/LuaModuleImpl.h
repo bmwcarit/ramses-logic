@@ -12,6 +12,7 @@
 #include "internals/LuaCompilationUtils.h"
 #include "internals/SolWrapper.h"
 #include "ramses-logic/EFeatureLevel.h"
+#include "ramses-logic/ELuaSavingMode.h"
 #include <string>
 
 namespace rlogic_serialization
@@ -44,12 +45,13 @@ namespace rlogic::internal
 
         [[nodiscard]] const sol::table& getModule() const;
         [[nodiscard]] const ModuleMapping& getDependencies() const;
+        [[nodiscard]] bool hasDebugLogFunctions() const;
 
         [[nodiscard]] static flatbuffers::Offset<rlogic_serialization::LuaModule> Serialize(
             const LuaModuleImpl& module,
             flatbuffers::FlatBufferBuilder& builder,
             SerializationMap& serializationMap,
-            EFeatureLevel featureLevel);
+            ELuaSavingMode luaSavingMode);
 
         [[nodiscard]] static std::unique_ptr<LuaModuleImpl> Deserialize(
             SolState& solState,
@@ -64,5 +66,6 @@ namespace rlogic::internal
         sol::table m_module;
         ModuleMapping m_dependencies;
         StandardModules m_stdModules;
+        bool m_hasDebugLogFunctions;
     };
 }

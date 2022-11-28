@@ -23,7 +23,7 @@ namespace rlogic::internal
         }
 
         SolState m_solState;
-        sol::environment m_protEnv{ m_solState.createEnvironment({}, {}) };
+        sol::environment m_protEnv{ m_solState.createEnvironment({}, {}, false) };
     };
 
     TEST_F(AEnvironmentProtection, ForbidsNotStringKeyGlobalAccessOfAnySort)

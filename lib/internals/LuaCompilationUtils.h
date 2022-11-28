@@ -36,6 +36,7 @@ namespace rlogic::internal
         std::reference_wrapper<SolState> solState;
         StandardModules stdModules;
         ModuleMapping userModules;
+        bool hasDebugLogFunctions = false;
     };
 
     struct LuaCompiledScript
@@ -74,10 +75,13 @@ namespace rlogic::internal
             sol::bytecode byteCodeFromPrecompiledScript,
             std::unique_ptr<Property> inputsFromPrecompiledScript,
             std::unique_ptr<Property> outputsFromPrecompiledScript,
-            EFeatureLevel featureLevel);
+            EFeatureLevel featureLevel,
+            bool enableDebugLogFunctions);
 
         [[nodiscard]] static std::optional<LuaCompiledInterface> CompileInterface(
             SolState& solState,
+            const ModuleMapping& userModules,
+            const StandardModules& stdModules,
             const std::string& source,
             std::string_view name,
             ErrorReporting& errorReporting);
@@ -90,7 +94,8 @@ namespace rlogic::internal
             std::string_view name,
             ErrorReporting& errorReporting,
             sol::bytecode byteCodeFromPrecompiledModule,
-            EFeatureLevel featureLevel);
+            EFeatureLevel featureLevel,
+            bool enableDebugLogFunctions);
 
         [[nodiscard]] static bool CheckModuleName(std::string_view name);
 

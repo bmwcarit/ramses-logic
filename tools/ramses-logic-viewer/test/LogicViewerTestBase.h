@@ -20,6 +20,7 @@
 #include "ramses-logic/RamsesNodeBinding.h"
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/TimerNode.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/AnchorPoint.h"
@@ -142,6 +143,7 @@ namespace rlogic::internal
         ramses::RenderPass* m_renderPass = { m_scene->createRenderPass() };
         ramses::RenderGroup* m_renderGroup = { m_scene->createRenderGroup() };
         ramses::RenderGroup* m_nestedRenderGroup = { m_scene->createRenderGroup() };
+        ramses::MeshNode* m_meshNode = { m_scene->createMeshNode() };
 
     private:
         // NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables) must be static and non-const (see SetMockScreenshot)

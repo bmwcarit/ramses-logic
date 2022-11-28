@@ -183,4 +183,16 @@ namespace rlogic
 
         extractAndExpect(src, { "foo" });
     }
+
+    TEST_F(ALogicEngine_DependencyExtraction, extractsModulesFromLuaInterfaceSource)
+    {
+        constexpr std::string_view src = R"(
+                modules("foo", "bar")
+                function interface(IN)
+                    IN.bla = foo.type
+                end
+            )";
+
+        extractAndExpect(src, { "foo", "bar" });
+    }
 }

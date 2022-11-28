@@ -9,6 +9,7 @@
 #pragma once
 
 #include "ramses-logic/APIExport.h"
+#include "ramses-logic/ELuaSavingMode.h"
 
 #include <string>
 #include <memory>
@@ -59,6 +60,21 @@ namespace rlogic
         * @param validationEnabled flag to disable/enable validation upon saving to file
         */
         RLOGIC_API void setValidationEnabled(bool validationEnabled);
+
+        /**
+        * Sets saving mode for all #rlogic::LuaScript and/or #rlogic::LuaModule instances.
+        * See #rlogic::ELuaSavingMode for the available options and their implications.
+        * Note that this is just a hint and the export logic will decide what to actually export,
+        * depending on availabilty of Lua source code or bytecode:
+        *  - if only source code is available (always the case when using #rlogic::EFeatureLevel_01)
+        *    then only source code is exported regardless of the selected saving \c mode
+        *  - if only byte code is available then only bytecode is exported regardless of the selected saving \c mode
+        *  - if both source and bytecode are available then the selected saving \c mode is applied
+        * There will be no error produced if selected saving mode cannot be respected.
+        *
+        * @param mode selected saving mode, default is #rlogic::ELuaSavingMode::SourceAndByteCode
+        */
+        RLOGIC_API void setLuaSavingMode(ELuaSavingMode mode);
 
         /**
          * Destructor of #SaveFileConfig

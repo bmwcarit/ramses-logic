@@ -51,13 +51,13 @@ namespace rlogic::internal
 
     TEST_F(ASolState, CreatesNewEnvironment)
     {
-        sol::environment env = m_solState.createEnvironment({}, {});
+        sol::environment env = m_solState.createEnvironment({}, {}, false);
         EXPECT_TRUE(env.valid());
     }
 
     TEST_F(ASolState, NewEnvironment_DoesNotExposeTypeSymbols)
     {
-        sol::environment env = m_solState.createEnvironment({}, {});
+        sol::environment env = m_solState.createEnvironment({}, {}, false);
         ASSERT_TRUE(env.valid());
 
         EXPECT_FALSE(env["Type"].valid());
@@ -65,17 +65,37 @@ namespace rlogic::internal
 
     TEST_F(ASolState, CreatesCustomMethods)
     {
-        sol::environment env = m_solState.createEnvironment({}, {});
+        sol::environment env = m_solState.createEnvironment({}, {}, false);
         ASSERT_TRUE(env.valid());
 
         EXPECT_TRUE(env["modules"].valid());
         EXPECT_TRUE(env["rl_len"].valid());
     }
 
+    TEST_F(ASolState, NewEnvironment_DoesNotExposeDebugLogFunctions)
+    {
+        sol::environment env = m_solState.createEnvironment({}, {}, false);
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_FALSE(env["rl_logInfo"].valid());
+        EXPECT_FALSE(env["rl_logWarn"].valid());
+        EXPECT_FALSE(env["rl_logError"].valid());
+    }
+
+    TEST_F(ASolState, NewEnvironment_ExposesDebugLogFunctions)
+    {
+        sol::environment env = m_solState.createEnvironment({}, {}, true);
+        ASSERT_TRUE(env.valid());
+
+        EXPECT_TRUE(env["rl_logInfo"].valid());
+        EXPECT_TRUE(env["rl_logWarn"].valid());
+        EXPECT_TRUE(env["rl_logError"].valid());
+    }
+
     class ASolState_Environment : public ASolState
     {
     protected:
-        sol::environment m_env {m_solState.createEnvironment({}, {})};
+        sol::environment m_env {m_solState.createEnvironment({}, {}, false)};
     };
 
     TEST_F(ASolState_Environment, HidesGlobalStandardModulesByDefault)
@@ -90,7 +110,7 @@ namespace rlogic::internal
 
     TEST_F(ASolState_Environment, ExposesOnlyRequestedGlobalStandardModules)
     {
-        sol::environment env = m_solState.createEnvironment({EStandardModule::Math}, {});
+        sol::environment env = m_solState.createEnvironment({EStandardModule::Math}, {}, false);
         ASSERT_TRUE(env.valid());
 
         EXPECT_TRUE(env["math"].valid());
@@ -104,7 +124,7 @@ namespace rlogic::internal
 
     TEST_F(ASolState_Environment, ExposesRequestedGlobalStandardModules_TwoModules)
     {
-        sol::environment env = m_solState.createEnvironment({ EStandardModule::String, EStandardModule::Table }, {});
+        sol::environment env = m_solState.createEnvironment({ EStandardModule::String, EStandardModule::Table }, {}, false);
         ASSERT_TRUE(env.valid());
 
         EXPECT_TRUE(env["string"].valid());
@@ -118,7 +138,7 @@ namespace rlogic::internal
 
     TEST_F(ASolState_Environment, ExposesRequestedGlobalStandardModules_BaseLib)
     {
-        sol::environment env = m_solState.createEnvironment({ EStandardModule::Base }, {});
+        sol::environment env = m_solState.createEnvironment({ EStandardModule::Base }, {}, false);
         ASSERT_TRUE(env.valid());
 
         EXPECT_TRUE(env["error"].valid());
@@ -139,7 +159,7 @@ namespace rlogic::internal
 
     TEST_F(ASolState_Environment, NewEnvironment_TwoEnvironmentsShareNoData)
     {
-        sol::environment env2 = m_solState.createEnvironment({}, {});
+        sol::environment env2 = m_solState.createEnvironment({}, {}, false);
         ASSERT_TRUE(env2.valid());
 
         m_env["thisBelongsTo"] = "m_env";
@@ -167,7 +187,7 @@ namespace rlogic::internal
         sol::function func = loadedScript();
 
         // Apply fresh environment to func
-        sol::environment newEnv = m_solState.createEnvironment({}, {});
+        sol::environment newEnv = m_solState.createEnvironment({}, {}, false);
         ASSERT_TRUE(newEnv.valid());
         newEnv.set_on(func);
 

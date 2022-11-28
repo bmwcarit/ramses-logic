@@ -59,6 +59,19 @@ namespace rlogic
         RLOGIC_API bool addStandardModuleDependency(EStandardModule stdModule);
 
         /**
+         * Will expose these log functions in Lua:
+         *   rl_logInfo
+         *   rl_logWarn
+         *   rl_logError
+         * Each with single string as argument.
+         * Call from Lua script or module to any of these will forward the string message to a corresponding internal Ramses Logic logger.
+         *
+         * IMPORTANT: These functions are meant for debug/prototype purposes only and attempt to save the project to file (#rlogic::LogicEngine::saveToFile)
+         * with any script or module with these functions enabled will result in failure!
+         */
+        RLOGIC_API void enableDebugLogFunctions();
+
+        /**
          * Destructor of #LuaConfig
          */
         RLOGIC_API ~LuaConfig() noexcept;

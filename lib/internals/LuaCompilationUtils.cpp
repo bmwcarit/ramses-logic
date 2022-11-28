@@ -34,9 +34,10 @@ namespace rlogic::internal
         sol::bytecode byteCodeFromPrecompiledScript,
         std::unique_ptr<Property> inputsFromPrecompiledScript,
         std::unique_ptr<Property> outputsFromPrecompiledScript,
-        EFeatureLevel featureLevel)
+        EFeatureLevel featureLevel,
+        bool enableDebugLogFunctions)
     {
-        sol::environment env = solState.createEnvironment(stdModules, userModules);
+        sol::environment env = solState.createEnvironment(stdModules, userModules, enableDebugLogFunctions);
         sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
 
         internalEnv["GLOBAL"] = solState.createTable();
@@ -44,8 +45,27 @@ namespace rlogic::internal
         sol::load_result load_result{};
         sol::protected_function_result main_result{};
         sol::protected_function mainFunction{};
-
         const std::string debuggingName = (featureLevel == EFeatureLevel_01 ? std::string(name) : "RL_lua_script");
+
+        if (!byteCodeFromPrecompiledScript.empty())
+        {
+            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
+            main_result = solState.loadScriptByteCode(byteCodeFromPrecompiledScript.as_string_view(), debuggingName, env);
+            if (!main_result.valid())
+            {
+                sol::error error = main_result;
+                if (source.empty())
+                {
+                    errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}': failed loading pre-compiled byte code and no source available to recompile:\n{}!", name, error.what()),
+                        nullptr, EErrorType::BinaryVersionMismatch);
+                    return std::nullopt;
+                }
+
+                LOG_WARN("Performance warning! Error during loading of LuaScript '{}' from pre-compiled byte code, will try to recompile script from source code. Error:\n{}!", name, error.what());
+                byteCodeFromPrecompiledScript.clear();
+            }
+        }
+
         if (byteCodeFromPrecompiledScript.empty())
         {
             load_result = solState.loadScript(source, debuggingName);
@@ -71,18 +91,6 @@ namespace rlogic::internal
             {
                 sol::error error = main_result;
                 errorReporting.add(error.what(), nullptr, EErrorType::LuaSyntaxError);
-                return std::nullopt;
-            }
-        }
-        else
-        {
-            ScopedEnvironmentProtection p(env, EEnvProtectionFlag::LoadScript);
-            main_result = solState.loadScriptByteCode(byteCodeFromPrecompiledScript.as_string_view(), debuggingName, env);
-
-            if (!main_result.valid())
-            {
-                sol::error error = main_result;
-                errorReporting.add(fmt::format("Fatal error during loading of LuaScript '{}': failed loading pre-compiled byte code:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
                 return std::nullopt;
             }
         }
@@ -144,7 +152,7 @@ namespace rlogic::internal
             PropertyTypeExtractor inputsExtractor("inputs", EPropertyType::Struct);
             PropertyTypeExtractor outputsExtractor("outputs", EPropertyType::Struct);
 
-            sol::environment interfaceEnv = solState.createEnvironment(stdModules, userModules);
+            sol::environment interfaceEnv = solState.createEnvironment(stdModules, userModules, false);
             sol::table internalInterfaceEnv = EnvironmentProtection::GetProtectedEnvironmentTable(interfaceEnv);
             PropertyTypeExtractor::RegisterTypes(internalInterfaceEnv);
             // Expose globals to interface function
@@ -178,27 +186,20 @@ namespace rlogic::internal
             resultOutputs = std::make_unique<Property>(std::make_unique<PropertyImpl>(extractedOutputsType, EPropertySemantics::ScriptOutput));
         }
 
-        std::string resultSource;
         sol::bytecode resultByteCode;
-
-        if(featureLevel == EFeatureLevel_01)
-        {
-            resultSource = std::move(source);
-        }
-        else if(featureLevel >= EFeatureLevel_02)
-        {
+        if(featureLevel >= EFeatureLevel_02)
             resultByteCode = (byteCodeFromPrecompiledScript.empty() ? mainFunction.dump() : std::move(byteCodeFromPrecompiledScript));
-        }
 
         EnvironmentProtection::SetEnvironmentProtectionLevel(env, EEnvProtectionFlag::RunFunction);
 
         return LuaCompiledScript{
             LuaCompiledSource{
-                std::move(resultSource),
+                std::move(source),
                 std::move(resultByteCode),
                 solState,
                 stdModules,
-                userModules
+                userModules,
+                enableDebugLogFunctions
             },
             std::move(run),
             std::move(resultInputs),
@@ -206,7 +207,13 @@ namespace rlogic::internal
         };
     }
 
-    std::optional<rlogic::internal::LuaCompiledInterface> LuaCompilationUtils::CompileInterface(SolState& solState, const std::string& source, std::string_view name, ErrorReporting& errorReporting)
+    std::optional<rlogic::internal::LuaCompiledInterface> LuaCompilationUtils::CompileInterface(
+        SolState& solState,
+        const ModuleMapping& userModules,
+        const StandardModules& stdModules,
+        const std::string& source,
+        std::string_view name,
+        ErrorReporting& errorReporting)
     {
         sol::load_result load_result = solState.loadScript(source, name);
         if (!load_result.valid())
@@ -216,7 +223,10 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
-        sol::environment env = solState.createEnvironment({}, {});
+        if (!CrossCheckDeclaredAndProvidedModules(source, userModules, name, errorReporting))
+            return std::nullopt;
+
+        sol::environment env = solState.createEnvironment(stdModules, userModules, false);
         sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
 
         sol::protected_function mainFunction = load_result;
@@ -252,7 +262,7 @@ namespace rlogic::internal
         // Name used for better error messages and discarded later
         PropertyTypeExtractor inputsExtractor("inputs", EPropertyType::Struct);
 
-        sol::environment interfaceEnv = solState.createEnvironment({}, {});
+        sol::environment interfaceEnv = solState.createEnvironment(stdModules, userModules, false);
         sol::table internalInterfaceEnv = EnvironmentProtection::GetProtectedEnvironmentTable(interfaceEnv);
         PropertyTypeExtractor::RegisterTypes(internalInterfaceEnv);
 
@@ -292,9 +302,10 @@ namespace rlogic::internal
         std::string_view name,
         ErrorReporting& errorReporting,
         sol::bytecode byteCodeFromPrecompiledModule,
-        EFeatureLevel featureLevel)
+        EFeatureLevel featureLevel,
+        bool enableDebugLogFunctions)
     {
-        sol::environment env = solState.createEnvironment(stdModules, userModules);
+        sol::environment env = solState.createEnvironment(stdModules, userModules, enableDebugLogFunctions);
         sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
         // interface definitions can be provided within module, in order to be able to extract them
         // when used in LuaScript interface the necessary user types need to be provided
@@ -313,11 +324,19 @@ namespace rlogic::internal
             if (!main_result.valid())
             {
                 sol::error error = main_result;
-                errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}': failed loading pre-compiled byte code:\n{}!", name, error.what()), nullptr, EErrorType::BinaryVersionMismatch);
-                return std::nullopt;
+                if (source.empty())
+                {
+                    errorReporting.add(fmt::format("Fatal error during loading of LuaModule '{}': failed loading pre-compiled byte code and no source available to recompile:\n{}!", name, error.what()),
+                        nullptr, EErrorType::BinaryVersionMismatch);
+                    return std::nullopt;
+                }
+
+                LOG_WARN("Performance warning! Error during loading of LuaScript '{}' from pre-compiled byte code, will try to recompile script from source code. Error:\n{}!", name, error.what());
+                byteCodeFromPrecompiledModule.clear();
             }
         }
-        else
+
+        if (byteCodeFromPrecompiledModule.empty())
         {
             load_result = solState.loadScript(source, debuggingName);
             if (!load_result.valid())
@@ -359,24 +378,18 @@ namespace rlogic::internal
         sol::table moduleTable = resultObj;
 
         //for serialization
-        std::string resultSource;
         sol::bytecode resultByteCode;
-        if (featureLevel == EFeatureLevel_01)
-        {
-            resultSource = std::move(source);
-        }
-        else if(featureLevel >= EFeatureLevel_02)
-        {
+        if(featureLevel >= EFeatureLevel_02)
             resultByteCode = (byteCodeFromPrecompiledModule.empty() ? mainFunction.dump() : std::move(byteCodeFromPrecompiledModule));
-        }
 
         auto compiledModule = LuaCompiledModule{
             LuaCompiledSource{
-                std::move(resultSource),
+                std::move(source),
                 std::move(resultByteCode),
                 solState,
                 stdModules,
-                userModules
+                userModules,
+                enableDebugLogFunctions
             },
             LuaCompilationUtils::MakeTableReadOnly(solState, moduleTable)
         };

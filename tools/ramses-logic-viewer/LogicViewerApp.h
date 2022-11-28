@@ -11,22 +11,14 @@
 #include "ramses-client.h"
 #include "ramses-framework-api/RamsesFrameworkTypes.h"
 #include "Result.h"
+#include "LogicViewer.h"
 #include <array>
 
-class ISceneSetup;
 class Arguments;
-
-namespace ramses
-{
-    class DisplayConfig;
-    class RendererConfig;
-}
+struct ImGuiContext;
 
 namespace rlogic
 {
-    class ImguiClientHelper;
-    class LogicViewer;
-    class LogicViewerGui;
     struct LogicViewerSettings;
 
     class LogicViewerApp
@@ -45,15 +37,15 @@ namespace rlogic
             ErrorUnknown        = -1,
         };
 
-        LogicViewerApp(int argc, char const* const* argv);
+        LogicViewerApp();
 
-        ~LogicViewerApp();
+        virtual ~LogicViewerApp();
 
         LogicViewerApp(const LogicViewerApp&) = delete;
 
         LogicViewerApp& operator=(const LogicViewerApp&) = delete;
 
-        [[nodiscard]] bool doOneLoop();
+        [[nodiscard]] virtual bool doOneLoop() = 0;
 
         [[nodiscard]] int exitCode() const;
 
@@ -61,30 +53,23 @@ namespace rlogic
 
         [[nodiscard]] rlogic::LogicViewer* getViewer();
 
-        [[nodiscard]] rlogic::ImguiClientHelper* getImguiClientHelper();
-
         [[nodiscard]] const rlogic::LogicViewerSettings* getSettings() const;
 
-    private:
-        [[nodiscard]] int init(int argc, char const* const* argv);
-        [[nodiscard]] ramses::displayId_t initDisplay(const Arguments& args, ramses::RamsesRenderer& renderer, const ramses::DisplayConfig& displayConfig);
+    protected:
+        [[nodiscard]] int loadScene(const Arguments& args);
+        [[nodiscard]] int createViewer(const Arguments& args, LogicViewer::ScreenshotFunc&& fScreenshot);
 
+        ImGuiContext*                                m_imguiContext = nullptr;
         std::unique_ptr<ramses::RamsesFramework>     m_framework;
         std::unique_ptr<rlogic::LogicViewerSettings> m_settings;
-        std::unique_ptr<rlogic::ImguiClientHelper>   m_imguiHelper;
         std::unique_ptr<rlogic::LogicViewer>         m_viewer;
-        std::unique_ptr<rlogic::LogicViewerGui>      m_gui;
-        std::unique_ptr<ISceneSetup>                 m_sceneSetup;
 
         ramses::RamsesClient* m_client = nullptr;
         ramses::Scene* m_scene = nullptr;
         rlogic::Result m_loadLuaStatus;
 
-        uint32_t m_width  = 0u;
-        uint32_t m_height = 0u;
-        std::array<float, 4> m_defaultClearColor{ 0, 0, 0, 1 };
-
         int m_exitCode = -1;
+        bool m_interactive = false;
     };
 
     inline int LogicViewerApp::exitCode() const
@@ -102,11 +87,6 @@ namespace rlogic
     inline rlogic::LogicViewer* LogicViewerApp::getViewer()
     {
         return m_viewer.get();
-    }
-
-    inline rlogic::ImguiClientHelper* LogicViewerApp::getImguiClientHelper()
-    {
-        return m_imguiHelper.get();
     }
 
     inline const rlogic::LogicViewerSettings* LogicViewerApp::getSettings() const

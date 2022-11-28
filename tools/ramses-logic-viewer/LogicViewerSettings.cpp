@@ -7,6 +7,7 @@
 //  -------------------------------------------------------------------------
 
 #include "LogicViewerSettings.h"
+#include "ImguiWrapper.h"
 
 #ifndef _MSC_VER
 #pragma GCC diagnostic push
@@ -31,6 +32,7 @@ namespace rlogic
     LogicViewerSettings::LogicViewerSettings()
     {
         auto* ctx = ImGui::GetCurrentContext();
+        assert(ctx != nullptr);
         ImGuiSettingsHandler ini_handler;
         ini_handler.TypeName = "LogicViewerGui";
         ini_handler.TypeHash = ImHashStr("LogicViewerGui");

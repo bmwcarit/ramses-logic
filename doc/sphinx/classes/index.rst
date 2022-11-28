@@ -38,6 +38,7 @@ Class Index
     RamsesRenderPassBinding
     RamsesRenderGroupBinding
     RamsesRenderGroupBindingElements
+    RamsesMeshNodeBinding
     SkinBinding
     SaveFileConfig
     TimerNode
@@ -86,6 +87,7 @@ Class Index
     ERotationType
     EStandardModule
     EFeatureLevel
+    ELuaSavingMode
 
 
 .. toctree::

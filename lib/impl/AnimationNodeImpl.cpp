@@ -33,6 +33,7 @@ namespace rlogic::internal
             assert(channel.timeStamps->getNumElements() == channel.keyframes->getNumElements());
             assert(!channel.tangentsIn || channel.timeStamps->getNumElements() == channel.tangentsIn->getNumElements());
             assert(!channel.tangentsOut || channel.timeStamps->getNumElements() == channel.tangentsOut->getNumElements());
+            assert(!exposeDataAsProperties || channel.keyframes->getDataType() != EPropertyType::Array);
 
             // extract basic channel data to work containers, update logic operates with these containers instead of original channel data
             // (for timestamps and keyframes at least), it also makes it possible to modify this data in runtime while keeping original data constant
@@ -74,7 +75,18 @@ namespace rlogic::internal
             {"duration", EPropertyType::Float},   // EOutputIdx_Duration
             });
         for (const auto& channel : m_channels)
-            outputs.children.push_back(MakeType(std::string{ channel.name }, channel.keyframes->getDataType()));
+        {
+            if (channel.keyframes->getDataType() == EPropertyType::Array)
+            {
+                const size_t elementArraySize = channel.keyframes->getData<std::vector<float>>()->front().size();
+                assert(elementArraySize < MaxArrayPropertySize);
+                outputs.children.push_back(MakeArray(std::string{ channel.name }, elementArraySize, EPropertyType::Float));
+            }
+            else
+            {
+                outputs.children.push_back(MakeType(std::string{ channel.name }, channel.keyframes->getDataType()));
+            }
+        }
         auto outputsImpl = std::make_unique<PropertyImpl>(std::move(outputs), EPropertySemantics::AnimationOutput);
 
         setRootProperties(std::make_unique<Property>(std::move(inputsImpl)), std::make_unique<Property>(std::move(outputsImpl)));
@@ -185,17 +197,19 @@ namespace rlogic::internal
             asQuaternion[3] *= normalizationFactor;
         }
 
-        std::visit([&](const auto& v) {
+        // 'progress' is at index 0, channel outputs are shifted by one
+        auto outputValueProp = getOutputs()->getChild(channelIdx + EOutputIdx_ChannelsBegin);
+        std::visit([outputValueProp](const auto& v) {
             using ValueType = std::remove_const_t<std::remove_reference_t<decltype(v)>>;
-            // array data type requires each array element to be set to individual output property
             if constexpr (std::is_same_v<ValueType, std::vector<float>>)
             {
-                assert(!"not implemented");
+                // array data type requires each array element to be set to individual output property
+                for (size_t arrayIdx = 0u; arrayIdx < v.size(); ++arrayIdx)
+                    outputValueProp->getChild(arrayIdx)->m_impl->setValue(v[arrayIdx]);
             }
             else
             {
-                // 'progress' is at index 0, channel outputs are shifted by one
-                getOutputs()->getChild(channelIdx + EOutputIdx_ChannelsBegin)->m_impl->setValue(PropertyValue{ v });
+                outputValueProp->m_impl->setValue(PropertyValue{ v });
             }
             }, interpolatedValue);
     }
@@ -267,6 +281,8 @@ namespace rlogic::internal
             auto upperValIt = upperVal.cbegin();
             auto lowerTangentOutIt = lowerTangentOut.cbegin();
             auto upperTangentInIt = upperTangentIn.cbegin();
+            assert(lowerVal.size() == lowerTangentOut.size());
+            assert(lowerVal.size() == upperTangentIn.size());
 
             // decompose vecXy and interpolate each component separately
             for (; valIt != val.cend(); ++valIt, ++lowerValIt, ++upperValIt, ++lowerTangentOutIt, ++upperTangentInIt)
@@ -454,7 +470,7 @@ namespace rlogic::internal
                 // array data type requires each array element of each keyframe element to be set to individual input property
                 if constexpr (std::is_same_v<ValueType, std::vector<float>>)
                 {
-                    assert(!"not implemented");
+                    assert(!"not supported");
                 }
                 else
                 {
@@ -488,7 +504,7 @@ namespace rlogic::internal
                 // array data type requires each array element of each keyframe element to be read from individual input property
                 if constexpr (std::is_same_v<ValueType, std::vector<float>>)
                 {
-                    assert(!"not implemented");
+                    assert(!"not supported");
                 }
                 else
                 {

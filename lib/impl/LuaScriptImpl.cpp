@@ -35,6 +35,7 @@ namespace rlogic::internal
         , m_runFunction(std::move(compiledScript.runFunction))
         , m_modules(std::move(compiledScript.source.userModules))
         , m_stdModules(std::move(compiledScript.source.stdModules))
+        , m_hasDebugLogFunctions{ compiledScript.source.hasDebugLogFunctions }
     {
         setRootProperties(std::move(compiledScript.rootInput), std::move(compiledScript.rootOutput));
     }
@@ -44,8 +45,15 @@ namespace rlogic::internal
         // unlike other logic objects, luascript properties created outside of it (from script or deserialized)
     }
 
-    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(const LuaScriptImpl& luaScript, flatbuffers::FlatBufferBuilder& builder, SerializationMap& serializationMap, EFeatureLevel featureLevel)
+    flatbuffers::Offset<rlogic_serialization::LuaScript> LuaScriptImpl::Serialize(
+        const LuaScriptImpl& luaScript,
+        flatbuffers::FlatBufferBuilder& builder,
+        SerializationMap& serializationMap,
+        ELuaSavingMode luaSavingMode)
     {
+        // serialization with debug logs is forbidden
+        assert(!luaScript.hasDebugLogFunctions());
+
         std::vector<flatbuffers::Offset<rlogic_serialization::LuaModuleUsage>> userModules;
         userModules.reserve(luaScript.m_modules.size());
         for (const auto& module : luaScript.m_modules)
@@ -69,27 +77,20 @@ namespace rlogic::internal
         const auto fbInputPropertyObject = PropertyImpl::Serialize(*luaScript.getInputs()->m_impl, builder, serializationMap);
         const auto fbOuputPropertyObject = PropertyImpl::Serialize(*luaScript.getOutputs()->m_impl, builder, serializationMap);
 
-        if (featureLevel == EFeatureLevel_01)
-        {
-            const auto fbSrcCode = builder.CreateString(luaScript.m_source);
-            auto script = rlogic_serialization::CreateLuaScript(builder,
-                fbLogicObject,
-                fbSrcCode,
-                fbModulesVec,
-                fbStdModulesVec,
-                fbInputPropertyObject,
-                fbOuputPropertyObject,
-                0
-            );
-            builder.Finish(script);
+        const bool hasSourceCode = !luaScript.m_source.empty();
+        const bool hasByteCode = !luaScript.m_byteCode.empty();
+        assert(hasSourceCode || hasByteCode);
+        const bool serializeSourceCode = hasSourceCode && !((luaSavingMode == ELuaSavingMode::ByteCodeOnly) && hasByteCode);
+        const bool serializeByteCode = hasByteCode && !((luaSavingMode == ELuaSavingMode::SourceCodeOnly) && hasSourceCode);
+        assert(serializeSourceCode || serializeByteCode);
 
-            return script;
-        }
+        const auto fbSrcCode = (serializeSourceCode ? builder.CreateString(luaScript.m_source) : 0);
 
-        if (featureLevel >= EFeatureLevel_02)
+        flatbuffers::Offset<flatbuffers::Vector<uint8_t>> byteCodeOffset{};
+        if (serializeByteCode)
         {
             std::string byteCodeString{ luaScript.m_byteCode.as_string_view() };
-            auto byteCodeOffset = serializationMap.resolveByteCodeOffsetIfFound(byteCodeString);
+            byteCodeOffset = serializationMap.resolveByteCodeOffsetIfFound(byteCodeString);
             if (byteCodeOffset.IsNull())
             {
                 std::vector<uint8_t> byteCodeAsVectorUInt8;
@@ -99,23 +100,20 @@ namespace rlogic::internal
                 byteCodeOffset = builder.CreateVector(byteCodeAsVectorUInt8);
                 serializationMap.storeByteCodeOffset(std::move(byteCodeString), byteCodeOffset);
             }
-
-            auto script = rlogic_serialization::CreateLuaScript(builder,
-                fbLogicObject,
-                0, //no source
-                fbModulesVec,
-                fbStdModulesVec,
-                fbInputPropertyObject,
-                fbOuputPropertyObject,
-                byteCodeOffset
-            );
-            builder.Finish(script);
-
-            return script;
         }
 
-        assert(false);
-        return {};
+        auto script = rlogic_serialization::CreateLuaScript(builder,
+            fbLogicObject,
+            fbSrcCode,
+            fbModulesVec,
+            fbStdModulesVec,
+            fbInputPropertyObject,
+            fbOuputPropertyObject,
+            byteCodeOffset
+        );
+        builder.Finish(script);
+
+        return script;
     }
 
     std::unique_ptr<LuaScriptImpl> LuaScriptImpl::Deserialize(
@@ -135,15 +133,11 @@ namespace rlogic::internal
             return nullptr;
         }
 
-        if (featureLevel == EFeatureLevel_01 && (!luaScript.luaSourceCode() || luaScript.luaSourceCode()->size() == 0))
+        const bool hasSourceCode = (luaScript.luaSourceCode() != nullptr && luaScript.luaSourceCode()->size() > 0);
+        const bool hasBytecode = (luaScript.luaByteCode() != nullptr && luaScript.luaByteCode()->size() > 0);
+        if (!hasSourceCode && !hasBytecode)
         {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua source code!", nullptr, EErrorType::BinaryVersionMismatch);
-            return nullptr;
-        }
-
-        if (featureLevel >= EFeatureLevel_02 && (!luaScript.luaByteCode() || luaScript.luaByteCode()->size() == 0))
-        {
-            errorReporting.add("Fatal error during loading of LuaScript from serialized data: missing Lua byte code!", nullptr, EErrorType::BinaryVersionMismatch);
+            errorReporting.add("Fatal error during loading of LuaScript from serialized data: has neither Lua source code nor bytecode!", nullptr, EErrorType::BinaryVersionMismatch);
             return nullptr;
         }
 
@@ -220,22 +214,26 @@ namespace rlogic::internal
         auto inputs = std::make_unique<Property>(std::move(rootInput));
         auto outputs = std::make_unique<Property>(std::move(rootOutput));
 
-        sol::environment env = solState.createEnvironment(stdModules, userModules);
-        sol::table internalEnv = EnvironmentProtection::GetProtectedEnvironmentTable(env);
-
-        sol::protected_function init;
-        sol::protected_function run;
+        std::string sourceCode = (hasSourceCode ? luaScript.luaSourceCode()->str() : "");
         sol::bytecode byteCode;
-
-        std::string sourceCode =  (featureLevel == EFeatureLevel_01 ? luaScript.luaSourceCode()->str() : "");
-
-        if (featureLevel >= EFeatureLevel_02)
+        if (hasBytecode)
         {
             byteCode.reserve(luaScript.luaByteCode()->size());
             std::transform(luaScript.luaByteCode()->cbegin(), luaScript.luaByteCode()->cend(), std::back_inserter(byteCode), [](uint8_t b) { return std::byte(b); });
         }
 
-        auto compiledScript = LuaCompilationUtils::CompileScriptOrImportPrecompiled(solState, userModules, stdModules, std::move(sourceCode), name, errorReporting, std::move(byteCode), std::move(inputs), std::move(outputs), featureLevel);
+        auto compiledScript = LuaCompilationUtils::CompileScriptOrImportPrecompiled(
+            solState,
+            userModules,
+            stdModules,
+            std::move(sourceCode),
+            name,
+            errorReporting,
+            std::move(byteCode),
+            std::move(inputs),
+            std::move(outputs),
+            featureLevel,
+            false);
 
         if (!compiledScript)
         {
@@ -268,5 +266,10 @@ namespace rlogic::internal
     const ModuleMapping& LuaScriptImpl::getModules() const
     {
         return m_modules;
+    }
+
+    bool LuaScriptImpl::hasDebugLogFunctions() const
+    {
+        return m_hasDebugLogFunctions;
     }
 }

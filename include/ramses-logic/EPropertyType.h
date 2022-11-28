@@ -251,7 +251,7 @@ namespace rlogic
         case EPropertyType::Vec2i:
         case EPropertyType::Vec3i:
         case EPropertyType::Vec4i:
-        case EPropertyType::Array:
+        case EPropertyType::Array: /// only with float elements
             return true;
         case EPropertyType::Bool:
         case EPropertyType::Struct:
@@ -268,8 +268,8 @@ namespace rlogic
     */
     constexpr bool CanPropertyTypeBeAnimated(EPropertyType type)
     {
-        // for now animating of array data types is not implemented
-        return CanPropertyTypeBeStoredInDataArray(type) && (type != EPropertyType::Array);
+        // all data types that can be stored in DataArray can be animated
+        return CanPropertyTypeBeStoredInDataArray(type);
     }
 
     /**

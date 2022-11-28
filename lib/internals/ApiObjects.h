@@ -13,6 +13,7 @@
 #include "ramses-logic/EFeatureLevel.h"
 #include "ramses-logic/PropertyLink.h"
 #include "ramses-logic/DataTypes.h"
+#include "ramses-logic/ELuaSavingMode.h"
 
 #include "impl/LuaConfigImpl.h"
 
@@ -33,6 +34,7 @@ namespace ramses
     class RenderPass;
     class RenderGroup;
     class UniformInput;
+    class MeshNode;
 }
 
 namespace rlogic_serialization
@@ -59,6 +61,7 @@ namespace rlogic
     class RamsesRenderPassBinding;
     class RamsesRenderGroupBinding;
     class RamsesRenderGroupBindingElements;
+    class RamsesMeshNodeBinding;
     class SkinBinding;
     class DataArray;
     class AnimationNode;
@@ -104,7 +107,8 @@ namespace rlogic::internal
         // Serialization/Deserialization
         static flatbuffers::Offset<rlogic_serialization::ApiObjects> Serialize(
             const ApiObjects& apiObjects,
-            flatbuffers::FlatBufferBuilder& builder);
+            flatbuffers::FlatBufferBuilder& builder,
+            ELuaSavingMode luaSavingMode);
         static std::unique_ptr<ApiObjects> Deserialize(
             const rlogic_serialization::ApiObjects& apiObjects,
             const IRamsesObjectResolver* ramsesResolver,
@@ -120,6 +124,7 @@ namespace rlogic::internal
             ErrorReporting& errorReporting);
         LuaInterface* createLuaInterface(
             std::string_view source,
+            const LuaConfigImpl& config,
             std::string_view interfaceName,
             ErrorReporting& errorReporting);
         LuaModule* createLuaModule(
@@ -132,6 +137,7 @@ namespace rlogic::internal
         RamsesCameraBinding* createRamsesCameraBinding(ramses::Camera& ramsesCamera, bool withFrustumPlanes, std::string_view name);
         RamsesRenderPassBinding* createRamsesRenderPassBinding(ramses::RenderPass& renderPass, std::string_view name);
         RamsesRenderGroupBinding* createRamsesRenderGroupBinding(ramses::RenderGroup& ramsesRenderGroup, const RamsesRenderGroupBindingElements& elements, std::string_view name);
+        RamsesMeshNodeBinding* createRamsesMeshNodeBinding(ramses::MeshNode& ramsesMeshNode, std::string_view name);
         SkinBinding* createSkinBinding(
             std::vector<const RamsesNodeBindingImpl*> joints,
             const std::vector<matrix44f>& inverseBindMatrices,
@@ -193,6 +199,7 @@ namespace rlogic::internal
         [[nodiscard]] bool destroyInternal(RamsesCameraBinding& ramsesCameraBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesRenderPassBinding& ramsesRenderPassBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(RamsesRenderGroupBinding& ramsesRenderGroupBinding, ErrorReporting& errorReporting);
+        [[nodiscard]] bool destroyInternal(RamsesMeshNodeBinding& ramsesMeshNodeBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(SkinBinding& skinBinding, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(AnimationNode& node, ErrorReporting& errorReporting);
         [[nodiscard]] bool destroyInternal(DataArray& dataArray, ErrorReporting& errorReporting);
@@ -211,6 +218,7 @@ namespace rlogic::internal
         ApiObjectContainer<RamsesCameraBinding>      m_ramsesCameraBindings;
         ApiObjectContainer<RamsesRenderPassBinding>  m_ramsesRenderPassBindings;
         ApiObjectContainer<RamsesRenderGroupBinding> m_ramsesRenderGroupBindings;
+        ApiObjectContainer<RamsesMeshNodeBinding>    m_ramsesMeshNodeBindings;
         ApiObjectContainer<SkinBinding>              m_skinBindings;
         ApiObjectContainer<DataArray>                m_dataArrays;
         ApiObjectContainer<AnimationNode>            m_animationNodes;

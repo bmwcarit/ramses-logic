@@ -28,7 +28,7 @@ namespace rlogic
     * inputs to the user of that network. Those input variables can be used to represent scenes in an abstract way.
     * LuaInterface instances are created by the #rlogic::LogicEngine class.
     *
-    * A LuaInterface can be created from Lua source code which must fulfill same requirements as #rlogic#LuaScript, except for the following:
+    * A LuaInterface can be created from Lua source code which must fulfill same requirements as #rlogic::LuaScript, except for the following:
     *
     * - A Lua interface contains only one global function: interface()
     * - The interface() function takes only one parameter that represents both inputs and outputs, e.g., interface(INOUT_PARAMS)

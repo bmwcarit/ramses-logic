@@ -7,7 +7,8 @@
 //  -------------------------------------------------------------------------
 
 #include "ramses-logic-build-config.h"
-#include "LogicViewerApp.h"
+#include "LogicViewerGuiApp.h"
+#include "LogicViewerHeadlessApp.h"
 #include "LogicViewer.h"
 #include "LogicViewerSettings.h"
 #include "gmock/gmock.h"
@@ -24,6 +25,7 @@
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/RamsesRenderGroupBindingElements.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/LuaInterface.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/SkinBinding.h"
@@ -76,6 +78,11 @@ const auto defaultLuaFile = R"(function default()
     rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false
     --RenderGroup bindings
     rlogic.renderGroupBindings["myRenderGroup"]["IN"]["renderOrders"]["myMeshNode"].value = 0
+    --MeshNode bindings
+    rlogic.meshNodeBindings["myMeshNode"]["IN"]["vertexOffset"].value = 0
+    rlogic.meshNodeBindings["myMeshNode"]["IN"]["indexOffset"].value = 0
+    rlogic.meshNodeBindings["myMeshNode"]["IN"]["indexCount"].value = 3
+    rlogic.meshNodeBindings["myMeshNode"]["IN"]["instanceCount"].value = 1
     --Anchor points
     --Skin bindings
 end
@@ -99,11 +106,10 @@ function test_default()
     -- stores a screenshot (relative to the working directory)
     rlogic.screenshot("test_default.png")
 end
-
 )";
 
 const auto iniFile = R"(
-[Window][Logic Viewer (FeatureLevel 04)]
+[Window][Logic Viewer (FeatureLevel 05)]
 Pos=0,0
 Size=540,720
 Collapsed=0
@@ -194,9 +200,14 @@ public:
         return renderPassBindings() + buttonHeight;
     }
 
-    [[nodiscard]] int32_t anchorPoints() const
+    [[nodiscard]] int32_t meshNodeBindings() const
     {
         return renderGroupBindings() + buttonHeight;
+    }
+
+    [[nodiscard]] int32_t anchorPoints() const
+    {
+        return meshNodeBindings() + buttonHeight;
     }
 
     [[nodiscard]] int32_t skinBindings() const
@@ -273,6 +284,7 @@ namespace rlogic::internal
     };
 
 
+    template <class T>
     class ALogicViewerAppBase
     {
     public:
@@ -374,6 +386,7 @@ namespace rlogic::internal
             rlogic::RamsesRenderGroupBindingElements rgElements;
             rgElements.addElement(*m_scene.meshNode, "myMeshNode");
             engine.createRamsesRenderGroupBinding(*m_scene.renderGroup, rgElements, "myRenderGroup");
+            engine.createRamsesMeshNodeBinding(*m_scene.meshNode, "myMeshNode");
 
             engine.createTimerNode("myTimer");
 
@@ -400,7 +413,7 @@ namespace rlogic::internal
             args.resize(argsList.size());
             std::transform(argsList.begin(), argsList.end(), args.begin(), [](const auto& str) { return str.c_str(); });
             args.insert(args.begin(), "viewer"); // 1st is executable name to comply with standard application args
-            m_app = std::make_unique<LogicViewerApp>(static_cast<int>(args.size()), args.data());
+            m_app = std::make_unique<T>(static_cast<int>(args.size()), args.data());
         }
 
         [[nodiscard]] bool runUntil(const std::string& message)
@@ -480,21 +493,34 @@ namespace rlogic::internal
         RamsesTestSetup   m_ramses;
         TriangleTestScene m_scene = {m_ramses.createTriangleTestScene()};
         LogHandler m_log;
-        std::unique_ptr<LogicViewerApp> m_app;
+        std::unique_ptr<T> m_app;
     };
 
-    class ALogicViewerApp : public ALogicViewerAppBase, public ::testing::Test
+    class ALogicViewerGuiApp : public ALogicViewerAppBase<LogicViewerGuiApp>, public ::testing::Test
     {
     };
 
-    class ALogicViewerAppUIBase : public ALogicViewerAppBase
+    class ALogicViewerHeadlessApp : public ALogicViewerAppBase<LogicViewerHeadlessApp>, public ::testing::Test
+    {
+    };
+
+    template <typename T>
+    class ALogicViewerApp_T : public ALogicViewerAppBase<T>, public ::testing::Test
+    {
+    };
+
+    using LogicViewerAppTypes = ::testing::Types< LogicViewerGuiApp, LogicViewerHeadlessApp>;
+
+    TYPED_TEST_SUITE(ALogicViewerApp_T, LogicViewerAppTypes);
+
+    class ALogicViewerAppUIBase : public ALogicViewerAppBase<LogicViewerGuiApp>
     {
     public:
         void setup(std::string_view ini, std::vector<std::string> args = {})
         {
             SaveFile(ini, "imgui.ini");
             args.emplace_back(ramsesFile);
-            createApp(args);
+            this->createApp(args);
 
             ui.setup(m_app->getSettings());
             ImGui::GetIO().GetClipboardTextFn = GetClipboardText;
@@ -582,7 +608,7 @@ namespace rlogic::internal
         }
     };
 
-    TEST_F(ALogicViewerApp, ImageCompareSelfTest)
+    TEST_F(ALogicViewerGuiApp, ImageCompareSelfTest)
     {
         EXPECT_TRUE(CompareImage("../res/unittests/ALogicViewerApp_red.png", "ALogicViewerApp_red.png"));
         EXPECT_TRUE(CompareImage("../res/unittests/ALogicViewerApp_red.png", "ALogicViewerApp_white.png", 100));
@@ -596,92 +622,92 @@ namespace rlogic::internal
         EXPECT_EQ("143262", str); // image differences
     }
 
-    TEST_F(ALogicViewerApp, nullparameter)
+    TYPED_TEST(ALogicViewerApp_T, nullparameter)
     {
-        LogicViewerApp app(0, nullptr);
+        TypeParam app(0, nullptr);
         EXPECT_EQ(-1, app.run());
         EXPECT_EQ(-1, app.exitCode());
     }
 
-    TEST_F(ALogicViewerApp, emptyParam)
+    TYPED_TEST(ALogicViewerApp_T, emptyParam)
     {
-        createApp();
-        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::RequiredError), m_app->run());
-        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::RequiredError), m_app->exitCode());
+        this->createApp();
+        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::RequiredError), this->m_app->run());
+        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::RequiredError), this->m_app->exitCode());
     }
 
-    TEST_F(ALogicViewerApp, version)
+    TYPED_TEST(ALogicViewerApp_T, version)
     {
         testing::internal::CaptureStdout();
-        createApp({ "--version" });
+        this->createApp({ "--version" });
         EXPECT_THAT(testing::internal::GetCapturedStdout(), testing::StartsWith(rlogic::g_PROJECT_VERSION));
-        EXPECT_EQ(0, m_app->run());
+        EXPECT_EQ(0, this->m_app->run());
     }
 
-    TEST_F(ALogicViewerApp, ramsesFileDoesNotExist)
+    TYPED_TEST(ALogicViewerApp_T, ramsesFileDoesNotExist)
     {
         testing::internal::CaptureStderr();
-        createApp({ "notExisting.ramses" });
-        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
+        this->createApp({ "notExisting.ramses" });
+        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), this->m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: notExisting.ramses"));
     }
 
-    TEST_F(ALogicViewerApp, logicFileDoesNotExist)
+    TYPED_TEST(ALogicViewerApp_T, logicFileDoesNotExist)
     {
         testing::internal::CaptureStderr();
-        createApp({ ramsesFile, "notExisting.rlogic" });
-        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
+        this->createApp({ ramsesFile, "notExisting.rlogic" });
+        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), this->m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: notExisting.rlogic"));
     }
 
-    TEST_F(ALogicViewerApp, luaFileDoesNotExist)
+    TYPED_TEST(ALogicViewerApp_T, luaFileDoesNotExist)
     {
         testing::internal::CaptureStderr();
-        createApp({ ramsesFile, logicFile, "notExisting.lua" });
-        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
+        this->createApp({ ramsesFile, logicFile, "notExisting.lua" });
+        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), this->m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: notExisting.lua"));
     }
 
-    TEST_F(ALogicViewerApp, writeDefaultLuaConfiguration)
+    TYPED_TEST(ALogicViewerApp_T, writeDefaultLuaConfiguration)
     {
-        createApp({ "--write-config", ramsesFile });
-        auto* viewer = m_app->getViewer();
+        this->createApp({ "--write-config", ramsesFile });
+        auto* viewer = this->m_app->getViewer();
         ASSERT_TRUE(viewer != nullptr);
         EXPECT_EQ(Result(), viewer->update());
-        EXPECT_EQ(0, m_app->run());
+        EXPECT_EQ(0, this->m_app->run());
         EXPECT_TRUE(fs::exists(luaFile));
         std::ifstream str(luaFile);
         std::string   genfile((std::istreambuf_iterator<char>(str)), std::istreambuf_iterator<char>());
         EXPECT_EQ(defaultLuaFile, genfile);
     }
 
-    TEST_F(ALogicViewerApp, writeDefaultLuaConfigurationHeadless)
+    TYPED_TEST(ALogicViewerApp_T, writeDefaultLuaConfigurationHeadless)
     {
-        createApp({ "--write-config", "--headless", ramsesFile });
-        auto* viewer = m_app->getViewer();
+        this->createApp({ "--write-config", "--headless", ramsesFile });
+        auto* viewer = this->m_app->getViewer();
         ASSERT_TRUE(viewer != nullptr);
         EXPECT_EQ(Result(), viewer->update());
-        EXPECT_EQ(0, m_app->run());
+        EXPECT_EQ(0, this->m_app->run());
         EXPECT_TRUE(fs::exists(luaFile));
         std::ifstream str(luaFile);
         std::string   genfile((std::istreambuf_iterator<char>(str)), std::istreambuf_iterator<char>());
         EXPECT_EQ(defaultLuaFile, genfile);
     }
 
-    TEST_F(ALogicViewerApp, writeDefaultLuaConfigurationToOtherFile)
+    TYPED_TEST(ALogicViewerApp_T, writeDefaultLuaConfigurationToOtherFile)
     {
-        createApp({ "--write-config=foobar.lua", ramsesFile });
-        auto* viewer = m_app->getViewer();
+        this->createApp({ "--write-config=foobar.lua", ramsesFile });
+        auto* viewer = this->m_app->getViewer();
         ASSERT_TRUE(viewer != nullptr);
         EXPECT_EQ(Result(), viewer->update());
-        EXPECT_EQ(0, m_app->run());
+        EXPECT_EQ(0, this->m_app->run());
         EXPECT_TRUE(fs::exists("foobar.lua"));
         std::ifstream str("foobar.lua");
         std::string   genfile((std::istreambuf_iterator<char>(str)), std::istreambuf_iterator<char>());
         EXPECT_EQ(defaultLuaFile, genfile);
     }
 
-    TEST_F(ALogicViewerApp, runInteractive)
+    TEST_F(ALogicViewerGuiApp, runInteractive)
     {
         createApp({ ramsesFile });
         EXPECT_TRUE(runUntil("is in state RENDERED caused by command SHOW"));
@@ -694,21 +720,28 @@ namespace rlogic::internal
         EXPECT_EQ(0, m_app->exitCode());
     }
 
-    TEST_F(ALogicViewerApp, exec_luaFileMissing)
+    TEST_F(ALogicViewerHeadlessApp, runInteractive)
+    {
+        createApp({ ramsesFile });
+        EXPECT_FALSE(m_app->doOneLoop());
+        EXPECT_EQ(-1, m_app->run());
+    }
+
+    TYPED_TEST(ALogicViewerApp_T, exec_luaFileMissing)
     {
         // implicit filename
         testing::internal::CaptureStderr();
-        createApp({ "--exec=test_default", ramsesFile });
-        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
+        this->createApp({ "--exec=test_default", ramsesFile });
+        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), this->m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("cannot open ALogicViewerAppTest.lua: No such file or directory"));
         // explicit filename
         testing::internal::CaptureStderr();
-        createApp({ "--exec=test_default", "--lua=NotExistingLuaFile.lua", ramsesFile });
-        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), m_app->run());
+        this->createApp({ "--exec=test_default", "--lua=NotExistingLuaFile.lua", ramsesFile });
+        EXPECT_EQ(static_cast<int>(CLI::ExitCodes::ValidationError), this->m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("File does not exist: NotExistingLuaFile.lua"));
     }
 
-    TEST_F(ALogicViewerApp, exec_screenshot)
+    TEST_F(ALogicViewerGuiApp, exec_screenshot)
     {
         SaveFile(R"(
             function test_default()
@@ -724,20 +757,20 @@ namespace rlogic::internal
         EXPECT_TRUE(CompareImage("test_yellow.png", "ALogicViewerApp_yellow.png"));
     }
 
-    TEST_F(ALogicViewerApp, exec_luaError)
+    TYPED_TEST(ALogicViewerApp_T, exec_luaError)
     {
-        SaveFile(R"(
+        this->SaveFile(R"(
             function test_default()
                 -- stores a screenshot (relative to the working directory)
                 rlogic.screenshot("test_red.png")
                 rlogic.appearanceBindings.myAppearance.IN.green.value = 1
                 rlogic.screenshot("test_yellow.png")
         )");
-        createApp({ "--exec=test_default", ramsesFile });
-        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
+        this->createApp({ "--exec=test_default", ramsesFile });
+        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), this->m_app->run());
     }
 
-    TEST_F(ALogicViewerApp, exec_lua_function)
+    TEST_F(ALogicViewerGuiApp, exec_lua_function)
     {
         SaveFile(R"(
             function test_default(filename, greenVal)
@@ -755,29 +788,29 @@ namespace rlogic::internal
         EXPECT_TRUE(CompareImage("almost_yellow.png", "ALogicViewerApp_yellow.png", 15.f));
     }
 
-    TEST_F(ALogicViewerApp, exec_lua_code)
+    TYPED_TEST(ALogicViewerApp_T, exec_lua_code)
     {
-        createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.44)", ramsesFile });
-        EXPECT_EQ(0, m_app->run());
-        auto appearance = m_app->getViewer()->getEngine().findByName<rlogic::RamsesAppearanceBinding>("myAppearance");
+        this->createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.44)", ramsesFile });
+        EXPECT_EQ(0, this->m_app->run());
+        auto appearance = this->m_app->getViewer()->getEngine().template findByName<typename rlogic::RamsesAppearanceBinding>("myAppearance");
         ASSERT_TRUE(appearance != nullptr);
         auto prop = appearance->getInputs()->getChild("green");
         ASSERT_TRUE(prop != nullptr);
-        EXPECT_FLOAT_EQ(0.44f, prop->get<float>().value());
+        EXPECT_FLOAT_EQ(0.44f, prop->template get<float>().value());
     }
 
-    TEST_F(ALogicViewerApp, exec_lua_error)
+    TYPED_TEST(ALogicViewerApp_T, exec_lua_error)
     {
         testing::internal::CaptureStderr();
-        createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green = 0.44)", ramsesFile });
+        this->createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green = 0.44)", ramsesFile });
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("sol: cannot set (new_index) into this object"));
-        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
+        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), this->m_app->run());
     }
 
-    TEST_F(ALogicViewerApp, exec_lua_headless)
+    TEST_F(ALogicViewerGuiApp, exec_lua_headless)
     {
         createApp({ R"(--exec-lua=rlogic.appearanceBindings.myAppearance.IN.green.value = 0.24)", "--headless", ramsesFile });
-        EXPECT_EQ(0, m_app->run());
+        ASSERT_EQ(0, m_app->run());
         auto appearance = m_app->getViewer()->getEngine().findByName<rlogic::RamsesAppearanceBinding>("myAppearance");
         ASSERT_TRUE(appearance != nullptr);
         auto prop = appearance->getInputs()->getChild("green");
@@ -785,15 +818,15 @@ namespace rlogic::internal
         EXPECT_FLOAT_EQ(0.24f, prop->get<float>().value());
     }
 
-    TEST_F(ALogicViewerApp, exec_lua_screenshot_headless)
+    TYPED_TEST(ALogicViewerApp_T, exec_lua_screenshot_headless)
     {
         testing::internal::CaptureStderr();
-        createApp({ R"(--exec-lua=rlogic.screenshot("screenshot.png"))", "--headless", ramsesFile });
-        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), m_app->run());
+        this->createApp({ R"(--exec-lua=rlogic.screenshot("screenshot.png"))", "--headless", ramsesFile });
+        EXPECT_EQ(static_cast<int>(LogicViewerApp::ExitCode::ErrorLoadLua), this->m_app->run());
         EXPECT_THAT(testing::internal::GetCapturedStderr(), testing::HasSubstr("No screenshots available in current configuration"));
     }
 
-    TEST_F(ALogicViewerApp, interactive_luaError)
+    TEST_F(ALogicViewerGuiApp, interactive_luaError)
     {
         SaveFile(R"(
             function test_default()
@@ -810,7 +843,7 @@ namespace rlogic::internal
         // does not terminate
     }
 
-    TEST_F(ALogicViewerApp, no_offscreen)
+    TEST_F(ALogicViewerGuiApp, no_offscreen)
     {
         SaveFile(R"(
             function test_default()
@@ -823,7 +856,7 @@ namespace rlogic::internal
         EXPECT_TRUE(CompareImage("test_red.png", "ALogicViewerApp_red.png"));
     }
 
-    TEST_F(ALogicViewerApp, windowSize)
+    TEST_F(ALogicViewerGuiApp, windowSize)
     {
         SaveFile(R"(
             function test_default()
@@ -972,6 +1005,20 @@ namespace rlogic::internal
         EXPECT_EQ(3, prop->get<int32_t>().value());
     }
 
+    TEST_F(ALogicViewerAppUI, modifyMeshNode)
+    {
+        const int32_t mouseX = 100;
+        EXPECT_TRUE(click(mouseX, ui.meshNodeBindings()));
+        EXPECT_TRUE(click(mouseX, ui.meshNodeBindings() + ui.smallButtonHeight));
+        EXPECT_TRUE(dragX(mouseX, mouseX + 30, ui.meshNodeBindings() + 4 * ui.smallButtonHeight));
+
+        auto* meshNode = m_app->getViewer()->getEngine().findByName<rlogic::RamsesMeshNodeBinding>("myMeshNode");
+        ASSERT_TRUE(meshNode != nullptr);
+        auto* prop = meshNode->getInputs()->getChild("vertexOffset");
+        ASSERT_TRUE(prop != nullptr);
+        EXPECT_EQ(3, prop->get<int32_t>().value());
+    }
+
     TEST_F(ALogicViewerAppUI, reloadConfiguration)
     {
         const int32_t xFile = 25;
@@ -1053,6 +1100,12 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
         EXPECT_TRUE(contextMenuSelect(mouseX, ui.renderGroupBindings()));
         EXPECT_EQ(R"(rlogic.renderGroupBindings["myRenderGroup"]["IN"]["renderOrders"]["myMeshNode"].value = 0)",
             rtrim(ImGui::GetClipboardText()));
+
+        EXPECT_TRUE(contextMenuSelect(mouseX, ui.meshNodeBindings()));
+        EXPECT_EQ(R"(rlogic.meshNodeBindings["myMeshNode"]["IN"]["vertexOffset"].value = 0
+rlogic.meshNodeBindings["myMeshNode"]["IN"]["indexOffset"].value = 0
+rlogic.meshNodeBindings["myMeshNode"]["IN"]["indexCount"].value = 3
+rlogic.meshNodeBindings["myMeshNode"]["IN"]["instanceCount"].value = 1)", rtrim(ImGui::GetClipboardText()));
     }
 
     TEST_F(ALogicViewerAppUI, changeView)
@@ -1249,7 +1302,7 @@ rlogic.renderPassBindings["myRenderPass"]["IN"]["renderOnce"].value = false)", r
 
     TEST_F(ALogicViewerAppUIUpdateReport, updateReport)
     {
-        setup(R"([Window][Logic Viewer (FeatureLevel 04)]
+        setup(R"([Window][Logic Viewer (FeatureLevel 05)]
 Pos=0,0
 Size=540,720
 Collapsed=0
@@ -1282,7 +1335,7 @@ ShowDisplaySettings=0)");
         EXPECT_EQ(1u, report.getInterval());
 
         EXPECT_EQ(1, report.getNodesExecuted().size());
-        EXPECT_EQ(9, report.getNodesSkippedExecution().size());
+        EXPECT_EQ(10, report.getNodesSkippedExecution().size());
 
         auto* interface = m_app->getViewer()->getEngine().findByName<rlogic::LuaInterface>("myInterface");
         ASSERT_TRUE(interface != nullptr);
@@ -1291,6 +1344,6 @@ ShowDisplaySettings=0)");
         prop->set(2.1f);
         EXPECT_TRUE(m_app->doOneLoop());
         EXPECT_EQ(4, report.getNodesExecuted().size());
-        EXPECT_EQ(6, report.getNodesSkippedExecution().size());
+        EXPECT_EQ(7, report.getNodesSkippedExecution().size());
     }
 }

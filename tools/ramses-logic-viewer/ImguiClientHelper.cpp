@@ -108,6 +108,7 @@ namespace rlogic
 
     ImguiClientHelper::ImguiClientHelper(ramses::RamsesClient& client, uint32_t width, uint32_t height, ramses::sceneId_t sceneid)
     {
+        assert(ImGui::GetCurrentContext() != nullptr); // context should be already created
         ramses::SceneConfig local;
         m_imguiscene = client.createScene(sceneid, local, "imgui scene");
 
@@ -136,7 +137,6 @@ namespace rlogic
         effect->findAttributeInput("a_texcoord", inputUV);
         effect->findAttributeInput("Color", inputColor);
 
-        ImGui::CreateContext();
         ImGuiIO& io = ImGui::GetIO();
         io.DisplaySize.x = static_cast<float>(width);
         io.DisplaySize.y = static_cast<float>(height);
@@ -190,10 +190,7 @@ namespace rlogic
         m_imguiscene->flush();
     }
 
-    ImguiClientHelper::~ImguiClientHelper()
-    {
-        ImGui::DestroyContext();
-    }
+    ImguiClientHelper::~ImguiClientHelper() = default;
 
     void ImguiClientHelper::setDisplayId(ramses::displayId_t displayId)
     {

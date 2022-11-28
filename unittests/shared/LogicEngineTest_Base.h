@@ -23,6 +23,7 @@
 #include "ramses-logic/RamsesRenderPassBinding.h"
 #include "ramses-logic/RamsesRenderGroupBinding.h"
 #include "ramses-logic/RamsesRenderGroupBindingElements.h"
+#include "ramses-logic/RamsesMeshNodeBinding.h"
 #include "ramses-logic/DataArray.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
@@ -152,7 +153,7 @@ namespace rlogic
             return createSkinBinding(*nodeBinding, *appearanceBinding, logicEngine);
         }
 
-        size_t m_emptySerializedSizeTotal{156u};
+        size_t m_emptySerializedSizeTotal{164u};
     };
 
     class ALogicEngine : public ALogicEngineBase, public ::testing::Test

@@ -9,7 +9,6 @@
 #pragma once
 
 #include "impl/LogicNodeImpl.h"
-#include "impl/LuaConfigImpl.h"
 
 #include "internals/LuaCompilationUtils.h"
 #include "internals/DeserializationMap.h"
@@ -18,6 +17,7 @@
 #include "ramses-logic/Property.h"
 #include "ramses-logic/LuaScript.h"
 #include "ramses-logic/EFeatureLevel.h"
+#include "ramses-logic/ELuaSavingMode.h"
 
 #include <memory>
 #include <functional>
@@ -58,7 +58,7 @@ namespace rlogic::internal
             const LuaScriptImpl& luaScript,
             flatbuffers::FlatBufferBuilder& builder,
             SerializationMap& serializationMap,
-            EFeatureLevel featureLevel);
+            ELuaSavingMode luaSavingMode);
 
         [[nodiscard]] static std::unique_ptr<LuaScriptImpl> Deserialize(
             SolState& solState,
@@ -70,6 +70,7 @@ namespace rlogic::internal
         std::optional<LogicNodeRuntimeError> update() override;
 
         [[nodiscard]] const ModuleMapping& getModules() const;
+        [[nodiscard]] bool hasDebugLogFunctions() const;
 
         void createRootProperties() final;
 
@@ -81,5 +82,6 @@ namespace rlogic::internal
         sol::protected_function m_runFunction;
         ModuleMapping           m_modules;
         StandardModules         m_stdModules;
+        bool m_hasDebugLogFunctions;
     };
 }

@@ -37,6 +37,9 @@ namespace rlogic
     * - Channel outputs: Each animation channel provided at creation time (#rlogic::LogicEngine::createAnimationNode)
     *                    will be represented as output property with name of the channel (#rlogic::AnimationChannel::name)
     *                    and a value of type matching element in #rlogic::AnimationChannel::keyframes.
+    *                    If the data type of keyframes is #rlogic::EPropertyType::Array (i.e. each keyframe is represented
+    *                    by an array of floats), the output property is also of array type and contains a corresponding
+    *                    number of children properties of type #rlogic::EPropertyType::Float.
     *                    Channel value output is a result of keyframes interpolation based on the 'progress' input above,
     *                    it can be linked to another logic node input to use the animation result.
     *

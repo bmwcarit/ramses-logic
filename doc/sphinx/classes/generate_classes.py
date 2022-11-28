@@ -39,6 +39,7 @@ content = [
         'RamsesRenderPassBinding',
         'RamsesRenderGroupBinding',
         'RamsesRenderGroupBindingElements',
+        'RamsesMeshNodeBinding',
         'SkinBinding',
         'SaveFileConfig',
         'TimerNode',
@@ -91,6 +92,7 @@ content = [
         'ERotationType',
         'EStandardModule',
         'EFeatureLevel',
+        'ELuaSavingMode',
     ],
     },
     {

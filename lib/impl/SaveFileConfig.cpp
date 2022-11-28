@@ -35,17 +35,21 @@ namespace rlogic
 
     void SaveFileConfig::setMetadataString(std::string_view metadata)
     {
-        return m_impl->setMetadataString(metadata);
+        m_impl->setMetadataString(metadata);
     }
 
     void SaveFileConfig::setExporterVersion(uint32_t major, uint32_t minor, uint32_t patch, uint32_t fileFormatVersion)
     {
-        return m_impl->setExporterVersion(major, minor, patch, fileFormatVersion);
+        m_impl->setExporterVersion(major, minor, patch, fileFormatVersion);
     }
-
 
     void SaveFileConfig::setValidationEnabled(bool validationEnabled)
     {
-        return m_impl->setValidationEnabled(validationEnabled);
+        m_impl->setValidationEnabled(validationEnabled);
+    }
+
+    void SaveFileConfig::setLuaSavingMode(ELuaSavingMode mode)
+    {
+        m_impl->setLuaSavingMode(mode);
     }
 }

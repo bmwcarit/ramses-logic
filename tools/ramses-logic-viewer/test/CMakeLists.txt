@@ -34,7 +34,7 @@ target_include_directories(ramses-logic-viewer-test
 MakeTestFromTarget(ramses-logic-viewer-test)
 folderize_target(ramses-logic-viewer-test "tools")
 
-if (ImageMagick_FOUND)
+if (ImageMagick_FOUND AND ramses-logic_PLATFORM)
     add_executable(ramses-logic-viewer-test_SWRAST
         LogicViewerAppTest.cpp
     )

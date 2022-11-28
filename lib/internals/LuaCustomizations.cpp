@@ -11,6 +11,8 @@
 #include "ramses-logic/Property.h"
 #include "ramses-logic/EPropertyType.h"
 
+#include "impl/LoggerImpl.h"
+
 #include "internals/SolHelper.h"
 #include "internals/WrappedLuaProperty.h"
 #include "internals/PropertyTypeExtractor.h"
@@ -33,6 +35,26 @@ namespace rlogic::internal
         env["rl_next"] = state["rl_next"];
         env["rl_pairs"] = state["rl_pairs"];
         env["rl_ipairs"] = state["rl_ipairs"];
+    }
+
+    void LuaCustomizations::MapDebugLogFunctions(sol::environment& env)
+    {
+        auto rl_logInfo = [](const std::string& msg)
+        {
+            LOG_INFO("LuaDebugLog: {}", msg);
+        };
+        auto rl_logWarn = [](const std::string& msg)
+        {
+            LOG_WARN("LuaDebugLog: {}", msg);
+        };
+        auto rl_logError = [](const std::string& msg)
+        {
+            LOG_ERROR("LuaDebugLog: {}", msg);
+        };
+
+        env["rl_logInfo"] = rl_logInfo;
+        env["rl_logWarn"] = rl_logWarn;
+        env["rl_logError"] = rl_logError;
     }
 
     size_t LuaCustomizations::rl_len(const sol::object& obj)

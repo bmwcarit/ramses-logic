@@ -122,11 +122,11 @@ namespace rlogic
         EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec2i));
         EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec3i));
         EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Vec4i));
+        EXPECT_TRUE(CanPropertyTypeBeAnimated(EPropertyType::Array));
 
         EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Bool));
         EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Struct));
         EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::String));
-        EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Array));
         EXPECT_FALSE(CanPropertyTypeBeAnimated(EPropertyType::Int64));
     }
 }

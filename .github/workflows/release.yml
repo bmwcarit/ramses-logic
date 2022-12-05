@@ -52,7 +52,7 @@ jobs:
       if: ${{ matrix.os == 'windows-latest' }}
 
     - name: Publish release
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v0.1.13
       with:
         files: |
           ${{runner.workspace}}/build/RamsesLogic-*.deb

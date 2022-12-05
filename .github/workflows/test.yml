@@ -46,6 +46,14 @@ jobs:
       shell: bash
       working-directory: ${{runner.workspace}}/build
       run: |
+        # This is needed because on the Windows Server 2019 build nodes of Github, the Perl installation
+        # exposes its libraries on the path and messes up CMake builds
+        echo "Path before: $PATH"
+        export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/c\/bin//')
+        export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/perl\/site\/bin//')
+        export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/perl\/bin//')
+        echo "Path after: $PATH"
+
         cmake $GITHUB_WORKSPACE \
             -DCMAKE_BUILD_TYPE=$BUILD_TYPE
       if: ${{ matrix.os == 'windows-latest' }}

@@ -54,6 +54,15 @@ jobs:
     - name: Publish release
       uses: softprops/action-gh-release@v0.1.13
       with:
+        fail_on_unmatched_files: true
+        files: |
+          ${{runner.workspace}}/build/RamsesLogic-*.zip
+      if: ${{ matrix.os == 'windows-latest' }}
+
+    - name: Publish release
+      uses: softprops/action-gh-release@v0.1.13
+      with:
+        fail_on_unmatched_files: true
         files: |
           ${{runner.workspace}}/build/RamsesLogic-*.deb
-          ${{runner.workspace}}/build/RamsesLogic-*.zip
+      if: ${{ matrix.os == 'ubuntu-18.04' }}

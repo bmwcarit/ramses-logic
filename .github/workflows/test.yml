@@ -21,7 +21,7 @@ jobs:
     # Newest -> so that we can test with latest tools (clang-tidy) and use recent drivers/packages
     strategy:
       matrix:
-        os: [ubuntu-18.04, ubuntu-latest, windows-latest]
+        os: [ubuntu-20.04, ubuntu-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -74,7 +74,7 @@ jobs:
       run: |
         cmake $GITHUB_WORKSPACE \
             -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-      if: ${{ matrix.os == 'ubuntu-18.04' }}
+      if: ${{ matrix.os == 'ubuntu-20.04' }}
 
     - name: Build
       working-directory: ${{runner.workspace}}/build

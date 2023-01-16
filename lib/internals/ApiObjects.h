@@ -126,7 +126,8 @@ namespace rlogic::internal
             std::string_view source,
             const LuaConfigImpl& config,
             std::string_view interfaceName,
-            ErrorReporting& errorReporting);
+            ErrorReporting& errorReporting,
+            bool verifyModules);
         LuaModule* createLuaModule(
             std::string_view source,
             const LuaConfigImpl& config,

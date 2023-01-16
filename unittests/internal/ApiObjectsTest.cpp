@@ -116,7 +116,7 @@ namespace rlogic::internal
 
         LuaInterface* createInterface(ApiObjects& apiObjects)
         {
-            auto intf = apiObjects.createLuaInterface(m_valid_empty_interface, {}, "intf", m_errorReporting);
+            auto intf = apiObjects.createLuaInterface(m_valid_empty_interface, {}, "intf", m_errorReporting, true);
             EXPECT_NE(nullptr, intf);
             return intf;
         }
@@ -1379,7 +1379,7 @@ namespace rlogic::internal
                 IN.param2 = {a=Type:Float(), b=Type:Int32()}
 
             end
-        )", {}, "intf name", m_errorReporting);
+        )", {}, "intf name", m_errorReporting, true);
         ASSERT_NE(nullptr, intf);
 
         ValidationResults validationResults;
@@ -1399,7 +1399,7 @@ namespace rlogic::internal
                 IN.param2 = {a=Type:Float(), b=Type:Int32()}
 
             end
-        )", {}, "intf name", m_errorReporting);
+        )", {}, "intf name", m_errorReporting, true);
 
         LuaScript* inputsScript = m_apiObjects.createLuaScript(R"LUA_SCRIPT(
         function interface(IN,OUT)

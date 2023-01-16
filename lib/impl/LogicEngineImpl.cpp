@@ -80,10 +80,10 @@ namespace rlogic::internal
         return m_apiObjects->createLuaScript(source, config, scriptName, m_errors);
     }
 
-    LuaInterface* LogicEngineImpl::createLuaInterface(std::string_view source, const LuaConfigImpl& config, std::string_view interfaceName)
+    LuaInterface* LogicEngineImpl::createLuaInterface(std::string_view source, const LuaConfigImpl& config, std::string_view interfaceName, bool verifyModules)
     {
         m_errors.clear();
-        return m_apiObjects->createLuaInterface(source, config, interfaceName, m_errors);
+        return m_apiObjects->createLuaInterface(source, config, interfaceName, m_errors, verifyModules);
     }
 
     LuaModule* LogicEngineImpl::createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName)

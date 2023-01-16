@@ -27,7 +27,8 @@ jobs:
       shell: bash
       working-directory: ${{runner.workspace}}/build
       run: |
-        sudo apt-get install libgles2-mesa-dev libx11-dev
+        sudo apt-get update && sudo apt-get -y --no-install-recommends install \
+          libgles2-mesa-dev libx11-dev
         cmake $GITHUB_WORKSPACE -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
             -Dramses-logic_PACKAGE_TYPE=DEB
         cmake --build . --target package --config $BUILD_TYPE

@@ -111,7 +111,13 @@ namespace rlogic
 
     LuaInterface* LogicEngine::createLuaInterface(std::string_view source, std::string_view interfaceName, const LuaConfig& config)
     {
-        return m_impl->createLuaInterface(source, *config.m_impl, interfaceName);
+        return m_impl->createLuaInterface(source, *config.m_impl, interfaceName, true);
+    }
+
+    LuaInterface* LogicEngine::createLuaInterface(std::string_view source, std::string_view interfaceName)
+    {
+        // deprecated version of interface creation does not verify modules declared in script
+        return m_impl->createLuaInterface(source, {}, interfaceName, false);
     }
 
     LuaModule* LogicEngine::createLuaModule(std::string_view source, const LuaConfig& config, std::string_view moduleName)

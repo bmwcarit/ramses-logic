@@ -211,6 +211,7 @@ namespace rlogic::internal
         SolState& solState,
         const ModuleMapping& userModules,
         const StandardModules& stdModules,
+        bool verifyModules,
         const std::string& source,
         std::string_view name,
         ErrorReporting& errorReporting)
@@ -223,7 +224,7 @@ namespace rlogic::internal
             return std::nullopt;
         }
 
-        if (!CrossCheckDeclaredAndProvidedModules(source, userModules, name, errorReporting))
+        if (verifyModules && !CrossCheckDeclaredAndProvidedModules(source, userModules, name, errorReporting))
             return std::nullopt;
 
         sol::environment env = solState.createEnvironment(stdModules, userModules, false);

@@ -82,6 +82,7 @@ namespace rlogic::internal
             SolState& solState,
             const ModuleMapping& userModules,
             const StandardModules& stdModules,
+            bool verifyModules,
             const std::string& source,
             std::string_view name,
             ErrorReporting& errorReporting);

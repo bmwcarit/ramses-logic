@@ -58,7 +58,6 @@ def main():
     shared_blacklist = binary_files | {
         r'\.git',
         r'\.gitignore',
-        r'\.lfsconfig',
         r'gitconfig$',
         r'xorg.conf',
         r'Xwrapper.config',

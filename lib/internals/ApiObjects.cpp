@@ -129,8 +129,7 @@ namespace rlogic::internal
         std::string_view source,
         const LuaConfigImpl& config,
         std::string_view interfaceName,
-        ErrorReporting& errorReporting,
-        bool verifyModules)
+        ErrorReporting& errorReporting)
     {
         if (interfaceName.empty())
         {
@@ -146,7 +145,6 @@ namespace rlogic::internal
             *m_solState,
             modules,
             config.getStandardModules(),
-            verifyModules,
             std::string{ source },
             interfaceName,
             errorReporting);

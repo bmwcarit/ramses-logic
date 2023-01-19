@@ -30,8 +30,7 @@ jobs:
 
     - name: Install GL/X11 packages for rendering (Linux only)
       run: |
-        sudo apt-get update && sudo apt-get -y --no-install-recommends install \
-          libgles2-mesa-dev libx11-dev
+        sudo apt-get install libgles2-mesa-dev libx11-dev
       if: ${{ contains(matrix.os, 'ubuntu') }}
 
     - name: Install clang and clang-tidy

@@ -691,23 +691,6 @@ the specific use-case which needs optimizing. Refer to the
 `google-benchmark docs <https://github.com/google/benchmark>`_ for hints how to
 design good benchmarks, to set the time measurement units, derive O-complexity, etc.
 
--------------------------
-Optimizing file size
--------------------------
-
-It's possible to reduce the file size of the exported LogicEngine data by storing the bytecode of the
-Lua scripts and modules, instead of the source code. This might sound very attractive, but it has two
-major caveats:
-
-* Lua bytecode is notnriously vulnerable to malicious attacks
-* Bytecode is architecture-specific, i.e. you can't run ARM bytecode on a x86 processor
-
-In order to provide a good mix between flexibility and performance, the LogicEngine allows choosing what
-to be stored when saving into a binary file: only the source code, only the bytecode, or both. While the first
-option is the safest and most robust, it is also the slowest. Storing both source and binary will offer both fast loading
-when the architecture matches and a fallback solution when it doesn't, but it results in larger binary files. Choose
-an option which suits the needs of your application. Read more in :func:`rlogic::SaveFileConfig::setLuaSavingMode`.
-
 =========================
 List of all examples
 =========================

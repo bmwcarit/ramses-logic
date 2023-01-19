@@ -93,7 +93,7 @@ namespace rlogic::internal
 
         // Public API
         LuaScript* createLuaScript(std::string_view source, const LuaConfigImpl& config, std::string_view scriptName);
-        LuaInterface* createLuaInterface(std::string_view source, const LuaConfigImpl& config, std::string_view interfaceName, bool verifyModules);
+        LuaInterface* createLuaInterface(std::string_view source, const LuaConfigImpl& config, std::string_view interfaceName);
         LuaModule* createLuaModule(std::string_view source, const LuaConfigImpl& config, std::string_view moduleName);
         bool extractLuaDependencies(std::string_view source, const std::function<void(const std::string&)>& callbackFunc);
         RamsesNodeBinding* createRamsesNodeBinding(ramses::Node& ramsesNode, ERotationType rotationType, std::string_view name);

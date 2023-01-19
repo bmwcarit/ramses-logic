@@ -191,25 +191,7 @@ namespace rlogic
         RLOGIC_API LuaInterface* createLuaInterface(
             std::string_view source,
             std::string_view interfaceName,
-            const LuaConfig& config);
-
-        /**
-        * Deprecated! Use #createLuaInterface(std::string_view, std::string_view, const LuaConfig&) instead.
-        *
-        * Same as #createLuaInterface(std::string_view, std::string_view, const LuaConfig&) but without
-        * support for using #rlogic::LuaModule in the interface, also will ignore any \c modules
-        * declaration within the provided interface source.
-        *
-        * @deprecated
-        * @param source the Lua source code
-        * @param interfaceName name to assign to the interface once it's created. This name must be unique!
-        * @return a pointer to the created object or nullptr if
-        * something went wrong during creation. In that case, use #getErrors() to obtain errors.
-        * The interface can be destroyed by calling the #destroy method
-        */
-        RLOGIC_API LuaInterface* createLuaInterface(
-            std::string_view source,
-            std::string_view interfaceName);
+            const LuaConfig& config = {});
 
         /**
          * Creates a new #rlogic::LuaModule from Lua source code.

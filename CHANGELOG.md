@@ -2,17 +2,6 @@
 
 # Unreleased
 
-# v1.4.1
-
-**CHANGED**
-
-* Upgrade ramses from 27.0.126 to 27.0.128 (patchfix)
-
-**FIXED**
-
-* Fixed ABI break with LogicEngine::createLuaInterface, keeping old (deprecated) version for backcompatibility
-* Deprecated version of LogicEngine::createLuaInterface ignores modules declared in Lua script to keep old behavior
-
 # v1.4.0
 
 **ADDED**

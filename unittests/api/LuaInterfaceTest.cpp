@@ -991,32 +991,6 @@ namespace rlogic::internal
         EXPECT_EQ(EPropertyType::Int32, colorProp->getChild("green")->getType());
     }
 
-    // tests that behavior of deprecated API is unchanged, some old assets have modules keyword in interface with invalid arguments
-    TEST_F(ALuaInterfaceWithModule, IgnoresModulesDeclaredInScriptIfUsingOldMethodToCreateInterface)
-    {
-        constexpr std::string_view intfSrc = R"(
-            modules("nonExistentMod")
-            function interface(IN)
-                IN.dummy = Type:Int32()
-            end
-        )";
-
-        const auto intf = m_logicEngine.createLuaInterface(intfSrc, "intf");
-        ASSERT_NE(intf, nullptr);
-        EXPECT_TRUE(m_logicEngine.getErrors().empty());
-
-        ASSERT_EQ(1u, intf->getInputs()->getChildCount());
-        const auto prop = intf->getInputs()->getChild(0);
-        EXPECT_EQ("dummy", prop->getName());
-        EXPECT_EQ(EPropertyType::Int32, prop->getType());
-
-        // if created with new API this will be error
-        const auto intfInvalid = m_logicEngine.createLuaInterface(intfSrc, "intf", {});
-        EXPECT_EQ(intfInvalid, nullptr);
-        ASSERT_EQ(1u, m_logicEngine.getErrors().size());
-        EXPECT_THAT(m_logicEngine.getErrors().front().message, ::testing::HasSubstr("Module dependencies declared in source code do not match those provided by LuaConfig"));
-    }
-
     class ALuaInterface_Serialization : public ALuaInterface
     {
     protected:

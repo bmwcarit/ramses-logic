@@ -28,6 +28,10 @@ jobs:
             compiler: clang
           - os: ubuntu-20.04
             compiler: clang-tidy
+          - os: ubuntu-22.04
+            compiler: clang
+          - os: ubuntu-22.04
+            compiler: default
 
     steps:
     - uses: actions/checkout@v3

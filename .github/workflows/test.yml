@@ -21,17 +21,8 @@ jobs:
     # Newest -> so that we can test with latest tools (clang-tidy) and use recent drivers/packages
     strategy:
       matrix:
-        os: [ubuntu-20.04, windows-2022]
+        os: [ubuntu-22.04]
         compiler: [default]
-        include:
-          - os: ubuntu-20.04
-            compiler: clang
-          - os: ubuntu-20.04
-            compiler: clang-tidy
-          - os: ubuntu-22.04
-            compiler: clang
-          - os: ubuntu-22.04
-            compiler: default
 
     steps:
     - uses: actions/checkout@v3

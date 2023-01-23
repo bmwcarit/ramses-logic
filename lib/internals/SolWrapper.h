@@ -26,6 +26,8 @@ __pragma(warning(push))
 __pragma(warning(disable: 4100))
 #endif
 
+// TODO (Violin) Workaround for a compiler issue fixed in newer sol. Remove once upgraded
+#include <limits>
 #include "sol/sol.hpp"
 
 #ifndef _MSC_VER

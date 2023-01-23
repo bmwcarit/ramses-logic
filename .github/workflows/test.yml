@@ -21,7 +21,13 @@ jobs:
     # Newest -> so that we can test with latest tools (clang-tidy) and use recent drivers/packages
     strategy:
       matrix:
-        os: [ubuntu-20.04, ubuntu-latest, windows-latest]
+        os: [ubuntu-20.04, windows-2022]
+        compiler: [default]
+        include:
+          - os: ubuntu-20.04
+            compiler: clang
+          - os: ubuntu-20.04
+            compiler: clang-tidy
 
     steps:
     - uses: actions/checkout@v3
@@ -38,54 +44,46 @@ jobs:
       run: |
         sudo apt-get install -y clang-10 clang-tidy-10 llvm-10
         sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-10 100
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ contains(matrix.compiler, 'clang') }}
 
     - name: Create Build Environment
       run: cmake -E make_directory ${{runner.workspace}}/build
 
-    - name: Configure CMake (Windows)
+    - name: Configure CMake (${{matrix.os}} ${{matrix.compiler}})
       shell: bash
       working-directory: ${{runner.workspace}}/build
       run: |
-        # This is needed because on the Windows Server 2019 build nodes of Github, the Perl installation
-        # exposes its libraries on the path and messes up CMake builds
-        echo "Path before: $PATH"
-        export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/c\/bin//')
-        export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/perl\/site\/bin//')
-        export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/perl\/bin//')
-        echo "Path after: $PATH"
+        extra_args=""
 
-        cmake $GITHUB_WORKSPACE \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-      if: ${{ matrix.os == 'windows-latest' }}
+        if [[ "${{matrix.compiler}}" == "clang"* ]]; then
+          extra_args+=" -DCMAKE_EXPORT_COMPILE_COMMANDS=1"
+          extra_args+=" -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain"
+          echo "$extra_args"
+        fi
 
-    - name: Configure CMake (Latest Ubuntu + Clang)
-      shell: bash
-      working-directory: ${{runner.workspace}}/build
-      run: |
-        cmake $GITHUB_WORKSPACE \
-            -DCMAKE_EXPORT_COMPILE_COMMANDS=1 \
-            -DCMAKE_TOOLCHAIN_FILE=$GITHUB_WORKSPACE/cmake/toolchain/Linux_X86_64_llvm.toolchain \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+        if [[ "${{matrix.os}}" == "windows"* ]]; then
+            # This is needed because on the Windows Server 2019 build nodes of Github, the Perl installation
+            # exposes its libraries on the path and messes up CMake builds
+            echo "Path before: $PATH"
+            export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/c\/bin//')
+            export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/perl\/site\/bin//')
+            export PATH=$(echo "$PATH" | sed -e 's/:\/c\/Strawberry\/perl\/bin//')
+            echo "Path after: $PATH"
+        fi
 
-    - name: Configure CMake (Oldest Ubuntu + GCC)
-      shell: bash
-      working-directory: ${{runner.workspace}}/build
-      run: |
-        cmake $GITHUB_WORKSPACE \
-            -DCMAKE_BUILD_TYPE=$BUILD_TYPE
-      if: ${{ matrix.os == 'ubuntu-20.04' }}
+        cmake $GITHUB_WORKSPACE ${extra_args} -DCMAKE_BUILD_TYPE=$BUILD_TYPE
 
     - name: Build
       working-directory: ${{runner.workspace}}/build
       shell: bash
       run: cmake --build . --config $BUILD_TYPE
+      if: ${{ matrix.compiler != 'clang-tidy' }}
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
       shell: bash
       run: ctest -C $BUILD_TYPE --exclude-regex '.*SWRAST'
+      if: ${{ matrix.compiler != 'clang-tidy' }}
 
     - name: Run clang-tidy
       shell: bash
@@ -97,4 +95,4 @@ jobs:
         $GITHUB_WORKSPACE/ci/scripts/clang-tidy-wrapper.py \
         --config $GITHUB_WORKSPACE/ci/scripts/config/clang-tidy-wrapper.yaml \
         $compile_commands_path
-      if: ${{ matrix.os == 'ubuntu-latest' }}
+      if: ${{ matrix.compiler == 'clang-tidy' }}

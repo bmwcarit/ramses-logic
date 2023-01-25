@@ -22,7 +22,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-22.04]
-        compiler: [default]
+        compiler: [clang]
 
     steps:
     - uses: actions/checkout@v3
@@ -34,12 +34,6 @@ jobs:
         sudo apt-get update && sudo apt-get -y --no-install-recommends install \
           libgles2-mesa-dev libx11-dev
       if: ${{ contains(matrix.os, 'ubuntu') }}
-
-    - name: Install clang and clang-tidy
-      run: |
-        sudo apt-get install -y clang-10 clang-tidy-10 llvm-10
-        sudo update-alternatives --install /usr/bin/clang-tidy clang-tidy /usr/bin/clang-tidy-10 100
-      if: ${{ contains(matrix.compiler, 'clang') }}
 
     - name: Create Build Environment
       run: cmake -E make_directory ${{runner.workspace}}/build

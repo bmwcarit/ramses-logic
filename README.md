@@ -40,6 +40,7 @@ existing files exported with Logic Engine version **W** or newer (Binary file co
 
 |Logic     | Included Ramses version       | Minimum required Ramses version    | Binary file compatibility    |
 |----------|-------------------------------|------------------------------------|------------------------------|
+|v1.4.2    | 27.0.130                      | 27.0.102                           | >= 1.0.0, F-Levels 01 - 05   |
 |v1.4.1    | 27.0.128                      | 27.0.102                           | >= 1.0.0, F-Levels 01 - 05   |
 |v1.4.0    | 27.0.126                      | 27.0.102                           | >= 1.0.0, F-Levels 01 - 05   |
 |v1.3.0    | 27.0.126                      | 27.0.102                           | >= 1.0.0, F-Levels 01 - 04   |

@@ -699,7 +699,7 @@ It's possible to reduce the file size of the exported LogicEngine data by storin
 Lua scripts and modules, instead of the source code. This might sound very attractive, but it has two
 major caveats:
 
-* Lua bytecode is notnriously vulnerable to malicious attacks
+* Lua bytecode is notoriously vulnerable to malicious attacks
 * Bytecode is architecture-specific, i.e. you can't run ARM bytecode on a x86 processor
 
 In order to provide a good mix between flexibility and performance, the LogicEngine allows choosing what

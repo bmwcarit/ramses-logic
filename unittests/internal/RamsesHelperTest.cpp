@@ -31,5 +31,6 @@ namespace rlogic::internal
         EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSampler2D));
         EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSampler3D));
         EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSamplerCube));
+        EXPECT_EQ(std::nullopt, ConvertRamsesUniformTypeToPropertyType(ramses::EEffectInputDataType_TextureSamplerExternal));
     }
 }

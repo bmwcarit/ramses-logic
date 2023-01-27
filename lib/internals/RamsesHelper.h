@@ -48,6 +48,7 @@ namespace rlogic::internal
         case ramses::EEffectInputDataType::EEffectInputDataType_TextureSampler3D:
         case ramses::EEffectInputDataType::EEffectInputDataType_TextureSamplerCube:
         case ramses::EEffectInputDataType::EEffectInputDataType_TextureSampler2DMS:
+        case ramses::EEffectInputDataType::EEffectInputDataType_TextureSamplerExternal:
             return std::nullopt;
         }
         return std::nullopt;

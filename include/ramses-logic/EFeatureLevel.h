@@ -25,8 +25,8 @@ namespace rlogic
      *    2. One or more new features are requested and implemented. If the features only add new API and additional
      *       data to be serialized, these are candidates for a new feature level - a collection of new features
      *       not accessible in the base 01 level.
-     *       - Note that breaking API or file format will always require a new major release,
-     *         but in this case these features can be released under a new feature level (e.g. EFeatureLevel_1).
+     *       - Note that breaking API (and in some cases file format) will always require a new major release,
+     *         but in this example these features can be released under a new feature level (e.g. EFeatureLevel_02).
      *       - Even though in the context of RamsesLogic the new features are fully backward compatible,
      *         they can quickly break assets compatibility when exported in case some of the editors/tools/applications
      *         use RamsesLogic with and some without the new features. Normally this would have to be solved
@@ -34,7 +34,7 @@ namespace rlogic
      *    3. Now new RamsesLogic can be deployed to any part of the asset pipeline without any risk of breaking asset
      *       compatibility because the new features will not be activated. The new features can be tested
      *       and even assets using them exported (e.g. to prototype new use cases) by activating them, while being able
-     *       to switch back to the earlier feature level at any time using this constructor, all that using same RamsesLogic library.
+     *       to switch back to the earlier feature level at any time, all that using same RamsesLogic library.
      *
      * A feature level always includes previous feature level(s) if any, e.g. a feature level released after base level will contain
      * all features from base 01 level, however base 01 level will include only base 01 level features and none from a newer feature level
@@ -68,6 +68,7 @@ namespace rlogic
         /// Released with version 1.4.0
         /// Added features:
         /// - RamsesMeshNodeBinding
+        /// - AnimationNode can animate DataArray containing arrays of floats as elements
         EFeatureLevel_05 = 5,
 
         /// Equals to the latest feature level

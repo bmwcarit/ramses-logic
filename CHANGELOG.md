@@ -2,6 +2,16 @@
 
 # Unreleased
 
+# v1.4.2
+
+**CHANGED**
+
+* Upgrade ramses from 27.0.128 to 27.0.130 (patchfix)
+
+**FIXED**
+
+* Compiles on GCC9 (Ubuntu 22.04 standard compiler)
+
 # v1.4.1
 
 **CHANGED**

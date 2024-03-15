@@ -83,6 +83,10 @@ Options
 
    Instructs the renderer to apply multisampling (Valid values: 1, 2, 4, 8)
 
+.. option:: --clear-color R G B A
+
+   Sets the display clear color to other than the default black (e.g.: :code:`ramses-logic-viewer --clear-color 0 0.5 0.8 1`)
+
 .. option:: --write-config [filename]
 
    Writes the default lua configuration to the given filename. If the filename is omitted, the viewer will use
@@ -108,11 +112,18 @@ Logic Nodes
 
 The module ``rlogic`` provides members to access all Logic Node types:
 
+* ``rlogic.interfaces`` (:cpp:class:`rlogic::LuaInterface`)
 * ``rlogic.scripts`` (:cpp:class:`rlogic::LuaScript`)
 * ``rlogic.animationNodes`` (:cpp:class:`rlogic::AnimationNode`)
+* ``rlogic.timerNodes`` (:cpp:class:`rlogic::TimerNode`)
 * ``rlogic.nodeBindings`` (:cpp:class:`rlogic::RamsesNodeBinding`)
 * ``rlogic.appearanceBindings`` (:cpp:class:`rlogic::RamsesAppearanceBinding`)
 * ``rlogic.cameraBindings`` (:cpp:class:`rlogic::RamsesCameraBinding`)
+* ``rlogic.renderPassBindings`` (:cpp:class:`rlogic::RamsesRenderPassBinding`)
+* ``rlogic.renderGroupBindings`` (:cpp:class:`rlogic::RamsesRenderGroupBinding`)
+* ``rlogic.meshNodeBindings`` (:cpp:class:`rlogic::RamsesMeshNodeBinding`)
+* ``rlogic.anchorPoints`` (:cpp:class:`rlogic::AnchorPoint`)
+* ``rlogic.skinBindings`` (:cpp:class:`rlogic::SkinBinding`)
 
 The Logic Node instances can be either found by name or by object id.
 Alternatively the node list can be iterated.
@@ -257,4 +268,16 @@ the logic engine state by calling ``rlogic.update()``:
     rlogic.update()
     if not rlogic.scripts.foo.OUT.color.value == {255, 0, 0} then
         error("unexpected value")
+    end
+
+``rlogic.update()`` has an optional integer parameter that takes a time value in milliseconds.
+If the parameter is set to a non-zero value, ``rlogic.update()`` will sleep for the given amount of time.
+This can be useful to avoid high CPU load, if the batch script needs to wait for an expected value change.
+
+.. code-block:: lua
+
+    rlogic.scripts.foo.IN.color.value = "red"
+
+    while not rlogic.scripts.foo.OUT.color.value == {255, 0, 0} do
+        rlogic.update(16)
     end

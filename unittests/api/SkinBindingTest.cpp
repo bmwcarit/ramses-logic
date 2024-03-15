@@ -171,6 +171,51 @@ namespace rlogic::internal
             EXPECT_NEAR(expectedMat2[i], mat2[i], 1e-4f) << i;
     }
 
+    TEST_F(ASkinBinding, CalculatesSameValuesAfterLoadingFromFile)
+    {
+        WithTempDirectory tmpDir;
+
+        m_jointNodes[0]->setRotation(1.f, 2.f, 3.f);
+        m_jointNodes[1]->setTranslation(-1.f, -2.f, -3.f);
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.saveToFile("tmp.logic"));
+        // change to dummy values in shared scene
+        const std::array<float, 32u> dummyData{ 0.f };
+        m_appearance->setInputValueMatrix44f(m_uniform, 2u, dummyData.data());
+
+        // load from file, update and expect unfiforms matching original values
+        LogicEngine loadedLogic{ m_logicEngine.getFeatureLevel() };
+        EXPECT_TRUE(loadedLogic.loadFromFile("tmp.logic", m_scene));
+        EXPECT_TRUE(loadedLogic.update());
+
+        const matrix44f expectedMat1 = {
+            0.998f, -0.0523f, 0.0349f, 0.f,
+            0.0529f, 0.9984f, -0.0174f, 0.f,
+            -0.0339f, 0.01925f, 0.9992f, 0.f,
+            -0.00209f, -0.00235f, 0.00227f, 1.f
+        };
+        const matrix44f expectedMat2 = {
+            1.f, 0.f, 0.f, 0.f,
+            0.f, 1.f, 0.f, 0.f,
+            0.f, 0.f, 1.f, 0.f,
+            -1.f, -2.f, -3.f, 1.f
+        };
+
+        std::array<float, 32u> uniformData{};
+        m_appearance->getInputValueMatrix44f(m_uniform, 2u, uniformData.data());
+
+        matrix44f mat1{};
+        matrix44f mat2{};
+        std::copy(uniformData.cbegin(), uniformData.cbegin() + 16u, mat1.begin());
+        std::copy(uniformData.cbegin() + 16u, uniformData.cend(), mat2.begin());
+
+        for (size_t i = 0u; i < 16u; ++i)
+            EXPECT_NEAR(expectedMat1[i], mat1[i], 1e-4f) << i;
+
+        for (size_t i = 0u; i < 16u; ++i)
+            EXPECT_NEAR(expectedMat2[i], mat2[i], 1e-4f) << i;
+    }
+
     class ASkinBinding_SerializationLifecycle : public ASkinBinding
     {
     protected:

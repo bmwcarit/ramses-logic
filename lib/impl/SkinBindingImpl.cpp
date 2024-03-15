@@ -73,7 +73,7 @@ namespace rlogic::internal
         for (const auto& mat : skinBinding.m_inverseBindMatrices)
         {
             const auto matData = mat.toStdArray();
-            inverseBindMatData.insert(inverseBindMatData.begin(), matData.cbegin(), matData.cend());
+            inverseBindMatData.insert(inverseBindMatData.end(), matData.cbegin(), matData.cend());
         }
         const auto fbInverseBindMatData = builder.CreateVector(inverseBindMatData);
 

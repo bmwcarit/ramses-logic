@@ -158,6 +158,7 @@ namespace rlogic
         void load(sol::load_result&& loadResult);
 
         rlogic::LogicEngine m_logicEngine;
+        ramses::Scene*      m_scene = nullptr;
         ScreenshotFunc      m_screenshotFunc;
         std::string         m_logicFilename;
         std::string         m_luaFilename;

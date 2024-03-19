@@ -9,6 +9,7 @@
 #include "LogicViewer.h"
 #include "LogicViewerLuaTypes.h"
 #include "LogicViewerLog.h"
+#include "ramses-client-api/Scene.h"
 #include "ramses-logic/LogicEngine.h"
 #include "ramses-logic/AnimationNode.h"
 #include "ramses-logic/TimerNode.h"
@@ -27,6 +28,7 @@
 #include "internals/SolHelper.h"
 #include <iostream>
 #include <fstream>
+#include <thread>
 
 namespace rlogic
 {
@@ -129,6 +131,7 @@ namespace rlogic
 
     bool LogicViewer::loadRamsesLogic(const std::string& filename, ramses::Scene* scene)
     {
+        m_scene = scene;
         m_logicFilename = filename;
         return m_logicEngine.loadFromFile(filename, scene);
     }
@@ -205,7 +208,11 @@ namespace rlogic
                 return m_screenshotFunc(screenshotFile);
             },
             ltnUpdate,
-            [&]() { updateEngine(); },
+            [&](uint32_t sleepMs = 0) {
+                updateEngine();
+                if (sleepMs != 0)
+                    std::this_thread::sleep_for(std::chrono::milliseconds(sleepMs));
+            },
             ltnLink,
             [&](const ConstPropertyWrapper& src, const PropertyWrapper& target) { return m_logicEngine.link(src.m_property, target.m_property); },
             ltnUnlink,
@@ -312,6 +319,8 @@ namespace rlogic
     void LogicViewer::updateEngine()
     {
         m_logicEngine.update();
+        if (m_scene)
+            m_scene->flush();
         if (m_updateReportEnabled)
         {
             m_updateReportSummary.add(m_logicEngine.getLastUpdateReport());

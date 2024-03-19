@@ -198,7 +198,6 @@ namespace rlogic
         if (isRunning)
         {
             const auto updateStatus = m_viewer->update();
-            m_scene->flush();
             m_imguiHelper->dispatchEvents();
             ImGui::NewFrame();
             m_gui->draw();

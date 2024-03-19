@@ -44,7 +44,6 @@ namespace rlogic::internal
                     IN.paramInt64_2 = Type:Int64()
                     IN.paramFloat = Type:Float()
                     IN.paramFloat_2 = Type:Float()
-                    IN.paramFloat_3 = Type:Float()
                     IN.paramString = Type:String()
                     IN.paramVec2f = Type:Vec2f()
                     IN.paramVec3f = Type:Vec3f()
@@ -59,6 +58,9 @@ namespace rlogic::internal
                             data2 = Type:Int32()
                         }
                     }
+                    IN.anchorData1 = Type:Vec2f()
+                    IN.anchorData2 = Type:Float()
+
                     OUT.paramBool = Type:Bool()
                     OUT.paramInt32 = Type:Int32()
                     OUT.paramInt64 = Type:Int64()
@@ -77,6 +79,8 @@ namespace rlogic::internal
                             data2 = Type:Int32()
                         }
                     }
+                    OUT.anchorData1 = Type:Vec2f()
+                    OUT.anchorData2 = Type:Float()
                 end
                 function run(IN,OUT)
                     OUT.paramBool = not IN.paramBool
@@ -93,6 +97,8 @@ namespace rlogic::internal
                     OUT.array = {10,20,30,44,50}
                     OUT.struct.nested.data1 = IN.paramString
                     OUT.struct.nested.data2 = IN.paramInt32
+                    OUT.anchorData1 = IN.anchorData1
+                    OUT.anchorData2 = IN.anchorData2
                 end
             )", {}, "foo");
 
@@ -165,11 +171,13 @@ namespace rlogic::internal
                 *script->getOutputs()->getChild("paramFloat"),
                 *cameraBinding->getInputs()->getChild("frustum")->getChild("leftPlane"));
 
-            // use weak link because of circular dependency. The link has no meaning, it is just
-            // needed to make the setup valid (fee of dangling content)
+            // use weak link because of circular dependency
+            engine.linkWeak(
+                *anchor->getOutputs()->getChild("viewportCoords"),
+                *script->getInputs()->getChild("anchorData1"));
             engine.linkWeak(
                 *anchor->getOutputs()->getChild("depth"),
-                *script->getInputs()->getChild("paramFloat_3"));
+                *script->getInputs()->getChild("anchorData2"));
 
             engine.update();
 
@@ -844,8 +852,29 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerLua, anchorPointByName)
     {
-        auto* coords = getOutput<rlogic::AnchorPoint>("foo", "viewportCoords");
-        EXPECT_TRUE(coords);
+        // unlink anchor from script inputs so that we can overwrite values
+        unlinkInput(*getInput<rlogic::LuaScript>("foo", "anchorData1"));
+        unlinkInput(*getInput<rlogic::LuaScript>("foo", "anchorData2"));
+
+        // first overwrite with some dummy values to 'reset' them
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.scripts.foo.IN.anchorData1.value = { 1, 2 }
+            rlogic.scripts.foo.IN.anchorData2.value = 3
+        )"));
+        auto* outScript = getNode<rlogic::LuaScript>("foo");
+        EXPECT_FLOAT_EQ(1.f, GetOutput(outScript, "anchorData1")->get<vec2f>().value()[0]);
+        EXPECT_FLOAT_EQ(2.f, GetOutput(outScript, "anchorData1")->get<vec2f>().value()[1]);
+        EXPECT_FLOAT_EQ(3.f, GetOutput(outScript, "anchorData2")->get<float>().value());
+
+        // now access values from anchor point and assign them to script inputs, overwriting the dummy values from before
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.scripts.foo.IN.anchorData1.value = { rlogic.anchorPoints.foo.OUT.viewportCoords.value[1], rlogic.anchorPoints.foo.OUT.viewportCoords.value[2] }
+            rlogic.scripts.foo.IN.anchorData2.value = rlogic.anchorPoints.foo.OUT.depth.value
+        )"));
+
+        EXPECT_FLOAT_EQ(0.f, GetOutput(outScript, "anchorData1")->get<vec2f>().value()[0]);
+        EXPECT_FLOAT_EQ(8.f, GetOutput(outScript, "anchorData1")->get<vec2f>().value()[1]);
+        EXPECT_FLOAT_EQ(-0.01010102f, GetOutput(outScript, "anchorData2")->get<float>().value());
     }
 
     TEST_F(ALogicViewerLua, interfaceById)
@@ -964,10 +993,19 @@ namespace rlogic::internal
 
     TEST_F(ALogicViewerLua, anchorPointById)
     {
-        auto* node = getNode<rlogic::AnchorPoint>("foo");
-        ASSERT_EQ(8u, node->getId());
-        auto* ticker = GetOutput(node, "viewportCoords");
-        EXPECT_TRUE(ticker);
+        // unlink anchor from script inputs so that we can overwrite values
+        unlinkInput(*getInput<rlogic::LuaScript>("foo", "anchorData1"));
+        unlinkInput(*getInput<rlogic::LuaScript>("foo", "anchorData2"));
+
+        EXPECT_EQ(Result(), loadLua(R"(
+            rlogic.scripts.foo.IN.anchorData1.value = { rlogic.anchorPoints[8].OUT.viewportCoords.value[1], rlogic.anchorPoints[8].OUT.viewportCoords.value[2] }
+            rlogic.scripts.foo.IN.anchorData2.value = rlogic.anchorPoints[8].OUT.depth.value
+        )"));
+
+        auto* outScript = getNode<rlogic::LuaScript>("foo");
+        EXPECT_FLOAT_EQ(0.f, GetOutput(outScript, "anchorData1")->get<vec2f>().value()[0]);
+        EXPECT_FLOAT_EQ(8.f, GetOutput(outScript, "anchorData1")->get<vec2f>().value()[1]);
+        EXPECT_FLOAT_EQ(-0.01010102f, GetOutput(outScript, "anchorData2")->get<float>().value());
     }
 
     TEST_F(ALogicViewerLua, animationNodeById)

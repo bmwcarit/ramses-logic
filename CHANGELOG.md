@@ -1,3 +1,9 @@
+# v1.4.5
+
+**FIXED**
+
+- SkinBinding update order bug where skin bindings use old values in update
+
 # v1.4.4
 
 **FIXED**

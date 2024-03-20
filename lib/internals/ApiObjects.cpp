@@ -276,6 +276,9 @@ namespace rlogic::internal
         registerLogicObject(std::move(up));
         binding->m_impl.createRootProperties();
 
+        for (auto& joint: binding->m_skinBinding.getJoints())
+            m_logicNodeDependencies.addBindingDependency(const_cast<RamsesNodeBindingImpl&>(*joint), binding->m_skinBinding); //NOLINT
+
         return binding;
     }
 

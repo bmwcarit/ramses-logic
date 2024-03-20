@@ -1,6 +1,27 @@
-# master
+# v1.4.5
 
-# Unreleased
+**FIXED**
+
+- SkinBinding update order bug where skin bindings use old values in update
+
+# v1.4.4
+
+**FIXED**
+
+* SkinBinding serializing inverse binding matrices in wrong order
+
+**CHANGED**
+
+* Upgrade ramses from 27.0.130 to 27.0.139
+* ramses-logic-viewer script improvements:
+   * scene is flushed when `rlogic.update()` is called from script
+   * added optional sleep parameter (milliseconds) to `rlogic.update()`
+
+# v1.4.3
+
+**FIXED**
+
+* Patched missing include in sol v3.2.2
 
 # v1.4.2
 

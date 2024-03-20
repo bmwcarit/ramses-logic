@@ -171,6 +171,116 @@ namespace rlogic::internal
             EXPECT_NEAR(expectedMat2[i], mat2[i], 1e-4f) << i;
     }
 
+    TEST_F(ASkinBinding, UpdatesBoundUniformOnNodeBindingChange)
+    {
+        // This is the same setup as regular tests, only recreated locally, since with the regular setup (by chance) the nodes are ordered differently.
+        // If there is no binding dependency between node binding and skin binding, node binding created after skin binding might appear after skin binding
+        // in update list, resulting in the changes to node binding not being propagated to skin binding and skin binding using old values during update.
+        auto appearance = m_scene->createAppearance(createTestEffect(), "skinAppearance2");
+        ramses::UniformInput uniform;
+        appearance->getEffect().findUniformInput("jointMat", uniform);
+        std::vector<ramses::Node*> jointNodes{ m_scene->createNode(), m_scene->createNode() };
+        RamsesAppearanceBinding* appearanceBinding{ m_logicEngine.createRamsesAppearanceBinding(*appearance) };
+        std::vector<const RamsesNodeBinding*> joints{ m_logicEngine.createRamsesNodeBinding(*jointNodes[0]), m_logicEngine.createRamsesNodeBinding(*jointNodes[1]) };
+
+        // add some transformations to the joints before calculating inverse mats and creating skin
+        jointNodes[0]->setTranslation(1.f, 2.f, 3.f);
+        jointNodes[1]->setRotation(10.f, 20.f, 30.f);
+
+        std::vector<matrix44f> inverseMats;
+        inverseMats.resize(2u);
+
+
+        float tempData[16]; // NOLINT(modernize-avoid-c-arrays) Ramses uses C array in matrix getters
+        jointNodes[0]->getInverseModelMatrix(tempData);
+        std::copy(std::begin(tempData), std::end(tempData), inverseMats[0].begin());
+        jointNodes[1]->getInverseModelMatrix(tempData);
+        std::copy(std::begin(tempData), std::end(tempData), inverseMats[1].begin());
+
+        auto skin = m_logicEngine.createSkinBinding(joints, inverseMats, *appearanceBinding, uniform, "skin2");
+
+        jointNodes[0]->setRotation(1.f, 2.f, 3.f);
+        jointNodes[1]->setTranslation(-1.f, -2.f, -3.f);
+
+        // The crutial part of this test is having this binding created after other logic nodes to make it appear last in node update topology.
+        RamsesNodeBinding& nodeBinding = *m_logicEngine.createRamsesNodeBinding(*jointNodes[0]);
+        auto inputs = nodeBinding.getInputs();
+        inputs->getChild("translation")->set<vec3f>(vec3f{2.1f, 2.2f, 2.3f});
+
+        EXPECT_TRUE(m_logicEngine.update());
+
+        const matrix44f expectedMat1 = {
+            0.998f, -0.0523f, 0.0349f, 0.f,
+            0.0529f, 0.9984f, -0.0174f, 0.f,
+            -0.0339f, 0.01925f, 0.9992f, 0.f,
+            1.0979f, 0.19764f, -0.69773f, 1.f
+        };
+        const matrix44f expectedMat2 = {
+            1.f, 0.f, 0.f, 0.f,
+            0.f, 1.f, 0.f, 0.f,
+            0.f, 0.f, 1.f, 0.f,
+            -1.f, -2.f, -3.f, 1.f
+        };
+
+        std::array<float, 32u> uniformData{};
+        appearance->getInputValueMatrix44f(skin->getAppearanceUniformInput(), 2u, uniformData.data());
+        matrix44f mat1{};
+        matrix44f mat2{};
+        std::copy(uniformData.cbegin(), uniformData.cbegin() + 16u, mat1.begin());
+        std::copy(uniformData.cbegin() + 16u, uniformData.cend(), mat2.begin());
+
+        for (size_t i = 0u; i < 16; ++i)
+            EXPECT_NEAR(expectedMat1[i], mat1[i], 1e-4f) << i;
+
+        for (size_t i = 0u; i < 16; ++i)
+            EXPECT_NEAR(expectedMat2[i], mat2[i], 1e-4f) << i;
+    }
+
+    TEST_F(ASkinBinding, CalculatesSameValuesAfterLoadingFromFile)
+    {
+        WithTempDirectory tmpDir;
+
+        m_jointNodes[0]->setRotation(1.f, 2.f, 3.f);
+        m_jointNodes[1]->setTranslation(-1.f, -2.f, -3.f);
+        EXPECT_TRUE(m_logicEngine.update());
+        EXPECT_TRUE(m_logicEngine.saveToFile("tmp.logic"));
+        // change to dummy values in shared scene
+        const std::array<float, 32u> dummyData{ 0.f };
+        m_appearance->setInputValueMatrix44f(m_uniform, 2u, dummyData.data());
+
+        // load from file, update and expect unfiforms matching original values
+        LogicEngine loadedLogic{ m_logicEngine.getFeatureLevel() };
+        EXPECT_TRUE(loadedLogic.loadFromFile("tmp.logic", m_scene));
+        EXPECT_TRUE(loadedLogic.update());
+
+        const matrix44f expectedMat1 = {
+            0.998f, -0.0523f, 0.0349f, 0.f,
+            0.0529f, 0.9984f, -0.0174f, 0.f,
+            -0.0339f, 0.01925f, 0.9992f, 0.f,
+            -0.00209f, -0.00235f, 0.00227f, 1.f
+        };
+        const matrix44f expectedMat2 = {
+            1.f, 0.f, 0.f, 0.f,
+            0.f, 1.f, 0.f, 0.f,
+            0.f, 0.f, 1.f, 0.f,
+            -1.f, -2.f, -3.f, 1.f
+        };
+
+        std::array<float, 32u> uniformData{};
+        m_appearance->getInputValueMatrix44f(m_uniform, 2u, uniformData.data());
+
+        matrix44f mat1{};
+        matrix44f mat2{};
+        std::copy(uniformData.cbegin(), uniformData.cbegin() + 16u, mat1.begin());
+        std::copy(uniformData.cbegin() + 16u, uniformData.cend(), mat2.begin());
+
+        for (size_t i = 0u; i < 16u; ++i)
+            EXPECT_NEAR(expectedMat1[i], mat1[i], 1e-4f) << i;
+
+        for (size_t i = 0u; i < 16u; ++i)
+            EXPECT_NEAR(expectedMat2[i], mat2[i], 1e-4f) << i;
+    }
+
     class ASkinBinding_SerializationLifecycle : public ASkinBinding
     {
     protected:

@@ -42,7 +42,7 @@ cd  test-cmake.config
 
 SET PATH=%INSTALL_DIR%/bin;%PATH%
 
-cmake -G%CMAKE_GENERATOR% -DCMAKE_PREFIX_PATH="%INSTALL_DIR%" --build test-cmake.config %SCRIPT_DIR%/shared-lib-check/
+cmake -G%CMAKE_GENERATOR% -DCMAKE_PREFIX_PATH="%INSTALL_DIR%" %SCRIPT_DIR%/shared-lib-check/
 cmake --build . --config %BUILD_CONFIG% --target run-all
 
 ::check for errors

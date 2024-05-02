@@ -163,6 +163,9 @@ namespace rlogic::internal
 
         [[nodiscard]] bool updateNodes(const NodeVector& nodes);
 
+        [[nodiscard]] bool updateSkinBindings();
+        [[nodiscard]] bool updateNode(LogicNodeImpl& node);
+
         [[nodiscard]] bool loadFromByteData(const void* byteData, size_t byteSize, ramses::Scene* scene, bool enableMemoryVerification, const std::string& dataSourceDescription);
         [[nodiscard]] bool checkFileIdentifierBytes(const std::string& dataSourceDescription, const std::string& fileIdBytes);
         [[nodiscard]] const char* getFileIdentifierMatchingFeatureLevel() const;

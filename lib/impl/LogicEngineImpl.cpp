@@ -30,6 +30,7 @@
 #include "impl/LuaModuleImpl.h"
 #include "impl/LuaConfigImpl.h"
 #include "impl/SaveFileConfigImpl.h"
+#include "impl/SkinBindingImpl.h"
 #include "impl/LogicEngineReportImpl.h"
 #include "impl/RamsesRenderGroupBindingElementsImpl.h"
 
@@ -436,7 +437,11 @@ namespace rlogic::internal
         // force dirty all timer nodes, anchor points and skinbindings
         setNodeToBeAlwaysUpdatedDirty();
 
-        const bool success = updateNodes(*sortedNodes);
+        bool success = updateNodes(*sortedNodes);
+
+        // update skin bindings only if updating the other nodes succeeded
+        if (success)
+            success = updateSkinBindings();
 
         if (m_statisticsEnabled || m_updateReportEnabled)
         {
@@ -449,13 +454,24 @@ namespace rlogic::internal
         return success;
     }
 
+    bool LogicEngineImpl::updateSkinBindings()
+    {
+        for (SkinBinding* skinBinding : m_apiObjects->getApiObjectContainer<SkinBinding>()) {
+            if (!updateNode(skinBinding->m_skinBinding)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     bool LogicEngineImpl::updateNodes(const NodeVector& sortedNodes)
     {
         for (LogicNodeImpl* nodeIter : sortedNodes)
         {
             LogicNodeImpl& node = *nodeIter;
 
-            if (!node.isDirty())
+            // skip also processing of SkinBindings, since they will be processed after updating everything else
+            if (!node.isDirty() || dynamic_cast<SkinBindingImpl*>(&node))
             {
                 if (m_updateReportEnabled)
                     m_updateReport.nodeSkippedExecution(node);
@@ -464,32 +480,39 @@ namespace rlogic::internal
                     continue;
             }
 
-            if (m_updateReportEnabled)
-                m_updateReport.nodeExecutionStarted(node);
-            if (m_statisticsEnabled)
-                m_statistics.nodeExecuted();
-
-            const std::optional<LogicNodeRuntimeError> potentialError = node.update();
-            if (potentialError)
-            {
-                m_errors.add(potentialError->message, m_apiObjects->getApiObject(node), EErrorType::RuntimeError);
+            if (!updateNode(node))
                 return false;
-            }
-
-            Property* outputs = node.getOutputs();
-            if (outputs != nullptr)
-            {
-                const size_t activatedLinks = activateLinksRecursive(*outputs->m_impl);
-
-                if (m_statisticsEnabled || m_updateReportEnabled)
-                    m_updateReport.linksActivated(activatedLinks);
-            }
-
-            if (m_updateReportEnabled)
-                m_updateReport.nodeExecutionFinished();
-
-            node.setDirty(false);
         }
+
+        return true;
+    }
+
+    bool LogicEngineImpl::updateNode(LogicNodeImpl& node)
+    {
+        if (m_updateReportEnabled)
+            m_updateReport.nodeExecutionStarted(node);
+        if (m_statisticsEnabled)
+            m_statistics.nodeExecuted();
+
+        const std::optional<LogicNodeRuntimeError> potentialError = node.update();
+        if (potentialError)
+        {
+            m_errors.add(potentialError->message, m_apiObjects->getApiObject(node), EErrorType::RuntimeError);
+            return false;
+        }
+
+        Property* outputs = node.getOutputs();
+        if (outputs != nullptr)
+        {
+            const size_t activatedLinks = activateLinksRecursive(*outputs->m_impl);
+
+            if (m_statisticsEnabled || m_updateReportEnabled)
+                m_updateReport.linksActivated(activatedLinks);
+        }
+
+        if (m_updateReportEnabled)
+            m_updateReport.nodeExecutionFinished();
+        node.setDirty(false);
 
         return true;
     }
